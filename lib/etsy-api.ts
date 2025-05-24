@@ -85,8 +85,8 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
 
   const params = new URLSearchParams({
     response_type: "code",
-    redirect_uri: "https://dolphin-app.vercel.app/api/etsy/callback",
-    scope: "shops_r listings_r",
+    redirect_uri: process.env.ETSY_CALLBACK_URI!,
+    scope: process.env.NEXT_PUBLIC_ETSY_SCOPES!,
     client_id: "vqxojc8u4keyk1ovhj3u7vzn", // Personal Access Token as client_id
     state: userId,
     code_challenge: codeChallenge,
@@ -116,7 +116,7 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
     body: new URLSearchParams({
       grant_type: "authorization_code",
       client_id: "vqxojc8u4keyk1ovhj3u7vzn", // Personal Access Token as client_id
-      redirect_uri: "https://dolphin-app.vercel.app/api/etsy/callback",
+      redirect_uri: process.env.ETSY_CALLBACK_URI!,
       code: code,
       code_verifier: authSession.code_verifier,
     }),

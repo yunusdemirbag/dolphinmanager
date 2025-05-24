@@ -68,10 +68,20 @@ export default function OnboardingPage() {
 
   const handleEtsyConnect = async () => {
     setEtsyLoading(true)
-    setError(null)
-
     try {
-      const response = await fetch("/api/etsy/auth")
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        setNotification({ type: "error", message: "Oturum bulunamadı. Lütfen tekrar giriş yapın." })
+        return
+      }
+
+      const response = await fetch("/api/etsy/auth", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      })
       const data = await response.json()
 
       if (data.authUrl) {
@@ -80,6 +90,7 @@ export default function OnboardingPage() {
         setNotification({ type: "error", message: "Etsy bağlantısı oluşturulamadı" })
       }
     } catch (error) {
+      console.error("Etsy connect error:", error)
       setNotification({ type: "error", message: "Bağlantı hatası oluştu" })
     } finally {
       setEtsyLoading(false)

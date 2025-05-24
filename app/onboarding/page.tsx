@@ -262,12 +262,12 @@ export default function OnboardingPage() {
                       </ul>
                     </div>
 
-                    <Button onClick={handleEtsyConnect} disabled={etsyLoading} className="w-full" size="lg">
-                      {etsyLoading ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Store className="w-4 h-4 mr-2" />
-                      )}
+                    <Button
+                      className="w-full"
+                      onClick={() => {
+                        window.location.href = "/api/etsy/login"
+                      }}
+                    >
                       Etsy Mağazamı Bağla
                     </Button>
 

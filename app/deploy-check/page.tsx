@@ -12,7 +12,6 @@ export default function DeployCheckPage() {
   const [envVars, setEnvVars] = useState({
     supabaseUrl: "",
     supabaseKey: "",
-    etsyClientId: "",
     appUrl: "",
   })
 
@@ -24,7 +23,6 @@ export default function DeployCheckPage() {
     setEnvVars({
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
       supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-      etsyClientId: process.env.NEXT_PUBLIC_ETSY_CLIENT_ID || "",
       appUrl: process.env.NEXT_PUBLIC_APP_URL || window.location.origin,
     })
   }, [])
@@ -36,7 +34,7 @@ export default function DeployCheckPage() {
   const checks = [
     {
       name: "Vercel Deploy",
-      status: deployUrl.includes("dolphinmanager.vercel.app"),
+      status: deployUrl.includes("dolphin-app.vercel.app"),
       value: deployUrl,
     },
     {
@@ -50,9 +48,9 @@ export default function DeployCheckPage() {
       value: envVars.supabaseKey ? "✓ Configured" : "❌ Missing",
     },
     {
-      name: "Etsy Client ID",
-      status: !!envVars.etsyClientId,
-      value: envVars.etsyClientId || "❌ Missing",
+      name: "App URL",
+      status: !!envVars.appUrl,
+      value: envVars.appUrl || "❌ Missing",
     },
   ]
 
@@ -141,12 +139,12 @@ export default function DeployCheckPage() {
                 <label className="text-sm font-medium">Callback URL (Etsy'de güncelleyin):</label>
                 <div className="flex items-center space-x-2 mt-1">
                   <code className="flex-1 p-2 bg-gray-100 rounded text-sm">
-                    https://dolphinmanager.vercel.app/api/etsy/callback
+                    https://dolphin-app.vercel.app/api/etsy/callback
                   </code>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => copyToClipboard("https://dolphinmanager.vercel.app/api/etsy/callback")}
+                    onClick={() => copyToClipboard("https://dolphin-app.vercel.app/api/etsy/callback")}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
@@ -156,11 +154,11 @@ export default function DeployCheckPage() {
               <div>
                 <label className="text-sm font-medium">Redirect URI (Etsy'de güncelleyin):</label>
                 <div className="flex items-center space-x-2 mt-1">
-                  <code className="flex-1 p-2 bg-gray-100 rounded text-sm">https://dolphinmanager.vercel.app</code>
+                  <code className="flex-1 p-2 bg-gray-100 rounded text-sm">https://dolphin-app.vercel.app</code>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => copyToClipboard("https://dolphinmanager.vercel.app")}
+                    onClick={() => copyToClipboard("https://dolphin-app.vercel.app")}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>

@@ -272,16 +272,16 @@ export default function TestEtsyPage() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="font-medium">Client ID</p>
-                <p className="text-gray-600">vqxojc8ud4eyk1ovhj3u7vzn</p>
+                <p className="font-medium">API Erişimi</p>
+                <p className="text-gray-600">Personal Access</p>
               </div>
               <div>
                 <p className="font-medium">Rate Limit</p>
                 <p className="text-gray-600">5/sec, 5,000/day</p>
               </div>
               <div>
-                <p className="font-medium">OAuth</p>
-                <p className="text-gray-600">Personal Access</p>
+                <p className="font-medium">Mağaza Limiti</p>
+                <p className="text-gray-600">5 mağaza</p>
               </div>
               <div>
                 <p className="font-medium">Status</p>

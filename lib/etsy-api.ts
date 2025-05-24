@@ -87,7 +87,7 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
     response_type: "code",
     redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/etsy/callback`,
     scope: "shops_r listings_r",
-    client_id: process.env.ETSY_CLIENT_ID!,
+    client_id: "vqxojc8u4keyk1ovhj3u7vzn",
     state: userId,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
@@ -115,7 +115,7 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
     },
     body: new URLSearchParams({
       grant_type: "authorization_code",
-      client_id: process.env.ETSY_CLIENT_ID!,
+      client_id: "vqxojc8u4keyk1ovhj3u7vzn",
       redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/etsy/callback`,
       code: code,
       code_verifier: authSession.code_verifier,
@@ -162,7 +162,7 @@ export async function refreshEtsyToken(userId: string): Promise<EtsyTokens> {
     },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      client_id: process.env.ETSY_CLIENT_ID!,
+      client_id: "vqxojc8u4keyk1ovhj3u7vzn",
       refresh_token: tokenData.refresh_token,
     }),
   })
@@ -216,7 +216,7 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
   const response = await fetch(`${ETSY_API_BASE}/application/shops`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "x-api-key": process.env.ETSY_CLIENT_ID!,
+      "x-api-key": "vqxojc8u4keyk1ovhj3u7vzn",
     },
   })
 
@@ -249,7 +249,7 @@ export async function getEtsyListings(
   const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/active?${params}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "x-api-key": process.env.ETSY_CLIENT_ID!,
+      "x-api-key": "vqxojc8u4keyk1ovhj3u7vzn",
     },
   })
 

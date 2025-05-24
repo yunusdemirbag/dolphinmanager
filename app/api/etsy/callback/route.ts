@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
       .eq("id", state)
 
     // Redirect to dashboard
-    return Response.redirect("https://dolphinmanager.vercel.app/dashboard")
+    return Response.redirect("https://dolphin-app.vercel.app/dashboard")
   } catch (error: any) {
     console.error("Etsy callback error:", error)
-    return Response.redirect("https://dolphinmanager.vercel.app/onboarding?error=" + encodeURIComponent(error.message))
+    return Response.redirect("https://dolphin-app.vercel.app/onboarding?error=" + encodeURIComponent(error.message))
   }
 }

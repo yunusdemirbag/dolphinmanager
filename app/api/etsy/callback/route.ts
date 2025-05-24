@@ -1,32 +1,41 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { exchangeCodeForToken, syncEtsyDataToDatabase } from "@/lib/etsy-api"
+import { createClient } from "@/lib/supabase/server"
+import { cookies } from "next/headers"
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const code = searchParams.get("code")
-  const state = searchParams.get("state") // This is the user ID
-  const error = searchParams.get("error")
-
-  if (error) {
-    return NextResponse.redirect(new URL(`/dashboard?error=${encodeURIComponent(error)}`, request.url))
-  }
-
-  if (!code || !state) {
-    return NextResponse.redirect(new URL("/dashboard?error=missing_parameters", request.url))
-  }
-
   try {
-    // Exchange code for tokens
-    await exchangeCodeForToken(code, state)
+    const searchParams = request.nextUrl.searchParams
+    const code = searchParams.get("code")
+    const state = searchParams.get("state")
 
-    // Sync Etsy data to database
+    if (!code || !state) {
+      return new Response("Missing code or state", { status: 400 })
+    }
+
+    // Exchange code for token
+    const tokens = await exchangeCodeForToken(code, state)
+
+    // Sync Etsy data
     await syncEtsyDataToDatabase(state)
 
-    return NextResponse.redirect(new URL("/dashboard?success=etsy_connected", request.url))
-  } catch (error) {
+    // Create supabase client
+    const cookieStore = cookies()
+    const supabase = createClient(cookieStore)
+
+    // Update user profile
+    await supabase
+      .from("profiles")
+      .update({
+        etsy_connected: true,
+        etsy_connected_at: new Date().toISOString(),
+      })
+      .eq("id", state)
+
+    // Redirect to dashboard
+    return Response.redirect("https://dolphinmanager.vercel.app/dashboard")
+  } catch (error: any) {
     console.error("Etsy callback error:", error)
-    return NextResponse.redirect(
-      new URL(`/dashboard?error=${encodeURIComponent("Failed to connect Etsy account")}`, request.url),
-    )
+    return Response.redirect("https://dolphinmanager.vercel.app/onboarding?error=" + encodeURIComponent(error.message))
   }
 }

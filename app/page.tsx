@@ -1,11 +1,42 @@
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { createClientSupabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ShoppingBag, Package, TrendingUp, DollarSign, Eye, Star, Plus, BarChart3 } from "lucide-react"
 
 export default function Dashboard() {
+  const router = useRouter()
+  const supabase = createClientSupabase()
+
+  useEffect(() => {
+    checkStoreConnection()
+  }, [])
+
+  const checkStoreConnection = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        router.push("/auth/login")
+        return
+      }
+
+      // Check if user has any stores connected
+      const { data: profile } = await supabase.from("profiles").select("etsy_shop_name").eq("id", session.user.id).single()
+      
+      if (!profile?.etsy_shop_name) {
+        router.push("/onboarding")
+        return
+      }
+    } catch (error) {
+      console.error("Error checking store connection:", error)
+    }
+  }
+
   const stats = [
     {
       title: "Toplam Satış",
@@ -96,31 +127,8 @@ export default function Dashboard() {
             <CardDescription>En son gelen siparişleriniz</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentOrders.map((order, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900">{order.customer}</p>
-                    <p className="text-sm text-gray-600">{order.product}</p>
-                    <p className="text-xs text-gray-500">{order.id}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">{order.amount}</p>
-                    <Badge
-                      variant={
-                        order.status === "Teslim Edildi"
-                          ? "default"
-                          : order.status === "Kargoda"
-                            ? "secondary"
-                            : "outline"
-                      }
-                      className="text-xs"
-                    >
-                      {order.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-center h-40 text-gray-500">
+              Henüz sipariş bulunmuyor
             </div>
           </CardContent>
         </Card>
@@ -132,28 +140,8 @@ export default function Dashboard() {
             <CardDescription>Bu ayki performans liderleri</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {topProducts.map((product, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{product.name}</p>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-sm text-gray-600">{product.sales} satış</span>
-                      <div className="flex items-center">
-                        <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                        <span className="text-xs text-gray-600 ml-1">{product.rating}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">{product.revenue}</p>
-                    <div className="flex items-center text-green-600">
-                      <TrendingUp className="w-3 h-3 mr-1" />
-                      <span className="text-xs">Yükseliş</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-center h-40 text-gray-500">
+              Henüz ürün bulunmuyor
             </div>
           </CardContent>
         </Card>

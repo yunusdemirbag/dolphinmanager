@@ -268,7 +268,7 @@ export default function OnboardingPage() {
                       ) : (
                         <Store className="w-4 h-4 mr-2" />
                       )}
-                      Etsy Hesabımı Bağla
+                      Etsy Mağazamı Bağla
                     </Button>
 
                     <p className="text-xs text-gray-500 text-center">Güvenli bağlantı. Şifrenizi paylaşmayız.</p>

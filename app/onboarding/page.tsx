@@ -68,6 +68,8 @@ export default function OnboardingPage() {
 
   const handleEtsyConnect = async () => {
     setEtsyLoading(true)
+    setError(null)
+
     try {
       const response = await fetch("/api/etsy/auth")
       const data = await response.json()
@@ -82,10 +84,6 @@ export default function OnboardingPage() {
     } finally {
       setEtsyLoading(false)
     }
-  }
-
-  const handleSkipEtsy = () => {
-    router.push("/dashboard")
   }
 
   const handleGoToDashboard = () => {
@@ -260,10 +258,6 @@ export default function OnboardingPage() {
                         <Store className="w-4 h-4 mr-2" />
                       )}
                       Etsy Hesabımı Bağla
-                    </Button>
-
-                    <Button variant="outline" onClick={handleSkipEtsy} className="w-full">
-                      Şimdilik Atla
                     </Button>
 
                     <p className="text-xs text-gray-500 text-center">Güvenli bağlantı. Şifrenizi paylaşmayız.</p>

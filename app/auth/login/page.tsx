@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
-import { createSimpleClient } from "@/lib/supabase"
+import { createClientSupabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,7 +21,7 @@ export default function LoginPage() {
   const router = useRouter()
 
   // Initialize Supabase client
-  const supabase = createSimpleClient()
+  const supabase = createClientSupabase()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

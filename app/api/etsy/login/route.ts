@@ -6,10 +6,17 @@ import { cookies } from "next/headers"
 export async function GET() {
   const { verifier, challenge } = generatePKCE()
   const state = crypto.randomUUID()
-
-  // State ve code_verifier'ı Supabase'e kaydet, sonucu logla
   const supabase = createClient(cookies())
+
+  // Kullanıcıyı session'dan bul
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    return NextResponse.redirect("/auth/login")
+  }
+
+  // user_id ile insert et
   const { data, error } = await supabase.from("etsy_auth_sessions").insert({
+    user_id: session.user.id,
     state,
     code_verifier: verifier,
     created_at: new Date().toISOString(),

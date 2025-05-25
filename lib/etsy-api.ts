@@ -82,10 +82,14 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
     challengeLength: codeChallenge.length 
   })
 
-  // Store code verifier in DB for later use
-  const { error } = await supabaseAdmin.from("etsy_auth_sessions").upsert({
+  // Önce eski session'ı sil
+  await supabaseAdmin.from("etsy_auth_sessions").delete().eq("user_id", userId)
+
+  // Yeni session'ı ekle
+  const { error } = await supabaseAdmin.from("etsy_auth_sessions").insert({
     user_id: userId,
     code_verifier: codeVerifier,
+    state: userId,
     created_at: new Date().toISOString(),
   })
 

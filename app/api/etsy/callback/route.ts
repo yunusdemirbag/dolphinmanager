@@ -33,6 +33,20 @@ export async function GET(request: NextRequest) {
     try {
       await exchangeCodeForToken(code, state)
       console.log("Token exchange successful")
+      
+      // Token'ların kaydedildiğini doğrula
+      const { supabaseAdmin } = await import("@/lib/supabase")
+      const { data: tokenCheck } = await supabaseAdmin
+        .from("etsy_tokens")
+        .select("access_token")
+        .eq("user_id", state)
+        .single()
+      
+      if (!tokenCheck) {
+        throw new Error("Tokens were not saved properly")
+      }
+      console.log("Token verification successful")
+      
     } catch (tokenError) {
       console.error("Token exchange failed:", tokenError)
       throw new Error(`Token exchange failed: ${String(tokenError)}`)
@@ -41,6 +55,9 @@ export async function GET(request: NextRequest) {
     // Etsy verilerini senkronize et
     console.log("Syncing Etsy data...")
     try {
+      // Kısa bir bekleme süresi ekle
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
       await syncEtsyDataToDatabase(state)
       console.log("Data sync successful")
     } catch (syncError) {

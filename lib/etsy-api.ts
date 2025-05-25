@@ -216,8 +216,9 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
       .update({ code_verifier: null })
       .eq("user_id", userId)
 
-    // Token'ları veritabanına kaydet
-    const { error: tokenError } = await supabaseAdmin.from("etsy_tokens").upsert({
+    // Token'ları veritabanına kaydet - DEBUG bilgisi ekle
+    console.log("Storing tokens for user_id:", userId)
+    const tokenData = {
       user_id: userId,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
@@ -225,14 +226,42 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
       token_type: tokens.token_type || 'Bearer',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+    }
+    console.log("Token data to store:", { 
+      user_id: tokenData.user_id, 
+      expires_at: tokenData.expires_at,
+      token_type: tokenData.token_type,
+      access_token_length: tokenData.access_token.length,
+      refresh_token_length: tokenData.refresh_token.length
     })
+
+    const { data: insertedData, error: tokenError } = await supabaseAdmin
+      .from("etsy_tokens")
+      .upsert(tokenData)
+      .select()
 
     if (tokenError) {
       console.error("Token storage error:", tokenError)
       throw new Error(`Failed to store tokens: ${tokenError.message}`)
     }
 
-    console.log("Tokens stored successfully")
+    console.log("Tokens stored successfully:", insertedData)
+    
+    // Verification: Token'ın gerçekten kaydedildiğini kontrol et
+    const { data: verifyData, error: verifyError } = await supabaseAdmin
+      .from("etsy_tokens")
+      .select("user_id, created_at, expires_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single()
+    
+    if (verifyError) {
+      console.error("Token verification failed:", verifyError)
+    } else {
+      console.log("Token verification successful:", verifyData)
+    }
+
     return tokens
 
   } catch (error) {
@@ -303,28 +332,59 @@ export async function refreshEtsyToken(userId: string): Promise<EtsyTokens> {
 }
 
 async function getValidAccessToken(userId: string): Promise<string> {
-  const { data: tokenData } = await supabaseAdmin
+  console.log("Getting valid access token for user_id:", userId)
+  
+  const { data: tokenData, error: tokenError } = await supabaseAdmin
     .from("etsy_tokens")
-    .select("access_token, expires_at, refresh_token")
+    .select("access_token, expires_at, refresh_token, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
     .single()
 
+  console.log("Token query result:", { 
+    found: !!tokenData, 
+    error: tokenError?.message,
+    user_id: userId 
+  })
+
+  if (tokenError) {
+    console.error("Token query error:", tokenError)
+  }
+
   if (!tokenData) {
+    console.log("No tokens found for user_id:", userId)
+    
+    // Debug: Tüm token'ları listele
+    const { data: allTokens } = await supabaseAdmin
+      .from("etsy_tokens")
+      .select("user_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(10)
+    
+    console.log("All tokens in database:", allTokens)
+    
     throw new Error("No Etsy tokens found. Please reconnect your Etsy account.")
   }
+
+  console.log("Token found:", {
+    expires_at: tokenData.expires_at,
+    created_at: tokenData.created_at,
+    access_token_length: tokenData.access_token.length
+  })
 
   // Check if token is expired
   const expiresAt = new Date(tokenData.expires_at)
   const now = new Date()
 
   if (expiresAt <= now) {
+    console.log("Token expired, refreshing...")
     // Token expired, refresh it
     const newTokens = await refreshEtsyToken(userId)
     return newTokens.access_token
   }
 
+  console.log("Token is valid, returning access token")
   return tokenData.access_token
 }
 

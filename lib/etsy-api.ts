@@ -219,13 +219,14 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
   const response = await fetch(`${ETSY_API_BASE}/application/shops`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "x-api-key": "vqxojc8u4keyk1ovhj3u7vzn",
+      "x-api-key": ETSY_CLIENT_ID,
     },
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Failed to fetch stores: ${error}`)
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Etsy API error:", errorData)
+    throw new Error(`Failed to fetch stores: ${errorData.error || response.statusText}`)
   }
 
   const data = await response.json()
@@ -252,13 +253,14 @@ export async function getEtsyListings(
   const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/active?${params}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "x-api-key": "vqxojc8u4keyk1ovhj3u7vzn",
+      "x-api-key": ETSY_CLIENT_ID,
     },
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Failed to fetch listings: ${error}`)
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Etsy API error:", errorData)
+    throw new Error(`Failed to fetch listings: ${errorData.error || response.statusText}`)
   }
 
   const data = await response.json()

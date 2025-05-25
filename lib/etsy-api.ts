@@ -355,9 +355,11 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
         },
       })
       
+      console.log("User endpoint response status:", userResponse.status)
+      
       if (userResponse.ok) {
         const userData = await userResponse.json()
-        console.log("User data success:", userData)
+        console.log("User data success:", JSON.stringify(userData, null, 2))
         
         // Eğer user data'da shop bilgisi varsa onu kullan
         if (userData.user_id) {
@@ -370,28 +372,33 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
               },
             })
             
+            console.log("Shop via user ID response status:", shopResponse.status)
+            
             if (shopResponse.ok) {
               const shopData = await shopResponse.json()
-              console.log("Shop data via user ID:", shopData)
+              console.log("Shop data via user ID:", JSON.stringify(shopData, null, 2))
               return shopData.results || shopData.shops || []
             } else {
-              console.log("Shop via user ID failed:", shopResponse.status)
+              const errorText = await shopResponse.text()
+              console.log("Shop via user ID failed:", shopResponse.status, errorText)
             }
           } catch (shopError) {
             console.log("Shop via user ID error:", shopError)
           }
+        } else {
+          console.log("No user_id found in user data")
         }
       } else {
-        console.log("User endpoint failed:", userResponse.status)
+        const errorText = await userResponse.text()
+        console.log("User endpoint failed:", userResponse.status, errorText)
       }
     } catch (userError) {
       console.log("User endpoint error:", userError)
     }
 
-    // Alternatif endpoint'leri dene
+    // Sadece çalışan endpoint'i dene - /application/shops'u kaldır çünkü shop_name gerektiriyor
     const endpoints = [
-      '/application/user/shops',
-      '/application/shops'
+      '/application/user/shops'
     ]
 
     for (const endpoint of endpoints) {

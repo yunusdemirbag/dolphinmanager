@@ -8,8 +8,8 @@ const ETSY_OAUTH_BASE = "https://www.etsy.com/oauth"
 
 const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
 const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || ""
-// Minimal scope ile başla - sadece temel izinler
-const ETSY_SCOPE = process.env.ETSY_SCOPE || "shops_r"
+// Personal Access için gerekli scope'lar - Gemini'nin önerdiği gibi
+const ETSY_SCOPE = process.env.ETSY_SCOPE || "shops_r listings_r transactions_r profile_r"
 
 // Environment variables kontrolü
 function checkEtsyConfig() {
@@ -361,11 +361,11 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
       console.log("Ping exception:", pingError)
     }
 
-    // 2. User endpoint testi
-    console.log("=== USER ENDPOINT TEST ===")
+    // 2. DOĞRU User endpoint testi - Personal Access için /user kullan
+    console.log("=== USER ENDPOINT TEST (Personal Access) ===")
     let userInfo: any = null
     try {
-      const userResponse = await fetch(`${ETSY_API_BASE}/application/user`, {
+      const userResponse = await fetch(`${ETSY_API_BASE}/user`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "x-api-key": ETSY_CLIENT_ID,
@@ -392,14 +392,13 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
       console.log("User endpoint exception:", userError)
     }
 
-    // 3. Sadece en basit shop endpoint'ini dene
-    console.log("=== SHOP ENDPOINT TEST ===")
+    // 3. DOĞRU Shop endpoint testi - Personal Access için /user/shops kullan
+    console.log("=== SHOP ENDPOINT TEST (Personal Access) ===")
     
-    // Sadece user/shops endpoint'ini dene
     try {
-      console.log("Trying: /application/user/shops")
+      console.log("Trying: /user/shops (Personal Access endpoint)")
       
-      const response = await fetch(`${ETSY_API_BASE}/application/user/shops`, {
+      const response = await fetch(`${ETSY_API_BASE}/user/shops`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "x-api-key": ETSY_CLIENT_ID,
@@ -445,10 +444,49 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
           
           // Specific error handling
           if (errorData.error === "Resource not found") {
-            console.log("ANALYSIS: Resource not found - possible causes:")
-            console.log("1. User has no shops")
-            console.log("2. Insufficient scope permissions")
-            console.log("3. Wrong API endpoint")
+            console.log("ANALYSIS: Resource not found - trying alternative endpoints...")
+            
+            // Alternatif endpoint'leri dene
+            const alternativeEndpoints = [
+              '/user/shops',
+              '/shops',
+              '/application/shops'
+            ]
+            
+            for (const altEndpoint of alternativeEndpoints) {
+              console.log(`Trying alternative: ${altEndpoint}`)
+              
+              try {
+                const altResponse = await fetch(`${ETSY_API_BASE}${altEndpoint}`, {
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "x-api-key": ETSY_CLIENT_ID,
+                  },
+                })
+                
+                console.log(`Alternative ${altEndpoint} status:`, altResponse.status)
+                
+                if (altResponse.ok) {
+                  const altText = await altResponse.text()
+                  console.log(`Alternative ${altEndpoint} response:`, altText)
+                  
+                  if (altText) {
+                    const altData = JSON.parse(altText)
+                    const altStores = altData.results || altData.shops || altData || []
+                    
+                    if (Array.isArray(altStores) && altStores.length > 0) {
+                      console.log(`SUCCESS with alternative ${altEndpoint}! Found:`, altStores.length)
+                      return altStores
+                    }
+                  }
+                } else {
+                  const altError = await altResponse.text()
+                  console.log(`Alternative ${altEndpoint} error:`, altError)
+                }
+              } catch (altError) {
+                console.log(`Alternative ${altEndpoint} exception:`, altError)
+              }
+            }
           }
         } catch (e) {
           console.log("Could not parse error as JSON")

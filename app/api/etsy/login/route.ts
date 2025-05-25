@@ -7,13 +7,14 @@ export async function GET() {
   const { verifier, challenge } = generatePKCE()
   const state = crypto.randomUUID()
 
-  // State ve code_verifier'ı Supabase'e kaydet
+  // State ve code_verifier'ı Supabase'e kaydet, sonucu logla
   const supabase = createClient(cookies())
-  await supabase.from("etsy_auth_sessions").insert({
+  const { data, error } = await supabase.from("etsy_auth_sessions").insert({
     state,
     code_verifier: verifier,
     created_at: new Date().toISOString(),
   })
+  console.log("SUPABASE INSERT", { data, error })
 
   const params = new URLSearchParams({
     response_type: "code",

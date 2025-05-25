@@ -175,21 +175,22 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
     }
   }
 
-  const handleConnectEtsy = () => {
-    // PKCE için state oluştur
-    const state = Math.random().toString(36).substring(2);
-    sessionStorage.setItem('etsy_oauth_state', state);
-    
-    // Etsy OAuth URL'ini oluştur
-    const etsyAuthUrl = new URL('https://www.etsy.com/oauth/connect');
-    etsyAuthUrl.searchParams.append('response_type', 'code');
-    etsyAuthUrl.searchParams.append('client_id', process.env.NEXT_PUBLIC_ETSY_CLIENT_ID as string);
-    etsyAuthUrl.searchParams.append('redirect_uri', process.env.NEXT_PUBLIC_ETSY_REDIRECT_URI as string);
-    etsyAuthUrl.searchParams.append('scope', 'shops_r shops_w listings_r listings_w listings_d transactions_r profile_r');
-    etsyAuthUrl.searchParams.append('state', state);
-    
-    // Etsy'ye yönlendir
-    window.location.href = etsyAuthUrl.toString();
+  const handleConnectEtsy = async () => {
+    try {
+      // API endpoint kullanarak Etsy auth URL'i al
+      const response = await fetch("/api/etsy/auth")
+      const data = await response.json()
+
+      if (data.authUrl) {
+        // Backend tarafından oluşturulan güvenli URL'e yönlendir
+        window.location.href = data.authUrl
+      } else {
+        alert("Etsy bağlantı URL'i oluşturulamadı. Lütfen tekrar deneyin.")
+      }
+    } catch (error) {
+      console.error("Etsy auth error:", error)
+      alert("Etsy bağlantısı sırasında bir hata oluştu. Lütfen tekrar deneyin.")
+    }
   };
 
   const handleResetEtsyConnection = async () => {

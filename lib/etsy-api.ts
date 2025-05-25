@@ -34,6 +34,7 @@ export interface EtsyListing {
   state: "active" | "inactive" | "draft"
   quantity: number
   url: string
+  views?: number
   price: {
     amount: number
     divisor: number
@@ -241,6 +242,8 @@ async function getValidAccessToken(userId: string): Promise<string> {
     .from("etsy_tokens")
     .select("access_token, expires_at, refresh_token")
     .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .single()
 
   if (!tokenData) {
@@ -321,27 +324,80 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
   try {
     console.log("Starting Etsy data sync for user:", userId)
     
-    // İlk olarak sadece profili güncelle, stores API'yi test etmeyelim
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .update({
-        etsy_shop_name: "Etsy Store Connected",
-        etsy_shop_id: "connected",
-      })
-      .eq("id", userId)
+    // Önce stores bilgisini çek
+    const stores = await getEtsyStores(userId)
+    console.log("Fetched stores:", stores)
     
-    if (profileError) {
-      console.error("Profile update error:", profileError)
-      throw profileError
+    if (stores.length > 0) {
+      const primaryStore = stores[0] // İlk store'u ana store olarak kullan
+      
+      // Profile'ı gerçek store bilgileriyle güncelle
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .update({
+          etsy_shop_name: primaryStore.shop_name,
+          etsy_shop_id: primaryStore.shop_id.toString(),
+        })
+        .eq("id", userId)
+      
+      if (profileError) {
+        console.error("Profile update error:", profileError)
+        throw profileError
+      }
+      
+      console.log("Profile updated with real store data:", primaryStore.shop_name)
+      
+      // Listings bilgisini çek
+      try {
+        const { listings, count } = await getEtsyListings(userId, primaryStore.shop_id, 25, 0)
+        console.log(`Fetched ${listings.length} listings out of ${count} total`)
+        
+        // Listings'i database'e kaydet (opsiyonel)
+        // Şimdilik sadece log'la, ileride products tablosuna kaydedebiliriz
+        console.log("Sample listings:", listings.slice(0, 3))
+        
+      } catch (listingsError) {
+        console.warn("Could not fetch listings, but store connection is successful:", listingsError)
+        // Listings çekilemese bile store bağlantısı başarılı
+      }
+      
+    } else {
+      // Store bulunamadı ama token geçerli, genel bir mesaj koy
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .update({
+          etsy_shop_name: "Etsy Store Connected",
+          etsy_shop_id: "connected",
+        })
+        .eq("id", userId)
+      
+      if (profileError) {
+        console.error("Profile update error:", profileError)
+        throw profileError
+      }
+      
+      console.log("No stores found but token is valid - marked as connected")
     }
     
-    console.log("Profile updated successfully")
-    
-    // Şimdilik store sync'i atlayalım
-    console.log("Basic sync completed - skipping full store sync for now")
+    console.log("Etsy data sync completed successfully")
     
   } catch (error) {
     console.error("Error in syncEtsyDataToDatabase:", error)
-    throw error
+    
+    // Hata durumunda da en azından bağlantı kurulduğunu belirt
+    try {
+      await supabaseAdmin
+        .from("profiles")
+        .update({
+          etsy_shop_name: "Etsy Connected (Limited Access)",
+          etsy_shop_id: "limited",
+        })
+        .eq("id", userId)
+      
+      console.log("Marked as limited access due to API restrictions")
+    } catch (fallbackError) {
+      console.error("Fallback update also failed:", fallbackError)
+      throw error // Orijinal hatayı fırlat
+    }
   }
 }

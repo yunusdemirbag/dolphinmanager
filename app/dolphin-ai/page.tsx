@@ -4,364 +4,444 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, TrendingUp, Lightbulb, Sparkles, RefreshCw, CalendarDays } from "lucide-react"
-import { createClient } from "@/lib/supabase"
+import {
+  Sparkles,
+  Calendar,
+  TrendingUp,
+  Target,
+  Lightbulb,
+  Heart,
+  Gift,
+  Snowflake,
+  Sun,
+  Leaf,
+  Flower,
+  RefreshCw,
+  Bot,
+  Clock
+} from "lucide-react"
 
 interface AIRecommendation {
-  type: "product" | "size" | "style" | "seasonal" | "marketing"
+  id: string
+  type: "size" | "style" | "theme" | "seo" | "seasonal"
   title: string
   description: string
   confidence: number
+  priority: "high" | "medium" | "low"
   data?: any
 }
 
-interface ImportantDate {
+interface CalendarEvent {
   date: string
   name: string
-  type: "holiday" | "seasonal" | "special"
-  recommendation: string
+  description: string
+  themes: string[]
+  colors: string[]
+  daysUntil: number
+  priority: "high" | "medium" | "low"
+  businessImpact: string
 }
 
 export default function DolphinAIPage() {
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([])
-  const [importantDates, setImportantDates] = useState<ImportantDate[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [lastGenerated, setLastGenerated] = useState<string | null>(null)
-  const [salesData, setSalesData] = useState<any>(null)
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
+  const [loading, setLoading] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [aiSource, setAiSource] = useState<"openai" | "fallback" | null>(null)
 
   useEffect(() => {
-    loadSalesData()
-    loadImportantDates()
+    // Sayfa yüklendiğinde localStorage'dan verileri yükle
+    loadDataFromStorage()
   }, [])
 
-  const loadSalesData = async () => {
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (user) {
-      // Satış verilerini yükle
-      const { data: products } = await supabase.from("products").select("*").eq("user_id", user.id)
-
-      const { data: orders } = await supabase.from("orders").select("*").eq("user_id", user.id)
-
-      setSalesData({ products, orders })
-    }
-  }
-
-  const loadImportantDates = () => {
-    // 2025 için önemli günler
-    const dates: ImportantDate[] = [
-      {
-        date: "2025-02-14",
-        name: "Sevgililer Günü",
-        type: "holiday",
-        recommendation:
-          "Romantik ve aşk temalı canvas wall art'lar hazırlayın. Çiftler için özel koleksiyonlar oluşturun.",
-      },
-      {
-        date: "2025-03-08",
-        name: "Kadınlar Günü",
-        type: "special",
-        recommendation: "Güçlü kadın figürleri, motivasyonel sözler ve feminen tasarımlar öne çıkarın.",
-      },
-      {
-        date: "2025-03-20",
-        name: "İlkbahar Başlangıcı",
-        type: "seasonal",
-        recommendation: "Pastel renkler, çiçek motifleri ve doğa temalı tasarımlar için ideal zaman.",
-      },
-      {
-        date: "2025-05-11",
-        name: "Anneler Günü",
-        type: "holiday",
-        recommendation: "Anne-çocuk temalı, aile fotoğrafları ve sıcak mesajlı canvas'lar hazırlayın.",
-      },
-      {
-        date: "2025-06-15",
-        name: "Babalar Günü",
-        type: "holiday",
-        recommendation: "Maskülen tasarımlar, spor temalı ve baba-çocuk görselleri öne çıkarın.",
-      },
-      {
-        date: "2025-06-21",
-        name: "Yaz Başlangıcı",
-        type: "seasonal",
-        recommendation: "Canlı renkler, plaj temaları ve tatil görselleri için sezon başlıyor.",
-      },
-      {
-        date: "2025-09-22",
-        name: "Sonbahar Başlangıcı",
-        type: "seasonal",
-        recommendation: "Sıcak tonlar, yaprak motifleri ve rustik tasarımlar için ideal dönem.",
-      },
-      {
-        date: "2025-10-31",
-        name: "Halloween",
-        type: "holiday",
-        recommendation: "Gotik, mistik ve korku temalı tasarımlar için yoğun satış dönemi.",
-      },
-      {
-        date: "2025-11-27",
-        name: "Thanksgiving",
-        type: "holiday",
-        recommendation: "Şükran, aile birliği ve sonbahar temalı canvas'lar hazırlayın.",
-      },
-      {
-        date: "2025-12-25",
-        name: "Noel",
-        type: "holiday",
-        recommendation: "Noel temalı, kış manzaraları ve hediye uygun boyutlarda canvas'lar.",
-      },
-    ]
-    setImportantDates(dates)
-  }
-
-  const generateRecommendations = async () => {
-    setIsLoading(true)
-
+  const loadDataFromStorage = () => {
     try {
-      // AI önerilerini oluştur
-      const response = await fetch("/api/ai/recommendations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          salesData,
-          businessType: "canvas_wall_art",
-          currentDate: new Date().toISOString(),
-        }),
-      })
+      // AI önerilerini yükle
+      const storedRecommendations = localStorage.getItem('aiRecommendations')
+      if (storedRecommendations) {
+        setRecommendations(JSON.parse(storedRecommendations))
+      }
 
-      if (response.ok) {
-        const aiRecommendations = await response.json()
-        setRecommendations(aiRecommendations.recommendations)
-        setLastGenerated(new Date().toLocaleString("tr-TR"))
+      // Takvim etkinliklerini yükle
+      const storedEvents = localStorage.getItem('calendarEvents')
+      if (storedEvents) {
+        setCalendarEvents(JSON.parse(storedEvents))
+      }
+
+      // Son güncelleme zamanını yükle
+      const storedLastUpdate = localStorage.getItem('lastAIUpdate')
+      if (storedLastUpdate) {
+        setLastUpdate(new Date(storedLastUpdate))
+      }
+
+      // AI kaynağını yükle
+      const storedAiSource = localStorage.getItem('aiSource')
+      if (storedAiSource) {
+        setAiSource(storedAiSource as "openai" | "fallback")
       }
     } catch (error) {
-      console.error("AI önerileri alınırken hata:", error)
-      // Fallback öneriler
-      setRecommendations([
-        {
-          type: "size",
-          title: "16x20 inch boyutu çok popüler",
-          description: "Son 30 günde en çok satan boyut 16x20 inch. Bu boyutta daha fazla tasarım eklemeyi düşünün.",
-          confidence: 85,
-        },
-        {
-          type: "style",
-          title: "Minimalist tasarımlar trend",
-          description: "Sade, minimalist ve modern tasarımlar yüksek dönüşüm oranına sahip.",
-          confidence: 78,
-        },
-        {
-          type: "seasonal",
-          title: "Kış temalı tasarımlar ekleyin",
-          description: "Mevsimsel olarak kış manzaraları ve sıcak tonlar talep görüyor.",
-          confidence: 72,
-        },
-      ])
-      setLastGenerated(new Date().toLocaleString("tr-TR"))
+      console.error("Error loading data from storage:", error)
     }
-
-    setIsLoading(false)
   }
 
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 80) return "bg-green-100 text-green-800"
-    if (confidence >= 60) return "bg-yellow-100 text-yellow-800"
-    return "bg-red-100 text-red-800"
+  const saveDataToStorage = (recommendations: AIRecommendation[], events: CalendarEvent[], source: "openai" | "fallback") => {
+    try {
+      localStorage.setItem('aiRecommendations', JSON.stringify(recommendations))
+      localStorage.setItem('calendarEvents', JSON.stringify(events))
+      localStorage.setItem('lastAIUpdate', new Date().toISOString())
+      localStorage.setItem('aiSource', source)
+    } catch (error) {
+      console.error("Error saving data to storage:", error)
+    }
+  }
+
+  const generateAIRecommendations = async () => {
+    setLoading(true)
+    
+    try {
+      // Hem AI önerileri hem de takvim etkinliklerini paralel olarak çek
+      const [aiResponse, calendarResponse] = await Promise.all([
+        fetch('/api/ai/canvas-recommendations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            businessType: 'canvas_wall_art',
+            userProfile: {
+              name: 'Yunus',
+              age: 27,
+              experience: 'intermediate',
+              focus: 'canvas_wall_art_prints'
+            }
+          })
+        }),
+        fetch('/api/ai/calendar-events', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            currentDate: new Date().toISOString()
+          })
+        })
+      ])
+
+      let newRecommendations: AIRecommendation[] = []
+      let newEvents: CalendarEvent[] = []
+      let source = "fallback"
+
+      // AI önerilerini işle
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json()
+        newRecommendations = aiData.recommendations || []
+        source = aiData.source || "fallback"
+      } else {
+        // Fallback mock recommendations
+        newRecommendations = [
+          {
+            id: "1",
+            type: "size",
+            title: "16x20 inch boyutu çok satıyor",
+            description: "Son 30 günde 16x20 inch boyutundaki canvas'larınız %45 daha fazla satış aldı. Bu boyuta odaklanmanızı öneriyorum.",
+            confidence: 92,
+            priority: "high",
+            data: { size: "16x20", salesIncrease: 45 }
+          },
+          {
+            id: "2",
+            type: "style",
+            title: "Minimalist stil trend'de",
+            description: "Minimalist ve clean tasarımlar bu ay %38 daha fazla görüntüleniyor. Sade çizgiler ve az renk kullanımı öneriyorum.",
+            confidence: 87,
+            priority: "high",
+            data: { style: "minimalist", viewIncrease: 38 }
+          },
+          {
+            id: "3",
+            type: "theme",
+            title: "Doğa teması popüler",
+            description: "Dağ manzaraları, orman ve doğa temalı canvas'lar bu sezon çok aranıyor. Özellikle yeşil tonları tercih ediliyor.",
+            confidence: 84,
+            priority: "medium",
+            data: { theme: "nature", colors: ["green", "brown", "beige"] }
+          },
+          {
+            id: "4",
+            type: "seo",
+            title: "SEO optimizasyonu gerekli",
+            description: "Ürünlerinizin %60'ında 'wall art' ve 'canvas print' anahtar kelimeleri eksik. Bu kelimeleri ekleyerek görünürlüğü artırabilirsiniz.",
+            confidence: 95,
+            priority: "high",
+            data: { missingKeywords: ["wall art", "canvas print", "home decor"] }
+          }
+        ]
+      }
+
+      // Takvim etkinliklerini işle
+      if (calendarResponse.ok) {
+        const calendarData = await calendarResponse.json()
+        newEvents = calendarData.events || []
+      }
+
+      // State'i güncelle
+      setRecommendations(newRecommendations)
+      setCalendarEvents(newEvents)
+      setAiSource(source as "openai" | "fallback")
+      setLastUpdate(new Date())
+
+      // localStorage'a kaydet
+      saveDataToStorage(newRecommendations, newEvents, source as "openai" | "fallback")
+
+    } catch (error) {
+      console.error("Error generating recommendations:", error)
+      // Fallback mock recommendations
+      const mockRecommendations: AIRecommendation[] = [
+        {
+          id: "1",
+          type: "size",
+          title: "16x20 inch boyutu çok satıyor",
+          description: "Son 30 günde 16x20 inch boyutundaki canvas'larınız %45 daha fazla satış aldı. Bu boyuta odaklanmanızı öneriyorum.",
+          confidence: 92,
+          priority: "high",
+          data: { size: "16x20", salesIncrease: 45 }
+        },
+        {
+          id: "2",
+          type: "style",
+          title: "Minimalist stil trend'de",
+          description: "Minimalist ve clean tasarımlar bu ay %38 daha fazla görüntüleniyor. Sade çizgiler ve az renk kullanımı öneriyorum.",
+          confidence: 87,
+          priority: "high",
+          data: { style: "minimalist", viewIncrease: 38 }
+        }
+      ]
+      setRecommendations(mockRecommendations)
+      setAiSource("fallback")
+      setLastUpdate(new Date())
+      
+      // Hata durumunda da localStorage'a kaydet
+      saveDataToStorage(mockRecommendations, [], "fallback")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "high": return "bg-red-100 text-red-800 border-red-200"
+      case "medium": return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "low": return "bg-green-100 text-green-800 border-green-200"
+      default: return "bg-gray-100 text-gray-800 border-gray-200"
+    }
   }
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case "product":
-        return <TrendingUp className="h-4 w-4" />
-      case "size":
-        return <Sparkles className="h-4 w-4" />
-      case "style":
-        return <Lightbulb className="h-4 w-4" />
-      case "seasonal":
-        return <Calendar className="h-4 w-4" />
-      case "marketing":
-        return <RefreshCw className="h-4 w-4" />
-      default:
-        return <Lightbulb className="h-4 w-4" />
+      case "size": return <Target className="h-4 w-4" />
+      case "style": return <Sparkles className="h-4 w-4" />
+      case "theme": return <Lightbulb className="h-4 w-4" />
+      case "seo": return <TrendingUp className="h-4 w-4" />
+      case "seasonal": return <Calendar className="h-4 w-4" />
+      default: return <Bot className="h-4 w-4" />
     }
   }
 
-  const getUpcomingDates = () => {
-    const today = new Date()
-    const upcoming = importantDates
-      .filter((date) => {
-        const eventDate = new Date(date.date)
-        const diffTime = eventDate.getTime() - today.getTime()
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-        return diffDays > 0 && diffDays <= 60 // Önümüzdeki 60 gün
-      })
-      .slice(0, 5)
-
-    return upcoming
+  const getCalendarIcon = (eventName: string) => {
+    if (eventName.includes("Sevgililer")) return Heart
+    if (eventName.includes("Noel") || eventName.includes("Kış")) return Snowflake
+    if (eventName.includes("Yaz")) return Sun
+    if (eventName.includes("Sonbahar")) return Leaf
+    if (eventName.includes("Bahar") || eventName.includes("Anne")) return Flower
+    return Calendar
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Sparkles className="h-8 w-8 text-orange-500" />
-            Dolphin AI
-          </h1>
-          <p className="text-gray-600 mt-2">Canvas Wall Art satışlarınız için AI destekli öneriler ve takvim</p>
-        </div>
-        <Button onClick={generateRecommendations} disabled={isLoading} className="bg-orange-500 hover:bg-orange-600">
-          {isLoading ? (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              Analiz Ediliyor...
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Öneri Al
-            </>
-          )}
-        </Button>
-      </div>
-
-      {lastGenerated && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-700">
-            <strong>Son güncelleme:</strong> {lastGenerated}
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* AI Önerileri */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lightbulb className="h-5 w-5 text-orange-500" />
-                AI Önerileri
-              </CardTitle>
-              <CardDescription>Satış verilerinize dayalı akıllı öneriler</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {recommendations.length === 0 ? (
-                <div className="text-center py-8">
-                  <Sparkles className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">AI önerilerini görmek için "Öneri Al" butonuna tıklayın</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {recommendations.map((rec, index) => (
-                    <div key={index} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {getTypeIcon(rec.type)}
-                          <h3 className="font-semibold text-gray-900">{rec.title}</h3>
-                        </div>
-                        <Badge className={getConfidenceColor(rec.confidence)}>%{rec.confidence} güven</Badge>
-                      </div>
-                      <p className="text-gray-600 text-sm">{rec.description}</p>
-                    </div>
-                  ))}
-                </div>
+    <div className="min-h-screen bg-gray-50">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Dolphin AI</h1>
+              <p className="text-gray-600">Fiziksel Canvas Wall Art Print işletmeniz için AI destekli öneriler ve takvim planlaması</p>
+              {lastUpdate && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Son güncelleme: {lastUpdate.toLocaleString('tr-TR')}
+                  {aiSource && (
+                    <span className="ml-2">
+                      <Badge variant={aiSource === "openai" ? "default" : "secondary"}>
+                        {aiSource === "openai" ? "OpenAI" : "Fallback"}
+                      </Badge>
+                    </span>
+                  )}
+                </p>
               )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Yaklaşan Önemli Günler */}
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-orange-500" />
-                Yaklaşan Önemli Günler
-              </CardTitle>
-              <CardDescription>Satış fırsatları için hazırlık yapın</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {getUpcomingDates().map((date, index) => {
-                  const eventDate = new Date(date.date)
-                  const today = new Date()
-                  const diffTime = eventDate.getTime() - today.getTime()
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-                  return (
-                    <div key={index} className="border-l-4 border-orange-500 pl-4 py-2">
-                      <div className="flex items-center justify-between mb-1">
-                        <h4 className="font-semibold text-sm">{date.name}</h4>
-                        <Badge variant="outline" className="text-xs">
-                          {diffDays} gün
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-2">{eventDate.toLocaleDateString("tr-TR")}</p>
-                      <p className="text-xs text-gray-700">{date.recommendation}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Canvas Wall Art İpuçları */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-orange-500" />
-            Canvas Wall Art İpuçları
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-orange-800 mb-2">Popüler Boyutlar</h4>
-              <ul className="text-sm text-orange-700 space-y-1">
-                <li>• 16x20 inch (40x50 cm)</li>
-                <li>• 12x16 inch (30x40 cm)</li>
-                <li>• 8x10 inch (20x25 cm)</li>
-                <li>• 24x36 inch (60x90 cm)</li>
-              </ul>
             </div>
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-blue-800 mb-2">Trend Stiller</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Minimalist</li>
-                <li>• Boho</li>
-                <li>• Modern Abstract</li>
-                <li>• Vintage</li>
-              </ul>
-            </div>
-            <div className="bg-green-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-green-800 mb-2">Popüler Temalar</h4>
-              <ul className="text-sm text-green-700 space-y-1">
-                <li>• Doğa & Manzara</li>
-                <li>• Motivasyonel</li>
-                <li>• Geometrik</li>
-                <li>• Hayvan Portreleri</li>
-              </ul>
-            </div>
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-purple-800 mb-2">SEO İpuçları</h4>
-              <ul className="text-sm text-purple-700 space-y-1">
-                <li>• "wall art" kullanın</li>
-                <li>• Boyut belirtin</li>
-                <li>• Renk adları ekleyin</li>
-                <li>• "canvas print" ekleyin</li>
-              </ul>
-            </div>
+            <Button 
+              onClick={generateAIRecommendations} 
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {loading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Güncelleniyor...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Yeni Öneriler Al
+                </>
+              )}
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* AI Önerileri - Sol taraf (2/3) */}
+          <div className="lg:col-span-2">
+            {recommendations.length > 0 ? (
+              <div className="space-y-4">
+                {recommendations.map((recommendation) => (
+                  <Card key={recommendation.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          {getTypeIcon(recommendation.type)}
+                          <CardTitle className="text-lg">{recommendation.title}</CardTitle>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getPriorityColor(recommendation.priority)}>
+                            {recommendation.priority === "high" ? "Yüksek" : 
+                             recommendation.priority === "medium" ? "Orta" : "Düşük"}
+                          </Badge>
+                          <Badge variant="outline">
+                            %{recommendation.confidence} güven
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-700">{recommendation.description}</p>
+                      {recommendation.data && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm font-medium text-gray-900 mb-1">Detaylar:</p>
+                          <div className="text-sm text-gray-600">
+                            {Object.entries(recommendation.data).map(([key, value]) => (
+                              <div key={key} className="flex justify-between">
+                                <span className="capitalize">{key}:</span>
+                                <span className="font-medium">
+                                  {Array.isArray(value) ? value.join(", ") : String(value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Bot className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Henüz öneri yok</h3>
+                  <p className="text-gray-600">
+                    AI destekli öneriler almak için sağ üstteki "Yeni Öneriler Al" butonuna tıklayın
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Yaklaşan Özel Günler - Sağ taraf (1/3) */}
+          <div className="lg:col-span-1">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Calendar className="h-5 w-5 mr-2" />
+                  Yaklaşan Özel Günler
+                </CardTitle>
+                <CardDescription>
+                  Canvas Wall Art Print satışları için önemli tarihler
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {calendarEvents.length > 0 ? (
+                  <div className="space-y-4">
+                    {calendarEvents.slice(0, 5).map((event, index) => {
+                      const IconComponent = getCalendarIcon(event.name)
+                      return (
+                        <div key={index} className={`border-l-4 pl-4 py-3 rounded-r-lg ${
+                          event.priority === 'high' ? 'border-orange-400 bg-orange-50' :
+                          event.priority === 'medium' ? 'border-blue-400 bg-blue-50' :
+                          'border-green-400 bg-green-50'
+                        }`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center">
+                              <IconComponent className={`h-5 w-5 mr-2 ${
+                                event.priority === 'high' ? 'text-orange-600' :
+                                event.priority === 'medium' ? 'text-blue-600' :
+                                'text-green-600'
+                              }`} />
+                              <h4 className="font-semibold text-gray-900">{event.name}</h4>
+                            </div>
+                            <div className={`flex items-center text-sm font-bold ${
+                              event.priority === 'high' ? 'text-orange-600' :
+                              event.priority === 'medium' ? 'text-blue-600' :
+                              'text-green-600'
+                            }`}>
+                              <Clock className="h-3 w-3 mr-1" />
+                              {event.daysUntil} gün
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-2">{event.description}</p>
+                          <p className="text-xs text-gray-600 mb-2 font-medium">İş Etkisi: {event.businessImpact}</p>
+                          
+                          {event.themes && event.themes.length > 0 && (
+                            <div className="mb-2">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Önerilen Temalar:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {event.themes.slice(0, 3).map((theme, themeIndex) => (
+                                  <Badge key={themeIndex} variant="secondary" className="text-xs">
+                                    {theme}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {event.colors && event.colors.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-700 mb-1">Önerilen Renkler:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {event.colors.slice(0, 3).map((color, colorIndex) => (
+                                  <Badge key={colorIndex} variant="outline" className="text-xs">
+                                    {color}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Calendar className="h-8 w-8 mx-auto mb-3 text-gray-400" />
+                    <p className="text-gray-600 text-sm">
+                      Henüz özel gün bilgisi yok
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </main>
     </div>
   )
 }
+

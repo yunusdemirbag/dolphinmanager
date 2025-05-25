@@ -1,6 +1,6 @@
 import * as React from "react"
 import "./globals.css"
-import { Header } from "./components/Header"
+import { Sidebar } from "./components/Sidebar"
 
 export const metadata = {
   title: "Dolphin Manager",
@@ -15,10 +15,29 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr">
-      <body>
-        <div className="min-h-screen bg-gray-50">
-          <Header />
-          {children}
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const settings = localStorage.getItem('dolphin-settings');
+                if (settings) {
+                  const { darkMode } = JSON.parse(settings);
+                  if (darkMode) {
+                    document.documentElement.classList.add('dark');
+                  }
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
+      <body className="transition-colors duration-300" suppressHydrationWarning={true}>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+          <Sidebar />
+          <div className="ml-16 transition-all duration-300">
+            {children}
+          </div>
         </div>
       </body>
     </html>

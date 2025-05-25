@@ -5,444 +5,452 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calculator, DollarSign, Combine, Plus, Trash2 } from "lucide-react"
-import { createClient } from "@/lib/supabase"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  DollarSign,
+  Package,
+  Truck,
+  Calculator,
+  TrendingUp,
+  Plus,
+  Edit,
+  Trash2,
+  Save
+} from "lucide-react"
 
 interface Variation {
   id: string
   name: string
-  type: "size" | "color" | "style" | "material"
+  type: "size" | "frame" | "material" | "orientation"
   values: string[]
-  isCommon: boolean
 }
 
 interface CostItem {
   id: string
-  variationId: string
-  variationValue: string
+  variationCombination: string[]
   productionCost: number
   shippingCost: number
   etsyCommission: number
-  notes?: string
-}
-
-interface ExchangeRate {
-  usd: number
-  lastUpdated: string
+  totalCost: number
+  sellingPrice?: number
+  profit?: number
+  profitMargin?: number
 }
 
 export default function CostsPage() {
   const [variations, setVariations] = useState<Variation[]>([])
   const [costItems, setCostItems] = useState<CostItem[]>([])
-  const [exchangeRate, setExchangeRate] = useState<ExchangeRate>({ usd: 34.5, lastUpdated: new Date().toISOString() })
-  const [selectedVariations, setSelectedVariations] = useState<string[]>([])
-  const [newCost, setNewCost] = useState({
-    variationId: "",
-    variationValue: "",
-    productionCost: 0,
-    shippingCost: 0,
-    etsyCommission: 6.5,
+  const [usdToTry, setUsdToTry] = useState(38.93) // Güncel kur
+  const [loadingRate, setLoadingRate] = useState(false)
+  const [newVariation, setNewVariation] = useState({
+    name: "",
+    type: "size" as const,
+    values: [""]
   })
+  const [editingCost, setEditingCost] = useState<string | null>(null)
 
   useEffect(() => {
-    loadVariations()
-    loadCostItems()
-    loadExchangeRate()
+    loadCanvasVariations()
+    loadCostData()
+    fetchExchangeRate()
   }, [])
 
-  const loadVariations = async () => {
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (user) {
-      // Mağazadaki tüm ürünlerden varyasyonları çek
-      const { data: products } = await supabase.from("products").select("tags").eq("user_id", user.id)
-
-      // Canvas wall art için tipik varyasyonlar
-      const commonVariations: Variation[] = [
-        {
-          id: "size",
-          name: "Boyut",
-          type: "size",
-          values: ["8x10 inch", "12x16 inch", "16x20 inch", "18x24 inch", "24x36 inch", "30x40 inch"],
-          isCommon: true,
-        },
-        {
-          id: "frame",
-          name: "Çerçeve",
-          type: "style",
-          values: ["Çerçevesiz", "Siyah Çerçeve", "Beyaz Çerçeve", "Ahşap Çerçeve", "Altın Çerçeve"],
-          isCommon: true,
-        },
-        {
-          id: "material",
-          name: "Malzeme",
-          type: "material",
-          values: ["Canvas", "Poster Kağıt", "Premium Canvas", "Metal Print", "Akrilik"],
-          isCommon: true,
-        },
-        {
-          id: "orientation",
-          name: "Yönelim",
-          type: "style",
-          values: ["Dikey", "Yatay", "Kare"],
-          isCommon: true,
-        },
-      ]
-
-      setVariations(commonVariations)
+  const fetchExchangeRate = async () => {
+    setLoadingRate(true)
+    try {
+      const response = await fetch('/api/exchange-rate')
+      if (response.ok) {
+        const data = await response.json()
+        setUsdToTry(data.rate)
+      }
+    } catch (error) {
+      console.error("Exchange rate fetch error:", error)
+    } finally {
+      setLoadingRate(false)
     }
   }
 
-  const loadCostItems = async () => {
+  const loadCanvasVariations = () => {
+    // Canvas wall art için varsayılan varyasyonlar
+    const defaultVariations: Variation[] = [
+      {
+        id: "1",
+        name: "Boyut",
+        type: "size",
+        values: ["8x10 inch", "12x16 inch", "16x20 inch", "18x24 inch", "24x36 inch", "30x40 inch"]
+      },
+      {
+        id: "2",
+        name: "Çerçeve",
+        type: "frame",
+        values: ["Çerçevesiz", "Siyah Çerçeve", "Beyaz Çerçeve", "Ahşap Çerçeve", "Altın Çerçeve"]
+      },
+      {
+        id: "3",
+        name: "Malzeme",
+        type: "material",
+        values: ["Canvas", "Poster", "Premium Canvas", "Metal Print", "Akrilik"]
+      },
+      {
+        id: "4",
+        name: "Yönelim",
+        type: "orientation",
+        values: ["Dikey", "Yatay", "Kare"]
+      }
+    ]
+    setVariations(defaultVariations)
+  }
+
+  const loadCostData = () => {
     // Örnek maliyet verileri
     const sampleCosts: CostItem[] = [
       {
         id: "1",
-        variationId: "size",
-        variationValue: "8x10 inch",
-        productionCost: 3.5,
-        shippingCost: 2.0,
-        etsyCommission: 6.5,
+        variationCombination: ["16x20 inch", "Çerçevesiz", "Canvas", "Dikey"],
+        productionCost: 8.50,
+        shippingCost: 3.20,
+        etsyCommission: 6.5, // %6.5
+        totalCost: 11.70,
+        sellingPrice: 25.99,
+        profit: 14.29,
+        profitMargin: 55.0
       },
       {
         id: "2",
-        variationId: "size",
-        variationValue: "16x20 inch",
-        productionCost: 8.0,
-        shippingCost: 4.5,
+        variationCombination: ["24x36 inch", "Siyah Çerçeve", "Premium Canvas", "Yatay"],
+        productionCost: 15.80,
+        shippingCost: 5.50,
         etsyCommission: 6.5,
+        totalCost: 21.30,
+        sellingPrice: 45.99,
+        profit: 24.69,
+        profitMargin: 53.7
       },
+      {
+        id: "3",
+        variationCombination: ["12x16 inch", "Beyaz Çerçeve", "Canvas", "Kare"],
+        productionCost: 6.20,
+        shippingCost: 2.80,
+        etsyCommission: 6.5,
+        totalCost: 9.00,
+        sellingPrice: 19.99,
+        profit: 10.99,
+        profitMargin: 55.0
+      }
     ]
     setCostItems(sampleCosts)
   }
 
-  const loadExchangeRate = async () => {
-    try {
-      // Gerçek API'den kur bilgisi al (örnek)
-      setExchangeRate({
-        usd: 34.5,
-        lastUpdated: new Date().toISOString(),
-      })
-    } catch (error) {
-      console.error("Kur bilgisi alınamadı:", error)
-    }
-  }
-
-  const addCostItem = () => {
-    if (newCost.variationId && newCost.variationValue) {
-      const costItem: CostItem = {
+  const addNewVariation = () => {
+    if (newVariation.name && newVariation.values[0]) {
+      const variation: Variation = {
         id: Date.now().toString(),
-        ...newCost,
+        name: newVariation.name,
+        type: newVariation.type,
+        values: newVariation.values.filter(v => v.trim() !== "")
       }
-      setCostItems([...costItems, costItem])
-      setNewCost({
-        variationId: "",
-        variationValue: "",
-        productionCost: 0,
-        shippingCost: 0,
-        etsyCommission: 6.5,
-      })
+      setVariations([...variations, variation])
+      setNewVariation({ name: "", type: "size", values: [""] })
     }
   }
 
-  const deleteCostItem = (id: string) => {
-    setCostItems(costItems.filter((item) => item.id !== id))
+  const addValueToVariation = (variationId: string, value: string) => {
+    setVariations(variations.map(v => 
+      v.id === variationId 
+        ? { ...v, values: [...v.values, value] }
+        : v
+    ))
   }
 
-  const combineVariations = () => {
-    if (selectedVariations.length >= 2) {
-      // Seçilen varyasyonları birleştir
-      const combinedName = selectedVariations.map((id) => variations.find((v) => v.id === id)?.name).join(" + ")
-
-      alert(`${combinedName} varyasyonları birleştirildi!`)
-      setSelectedVariations([])
-    }
+  const calculateTotalCost = (productionCost: number, shippingCost: number, sellingPrice: number) => {
+    const etsyCommissionAmount = (sellingPrice * 6.5) / 100
+    return productionCost + shippingCost + etsyCommissionAmount
   }
 
-  const calculateTotalCost = (item: CostItem) => {
-    const total = item.productionCost + item.shippingCost
-    return total
+  const calculateProfit = (sellingPrice: number, totalCost: number) => {
+    return sellingPrice - totalCost
   }
 
-  const calculateTotalCostTL = (item: CostItem) => {
-    return calculateTotalCost(item) * exchangeRate.usd
+  const calculateProfitMargin = (profit: number, sellingPrice: number) => {
+    return (profit / sellingPrice) * 100
   }
 
-  const getVariationName = (id: string) => {
-    return variations.find((v) => v.id === id)?.name || id
+  const getProfitColor = (margin: number) => {
+    if (margin >= 50) return "text-green-600"
+    if (margin >= 30) return "text-yellow-600"
+    return "text-red-600"
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Calculator className="h-8 w-8 text-orange-500" />
-            Maliyet Yönetimi
-          </h1>
-          <p className="text-gray-600 mt-2">Varyasyonlara göre üretim, kargo ve komisyon maliyetleri</p>
-        </div>
-        <div className="text-right">
-          <div className="text-sm text-gray-500">USD/TL Kuru</div>
-          <div className="text-2xl font-bold text-green-600">₺{exchangeRate.usd}</div>
-          <div className="text-xs text-gray-400">{new Date(exchangeRate.lastUpdated).toLocaleString("tr-TR")}</div>
-        </div>
-      </div>
-
-      <Tabs defaultValue="costs" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="costs">Maliyet Tablosu</TabsTrigger>
-          <TabsTrigger value="variations">Varyasyon Yönetimi</TabsTrigger>
-          <TabsTrigger value="calculator">Kar Hesaplayıcı</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="costs" className="space-y-6">
-          {/* Yeni Maliyet Ekleme */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5 text-orange-500" />
-                Yeni Maliyet Ekle
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <Label htmlFor="variation">Varyasyon</Label>
-                  <Select
-                    value={newCost.variationId}
-                    onValueChange={(value) => setNewCost({ ...newCost, variationId: value, variationValue: "" })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {variations.map((variation) => (
-                        <SelectItem key={variation.id} value={variation.id}>
-                          {variation.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="value">Değer</Label>
-                  <Select
-                    value={newCost.variationValue}
-                    onValueChange={(value) => setNewCost({ ...newCost, variationValue: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {newCost.variationId &&
-                        variations
-                          .find((v) => v.id === newCost.variationId)
-                          ?.values.map((value) => (
-                            <SelectItem key={value} value={value}>
-                              {value}
-                            </SelectItem>
-                          ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="production">Üretim ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={newCost.productionCost}
-                    onChange={(e) => setNewCost({ ...newCost, productionCost: Number.parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="shipping">Kargo ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={newCost.shippingCost}
-                    onChange={(e) => setNewCost({ ...newCost, shippingCost: Number.parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={addCostItem} className="w-full bg-orange-500 hover:bg-orange-600">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ekle
-                  </Button>
-                </div>
+    <div className="min-h-screen bg-gray-50">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              <DollarSign className="h-8 w-8 text-green-600 mr-3" />
+              Maliyetler
+            </h1>
+            <p className="text-gray-600 mt-2">Canvas wall art varyasyonları için maliyet yönetimi</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className="text-sm text-gray-600">
+                USD/TRY: <span className="font-semibold">₺{usdToTry}</span>
               </div>
-            </CardContent>
-          </Card>
+              {loadingRate && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              )}
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={fetchExchangeRate}
+                disabled={loadingRate}
+                className="text-xs"
+              >
+                Güncelle
+              </Button>
+            </div>
+            <Button className="bg-green-600 hover:bg-green-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Yeni Maliyet
+            </Button>
+          </div>
+        </div>
+
+        <Tabs defaultValue="costs" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="costs">Maliyet Tablosu</TabsTrigger>
+            <TabsTrigger value="variations">Varyasyonlar</TabsTrigger>
+            <TabsTrigger value="calculator">Kar Hesaplayıcı</TabsTrigger>
+          </TabsList>
 
           {/* Maliyet Tablosu */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-orange-500" />
-                Maliyet Tablosu
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-3">Varyasyon</th>
-                      <th className="text-left p-3">Değer</th>
-                      <th className="text-right p-3">Üretim ($)</th>
-                      <th className="text-right p-3">Kargo ($)</th>
-                      <th className="text-right p-3">Etsy (%)</th>
-                      <th className="text-right p-3">Toplam ($)</th>
-                      <th className="text-right p-3">Toplam (₺)</th>
-                      <th className="text-center p-3">İşlem</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {costItems.map((item) => (
-                      <tr key={item.id} className="border-b hover:bg-gray-50">
-                        <td className="p-3">
-                          <Badge variant="outline">{getVariationName(item.variationId)}</Badge>
-                        </td>
-                        <td className="p-3">{item.variationValue}</td>
-                        <td className="text-right p-3">${item.productionCost.toFixed(2)}</td>
-                        <td className="text-right p-3">${item.shippingCost.toFixed(2)}</td>
-                        <td className="text-right p-3">{item.etsyCommission}%</td>
-                        <td className="text-right p-3 font-semibold">${calculateTotalCost(item).toFixed(2)}</td>
-                        <td className="text-right p-3 font-semibold text-green-600">
-                          ₺{calculateTotalCostTL(item).toFixed(2)}
-                        </td>
-                        <td className="text-center p-3">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteCostItem(item.id)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
+          <TabsContent value="costs">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Package className="h-5 w-5 mr-2 text-blue-600" />
+                  Varyasyon Bazlı Maliyetler
+                </CardTitle>
+                <CardDescription>
+                  Tüm canvas wall art varyasyonları için detaylı maliyet analizi
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 px-4 py-2 text-left">Varyasyon</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Üretim ($)</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Kargo ($)</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Etsy Kom. ($)</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Toplam ($)</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Satış ($)</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Kar ($)</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">Kar %</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">TL Kar</th>
+                        <th className="border border-gray-200 px-4 py-2 text-left">İşlemler</th>
                       </tr>
+                    </thead>
+                    <tbody>
+                      {costItems.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-2">
+                            <div className="space-y-1">
+                              {item.variationCombination.map((variation, idx) => (
+                                <Badge key={idx} variant="outline" className="mr-1">
+                                  {variation}
+                                </Badge>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2">${item.productionCost}</td>
+                          <td className="border border-gray-200 px-4 py-2">${item.shippingCost}</td>
+                          <td className="border border-gray-200 px-4 py-2">
+                            ${((item.sellingPrice || 0) * 6.5 / 100).toFixed(2)}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2 font-semibold">
+                            ${item.totalCost}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2">${item.sellingPrice}</td>
+                          <td className="border border-gray-200 px-4 py-2 font-semibold">
+                            ${item.profit}
+                          </td>
+                          <td className={`border border-gray-200 px-4 py-2 font-semibold ${getProfitColor(item.profitMargin || 0)}`}>
+                            {item.profitMargin?.toFixed(1)}%
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2 font-semibold text-green-600">
+                            ₺{((item.profit || 0) * usdToTry).toFixed(2)}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2">
+                            <div className="flex space-x-2">
+                              <Button size="sm" variant="outline">
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-red-600">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Varyasyonlar */}
+          <TabsContent value="variations">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Mevcut Varyasyonlar</CardTitle>
+                  <CardDescription>Canvas wall art için tanımlı varyasyonlar</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {variations.map((variation) => (
+                      <div key={variation.id} className="border rounded-lg p-4">
+                        <h3 className="font-semibold text-gray-900 mb-2">{variation.name}</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {variation.values.map((value, idx) => (
+                            <Badge key={idx} variant="secondary">
+                              {value}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  </div>
+                </CardContent>
+              </Card>
 
-        <TabsContent value="variations" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Combine className="h-5 w-5 text-orange-500" />
-                Varyasyon Birleştirme
-              </CardTitle>
-              <CardDescription>Ortak varyasyonları birleştirerek yeni kombinasyonlar oluşturun</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {variations.map((variation) => (
-                    <div key={variation.id} className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={variation.id}
-                          checked={selectedVariations.includes(variation.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedVariations([...selectedVariations, variation.id])
-                            } else {
-                              setSelectedVariations(selectedVariations.filter((id) => id !== variation.id))
-                            }
-                          }}
-                        />
-                        <Label htmlFor={variation.id} className="font-semibold">
-                          {variation.name}
-                        </Label>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Yeni Varyasyon Ekle</CardTitle>
+                  <CardDescription>Canvas için yeni varyasyon türü tanımlayın</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="variation-name">Varyasyon Adı</Label>
+                      <Input
+                        id="variation-name"
+                        value={newVariation.name}
+                        onChange={(e) => setNewVariation({...newVariation, name: e.target.value})}
+                        placeholder="Örn: Boyut, Çerçeve, Malzeme"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="variation-type">Tür</Label>
+                      <Select value={newVariation.type} onValueChange={(value: any) => setNewVariation({...newVariation, type: value})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="size">Boyut</SelectItem>
+                          <SelectItem value="frame">Çerçeve</SelectItem>
+                          <SelectItem value="material">Malzeme</SelectItem>
+                          <SelectItem value="orientation">Yönelim</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="variation-values">Değerler (virgülle ayırın)</Label>
+                      <Input
+                        id="variation-values"
+                        value={newVariation.values[0]}
+                        onChange={(e) => setNewVariation({...newVariation, values: e.target.value.split(',')})}
+                        placeholder="8x10 inch, 12x16 inch, 16x20 inch"
+                      />
+                    </div>
+                    <Button onClick={addNewVariation} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Varyasyon Ekle
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Kar Hesaplayıcı */}
+          <TabsContent value="calculator">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Calculator className="h-5 w-5 mr-2 text-purple-600" />
+                  Kar Hesaplayıcı
+                </CardTitle>
+                <CardDescription>
+                  Yeni ürün için kar marjı hesaplayın
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Maliyet Bilgileri</h3>
+                    <div>
+                      <Label htmlFor="production-cost">Üretim Maliyeti ($)</Label>
+                      <Input id="production-cost" type="number" placeholder="8.50" />
+                    </div>
+                    <div>
+                      <Label htmlFor="shipping-cost">Kargo Maliyeti ($)</Label>
+                      <Input id="shipping-cost" type="number" placeholder="3.20" />
+                    </div>
+                    <div>
+                      <Label htmlFor="selling-price">Satış Fiyatı ($)</Label>
+                      <Input id="selling-price" type="number" placeholder="25.99" />
+                    </div>
+                    <Button className="w-full">
+                      <Calculator className="h-4 w-4 mr-2" />
+                      Hesapla
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Hesaplama Sonuçları</h3>
+                    <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                      <div className="flex justify-between">
+                        <span>Etsy Komisyonu (6.5%):</span>
+                        <span className="font-semibold">$1.69</span>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        {variation.values.slice(0, 3).join(", ")}
-                        {variation.values.length > 3 && "..."}
+                      <div className="flex justify-between">
+                        <span>Toplam Maliyet:</span>
+                        <span className="font-semibold">$13.39</span>
+                      </div>
+                      <div className="flex justify-between text-green-600">
+                        <span>Net Kar:</span>
+                        <span className="font-semibold">$12.60</span>
+                      </div>
+                      <div className="flex justify-between text-green-600">
+                        <span>Kar Marjı:</span>
+                        <span className="font-semibold">48.5%</span>
+                      </div>
+                      <div className="flex justify-between text-blue-600">
+                        <span>TL Kar:</span>
+                        <span className="font-semibold">₺434.70</span>
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                {selectedVariations.length >= 2 && (
-                  <Button onClick={combineVariations} className="bg-orange-500 hover:bg-orange-600">
-                    <Combine className="h-4 w-4 mr-2" />
-                    Seçilen Varyasyonları Birleştir ({selectedVariations.length})
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="calculator" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5 text-orange-500" />
-                Kar Hesaplayıcı
-              </CardTitle>
-              <CardDescription>Satış fiyatı ve kar marjı hesaplamaları</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Maliyet Bilgileri</h3>
-                  <div className="space-y-2">
-                    <Label>Üretim Maliyeti ($)</Label>
-                    <Input type="number" step="0.01" placeholder="5.00" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Kargo Maliyeti ($)</Label>
-                    <Input type="number" step="0.01" placeholder="3.00" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Hedef Kar Marjı (%)</Label>
-                    <Input type="number" placeholder="40" />
                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Hesaplanan Değerler</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                    <div className="flex justify-between">
-                      <span>Toplam Maliyet:</span>
-                      <span className="font-semibold">$8.00</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Etsy Komisyonu (6.5%):</span>
-                      <span className="font-semibold">$0.78</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Önerilen Satış Fiyatı:</span>
-                      <span className="font-semibold text-green-600">$15.00</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Net Kar:</span>
-                      <span className="font-semibold text-green-600">$6.22</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Kar Marjı:</span>
-                      <span className="font-semibold text-green-600">41.5%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   )
 }

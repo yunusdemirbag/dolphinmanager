@@ -2,493 +2,403 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import {
+  DollarSign,
   TrendingUp,
   TrendingDown,
-  Clock,
-  CreditCard,
-  Wallet,
-  Building2,
-  AlertCircle,
-  CheckCircle,
+  Store,
   Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  CreditCard
 } from "lucide-react"
 
 interface StoreFinance {
-  storeId: string
+  id: string
   storeName: string
   totalSales: number
-  etsyCommission: number
-  supplierCosts: number
+  etsyCommissions: number
+  productionCosts: number
+  shippingCosts: number
   netProfit: number
-  pendingPayments: number
-  lastPaymentDate: string
-  status: "positive" | "negative" | "neutral"
-  currency: "USD" | "TL"
+  profitMargin: number
+  status: "profit" | "loss" | "neutral"
+  expectedPayment: number
+  nextPaymentDate: string
+  pendingOrders: number
 }
 
-interface FinanceSummary {
+interface FinancialSummary {
   totalBalance: number
   expectedIncome: number
   pendingExpenses: number
   netPosition: number
-  exchangeRate: number
+  usdToTry: number
 }
 
 export default function FinancePage() {
   const [storeFinances, setStoreFinances] = useState<StoreFinance[]>([])
-  const [summary, setSummary] = useState<FinanceSummary>({
+  const [summary, setSummary] = useState<FinancialSummary>({
     totalBalance: 0,
     expectedIncome: 0,
     pendingExpenses: 0,
     netPosition: 0,
-    exchangeRate: 34.5,
+    usdToTry: 38.93
   })
-  const [selectedPeriod, setSelectedPeriod] = useState("thisMonth")
+  const [loading, setLoading] = useState(true)
+  const [loadingRate, setLoadingRate] = useState(false)
 
   useEffect(() => {
-    loadFinanceData()
-  }, [selectedPeriod])
+    loadFinancialData()
+    fetchExchangeRate()
+  }, [])
 
-  const loadFinanceData = async () => {
-    // Örnek mağaza finansal verileri
+  const loadFinancialData = () => {
+    // Canvas wall art mağazaları için örnek finansal veriler
     const mockStoreData: StoreFinance[] = [
       {
-        storeId: "store1",
+        id: "1",
         storeName: "Canvas Dreams Studio",
-        totalSales: 2450.0,
-        etsyCommission: 159.25,
-        supplierCosts: 980.0,
-        netProfit: 1310.75,
-        pendingPayments: 340.0,
-        lastPaymentDate: "2025-01-20",
-        status: "positive",
-        currency: "USD",
+        totalSales: 2450.80,
+        etsyCommissions: 159.30,
+        productionCosts: 980.50,
+        shippingCosts: 245.20,
+        netProfit: 1065.80,
+        profitMargin: 43.5,
+        status: "profit",
+        expectedPayment: 1890.50,
+        nextPaymentDate: "2024-12-28",
+        pendingOrders: 12
       },
       {
-        storeId: "store2",
-        storeName: "Minimalist Wall Art",
-        totalSales: 1890.0,
-        etsyCommission: 122.85,
-        supplierCosts: 756.0,
-        netProfit: 1011.15,
-        pendingPayments: 280.0,
-        lastPaymentDate: "2025-01-18",
-        status: "positive",
-        currency: "USD",
+        id: "2",
+        storeName: "Modern Wall Art Co",
+        totalSales: 1820.40,
+        etsyCommissions: 118.30,
+        productionCosts: 890.20,
+        shippingCosts: 182.10,
+        netProfit: 629.80,
+        profitMargin: 34.6,
+        status: "profit",
+        expectedPayment: 1402.10,
+        nextPaymentDate: "2024-12-30",
+        pendingOrders: 8
       },
       {
-        storeId: "store3",
-        storeName: "Boho Canvas Co",
-        totalSales: 890.0,
-        etsyCommission: 57.85,
-        supplierCosts: 445.0,
-        netProfit: 387.15,
-        pendingPayments: 120.0,
-        lastPaymentDate: "2025-01-15",
-        status: "positive",
-        currency: "USD",
-      },
-      {
-        storeId: "store4",
-        storeName: "Abstract Art Hub",
-        totalSales: 450.0,
-        etsyCommission: 29.25,
-        supplierCosts: 380.0,
-        netProfit: 40.75,
-        pendingPayments: 85.0,
-        lastPaymentDate: "2025-01-10",
+        id: "3",
+        storeName: "Minimalist Canvas",
+        totalSales: 980.60,
+        etsyCommissions: 63.74,
+        productionCosts: 520.30,
+        shippingCosts: 98.20,
+        netProfit: 298.36,
+        profitMargin: 30.4,
         status: "neutral",
-        currency: "USD",
+        expectedPayment: 756.86,
+        nextPaymentDate: "2025-01-02",
+        pendingOrders: 5
       },
       {
-        storeId: "store5",
-        storeName: "Vintage Canvas Store",
-        totalSales: 320.0,
-        etsyCommission: 20.8,
-        supplierCosts: 340.0,
-        netProfit: -40.8,
-        pendingPayments: 45.0,
-        lastPaymentDate: "2025-01-08",
-        status: "negative",
-        currency: "USD",
+        id: "4",
+        storeName: "Vintage Prints Hub",
+        totalSales: 650.20,
+        etsyCommissions: 42.26,
+        productionCosts: 480.80,
+        shippingCosts: 85.40,
+        netProfit: 41.74,
+        profitMargin: 6.4,
+        status: "loss",
+        expectedPayment: 507.94,
+        nextPaymentDate: "2025-01-05",
+        pendingOrders: 3
       },
+      {
+        id: "5",
+        storeName: "Nature Canvas Art",
+        totalSales: 1560.90,
+        etsyCommissions: 101.46,
+        productionCosts: 720.40,
+        shippingCosts: 156.20,
+        netProfit: 582.84,
+        profitMargin: 37.3,
+        status: "profit",
+        expectedPayment: 1204.44,
+        nextPaymentDate: "2024-12-29",
+        pendingOrders: 9
+      }
     ]
 
     setStoreFinances(mockStoreData)
 
-    // Özet hesaplama
-    const totalSales = mockStoreData.reduce((sum, store) => sum + store.totalSales, 0)
-    const totalCommissions = mockStoreData.reduce((sum, store) => sum + store.etsyCommission, 0)
-    const totalCosts = mockStoreData.reduce((sum, store) => sum + store.supplierCosts, 0)
-    const totalPending = mockStoreData.reduce((sum, store) => sum + store.pendingPayments, 0)
-    const netProfit = mockStoreData.reduce((sum, store) => sum + store.netProfit, 0)
+    // Genel özet hesapla
+    const totalBalance = mockStoreData.reduce((sum, store) => sum + store.netProfit, 0)
+    const expectedIncome = mockStoreData.reduce((sum, store) => sum + store.expectedPayment, 0)
+    const pendingExpenses = mockStoreData.reduce((sum, store) => sum + store.productionCosts, 0) * 0.3 // Bekleyen üretici ödemeleri
+    const netPosition = totalBalance + expectedIncome - pendingExpenses
 
     setSummary({
-      totalBalance: netProfit,
-      expectedIncome: totalPending,
-      pendingExpenses: 1250.0, // Bekleyen üretici ödemeleri
-      netPosition: netProfit + totalPending - 1250.0,
-      exchangeRate: 34.5,
+      totalBalance,
+      expectedIncome,
+      pendingExpenses,
+      netPosition,
+      usdToTry: 38.93
     })
+
+    setLoading(false)
   }
 
-  const formatCurrency = (amount: number, currency: "USD" | "TL" = "USD") => {
-    if (currency === "USD") {
-      return `$${amount.toFixed(2)}`
+  const fetchExchangeRate = async () => {
+    setLoadingRate(true)
+    try {
+      const response = await fetch('/api/exchange-rate')
+      if (response.ok) {
+        const data = await response.json()
+        setSummary(prev => ({ ...prev, usdToTry: data.rate }))
+      }
+    } catch (error) {
+      console.error("Exchange rate fetch error:", error)
+    } finally {
+      setLoadingRate(false)
     }
-    return `₺${(amount * summary.exchangeRate).toFixed(2)}`
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "positive":
-        return "text-green-600 bg-green-50 border-green-200"
-      case "negative":
-        return "text-red-600 bg-red-50 border-red-200"
-      default:
-        return "text-yellow-600 bg-yellow-50 border-yellow-200"
+      case "profit": return "bg-green-100 text-green-800 border-green-200"
+      case "loss": return "bg-red-100 text-red-800 border-red-200"
+      case "neutral": return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      default: return "bg-gray-100 text-gray-800 border-gray-200"
     }
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "positive":
-        return <TrendingUp className="w-4 h-4" />
-      case "negative":
-        return <TrendingDown className="w-4 h-4" />
-      default:
-        return <AlertCircle className="w-4 h-4" />
+      case "profit": return <TrendingUp className="h-4 w-4" />
+      case "loss": return <TrendingDown className="h-4 w-4" />
+      case "neutral": return <Clock className="h-4 w-4" />
+      default: return <Clock className="h-4 w-4" />
     }
   }
 
-  const positiveStores = storeFinances.filter((store) => store.status === "positive")
-  const negativeStores = storeFinances.filter((store) => store.status === "negative")
-  const neutralStores = storeFinances.filter((store) => store.status === "neutral")
+  const formatCurrency = (amount: number, currency: "USD" | "TRY" = "USD") => {
+    if (currency === "TRY") {
+      return `₺${(amount * summary.usdToTry).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`
+    }
+    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+  }
+
+  const getDaysUntilPayment = (dateString: string) => {
+    const paymentDate = new Date(dateString)
+    const today = new Date()
+    const diffTime = paymentDate.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <DollarSign className="h-12 w-12 animate-pulse text-green-600 mx-auto mb-4" />
+          <p className="text-gray-600">Finansal veriler yükleniyor...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Wallet className="h-8 w-8 text-green-500" />
-            Finans Yönetimi
-          </h1>
-          <p className="text-gray-600 mt-2">Tüm mağazalarının finansal durumu ve beklenen gelirler</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="text-right">
-            <div className="text-sm text-gray-500">USD/TL Kuru</div>
-            <div className="text-xl font-bold text-blue-600">₺{summary.exchangeRate}</div>
+    <div className="min-h-screen bg-gray-50">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              <DollarSign className="h-8 w-8 text-green-600 mr-3" />
+              Finans
+            </h1>
+            <p className="text-gray-600 mt-2">Canvas wall art mağazalarınızın finansal durumu</p>
           </div>
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md"
-          >
-            <option value="thisMonth">Bu Ay</option>
-            <option value="lastMonth">Geçen Ay</option>
-            <option value="last3Months">Son 3 Ay</option>
-            <option value="thisYear">Bu Yıl</option>
-          </select>
+          <div className="text-right">
+            <div className="text-sm text-gray-500">USD/TRY Kuru</div>
+            <div className="text-xl font-bold text-blue-600">₺{summary.usdToTry}</div>
+          </div>
         </div>
-      </div>
 
-      {/* Genel Özet */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-700">Toplam Bakiye</p>
-                <p className="text-2xl font-bold text-green-900">{formatCurrency(summary.totalBalance)}</p>
-                <p className="text-sm text-green-600">{formatCurrency(summary.totalBalance, "TL")}</p>
-              </div>
-              <div className="p-3 rounded-full bg-green-100">
-                <Wallet className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Financial Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Toplam Bakiye</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">{formatCurrency(summary.totalBalance)}</div>
+              <div className="text-sm text-gray-500">{formatCurrency(summary.totalBalance, "TRY")}</div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-700">Beklenen Gelir</p>
-                <p className="text-2xl font-bold text-blue-900">{formatCurrency(summary.expectedIncome)}</p>
-                <p className="text-sm text-blue-600">{formatCurrency(summary.expectedIncome, "TL")}</p>
-              </div>
-              <div className="p-3 rounded-full bg-blue-100">
-                <Clock className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Beklenen Gelir</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(summary.expectedIncome)}</div>
+              <div className="text-sm text-gray-500">{formatCurrency(summary.expectedIncome, "TRY")}</div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-700">Bekleyen Giderler</p>
-                <p className="text-2xl font-bold text-orange-900">{formatCurrency(summary.pendingExpenses)}</p>
-                <p className="text-sm text-orange-600">{formatCurrency(summary.pendingExpenses, "TL")}</p>
-              </div>
-              <div className="p-3 rounded-full bg-orange-100">
-                <CreditCard className="w-6 h-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Bekleyen Giderler</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(summary.pendingExpenses)}</div>
+              <div className="text-sm text-gray-500">{formatCurrency(summary.pendingExpenses, "TRY")}</div>
+            </CardContent>
+          </Card>
 
-        <Card
-          className={`border-2 ${summary.netPosition >= 0 ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}`}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm font-medium ${summary.netPosition >= 0 ? "text-green-700" : "text-red-700"}`}>
-                  Net Durum
-                </p>
-                <p className={`text-2xl font-bold ${summary.netPosition >= 0 ? "text-green-900" : "text-red-900"}`}>
-                  {formatCurrency(summary.netPosition)}
-                </p>
-                <p className={`text-sm ${summary.netPosition >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(summary.netPosition, "TL")}
-                </p>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Net Durum</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${summary.netPosition >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(summary.netPosition)}
               </div>
-              <div className={`p-3 rounded-full ${summary.netPosition >= 0 ? "bg-green-100" : "bg-red-100"}`}>
-                {summary.netPosition >= 0 ? (
-                  <ArrowUpRight className="w-6 h-6 text-green-600" />
-                ) : (
-                  <ArrowDownRight className="w-6 h-6 text-red-600" />
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div className="text-sm text-gray-500">{formatCurrency(summary.netPosition, "TRY")}</div>
+            </CardContent>
+          </Card>
+        </div>
 
-      <Tabs defaultValue="all-stores" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all-stores">Tüm Mağazalar ({storeFinances.length})</TabsTrigger>
-          <TabsTrigger value="positive" className="text-green-600">
-            Kârda ({positiveStores.length})
-          </TabsTrigger>
-          <TabsTrigger value="negative" className="text-red-600">
-            Zararda ({negativeStores.length})
-          </TabsTrigger>
-          <TabsTrigger value="neutral" className="text-yellow-600">
-            Nötr ({neutralStores.length})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all-stores">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {storeFinances.map((store) => (
-              <Card key={store.storeId} className={`border-2 ${getStatusColor(store.status)}`}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Building2 className="w-5 h-5" />
-                      <CardTitle className="text-lg">{store.storeName}</CardTitle>
-                    </div>
-                    <Badge variant="outline" className={getStatusColor(store.status)}>
-                      {getStatusIcon(store.status)}
-                      <span className="ml-1">
-                        {store.status === "positive" ? "Kârda" : store.status === "negative" ? "Zararda" : "Nötr"}
-                      </span>
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+        {/* Store-wise Financial Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {storeFinances.map((store) => (
+            <Card key={store.id} className="relative">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
+                    <Store className="h-5 w-5 mr-2 text-blue-600" />
+                    {store.storeName}
+                  </CardTitle>
+                  <Badge className={getStatusColor(store.status)}>
+                    {getStatusIcon(store.status)}
+                    <span className="ml-1">
+                      {store.status === 'profit' ? 'Kârda' : store.status === 'loss' ? 'Zararda' : 'Nötr'}
+                    </span>
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Financial Metrics */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-sm text-gray-600">Toplam Satış</p>
-                      <p className="text-lg font-semibold">{formatCurrency(store.totalSales)}</p>
-                      <p className="text-xs text-gray-500">{formatCurrency(store.totalSales, "TL")}</p>
+                      <span className="text-gray-600">Toplam Satış:</span>
+                      <div className="font-semibold">{formatCurrency(store.totalSales)}</div>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Net Kâr</p>
-                      <p
-                        className={`text-lg font-semibold ${store.netProfit >= 0 ? "text-green-600" : "text-red-600"}`}
-                      >
+                      <span className="text-gray-600">Net Kâr:</span>
+                      <div className={`font-semibold ${store.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {formatCurrency(store.netProfit)}
-                      </p>
-                      <p className="text-xs text-gray-500">{formatCurrency(store.netProfit, "TL")}</p>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Etsy Komisyonu:</span>
-                      <span className="text-red-600">-{formatCurrency(store.etsyCommission)}</span>
+                    <div>
+                      <span className="text-gray-600">Etsy Komisyon:</span>
+                      <div className="font-semibold text-red-600">{formatCurrency(store.etsyCommissions)}</div>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Üretici Maliyeti:</span>
-                      <span className="text-red-600">-{formatCurrency(store.supplierCosts)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-medium">
-                      <span className="text-gray-600">Bekleyen Ödeme:</span>
-                      <span className="text-blue-600">{formatCurrency(store.pendingPayments)}</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Son Ödeme:</span>
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-3 h-3 text-gray-400" />
-                        <span>{new Date(store.lastPaymentDate).toLocaleDateString("tr-TR")}</span>
+                    <div>
+                      <span className="text-gray-600">Kâr Marjı:</span>
+                      <div className={`font-semibold ${store.profitMargin >= 30 ? 'text-green-600' : store.profitMargin >= 15 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {store.profitMargin.toFixed(1)}%
                       </div>
                     </div>
                   </div>
 
-                  {/* Kar Marjı Progress Bar */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-600">Kar Marjı</span>
-                      <span className="font-medium">{((store.netProfit / store.totalSales) * 100).toFixed(1)}%</span>
+                  {/* Profit Margin Progress */}
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-600">Kâr Marjı</span>
+                      <span className="font-semibold">{store.profitMargin.toFixed(1)}%</span>
                     </div>
-                    <Progress value={Math.max(0, (store.netProfit / store.totalSales) * 100)} className="h-2" />
+                    <Progress 
+                      value={store.profitMargin} 
+                      className="h-2"
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
 
-        <TabsContent value="positive">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {positiveStores.map((store) => (
-              <Card key={store.storeId} className="border-2 border-green-200 bg-green-50">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <CardTitle className="text-lg text-green-900">{store.storeName}</CardTitle>
+                  {/* Expected Payment */}
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm text-gray-600">Beklenen Ödeme</div>
+                        <div className="font-semibold text-blue-600">{formatCurrency(store.expectedPayment)}</div>
+                        <div className="text-xs text-gray-500">{formatCurrency(store.expectedPayment, "TRY")}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-gray-600">Tarih</div>
+                        <div className="font-semibold">{new Date(store.nextPaymentDate).toLocaleDateString('tr-TR')}</div>
+                        <div className="text-xs text-gray-500">
+                          {getDaysUntilPayment(store.nextPaymentDate)} gün kaldı
+                        </div>
+                      </div>
                     </div>
-                    <Badge className="bg-green-100 text-green-800">
-                      <TrendingUp className="w-3 h-3 mr-1" />
-                      Kârda
-                    </Badge>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">{formatCurrency(store.netProfit)}</p>
-                    <p className="text-sm text-green-700">Net Kâr</p>
-                    <p className="text-xs text-gray-600 mt-1">{formatCurrency(store.netProfit, "TL")}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
 
-        <TabsContent value="negative">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {negativeStores.map((store) => (
-              <Card key={store.storeId} className="border-2 border-red-200 bg-red-50">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="w-5 h-5 text-red-600" />
-                      <CardTitle className="text-lg text-red-900">{store.storeName}</CardTitle>
+                  {/* Pending Orders */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Bekleyen Sipariş:</span>
+                    <Badge variant="outline">{store.pendingOrders} adet</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Upcoming Payments */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Calendar className="h-5 w-5 mr-2 text-purple-600" />
+              Yaklaşan Ödemeler
+            </CardTitle>
+            <CardDescription>
+              Bu hafta ve gelecek hafta beklenen Etsy ödemeleri
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {storeFinances
+                .sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime())
+                .map((store) => {
+                  const daysUntil = getDaysUntilPayment(store.nextPaymentDate)
+                  return (
+                    <div key={store.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <CreditCard className="h-5 w-5 text-green-600" />
+                        <div>
+                          <div className="font-semibold">{store.storeName}</div>
+                          <div className="text-sm text-gray-600">
+                            {new Date(store.nextPaymentDate).toLocaleDateString('tr-TR')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-green-600">{formatCurrency(store.expectedPayment)}</div>
+                        <div className="text-sm text-gray-500">
+                          {daysUntil === 0 ? 'Bugün' : daysUntil === 1 ? 'Yarın' : `${daysUntil} gün`}
+                        </div>
+                      </div>
                     </div>
-                    <Badge className="bg-red-100 text-red-800">
-                      <TrendingDown className="w-3 h-3 mr-1" />
-                      Zararda
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-red-600">{formatCurrency(Math.abs(store.netProfit))}</p>
-                    <p className="text-sm text-red-700">Net Zarar</p>
-                    <p className="text-xs text-gray-600 mt-1">{formatCurrency(Math.abs(store.netProfit), "TL")}</p>
-                  </div>
-                  <div className="mt-4 p-3 bg-red-100 rounded-lg">
-                    <p className="text-xs text-red-700">
-                      ⚠️ Bu mağaza için acil eylem gerekli! Maliyetleri gözden geçir veya fiyatları artır.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="neutral">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {neutralStores.map((store) => (
-              <Card key={store.storeId} className="border-2 border-yellow-200 bg-yellow-50">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="w-5 h-5 text-yellow-600" />
-                      <CardTitle className="text-lg text-yellow-900">{store.storeName}</CardTitle>
-                    </div>
-                    <Badge className="bg-yellow-100 text-yellow-800">
-                      <AlertCircle className="w-3 h-3 mr-1" />
-                      Nötr
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-yellow-600">{formatCurrency(store.netProfit)}</p>
-                    <p className="text-sm text-yellow-700">Düşük Kâr</p>
-                    <p className="text-xs text-gray-600 mt-1">{formatCurrency(store.netProfit, "TL")}</p>
-                  </div>
-                  <div className="mt-4 p-3 bg-yellow-100 rounded-lg">
-                    <p className="text-xs text-yellow-700">
-                      💡 Bu mağaza için optimizasyon fırsatı var! SEO ve fiyat stratejisini gözden geçir.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Beklenen Gelirler Detayı */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-blue-500" />
-            Beklenen Gelirler Detayı
-          </CardTitle>
-          <CardDescription>Etsy'den gelecek ödemeler ve tahmini tarihler</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-medium text-blue-900 mb-2">Bu Hafta</h4>
-                <p className="text-2xl font-bold text-blue-600">{formatCurrency(485.0)}</p>
-                <p className="text-sm text-blue-700">3 mağazadan</p>
-              </div>
-              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                <h4 className="font-medium text-green-900 mb-2">Gelecek Hafta</h4>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(365.0)}</p>
-                <p className="text-sm text-green-700">2 mağazadan</p>
-              </div>
-              <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                <h4 className="font-medium text-purple-900 mb-2">Ay Sonu</h4>
-                <p className="text-2xl font-bold text-purple-600">{formatCurrency(summary.expectedIncome)}</p>
-                <p className="text-sm text-purple-700">Toplam beklenen</p>
-              </div>
+                  )
+                })}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </main>
     </div>
   )
 }

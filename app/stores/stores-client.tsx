@@ -349,12 +349,56 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Connection Status Alert - Sadece gerçek bağlantı yoksa göster */}
         {!etsyConnected && (
-          <Alert className="mb-6 border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
-            <AlertCircle className="h-4 w-4 text-orange-600" />
-            <AlertDescription className="text-orange-800 dark:text-orange-200">
-              <strong>Etsy API bağlantısı yok</strong> - Gerçek mağaza verilerinizi görmek için Etsy hesabınızı bağlayın.
-            </AlertDescription>
-          </Alert>
+          <div className="space-y-4 mb-6">
+            <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800 dark:text-orange-200">
+                <strong>Etsy API bağlantısı yok</strong> - Gerçek mağaza verilerinizi görmek için Etsy hesabınızı bağlayın.
+              </AlertDescription>
+            </Alert>
+            
+            {/* Debug Panel */}
+            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm text-blue-800 dark:text-blue-200">🔧 Bağlantı Sorun Giderme</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">Adım 1: Bağlantıyı Sıfırla</h4>
+                    <p className="text-xs mb-2">Eski token'ları temizle</p>
+                    <button
+                      onClick={handleResetEtsyConnection}
+                      disabled={resetting}
+                      className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
+                    >
+                      {resetting ? 'Sıfırlanıyor...' : '🗑️ Sıfırla'}
+                    </button>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Adım 2: Yeniden Bağlan</h4>
+                    <p className="text-xs mb-2">Etsy'de tüm izinleri ver</p>
+                    <button
+                      onClick={handleConnectEtsy}
+                      disabled={reconnecting}
+                      className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 disabled:opacity-50"
+                    >
+                      {reconnecting ? 'Bağlanıyor...' : '🔗 Bağlan'}
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 bg-white dark:bg-gray-800 rounded border text-xs">
+                  <h5 className="font-semibold mb-1">💡 Önemli Notlar:</h5>
+                  <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                    <li>Etsy'de bağlantı sırasında <strong>tüm izinleri</strong> verin</li>
+                    <li>Özellikle "mağaza bilgilerini okuma" iznini verin</li>
+                    <li>Eğer hala çalışmazsa, Vercel loglarını kontrol edin</li>
+                    <li>Sorun devam ederse, Etsy Developer hesabınızı kontrol edin</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Stats Overview - Sadece gerçek mağazalar için */}

@@ -8,7 +8,8 @@ const ETSY_OAUTH_BASE = "https://www.etsy.com/oauth"
 
 const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
 const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || ""
-const ETSY_SCOPE = process.env.ETSY_SCOPE || "email_r shops_r shops_w listings_r listings_w transactions_r profile_r address_r"
+// Minimal scope ile başla - sadece temel izinler
+const ETSY_SCOPE = process.env.ETSY_SCOPE || "shops_r"
 
 // Environment variables kontrolü
 function checkEtsyConfig() {
@@ -329,12 +330,17 @@ async function getValidAccessToken(userId: string): Promise<string> {
 
 export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
   try {
+    console.log("=== ETSY API DEBUG START ===")
+    console.log("User ID:", userId)
+    console.log("ETSY_CLIENT_ID:", ETSY_CLIENT_ID ? "SET" : "MISSING")
+    console.log("ETSY_REDIRECT_URI:", process.env.ETSY_REDIRECT_URI ? "SET" : "MISSING")
+    console.log("ETSY_SCOPE:", ETSY_SCOPE)
+    
     const accessToken = await getValidAccessToken(userId)
+    console.log("Access token:", accessToken ? "FOUND" : "MISSING")
 
-    console.log("Fetching Etsy stores for user:", userId)
-
-    // 1. Önce API'nin çalışıp çalışmadığını test et
-    console.log("=== Testing API connectivity ===")
+    // 1. Basit ping testi
+    console.log("=== PING TEST ===")
     try {
       const pingResponse = await fetch(`${ETSY_API_BASE}/application/openapi-ping`, {
         headers: {
@@ -342,18 +348,21 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
           "x-api-key": ETSY_CLIENT_ID,
         },
       })
-      console.log("Ping test result:", pingResponse.status, pingResponse.ok)
+      console.log("Ping status:", pingResponse.status)
       
       if (pingResponse.ok) {
-        const pingData = await pingResponse.text()
-        console.log("Ping response:", pingData)
+        const pingText = await pingResponse.text()
+        console.log("Ping response:", pingText)
+      } else {
+        const pingError = await pingResponse.text()
+        console.log("Ping error:", pingError)
       }
     } catch (pingError) {
-      console.log("Ping failed:", pingError)
+      console.log("Ping exception:", pingError)
     }
 
-    // 2. User bilgisini çek
-    console.log("=== Fetching user info ===")
+    // 2. User endpoint testi
+    console.log("=== USER ENDPOINT TEST ===")
     let userInfo: any = null
     try {
       const userResponse = await fetch(`${ETSY_API_BASE}/application/user`, {
@@ -367,109 +376,95 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
       
       if (userResponse.ok) {
         userInfo = await userResponse.json()
-        console.log("User info:", JSON.stringify(userInfo, null, 2))
+        console.log("User info SUCCESS:", JSON.stringify(userInfo, null, 2))
       } else {
-        const errorText = await userResponse.text()
-        console.log("User endpoint error:", errorText)
+        const userError = await userResponse.text()
+        console.log("User endpoint error:", userError)
+        
+        // Eğer user endpoint bile çalışmıyorsa, token veya scope sorunu var
+        if (userResponse.status === 403 || userResponse.status === 401) {
+          console.log("CRITICAL: Authentication/Authorization failed!")
+          console.log("This indicates token or scope issues")
+          return []
+        }
       }
     } catch (userError) {
       console.log("User endpoint exception:", userError)
     }
 
-    // 3. Farklı shop endpoint'lerini dene
-    console.log("=== Trying different shop endpoints ===")
+    // 3. Sadece en basit shop endpoint'ini dene
+    console.log("=== SHOP ENDPOINT TEST ===")
     
-    const shopEndpoints = [
-      // En basit endpoint'ten başla
-      '/application/user/shops',
-      // Eğer user_id varsa onu kullan
-      userInfo?.user_id ? `/application/users/${userInfo.user_id}/shops` : null,
-      // Genel shops endpoint'i (parametresiz)
-      '/application/shops?limit=25',
-    ].filter(Boolean) // null'ları filtrele
-
-    for (const endpoint of shopEndpoints) {
-      console.log(`Trying endpoint: ${endpoint}`)
-      
-      try {
-        const response = await fetch(`${ETSY_API_BASE}${endpoint}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "x-api-key": ETSY_CLIENT_ID,
-          },
-        })
-
-        console.log(`Endpoint ${endpoint} - Status: ${response.status}`)
-
-        if (response.ok) {
-          const responseText = await response.text()
-          console.log(`Endpoint ${endpoint} - Raw response:`, responseText)
-          
-          if (responseText) {
-            try {
-              const data = JSON.parse(responseText)
-              console.log(`Endpoint ${endpoint} - Parsed data:`, JSON.stringify(data, null, 2))
-              
-              // Farklı response formatlarını kontrol et
-              const stores = data.results || data.shops || data || []
-              
-              if (Array.isArray(stores) && stores.length > 0) {
-                console.log(`SUCCESS! Found ${stores.length} stores via ${endpoint}`)
-                return stores
-              } else {
-                console.log(`Endpoint ${endpoint} returned empty or invalid data`)
-              }
-            } catch (parseError) {
-              console.log(`Endpoint ${endpoint} - JSON parse error:`, parseError)
-            }
-          } else {
-            console.log(`Endpoint ${endpoint} returned empty response`)
-          }
-        } else {
-          const errorText = await response.text()
-          console.log(`Endpoint ${endpoint} - Error: ${response.status} - ${errorText}`)
-          
-          // Hata detaylarını parse etmeyi dene
-          try {
-            const errorData = JSON.parse(errorText)
-            console.log(`Endpoint ${endpoint} - Error details:`, JSON.stringify(errorData, null, 2))
-          } catch (e) {
-            // JSON değilse text olarak logla
-          }
-        }
-      } catch (fetchError) {
-        console.log(`Endpoint ${endpoint} - Fetch exception:`, fetchError)
-      }
-    }
-
-    // 4. Hiçbir endpoint çalışmadıysa scope sorununu kontrol et
-    console.log("=== All shop endpoints failed, checking token scopes ===")
-    
-    // Token'ın scope'unu kontrol etmeye çalış
+    // Sadece user/shops endpoint'ini dene
     try {
-      const tokenInfoResponse = await fetch(`${ETSY_API_BASE}/application/scopes`, {
+      console.log("Trying: /application/user/shops")
+      
+      const response = await fetch(`${ETSY_API_BASE}/application/user/shops`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "x-api-key": ETSY_CLIENT_ID,
         },
       })
-      
-      if (tokenInfoResponse.ok) {
-        const scopeData = await tokenInfoResponse.json()
-        console.log("Token scopes:", JSON.stringify(scopeData, null, 2))
+
+      console.log("Shop endpoint status:", response.status)
+      console.log("Shop endpoint ok:", response.ok)
+
+      if (response.ok) {
+        const responseText = await response.text()
+        console.log("Shop endpoint raw response:", responseText)
+        
+        if (responseText) {
+          try {
+            const data = JSON.parse(responseText)
+            console.log("Shop endpoint parsed data:", JSON.stringify(data, null, 2))
+            
+            const stores = data.results || data.shops || data || []
+            
+            if (Array.isArray(stores) && stores.length > 0) {
+              console.log("SUCCESS! Found stores:", stores.length)
+              console.log("=== ETSY API DEBUG END ===")
+              return stores
+            } else {
+              console.log("Shop endpoint returned empty data")
+              console.log("Data structure:", typeof data, Array.isArray(data))
+            }
+          } catch (parseError) {
+            console.log("Shop endpoint JSON parse error:", parseError)
+          }
+        } else {
+          console.log("Shop endpoint returned empty response")
+        }
       } else {
-        console.log("Could not fetch token scopes:", tokenInfoResponse.status)
+        const errorText = await response.text()
+        console.log("Shop endpoint error text:", errorText)
+        
+        // Error'u parse etmeyi dene
+        try {
+          const errorData = JSON.parse(errorText)
+          console.log("Shop endpoint error data:", JSON.stringify(errorData, null, 2))
+          
+          // Specific error handling
+          if (errorData.error === "Resource not found") {
+            console.log("ANALYSIS: Resource not found - possible causes:")
+            console.log("1. User has no shops")
+            console.log("2. Insufficient scope permissions")
+            console.log("3. Wrong API endpoint")
+          }
+        } catch (e) {
+          console.log("Could not parse error as JSON")
+        }
       }
-    } catch (scopeError) {
-      console.log("Scope check failed:", scopeError)
+    } catch (fetchError) {
+      console.log("Shop endpoint fetch exception:", fetchError)
     }
 
-    // Hiçbir endpoint çalışmadı - boş liste döndür
-    console.log("All endpoints failed - returning empty list")
+    console.log("=== FINAL RESULT ===")
+    console.log("No shops found - returning empty array")
+    console.log("=== ETSY API DEBUG END ===")
     return []
 
   } catch (error) {
-    console.error("getEtsyStores error:", error)
+    console.error("getEtsyStores critical error:", error)
     throw error
   }
 }

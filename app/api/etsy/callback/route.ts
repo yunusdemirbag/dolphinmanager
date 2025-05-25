@@ -15,12 +15,15 @@ export async function GET(req: NextRequest) {
   // Get stored PKCE data from Supabase
   const cookieStore = cookies()
   const supabase = createClient(cookieStore)
-  
-  const { data: session } = await supabase
+
+  // Hata ayıklama için log ekle
+  console.log("CALLBACK STATE:", state)
+  const { data: session, error: sessionError } = await supabase
     .from("etsy_auth_sessions")
     .select("code_verifier")
     .eq("state", state)
     .single()
+  console.log("SUPABASE SESSION:", session, sessionError)
 
   if (!session) {
     return NextResponse.json({ error: "Invalid state" }, { status: 400 })
@@ -34,20 +37,32 @@ export async function GET(req: NextRequest) {
     code_verifier: session.code_verifier,
   })
 
-  const tokenRes = await fetch("https://api.etsy.com/v3/public/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  })
-
-  if (!tokenRes.ok) {
-    return NextResponse.json(
-      { error: await tokenRes.text() },
-      { status: tokenRes.status }
-    )
+  let token
+  try {
+    const tokenRes = await fetch("https://api.etsy.com/v3/public/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    })
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text()
+      console.error("TOKEN EXCHANGE ERROR:", errText)
+      return NextResponse.json(
+        { error: errText },
+        { status: tokenRes.status }
+      )
+    }
+    token = await tokenRes.json()
+  } catch (e) {
+    let errMsg = "Unknown error"
+    if (e instanceof Error) {
+      errMsg = e.message
+    } else if (typeof e === "string") {
+      errMsg = e
+    }
+    console.error("TOKEN EXCHANGE EXCEPTION:", errMsg)
+    return NextResponse.json({ error: errMsg }, { status: 500 })
   }
-
-  const token = await tokenRes.json()
 
   // Store tokens in Supabase
   await supabase.from("etsy_tokens").upsert({
@@ -64,5 +79,7 @@ export async function GET(req: NextRequest) {
     .delete()
     .eq("state", state)
 
-  return NextResponse.redirect("/dashboard")
+  // Absolute URL ile redirect (origin yerine env kullan)
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://dolphin-app.vercel.app"
+  return NextResponse.redirect(`${baseUrl}/dashboard`)
 }

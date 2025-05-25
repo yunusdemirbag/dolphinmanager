@@ -221,7 +221,7 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-      token_type: tokens.token_type,
+      token_type: tokens.token_type || 'Bearer',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -283,7 +283,7 @@ export async function refreshEtsyToken(userId: string): Promise<EtsyTokens> {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-      token_type: tokens.token_type,
+      token_type: tokens.token_type || 'Bearer',
       updated_at: new Date().toISOString(),
     })
 
@@ -331,7 +331,8 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
   try {
     const accessToken = await getValidAccessToken(userId)
 
-    const response = await fetch(`${ETSY_API_BASE}/application/shops`, {
+    // Doğru endpoint: /application/user/shops (kullanıcının mağazalarını getirir)
+    const response = await fetch(`${ETSY_API_BASE}/application/user/shops`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "x-api-key": ETSY_CLIENT_ID,
@@ -365,6 +366,7 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
       throw new Error("Failed to parse Etsy API response")
     }
 
+    console.log("Etsy stores response:", data)
     return data.results || []
   } catch (error) {
     console.error("getEtsyStores error:", error)

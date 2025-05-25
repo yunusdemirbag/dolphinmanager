@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS analytics (
 CREATE TABLE IF NOT EXISTS etsy_auth_sessions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  code_verifier TEXT NOT NULL,
+  code_verifier TEXT,
+  state TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS etsy_tokens (
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL UNIQUE,
   access_token TEXT NOT NULL,
   refresh_token TEXT NOT NULL,
+  token_type TEXT DEFAULT 'Bearer',
   expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

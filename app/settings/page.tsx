@@ -51,6 +51,28 @@ export default function SettingsPage() {
     if (autoUpdateCurrency) {
       fetchCurrentExchangeRate()
     }
+    
+    // URL parametrelerini kontrol et
+    const urlParams = new URLSearchParams(window.location.search)
+    const etsyStatus = urlParams.get('etsy')
+    const error = urlParams.get('error')
+    const details = urlParams.get('details')
+    
+    if (etsyStatus === 'connected') {
+      alert("✅ Etsy mağazanız başarıyla bağlandı!")
+      // URL'yi temizle
+      window.history.replaceState({}, '', '/settings')
+      // Bağlantı durumunu yeniden kontrol et
+      setTimeout(() => checkEtsyConnection(), 1000)
+    } else if (error) {
+      let errorMessage = "❌ Etsy bağlantısında hata oluştu."
+      if (details) {
+        errorMessage += `\n\nDetay: ${decodeURIComponent(details)}`
+      }
+      alert(errorMessage)
+      // URL'yi temizle
+      window.history.replaceState({}, '', '/settings')
+    }
   }, [])
 
   const loadSettings = () => {

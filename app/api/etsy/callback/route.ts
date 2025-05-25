@@ -14,14 +14,14 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error("Etsy OAuth error:", error, error_description)
     return NextResponse.redirect(
-      new URL(`/onboarding?error=${error}`, request.url)
+      new URL(`/settings?error=${error}`, request.url)
     )
   }
 
   if (!code || !state) {
     console.error("Missing params:", { code, state })
     return NextResponse.redirect(
-      new URL("/onboarding?error=missing_params", request.url)
+      new URL("/settings?error=missing_params", request.url)
     )
   }
 
@@ -36,9 +36,9 @@ export async function GET(request: NextRequest) {
     await syncEtsyDataToDatabase(state)
     console.log("Data sync completed successfully")
 
-    // Başarılı - dashboard'a yönlendir
+    // Başarılı - settings sayfasına yönlendir (etsy=connected parametresi ile)
     return NextResponse.redirect(
-      new URL("/dashboard?etsy=connected", request.url)
+      new URL("/settings?etsy=connected", request.url)
     )
   } catch (error: any) {
     console.error("Etsy callback error details:", {
@@ -47,8 +47,10 @@ export async function GET(request: NextRequest) {
       state,
       code: code.substring(0, 10) + "..."
     })
+    
+    // Hata durumunda settings sayfasına yönlendir
     return NextResponse.redirect(
-      new URL("/onboarding?error=etsy_connection_failed&details=" + encodeURIComponent(error.message), request.url)
+      new URL("/settings?error=etsy_connection_failed&details=" + encodeURIComponent(error.message), request.url)
     )
   }
 }

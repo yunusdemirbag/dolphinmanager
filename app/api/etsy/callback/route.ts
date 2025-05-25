@@ -30,18 +30,36 @@ export async function GET(request: NextRequest) {
 
     // Token değişimi
     console.log("Exchanging code for token...")
-    await exchangeCodeForToken(code, state)
+    try {
+      await exchangeCodeForToken(code, state)
+      console.log("Token exchange successful")
+    } catch (tokenError) {
+      console.error("Token exchange failed:", tokenError)
+      throw new Error(`Token exchange failed: ${String(tokenError)}`)
+    }
     
     // Etsy verilerini senkronize et
     console.log("Syncing Etsy data...")
-    await syncEtsyDataToDatabase(state)
+    try {
+      await syncEtsyDataToDatabase(state)
+      console.log("Data sync successful")
+    } catch (syncError) {
+      console.error("Data sync failed:", syncError)
+      throw new Error(`Data sync failed: ${String(syncError)}`)
+    }
 
     // Başarılı - dashboard'a yönlendir
+    console.log("Etsy connection completed successfully, redirecting to dashboard")
     return NextResponse.redirect(
       new URL("/dashboard?etsy=connected", request.url)
     )
   } catch (error) {
     console.error("Etsy callback error:", error)
+    console.error("Error details:", {
+      message: String(error),
+      code,
+      state
+    })
     return NextResponse.redirect(
       new URL("/onboarding?error=etsy_connection_failed", request.url)
     )

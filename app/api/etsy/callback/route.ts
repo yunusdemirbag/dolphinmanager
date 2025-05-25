@@ -14,14 +14,14 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error("Etsy OAuth error:", error, error_description)
     return NextResponse.redirect(
-      new URL(`/settings?error=${error}`, request.url)
+      new URL(`/stores?error=${error}&description=${encodeURIComponent(error_description || '')}`, request.url)
     )
   }
 
   if (!code || !state) {
     console.error("Missing params:", { code, state })
     return NextResponse.redirect(
-      new URL("/settings?error=missing_params", request.url)
+      new URL("/stores?error=missing_params", request.url)
     )
   }
 
@@ -36,9 +36,9 @@ export async function GET(request: NextRequest) {
     await syncEtsyDataToDatabase(state)
     console.log("Data sync completed successfully")
 
-    // Başarılı - settings sayfasına yönlendir (etsy=connected parametresi ile)
+    // Başarılı - stores sayfasına yönlendir (etsy=connected parametresi ile)
     return NextResponse.redirect(
-      new URL("/settings?etsy=connected", request.url)
+      new URL("/stores?etsy=connected", request.url)
     )
   } catch (error: any) {
     console.error("Etsy callback error details:", {
@@ -48,9 +48,9 @@ export async function GET(request: NextRequest) {
       code: code.substring(0, 10) + "..."
     })
     
-    // Hata durumunda settings sayfasına yönlendir
+    // Hata durumunda stores sayfasına yönlendir
     return NextResponse.redirect(
-      new URL("/settings?error=etsy_connection_failed&details=" + encodeURIComponent(error.message), request.url)
+      new URL("/stores?error=etsy_connection_failed&details=" + encodeURIComponent(error.message), request.url)
     )
   }
 }

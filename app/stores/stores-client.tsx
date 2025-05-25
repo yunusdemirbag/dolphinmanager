@@ -74,6 +74,38 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
 
   useEffect(() => {
     loadStores()
+    
+    // URL parametrelerini kontrol et - Etsy callback'den gelen mesajlar
+    const urlParams = new URLSearchParams(window.location.search)
+    const etsyStatus = urlParams.get('etsy')
+    const error = urlParams.get('error')
+    const details = urlParams.get('details')
+    const description = urlParams.get('description')
+    
+    if (etsyStatus === 'connected') {
+      alert("✅ Etsy mağazanız başarıyla bağlandı!")
+      // URL'yi temizle
+      window.history.replaceState({}, '', '/stores')
+      // Bağlantı durumunu yeniden kontrol et
+      setTimeout(() => loadStores(), 1000)
+    } else if (error) {
+      let errorMessage = "❌ Etsy bağlantısında hata oluştu."
+      
+      if (error === 'missing_params') {
+        errorMessage += "\n\nHata: Eksik parametreler. Lütfen tekrar deneyin."
+      } else if (error === 'etsy_connection_failed') {
+        errorMessage += "\n\nBağlantı başarısız oldu."
+        if (details) {
+          errorMessage += `\n\nDetay: ${decodeURIComponent(details)}`
+        }
+      } else if (description) {
+        errorMessage += `\n\nDetay: ${decodeURIComponent(description)}`
+      }
+      
+      alert(errorMessage)
+      // URL'yi temizle
+      window.history.replaceState({}, '', '/stores')
+    }
   }, [])
 
   const loadStores = async () => {
@@ -112,7 +144,7 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
     setReconnecting(true)
     try {
       const response = await fetch('/api/etsy/auth', {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json'
         }
@@ -120,11 +152,12 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
       
       if (response.ok) {
         const { authUrl } = await response.json()
+        // Aynı sekmede Etsy OAuth'a yönlendir
         window.location.href = authUrl
       } else {
-        const error = await response.text()
-        console.error('Auth error:', error)
-        alert('Etsy bağlantısı başlatılamadı: ' + error)
+        const errorData = await response.json()
+        console.error('Auth error:', errorData)
+        alert(`Etsy bağlantısı başlatılamadı: ${errorData.details || errorData.error}`)
       }
     } catch (error) {
       console.error('Error connecting to Etsy:', error)

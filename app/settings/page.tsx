@@ -25,17 +25,13 @@ import {
   Bell,
   Shield,
   User,
-  Wifi,
-  ExternalLink,
-  AlertTriangle
+  Wifi
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [etsyConnecting, setEtsyConnecting] = useState(false)
-  const [etsyConnectionStatus, setEtsyConnectionStatus] = useState<'connected' | 'disconnected' | 'error' | 'checking'>('checking')
   const [usdToTry, setUsdToTry] = useState(38.93)
   const [autoUpdateCurrency, setAutoUpdateCurrency] = useState(true)
   const [darkMode, setDarkMode] = useState(false)
@@ -47,31 +43,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings()
-    checkEtsyConnection()
     if (autoUpdateCurrency) {
       fetchCurrentExchangeRate()
-    }
-    
-    // URL parametrelerini kontrol et
-    const urlParams = new URLSearchParams(window.location.search)
-    const etsyStatus = urlParams.get('etsy')
-    const error = urlParams.get('error')
-    const details = urlParams.get('details')
-    
-    if (etsyStatus === 'connected') {
-      alert("✅ Etsy mağazanız başarıyla bağlandı!")
-      // URL'yi temizle
-      window.history.replaceState({}, '', '/settings')
-      // Bağlantı durumunu yeniden kontrol et
-      setTimeout(() => checkEtsyConnection(), 1000)
-    } else if (error) {
-      let errorMessage = "❌ Etsy bağlantısında hata oluştu."
-      if (details) {
-        errorMessage += `\n\nDetay: ${decodeURIComponent(details)}`
-      }
-      alert(errorMessage)
-      // URL'yi temizle
-      window.history.replaceState({}, '', '/settings')
     }
   }, [])
 
@@ -170,55 +143,6 @@ export default function SettingsPage() {
     }
   }
 
-  const checkEtsyConnection = async () => {
-    try {
-      const response = await fetch('/api/etsy/stores')
-      if (response.ok) {
-        const data = await response.json()
-        setEtsyConnectionStatus(data.stores && data.stores.length > 0 ? 'connected' : 'disconnected')
-      } else {
-        setEtsyConnectionStatus('error')
-      }
-    } catch (error) {
-      console.error("Etsy connection check error:", error)
-      setEtsyConnectionStatus('error')
-    }
-  }
-
-  const handleEtsyReconnect = async () => {
-    setEtsyConnecting(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        alert("Lütfen önce giriş yapın")
-        return
-      }
-
-      // Etsy OAuth URL'ini al - GET request kullan
-      const response = await fetch('/api/etsy/auth', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        // Aynı sekmede Etsy OAuth'a yönlendir
-        window.location.href = data.authUrl
-      } else {
-        const errorData = await response.json()
-        console.error("Etsy auth error:", errorData)
-        alert(`Etsy bağlantısı başlatılamadı: ${errorData.details || errorData.error}`)
-      }
-    } catch (error) {
-      console.error("Etsy reconnect error:", error)
-      alert("Etsy bağlantısı kurulurken hata oluştu. Lütfen tekrar deneyin.")
-    } finally {
-      setEtsyConnecting(false)
-    }
-  }
-
   return (
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -246,128 +170,6 @@ export default function SettingsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Etsy Bağlantı Durumu */}
-          <Card className={`${darkMode ? 'bg-gray-800 border-gray-700' : ''} lg:col-span-2`}>
-            <CardHeader>
-              <CardTitle className={`flex items-center ${darkMode ? 'text-white' : ''}`}>
-                <Wifi className="h-5 w-5 mr-2 text-orange-600" />
-                Etsy Bağlantı Durumu
-              </CardTitle>
-              <CardDescription className={darkMode ? 'text-gray-400' : ''}>
-                Etsy mağaza bağlantınızı yönetin
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    etsyConnectionStatus === 'connected' ? 'bg-green-500' :
-                    etsyConnectionStatus === 'disconnected' ? 'bg-yellow-500' :
-                    etsyConnectionStatus === 'error' ? 'bg-red-500' :
-                    'bg-gray-400 animate-pulse'
-                  }`}></div>
-                  <div>
-                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                      {etsyConnectionStatus === 'connected' ? 'Bağlı' :
-                       etsyConnectionStatus === 'disconnected' ? 'Bağlantı Kesildi' :
-                       etsyConnectionStatus === 'error' ? 'Bağlantı Hatası' :
-                       'Kontrol Ediliyor...'}
-                    </p>
-                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {etsyConnectionStatus === 'connected' ? 'Etsy mağazanız başarıyla bağlandı' :
-                       etsyConnectionStatus === 'disconnected' ? 'Etsy mağazanız bağlı değil' :
-                       etsyConnectionStatus === 'error' ? 'Etsy bağlantısında sorun var' :
-                       'Bağlantı durumu kontrol ediliyor...'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant={
-                    etsyConnectionStatus === 'connected' ? 'default' :
-                    etsyConnectionStatus === 'disconnected' ? 'secondary' :
-                    etsyConnectionStatus === 'error' ? 'destructive' :
-                    'outline'
-                  }>
-                    {etsyConnectionStatus === 'connected' ? 'Aktif' :
-                     etsyConnectionStatus === 'disconnected' ? 'Pasif' :
-                     etsyConnectionStatus === 'error' ? 'Hata' :
-                     'Kontrol'}
-                  </Badge>
-                </div>
-              </div>
-
-              {etsyConnectionStatus !== 'connected' && (
-                <div className={`p-4 rounded-lg border ${
-                  etsyConnectionStatus === 'error' ? 
-                    (darkMode ? 'bg-red-900/20 border-red-800' : 'bg-red-50 border-red-200') :
-                    (darkMode ? 'bg-yellow-900/20 border-yellow-800' : 'bg-yellow-50 border-yellow-200')
-                }`}>
-                  <div className="flex items-start space-x-3">
-                    <AlertTriangle className={`h-5 w-5 mt-0.5 ${
-                      etsyConnectionStatus === 'error' ? 'text-red-500' : 'text-yellow-500'
-                    }`} />
-                    <div className="flex-1">
-                      <h4 className={`font-medium ${
-                        etsyConnectionStatus === 'error' ? 
-                          (darkMode ? 'text-red-300' : 'text-red-800') :
-                          (darkMode ? 'text-yellow-300' : 'text-yellow-800')
-                      }`}>
-                        {etsyConnectionStatus === 'error' ? 'Bağlantı Hatası' : 'Etsy Bağlantısı Gerekli'}
-                      </h4>
-                      <p className={`text-sm mt-1 ${
-                        etsyConnectionStatus === 'error' ? 
-                          (darkMode ? 'text-red-400' : 'text-red-700') :
-                          (darkMode ? 'text-yellow-400' : 'text-yellow-700')
-                      }`}>
-                        {etsyConnectionStatus === 'error' ? 
-                          'Etsy API bağlantısında sorun var. Token süresi dolmuş olabilir.' :
-                          'Dolphin Manager\'ın tüm özelliklerini kullanmak için Etsy mağazanızı bağlamanız gerekiyor.'
-                        }
-                      </p>
-                      <Button
-                        onClick={handleEtsyReconnect}
-                        disabled={etsyConnecting}
-                        className="mt-3 bg-orange-600 hover:bg-orange-700 text-white"
-                        size="sm"
-                      >
-                        {etsyConnecting ? (
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                        )}
-                        {etsyConnecting ? 'Bağlanıyor...' : 'Etsy\'yi Yeniden Bağla'}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {etsyConnectionStatus === 'connected' && (
-                <div className={`p-4 rounded-lg ${darkMode ? 'bg-green-900/20 border border-green-800' : 'bg-green-50 border border-green-200'}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`font-medium ${darkMode ? 'text-green-300' : 'text-green-800'}`}>
-                        ✅ Etsy Bağlantısı Aktif
-                      </p>
-                      <p className={`text-sm ${darkMode ? 'text-green-400' : 'text-green-700'}`}>
-                        Mağaza verileriniz senkronize ediliyor
-                      </p>
-                    </div>
-                    <Button
-                      onClick={checkEtsyConnection}
-                      variant="outline"
-                      size="sm"
-                      className={darkMode ? 'border-green-600 text-green-300 hover:bg-green-900' : 'border-green-300 text-green-700 hover:bg-green-100'}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Yenile
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Kur Ayarları */}
           <Card className={darkMode ? 'bg-gray-800 border-gray-700' : ''}>
             <CardHeader>

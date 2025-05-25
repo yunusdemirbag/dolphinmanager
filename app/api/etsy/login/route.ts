@@ -11,7 +11,8 @@ export async function GET() {
   // Kullanıcıyı session'dan bul
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
-    return NextResponse.redirect("/auth/login")
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://dolphin-app.vercel.app"
+    return NextResponse.redirect(`${baseUrl}/auth/login`)
   }
 
   // user_id ile insert et

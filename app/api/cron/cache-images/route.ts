@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 //   ]
 // }
 
-export const maxDuration = 300; // 5 dakika
+export const maxDuration = 60; // 1 dakika
 
 export async function GET(request: Request) {
   // Basic auth veya API key kontrolü - production'da daha güvenli hale getirin

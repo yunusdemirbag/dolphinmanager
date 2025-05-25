@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ authUrl })
   } catch (error) {
     console.error("Etsy auth error:", error)
-    return NextResponse.json({ error: "Failed to generate auth URL" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Failed to generate auth URL", 
+      details: error instanceof Error ? error.message : "Unknown error" 
+    }, { status: 500 })
   }
 }

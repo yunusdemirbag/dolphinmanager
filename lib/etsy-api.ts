@@ -6,9 +6,21 @@ import { supabaseAdmin } from "./supabase"
 const ETSY_API_BASE = "https://api.etsy.com/v3"
 const ETSY_OAUTH_BASE = "https://www.etsy.com/oauth"
 
-const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID!
-const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI!
-const ETSY_SCOPE = process.env.ETSY_SCOPE!
+const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
+const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || "http://localhost:3000/api/etsy/callback"
+const ETSY_SCOPE = process.env.ETSY_SCOPE || "shops_r listings_r"
+
+// Environment variables kontrolü
+function checkEtsyConfig() {
+  const missing = []
+  if (!ETSY_CLIENT_ID) missing.push("ETSY_CLIENT_ID")
+  if (!process.env.ETSY_REDIRECT_URI) missing.push("ETSY_REDIRECT_URI") 
+  if (!process.env.ETSY_SCOPE) missing.push("ETSY_SCOPE")
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing Etsy environment variables: ${missing.join(", ")}. Please add them to your .env.local file.`)
+  }
+}
 
 export interface EtsyStore {
   shop_id: number
@@ -77,6 +89,12 @@ export function generatePKCE() {
 export async function getEtsyAuthUrl(userId: string): Promise<string> {
   try {
     console.log("Creating Etsy auth URL for user:", userId)
+    
+    // Environment variables kontrolü
+    if (!ETSY_CLIENT_ID || !ETSY_REDIRECT_URI || !ETSY_SCOPE) {
+      throw new Error("Missing Etsy environment variables. Please check ETSY_CLIENT_ID, ETSY_REDIRECT_URI, and ETSY_SCOPE")
+    }
+    
     // PKCE oluştur
     const codeVerifier = generateCodeVerifier()
     const codeChallenge = generateCodeChallenge(codeVerifier)
@@ -115,7 +133,7 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
     })
 
     const authUrl = `https://www.etsy.com/oauth/connect?${params.toString()}`
-    console.log("Generated auth URL")
+    console.log("Generated auth URL successfully")
 
     return authUrl
   } catch (error) {
@@ -264,23 +282,48 @@ async function getValidAccessToken(userId: string): Promise<string> {
 }
 
 export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
-  const accessToken = await getValidAccessToken(userId)
+  try {
+    const accessToken = await getValidAccessToken(userId)
 
-  const response = await fetch(`${ETSY_API_BASE}/application/shops`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "x-api-key": ETSY_CLIENT_ID,
-    },
-  })
+    const response = await fetch(`${ETSY_API_BASE}/application/shops`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "x-api-key": ETSY_CLIENT_ID,
+      },
+    })
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    console.error("Etsy API error:", errorData)
-    throw new Error(`Failed to fetch stores: ${errorData.error || response.statusText}`)
+    if (!response.ok) {
+      let errorData: any = {}
+      try {
+        const responseText = await response.text()
+        if (responseText) {
+          errorData = JSON.parse(responseText)
+        }
+      } catch (parseError) {
+        console.error("Failed to parse error response:", parseError)
+        errorData = { error: response.statusText }
+      }
+      
+      console.error("Etsy API error:", errorData)
+      throw new Error(`Failed to fetch stores: ${errorData.error || response.statusText}`)
+    }
+
+    let data: any = {}
+    try {
+      const responseText = await response.text()
+      if (responseText) {
+        data = JSON.parse(responseText)
+      }
+    } catch (parseError) {
+      console.error("Failed to parse success response:", parseError)
+      throw new Error("Failed to parse Etsy API response")
+    }
+
+    return data.results || []
+  } catch (error) {
+    console.error("getEtsyStores error:", error)
+    throw error
   }
-
-  const data = await response.json()
-  return data.results || []
 }
 
 export async function getEtsyListings(

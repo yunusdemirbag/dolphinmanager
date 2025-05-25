@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ExternalLink } from "lucide-react"
+import { createClientSupabase } from "@/lib/supabase"
 
 export default function OnboardingPage() {
   const [loading, setLoading] = useState(false)
@@ -11,10 +12,35 @@ export default function OnboardingPage() {
   const handleEtsyConnect = async () => {
     setLoading(true)
     try {
-      // Direkt olarak Etsy login akışına gönder
-      window.location.href = "/api/etsy/login"
+      // Supabase oturumundan user_id al
+      const supabase = createClientSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        alert("Oturum bulunamadı. Lütfen giriş yapın.")
+        setLoading(false)
+        return
+      }
+      // /api/etsy/login endpoint'ine user token ile fetch
+      const session = await supabase.auth.getSession()
+      const token = session.data.session?.access_token
+      const res = await fetch("/api/etsy/login", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (res.redirected) {
+        window.location.href = res.url
+        return
+      }
+      const data = await res.json()
+      if (data.error) {
+        alert(data.error)
+      }
     } catch (error) {
       console.error("Etsy bağlantı hatası:", error)
+      alert("Etsy bağlantı hatası")
+    } finally {
       setLoading(false)
     }
   }

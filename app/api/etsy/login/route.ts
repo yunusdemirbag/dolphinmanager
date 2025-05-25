@@ -1,26 +1,31 @@
 import { supabaseAdmin } from "@/lib/supabase"
 import { generatePKCE } from "@/lib/etsy-api"
 import { NextRequest, NextResponse } from "next/server"
-import crypto from "crypto"
 
 export async function GET(req: NextRequest) {
-  // supabaseAdmin direkt kullan
-  
   try {
-    // Generate PKCE
+    // Supabase oturumundan user_id al
+    const authHeader = req.headers.get("authorization")
+    let userId: string | null = null
+    if (authHeader) {
+      const token = authHeader.replace("Bearer ", "")
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+      userId = user?.id || null
+    }
+    // Eğer header yoksa, cookie'den veya başka bir yerden de alınabilir (gerekirse eklenir)
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // PKCE üret
     const { codeVerifier, codeChallenge } = generatePKCE()
     
-    // Daha güvenilir state üretimi için UUID kullan
-    const state = crypto.randomUUID().replace(/-/g, "").substring(0, 10)
-    console.log("Generated state:", state)
-    
-    // Etsy OAuth URL
-    const etsyClientId = process.env.ETSY_CLIENT_ID
-    
-    // Tam URL kullan - Etsy'de kayıtlı olan URL olmalı
-    const redirectUri = "https://dolphin-app.vercel.app/api/etsy/callback"
+    // State olarak user_id kullan
+    const state = userId
     
     // Etsy OAuth parametreleri
+    const etsyClientId = process.env.ETSY_CLIENT_ID
+    const redirectUri = "https://dolphin-app.vercel.app/api/etsy/callback"
     const etsyAuthParams = new URLSearchParams({
       response_type: "code",
       client_id: etsyClientId!,
@@ -30,62 +35,20 @@ export async function GET(req: NextRequest) {
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
     })
-    
-    // Geçici kullanıcı ID'si
-    const tempUserId = `temp_${crypto.randomUUID().substring(0, 8)}`
-    
-    console.log("Trying to store state in Supabase")
-    
-    // etsy_auth_sessions tablosunun yapısını kontrol et ve uygun şekilde kaydet
-    try {
-      // Önce tablo yapısını incelemek için bir kayıt oluşturalım
-      // Supabase'in error mesajından sütun adlarını öğrenmek için
-      const { error: tableInfoError } = await supabaseAdmin
-        .from("etsy_auth_sessions")
-        .select("*")
-        .limit(1)
-      
-      console.log("Table structure check:", tableInfoError ? tableInfoError.message : "success")
-      
-      // Basit bir yapı ile deneyelim - sadece state ve code_verifier
-      const { data, error } = await supabaseAdmin
-        .from("etsy_auth_sessions")
-        .insert({
-          state: state,
-          code_verifier: codeVerifier
-          // user_id sütunu olmadığı için eklenmedi
-        })
-      
-      if (error) {
-        console.error("Error storing state in Supabase:", error)
-        console.error("Error details:", JSON.stringify(error))
-        return NextResponse.json({ 
-          error: "Failed to store OAuth state",
-          details: error
-        }, { status: 500 })
-      }
-      
-      // Ayrı bir tablo kullanarak user_id bilgisini sakla
-      await supabaseAdmin.from("temp_users").upsert({
-        id: tempUserId,
-        state: state,
-        created_at: new Date().toISOString()
-      }).select()
-      
-      console.log("State stored successfully:", state)
-    } catch (dbError) {
-      console.error("Exception during DB operation:", dbError)
-      return NextResponse.json({ 
-        error: "Database exception",
-        details: dbError
-      }, { status: 500 })
+
+    // Supabase'e kaydet
+    const { error } = await supabaseAdmin.from("etsy_auth_sessions").upsert({
+      user_id: userId,
+      code_verifier: codeVerifier,
+      created_at: new Date().toISOString(),
+    })
+    if (error) {
+      console.error("Error storing state in Supabase:", error)
+      return NextResponse.json({ error: "Failed to store OAuth state", details: error }, { status: 500 })
     }
-    
+
     // Etsy OAuth URL'sine yönlendir
     const authUrl = `https://www.etsy.com/oauth/connect?${etsyAuthParams.toString()}`
-    
-    console.log("Auth URL: ", authUrl)
-    
     return NextResponse.redirect(authUrl)
   } catch (error) {
     console.error("Etsy login error:", error)

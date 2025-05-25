@@ -7,7 +7,7 @@ const ETSY_API_BASE = "https://api.etsy.com/v3"
 const ETSY_OAUTH_BASE = "https://www.etsy.com/oauth"
 
 const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
-const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || "http://localhost:3000/api/etsy/callback"
+const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || ""
 const ETSY_SCOPE = process.env.ETSY_SCOPE || "shops_r listings_r"
 
 // Environment variables kontrolü
@@ -71,13 +71,24 @@ export interface EtsyTokens {
   token_type: string
 }
 
-// PKCE helpers (Node-compatible)
+// PKCE helpers - Node.js uyumlu
 function generateCodeVerifier(): string {
-  return crypto.randomBytes(32).toString("base64url")
+  // Node.js'te crypto.getRandomValues yok, crypto.randomBytes kullanıyoruz
+  const buffer = crypto.randomBytes(96)
+  return buffer.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
+    .substring(0, 128)
 }
 
-function generateCodeChallenge(verifier: string): string {
-  return crypto.createHash("sha256").update(verifier).digest("base64url")
+function generateCodeChallenge(codeVerifier: string): string {
+  const hash = crypto.createHash('sha256')
+  hash.update(codeVerifier, 'utf8')
+  return hash.digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
 }
 
 export function generatePKCE() {
@@ -91,50 +102,63 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
     console.log("Creating Etsy auth URL for user:", userId)
     
     // Environment variables kontrolü
-    if (!ETSY_CLIENT_ID || !ETSY_REDIRECT_URI || !ETSY_SCOPE) {
-      throw new Error("Missing Etsy environment variables. Please check ETSY_CLIENT_ID, ETSY_REDIRECT_URI, and ETSY_SCOPE")
-    }
+    checkEtsyConfig()
     
-    // PKCE oluştur
+    // PKCE oluştur - örnekteki gibi
     const codeVerifier = generateCodeVerifier()
     const codeChallenge = generateCodeChallenge(codeVerifier)
+    
+    console.log("Generated PKCE:", { 
+      codeVerifier: codeVerifier.substring(0, 10) + "...", 
+      codeChallenge: codeChallenge.substring(0, 10) + "..." 
+    })
 
-    // Önce eski kayıtları temizle
-    await supabaseAdmin
+    // Store'dan code verifier'ı al ve sakla - örnekteki gibi
+    const { data: existingStore } = await supabaseAdmin
       .from("etsy_auth_sessions")
-      .delete()
+      .select("*")
       .eq("user_id", userId)
+      .single()
 
-    // Yeni kayıt oluştur - state olarak userId kullan
-    const { error } = await supabaseAdmin
-      .from("etsy_auth_sessions")
-      .insert({
-        user_id: userId,
-        code_verifier: codeVerifier,
-        state: userId,
-      })
+    if (existingStore) {
+      // Mevcut store'u güncelle
+      await supabaseAdmin
+        .from("etsy_auth_sessions")
+        .update({
+          code_verifier: codeVerifier,
+          state: userId,
+          created_at: new Date().toISOString()
+        })
+        .eq("user_id", userId)
+    } else {
+      // Yeni store oluştur
+      const { error } = await supabaseAdmin
+        .from("etsy_auth_sessions")
+        .insert({
+          user_id: userId,
+          code_verifier: codeVerifier,
+          state: userId,
+        })
 
-    if (error) {
-      console.error("Database error:", error)
-      throw new Error(`Failed to store auth session: ${error.message}`)
+      if (error) {
+        console.error("Database error:", error)
+        throw new Error(`Failed to store auth session: ${error.message}`)
+      }
     }
 
     console.log("Auth session stored successfully")
 
-    // Etsy OAuth URL'ini oluştur
-    const params = new URLSearchParams({
-      response_type: "code",
-      client_id: ETSY_CLIENT_ID,
-      redirect_uri: ETSY_REDIRECT_URI,
-      scope: ETSY_SCOPE,
-      state: userId, // state parametresi olarak userId
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-    })
+    // Etsy OAuth URL'ini oluştur - örnekteki gibi
+    const authUrl = `https://www.etsy.com/oauth/connect?` +
+      `response_type=code&` +
+      `client_id=${ETSY_CLIENT_ID}&` +
+      `redirect_uri=${encodeURIComponent(ETSY_REDIRECT_URI)}&` +
+      `scope=${encodeURIComponent(ETSY_SCOPE)}&` +
+      `state=${userId}&` +
+      `code_challenge=${codeChallenge}&` +
+      `code_challenge_method=S256`
 
-    const authUrl = `https://www.etsy.com/oauth/connect?${params.toString()}`
     console.log("Generated auth URL successfully")
-
     return authUrl
   } catch (error) {
     console.error("getEtsyAuthUrl error:", error)
@@ -145,114 +169,136 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
 export async function exchangeCodeForToken(code: string, userId: string): Promise<EtsyTokens> {
   console.log("Exchanging code for token - userId:", userId)
   
-  // Get stored code verifier
-  const { data: authSession, error: sessionError } = await supabaseAdmin
-    .from("etsy_auth_sessions")
-    .select("code_verifier")
-    .eq("user_id", userId)
-    .single()
-
-  if (sessionError || !authSession) {
-    console.error("Code verifier not found:", sessionError)
-    throw new Error("Code verifier not found")
-  }
-
-  console.log("Found code verifier, making token request...")
-
-  const body = qs.stringify({
-    grant_type: "authorization_code",
-    client_id: ETSY_CLIENT_ID,
-    redirect_uri: ETSY_REDIRECT_URI,
-    code,
-    code_verifier: authSession.code_verifier,
-  })
-
-  console.log("Making token request to Etsy...")
-  const response = await fetch(`https://api.etsy.com/v3/public/oauth/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "x-api-key": ETSY_CLIENT_ID,
-    },
-    body,
-  })
-
-  const responseText = await response.text()
-  console.log("Token response status:", response.status)
-  console.log("Token response:", responseText)
-
-  if (!response.ok) {
-    throw new Error(`Token exchange failed: ${responseText}`)
-  }
-
-  let tokens: EtsyTokens
   try {
-    tokens = JSON.parse(responseText)
-  } catch (e) {
-    throw new Error(`Failed to parse token response: ${responseText}`)
+    // Store'dan code verifier'ı al - örnekteki gibi
+    const { data: authSession, error: sessionError } = await supabaseAdmin
+      .from("etsy_auth_sessions")
+      .select("code_verifier")
+      .eq("user_id", userId)
+      .single()
+
+    if (sessionError || !authSession?.code_verifier) {
+      console.error("Code verifier not found:", sessionError)
+      throw new Error("Code verifier not found")
+    }
+
+    console.log("Found code verifier, making token request...")
+
+    // Token isteği - örnekteki gibi
+    const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-api-key': ETSY_CLIENT_ID,
+      },
+      body: qs.stringify({
+        'grant_type': 'authorization_code',
+        'client_id': ETSY_CLIENT_ID,
+        'redirect_uri': ETSY_REDIRECT_URI,
+        'code': code,
+        'code_verifier': authSession.code_verifier,
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("Token exchange error:", response.status, errorText)
+      throw new Error(`Token exchange failed: ${response.status} - ${errorText}`)
+    }
+
+    const tokens: EtsyTokens = await response.json()
+    console.log("Token exchange successful")
+
+    // Code verifier'ı temizle
+    await supabaseAdmin
+      .from("etsy_auth_sessions")
+      .update({ code_verifier: null })
+      .eq("user_id", userId)
+
+    // Token'ları veritabanına kaydet
+    const { error: tokenError } = await supabaseAdmin.from("etsy_tokens").upsert({
+      user_id: userId,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      token_type: tokens.token_type,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    if (tokenError) {
+      console.error("Token storage error:", tokenError)
+      throw new Error(`Failed to store tokens: ${tokenError.message}`)
+    }
+
+    console.log("Tokens stored successfully")
+    return tokens
+
+  } catch (error) {
+    console.error("Token exchange error:", error)
+    throw error
   }
-
-  // Store tokens in DB
-  const { error: tokenError } = await supabaseAdmin.from("etsy_tokens").upsert({
-    user_id: userId,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-    expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-    created_at: new Date().toISOString(),
-  })
-
-  if (tokenError) {
-    console.error("Failed to store tokens:", tokenError)
-    throw tokenError
-  }
-
-  // Clean up auth session
-  await supabaseAdmin.from("etsy_auth_sessions").delete().eq("user_id", userId)
-
-  return tokens
 }
 
 export async function refreshEtsyToken(userId: string): Promise<EtsyTokens> {
-  const { data: tokenData } = await supabaseAdmin
-    .from("etsy_tokens")
-    .select("refresh_token")
-    .eq("user_id", userId)
-    .single()
+  console.log("Refreshing token for user:", userId)
+  
+  try {
+    const { data: tokenData } = await supabaseAdmin
+      .from("etsy_tokens")
+      .select("refresh_token")
+      .eq("user_id", userId)
+      .single()
 
-  if (!tokenData) throw new Error("No refresh token found")
+    if (!tokenData?.refresh_token) {
+      throw new Error("No refresh token found")
+    }
 
-  const body = qs.stringify({
-    grant_type: "refresh_token",
-    client_id: ETSY_CLIENT_ID,
-    refresh_token: tokenData.refresh_token,
-  })
+    // Refresh token isteği - örnekteki gibi
+    const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'x-api-key': ETSY_CLIENT_ID,
+      },
+      body: qs.stringify({
+        'grant_type': 'refresh_token',
+        'client_id': ETSY_CLIENT_ID,
+        'refresh_token': tokenData.refresh_token,
+      })
+    })
 
-  const response = await fetch(`${ETSY_API_BASE}/public/oauth/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "x-api-key": ETSY_CLIENT_ID,
-    },
-    body,
-  })
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("Token refresh error:", response.status, errorText)
+      throw new Error(`Token refresh failed: ${response.status} - ${errorText}`)
+    }
 
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Token refresh failed: ${error}`)
+    const tokens: EtsyTokens = await response.json()
+    console.log("Token refresh successful")
+
+    // Token'ları güncelle
+    const { error: updateError } = await supabaseAdmin.from("etsy_tokens").upsert({
+      user_id: userId,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      token_type: tokens.token_type,
+      updated_at: new Date().toISOString(),
+    })
+
+    if (updateError) {
+      console.error("Token update error:", updateError)
+      throw new Error(`Failed to update tokens: ${updateError.message}`)
+    }
+
+    console.log("Tokens updated successfully")
+    return tokens
+
+  } catch (error) {
+    console.error("Token refresh error:", error)
+    throw error
   }
-
-  const tokens: EtsyTokens = await response.json()
-
-  // Update tokens in DB
-  await supabaseAdmin.from("etsy_tokens").upsert({
-    user_id: userId,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-    expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
-  })
-
-  return tokens
 }
 
 async function getValidAccessToken(userId: string): Promise<string> {

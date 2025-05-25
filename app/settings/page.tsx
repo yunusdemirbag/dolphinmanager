@@ -172,24 +172,22 @@ export default function SettingsPage() {
         return
       }
 
-      // Etsy OAuth URL'ini al
+      // Etsy OAuth URL'ini al - GET request kullan
       const response = await fetch('/api/etsy/auth', {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: user.id })
+        }
       })
 
       if (response.ok) {
         const data = await response.json()
-        // Yeni sekmede Etsy OAuth'a yönlendir
-        window.open(data.authUrl, '_blank')
-        
-        // Kullanıcıya bilgi ver
-        alert("Etsy bağlantısı için yeni sekme açıldı. Lütfen Etsy'de yetkilendirme işlemini tamamlayın.")
+        // Aynı sekmede Etsy OAuth'a yönlendir
+        window.location.href = data.authUrl
       } else {
-        throw new Error("Etsy bağlantı URL'si alınamadı")
+        const errorData = await response.json()
+        console.error("Etsy auth error:", errorData)
+        alert(`Etsy bağlantısı başlatılamadı: ${errorData.details || errorData.error}`)
       }
     } catch (error) {
       console.error("Etsy reconnect error:", error)

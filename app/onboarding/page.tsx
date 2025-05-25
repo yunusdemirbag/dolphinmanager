@@ -20,26 +20,32 @@ export default function OnboardingPage() {
         setLoading(false)
         return
       }
-      // /api/etsy/login endpoint'ine user token ile fetch
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
-      const res = await fetch("/api/etsy/login", {
-        method: "GET",
+
+      console.log("Current user ID:", user.id)
+
+      // /api/etsy/auth endpoint'ine POST request
+      const response = await fetch("/api/etsy/auth", {
+        method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({ userId: user.id }),
       })
-      if (res.redirected) {
-        window.location.href = res.url
-        return
+
+      if (!response.ok) {
+        const error = await response.text()
+        throw new Error(error)
       }
-      const data = await res.json()
-      if (data.error) {
-        alert(data.error)
-      }
+
+      const { authUrl } = await response.json()
+      console.log("Redirecting to Etsy auth:", authUrl)
+
+      // Etsy'ye yönlendir
+      window.location.href = authUrl
+
     } catch (error) {
       console.error("Etsy bağlantı hatası:", error)
-      alert("Etsy bağlantı hatası")
+      alert("Etsy bağlantı hatası: " + String(error))
     } finally {
       setLoading(false)
     }

@@ -1,6 +1,47 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase"
 import { getEtsyAuthUrl } from "@/lib/etsy-api"
+import { createServerSupabase } from "@/lib/supabase"
+
+export async function POST(request: NextRequest) {
+  try {
+    // Request body'den userId al
+    const { userId } = await request.json()
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: "User ID required" },
+        { status: 400 }
+      )
+    }
+    
+    // Kullanıcı doğrulaması
+    const supabase = createServerSupabase()
+    const { data: { user }, error } = await supabase.auth.getUser()
+    
+    if (error || !user || user.id !== userId) {
+      console.error("User validation failed:", { error, user, userId })
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+    
+    console.log("Generating Etsy auth URL for user:", userId)
+    
+    // Etsy auth URL'ini oluştur
+    const authUrl = await getEtsyAuthUrl(userId)
+    
+    return NextResponse.json({ authUrl })
+    
+  } catch (error) {
+    console.error("Etsy auth error:", error)
+    return NextResponse.json(
+      { error: String(error) || "Failed to generate auth URL" },
+      { status: 500 }
+    )
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {

@@ -460,9 +460,21 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
         {/* Connected Stores - Sadece gerçek bağlı mağazalar */}
         {connectedStores.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Bağlı Mağazalar ({connectedStores.length})
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Bağlı Mağazalar ({connectedStores.length})
+              </h2>
+              {connectedStores.length < 5 && (
+                <Button onClick={handleConnectEtsy} disabled={reconnecting} size="sm">
+                  {reconnecting ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4 mr-2" />
+                  )}
+                  Yeni Mağaza Ekle
+                </Button>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {connectedStores.map((store) => (
                 <StoreCard 
@@ -473,6 +485,16 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
                 />
               ))}
             </div>
+            {connectedStores.length >= 5 && (
+              <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 mr-2" />
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <strong>Maksimum mağaza sayısına ulaştınız.</strong> Etsy Personal Access en fazla 5 mağaza bağlantısına izin verir.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

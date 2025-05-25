@@ -9,7 +9,7 @@ const ETSY_OAUTH_BASE = "https://www.etsy.com/oauth"
 const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
 const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || ""
 // Personal Access için gerekli scope'lar - Gemini'nin önerdiği gibi
-const ETSY_SCOPE = process.env.ETSY_SCOPE || "shops_r listings_r transactions_r profile_r"
+const ETSY_SCOPE = process.env.ETSY_SCOPE || "shops_r shops_w listings_r listings_w listings_d transactions_r profile_r"
 
 // Environment variables kontrolü
 function checkEtsyConfig() {
@@ -678,4 +678,809 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
     // Artık hata fırlatmıyoruz - bağlantı başarılı sayılsın
     console.log("Sync completed with limitations")
   }
+}
+
+// Finansal veri tipleri
+export interface EtsyPayment {
+  payment_id: number
+  buyer_user_id: number
+  shop_id: number
+  receipt_id: number
+  amount_gross: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  amount_fees: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  amount_net: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  posted_gross: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  posted_fees: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  posted_net: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  adjusted_gross: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  adjusted_fees: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  adjusted_net: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  currency: string
+  shop_currency: string
+  buyer_currency: string
+  shipping_user_id: number
+  shipping_address_id: number
+  billing_address_id: number
+  status: string
+  shipped_timestamp: number
+  create_timestamp: number
+  update_timestamp: number
+}
+
+export interface EtsyReceipt {
+  receipt_id: number
+  receipt_type: number
+  seller_user_id: number
+  seller_email: string
+  buyer_user_id: number
+  buyer_email: string
+  name: string
+  first_line: string
+  second_line: string
+  city: string
+  state: string
+  zip: string
+  formatted_address: string
+  country_iso: string
+  payment_method: string
+  payment_email: string
+  message_from_seller: string
+  message_from_buyer: string
+  message_from_payment: string
+  is_paid: boolean
+  is_shipped: boolean
+  create_timestamp: number
+  update_timestamp: number
+  grandtotal: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  subtotal: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  total_price: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  total_shipping_cost: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  total_tax_cost: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  total_vat_cost: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  discount_amt: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  gift_wrap_price: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+}
+
+export interface EtsyLedgerEntry {
+  entry_id: number
+  ledger_id: number
+  sequence_number: number
+  amount: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  currency: string
+  description: string
+  balance: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  create_date: number
+}
+
+// Etsy Payments API - Gerçek ödeme verilerini çeker
+export async function getEtsyPayments(
+  userId: string,
+  shopId: number,
+  limit = 25,
+  offset = 0
+): Promise<{
+  payments: EtsyPayment[]
+  count: number
+}> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  })
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/payments?${params}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Etsy Payments API error:", errorData)
+    throw new Error(`Failed to fetch payments: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return {
+    payments: data.results || [],
+    count: data.count || 0,
+  }
+}
+
+// Etsy Receipts API - Sipariş verilerini çeker
+export async function getEtsyReceipts(
+  userId: string,
+  shopId: number,
+  limit = 25,
+  offset = 0
+): Promise<{
+  receipts: EtsyReceipt[]
+  count: number
+}> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  })
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/receipts?${params}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Etsy Receipts API error:", errorData)
+    throw new Error(`Failed to fetch receipts: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return {
+    receipts: data.results || [],
+    count: data.count || 0,
+  }
+}
+
+// Etsy Ledger Entries API - Hesap hareketlerini çeker
+export async function getEtsyLedgerEntries(
+  userId: string,
+  shopId: number,
+  limit = 25,
+  offset = 0,
+  minCreated?: number,
+  maxCreated?: number
+): Promise<{
+  entries: EtsyLedgerEntry[]
+  count: number
+}> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  })
+
+  if (minCreated) {
+    params.append('min_created', minCreated.toString())
+  }
+  if (maxCreated) {
+    params.append('max_created', maxCreated.toString())
+  }
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/payment-account/ledger-entries?${params}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Etsy Ledger API error:", errorData)
+    throw new Error(`Failed to fetch ledger entries: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return {
+    entries: data.results || [],
+    count: data.count || 0,
+  }
+}
+
+// Finansal özet hesaplama fonksiyonu
+export async function calculateFinancialSummary(
+  userId: string,
+  shopId: number,
+  days = 30
+): Promise<{
+  totalRevenue: number
+  totalOrders: number
+  totalFees: number
+  netRevenue: number
+  averageOrderValue: number
+  currency: string
+}> {
+  try {
+    // Son 30 günün timestamp'i
+    const thirtyDaysAgo = Math.floor((Date.now() - (days * 24 * 60 * 60 * 1000)) / 1000)
+    
+    // Payments ve receipts'i paralel olarak çek
+    const [paymentsResult, receiptsResult] = await Promise.all([
+      getEtsyPayments(userId, shopId, 100, 0),
+      getEtsyReceipts(userId, shopId, 100, 0)
+    ])
+
+    const { payments } = paymentsResult
+    const { receipts } = receiptsResult
+
+    // Son 30 günün verilerini filtrele
+    const recentPayments = payments.filter(payment => 
+      payment.create_timestamp >= thirtyDaysAgo
+    )
+    
+    const recentReceipts = receipts.filter(receipt => 
+      receipt.create_timestamp >= thirtyDaysAgo && receipt.is_paid
+    )
+
+    // Finansal hesaplamalar
+    let totalRevenue = 0
+    let totalFees = 0
+    let currency = 'USD'
+
+    recentPayments.forEach(payment => {
+      totalRevenue += payment.amount_gross.amount / payment.amount_gross.divisor
+      totalFees += payment.amount_fees.amount / payment.amount_fees.divisor
+      currency = payment.amount_gross.currency_code
+    })
+
+    const netRevenue = totalRevenue - totalFees
+    const totalOrders = recentReceipts.length
+    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+
+    return {
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      totalOrders,
+      totalFees: Math.round(totalFees * 100) / 100,
+      netRevenue: Math.round(netRevenue * 100) / 100,
+      averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+      currency
+    }
+  } catch (error) {
+    console.error("Error calculating financial summary:", error)
+    // Hata durumunda boş veri döndür
+    return {
+      totalRevenue: 0,
+      totalOrders: 0,
+      totalFees: 0,
+      netRevenue: 0,
+      averageOrderValue: 0,
+      currency: 'USD'
+    }
+  }
+}
+
+// ===== ETSY LISTING CRUD OPERATIONS =====
+
+export interface CreateListingData {
+  quantity: number
+  title: string
+  description: string
+  price: number // USD cents (örn: 1000 = $10.00)
+  who_made: "i_did" | "someone_else" | "collective"
+  when_made: "made_to_order" | "2020_2024" | "2010_2019" | "2000_2009" | "1990s" | "1980s" | "1970s" | "1960s" | "1950s" | "1940s" | "1930s" | "1920s" | "1910s" | "1900s" | "1800s" | "1700s" | "before_1700"
+  taxonomy_id: number
+  shipping_profile_id?: number
+  materials?: string[]
+  tags?: string[]
+  image_ids?: number[]
+  is_digital?: boolean
+  processing_min?: number
+  processing_max?: number
+}
+
+export interface UpdateListingData {
+  title?: string
+  description?: string
+  price?: number
+  quantity?: number
+  tags?: string[]
+  materials?: string[]
+  state?: "active" | "inactive" | "draft"
+  shipping_profile_id?: number
+  processing_min?: number
+  processing_max?: number
+}
+
+// Yeni listing oluştur (draft olarak)
+export async function createDraftListing(
+  userId: string,
+  shopId: number,
+  listingData: CreateListingData
+): Promise<EtsyListing> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const formData = new URLSearchParams()
+  formData.append('quantity', listingData.quantity.toString())
+  formData.append('title', listingData.title)
+  formData.append('description', listingData.description)
+  formData.append('price', listingData.price.toString())
+  formData.append('who_made', listingData.who_made)
+  formData.append('when_made', listingData.when_made)
+  formData.append('taxonomy_id', listingData.taxonomy_id.toString())
+
+  if (listingData.shipping_profile_id) {
+    formData.append('shipping_profile_id', listingData.shipping_profile_id.toString())
+  }
+  if (listingData.materials) {
+    listingData.materials.forEach(material => formData.append('materials', material))
+  }
+  if (listingData.tags) {
+    listingData.tags.forEach(tag => formData.append('tags', tag))
+  }
+  if (listingData.image_ids) {
+    formData.append('image_ids', listingData.image_ids.join(','))
+  }
+  if (listingData.is_digital) {
+    formData.append('is_digital', 'true')
+  }
+  if (listingData.processing_min) {
+    formData.append('processing_min', listingData.processing_min.toString())
+  }
+  if (listingData.processing_max) {
+    formData.append('processing_max', listingData.processing_max.toString())
+  }
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Create listing error:", errorData)
+    throw new Error(`Failed to create listing: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data
+}
+
+// Listing güncelle
+export async function updateListing(
+  userId: string,
+  shopId: number,
+  listingId: number,
+  updateData: UpdateListingData
+): Promise<EtsyListing> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const formData = new URLSearchParams()
+  
+  if (updateData.title) formData.append('title', updateData.title)
+  if (updateData.description) formData.append('description', updateData.description)
+  if (updateData.price) formData.append('price', updateData.price.toString())
+  if (updateData.quantity) formData.append('quantity', updateData.quantity.toString())
+  if (updateData.state) formData.append('state', updateData.state)
+  if (updateData.shipping_profile_id) formData.append('shipping_profile_id', updateData.shipping_profile_id.toString())
+  if (updateData.processing_min) formData.append('processing_min', updateData.processing_min.toString())
+  if (updateData.processing_max) formData.append('processing_max', updateData.processing_max.toString())
+  
+  if (updateData.tags) {
+    updateData.tags.forEach(tag => formData.append('tags', tag))
+  }
+  if (updateData.materials) {
+    updateData.materials.forEach(material => formData.append('materials', material))
+  }
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Update listing error:", errorData)
+    throw new Error(`Failed to update listing: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data
+}
+
+// Listing sil
+export async function deleteListing(
+  userId: string,
+  listingId: number
+): Promise<void> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const response = await fetch(`${ETSY_API_BASE}/application/listings/${listingId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Delete listing error:", errorData)
+    throw new Error(`Failed to delete listing: ${errorData.error || response.statusText}`)
+  }
+}
+
+// Listing'e resim yükle
+export async function uploadListingImage(
+  userId: string,
+  shopId: number,
+  listingId: number,
+  imageFile: File | Buffer,
+  filename?: string
+): Promise<any> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const formData = new FormData()
+  
+  if (imageFile instanceof File) {
+    formData.append('image', imageFile)
+  } else {
+    // Buffer için
+    const blob = new Blob([imageFile])
+    formData.append('image', blob, filename || 'image.jpg')
+  }
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Upload image error:", errorData)
+    throw new Error(`Failed to upload image: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data
+}
+
+// ===== SHOP MANAGEMENT =====
+
+export interface UpdateShopData {
+  title?: string
+  announcement?: string
+  sale_message?: string
+  digital_sale_message?: string
+}
+
+// Shop bilgilerini güncelle
+export async function updateShop(
+  userId: string,
+  shopId: number,
+  updateData: UpdateShopData
+): Promise<EtsyStore> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const formData = new URLSearchParams()
+  
+  if (updateData.title) formData.append('title', updateData.title)
+  if (updateData.announcement) formData.append('announcement', updateData.announcement)
+  if (updateData.sale_message) formData.append('sale_message', updateData.sale_message)
+  if (updateData.digital_sale_message) formData.append('digital_sale_message', updateData.digital_sale_message)
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Update shop error:", errorData)
+    throw new Error(`Failed to update shop: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data
+}
+
+// ===== SHOP SECTIONS =====
+
+export interface ShopSection {
+  shop_section_id: number
+  title: string
+  rank: number
+  user_id: number
+  active_listing_count: number
+}
+
+// Shop section oluştur
+export async function createShopSection(
+  userId: string,
+  shopId: number,
+  title: string
+): Promise<ShopSection> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const formData = new URLSearchParams()
+  formData.append('title', title)
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/sections`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Create section error:", errorData)
+    throw new Error(`Failed to create section: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data
+}
+
+// Shop section'ları listele
+export async function getShopSections(
+  userId: string,
+  shopId: number
+): Promise<ShopSection[]> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/sections`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Get sections error:", errorData)
+    throw new Error(`Failed to get sections: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data.results || []
+}
+
+// ===== SHIPPING PROFILES =====
+
+export interface ShippingProfile {
+  shipping_profile_id: number
+  title: string
+  user_id: number
+  min_processing_time: number
+  max_processing_time: number
+  processing_time_unit: string
+  origin_country_iso: string
+}
+
+export interface CreateShippingProfileData {
+  title: string
+  origin_country_iso: string
+  primary_cost: number
+  secondary_cost: number
+  min_processing_time: number
+  max_processing_time: number
+  destination_country_iso?: string
+  destination_region?: "eu" | "non_eu" | "none"
+}
+
+// Shipping profile oluştur
+export async function createShippingProfile(
+  userId: string,
+  shopId: number,
+  profileData: CreateShippingProfileData
+): Promise<ShippingProfile> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const formData = new URLSearchParams()
+  formData.append('title', profileData.title)
+  formData.append('origin_country_iso', profileData.origin_country_iso)
+  formData.append('primary_cost', profileData.primary_cost.toString())
+  formData.append('secondary_cost', profileData.secondary_cost.toString())
+  formData.append('min_processing_time', profileData.min_processing_time.toString())
+  formData.append('max_processing_time', profileData.max_processing_time.toString())
+
+  if (profileData.destination_country_iso) {
+    formData.append('destination_country_iso', profileData.destination_country_iso)
+  }
+  if (profileData.destination_region) {
+    formData.append('destination_region', profileData.destination_region)
+  }
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Create shipping profile error:", errorData)
+    throw new Error(`Failed to create shipping profile: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data
+}
+
+// Shipping profile'ları listele
+export async function getShippingProfiles(
+  userId: string,
+  shopId: number
+): Promise<ShippingProfile[]> {
+  const accessToken = await getValidAccessToken(userId)
+
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-api-key": ETSY_CLIENT_ID,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Get shipping profiles error:", errorData)
+    throw new Error(`Failed to get shipping profiles: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data.results || []
+}
+
+// ===== TAXONOMY & PROPERTIES =====
+
+export interface TaxonomyNode {
+  id: number
+  level: number
+  name: string
+  parent_id?: number
+  path: string[]
+  children?: TaxonomyNode[]
+}
+
+export interface Property {
+  property_id: number
+  name: string
+  display_name: string
+  scales?: PropertyScale[]
+  possible_values?: PropertyValue[]
+}
+
+export interface PropertyScale {
+  scale_id: number
+  display_name: string
+  description: string
+}
+
+export interface PropertyValue {
+  value_id: number
+  name: string
+  scale_id?: number
+}
+
+// Seller taxonomy node'larını getir
+export async function getSellerTaxonomyNodes(): Promise<TaxonomyNode[]> {
+  const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes`, {
+    headers: {
+      "x-api-key": ETSY_CLIENT_ID,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Get taxonomy error:", errorData)
+    throw new Error(`Failed to get taxonomy: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data.results || []
+}
+
+// Taxonomy ID'ye göre property'leri getir
+export async function getPropertiesByTaxonomyId(taxonomyId: number): Promise<Property[]> {
+  const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes/${taxonomyId}/properties`, {
+    headers: {
+      "x-api-key": ETSY_CLIENT_ID,
+    },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    console.error("Get properties error:", errorData)
+    throw new Error(`Failed to get properties: ${errorData.error || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data.results || []
 }

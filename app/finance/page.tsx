@@ -57,20 +57,63 @@ export default function FinancePage() {
     fetchExchangeRate()
   }, [])
 
-  const loadFinancialData = () => {
-    // Demo veri kaldırıldı - gerçek API'den veri çekilecek
-    setStoreFinances([])
+  const loadFinancialData = async () => {
+    setLoading(true)
+    try {
+      // Gerçek Etsy finansal verilerini çek
+      const response = await fetch('/api/etsy/stats')
+      
+      if (response.ok) {
+        const data = await response.json()
+        
+        if (data.connected && data.store) {
+          // Etsy verilerinden store finance objesi oluştur
+          const storeFinance: StoreFinance = {
+            id: data.store.shop_id.toString(),
+            storeName: data.store.shop_name,
+            totalSales: data.revenue || 0,
+            etsyCommissions: data.fees || 0,
+            productionCosts: 0, // Bu veri Etsy'de yok, ayrı hesaplanmalı
+            shippingCosts: 0, // Bu veri Etsy'de yok, ayrı hesaplanmalı
+            netProfit: data.net_revenue || 0,
+            profitMargin: data.revenue > 0 ? ((data.net_revenue || 0) / data.revenue * 100) : 0,
+            status: (data.net_revenue || 0) > 0 ? "profit" : (data.net_revenue || 0) < 0 ? "loss" : "neutral",
+            expectedPayment: data.net_revenue || 0,
+            nextPaymentDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 gün sonra
+            pendingOrders: data.orders || 0
+          }
 
-    // Genel özet sıfırla
-    setSummary({
-      totalBalance: 0,
-      expectedIncome: 0,
-      pendingExpenses: 0,
-      netPosition: 0,
-      usdToTry: 38.93
-    })
+          setStoreFinances([storeFinance])
 
-    setLoading(false)
+          // Genel özet güncelle
+          setSummary(prev => ({
+            ...prev,
+            totalBalance: data.net_revenue || 0,
+            expectedIncome: data.revenue || 0,
+            pendingExpenses: data.fees || 0,
+            netPosition: data.net_revenue || 0
+          }))
+        } else {
+          // Etsy bağlı değil - boş veri
+          setStoreFinances([])
+          setSummary(prev => ({
+            ...prev,
+            totalBalance: 0,
+            expectedIncome: 0,
+            pendingExpenses: 0,
+            netPosition: 0
+          }))
+        }
+      } else {
+        console.error('Failed to fetch financial data')
+        setStoreFinances([])
+      }
+    } catch (error) {
+      console.error('Error loading financial data:', error)
+      setStoreFinances([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const fetchExchangeRate = async () => {

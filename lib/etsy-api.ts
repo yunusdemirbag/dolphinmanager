@@ -77,12 +77,22 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
   const codeVerifier = generateCodeVerifier()
   const codeChallenge = generateCodeChallenge(codeVerifier)
 
+  console.log("Generated PKCE:", { 
+    verifierLength: codeVerifier.length,
+    challengeLength: codeChallenge.length 
+  })
+
   // Store code verifier in DB for later use
-  await supabaseAdmin.from("etsy_auth_sessions").upsert({
+  const { error } = await supabaseAdmin.from("etsy_auth_sessions").upsert({
     user_id: userId,
     code_verifier: codeVerifier,
     created_at: new Date().toISOString(),
   })
+
+  if (error) {
+    console.error("Failed to store code verifier:", error)
+    throw error
+  }
 
   const params = new URLSearchParams({
     response_type: "code",
@@ -94,18 +104,28 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
     code_challenge_method: "S256",
   })
 
-  return `${ETSY_OAUTH_BASE}/connect?${params.toString()}`
+  const authUrl = `${ETSY_OAUTH_BASE}/connect?${params.toString()}`
+  console.log("Auth URL:", authUrl)
+  
+  return authUrl
 }
 
 export async function exchangeCodeForToken(code: string, userId: string): Promise<EtsyTokens> {
+  console.log("Exchanging code for token - userId:", userId)
+  
   // Get stored code verifier
-  const { data: authSession } = await supabaseAdmin
+  const { data: authSession, error: sessionError } = await supabaseAdmin
     .from("etsy_auth_sessions")
     .select("code_verifier")
     .eq("user_id", userId)
     .single()
 
-  if (!authSession) throw new Error("Code verifier not found")
+  if (sessionError || !authSession) {
+    console.error("Code verifier not found:", sessionError)
+    throw new Error("Code verifier not found")
+  }
+
+  console.log("Found code verifier, making token request...")
 
   const body = qs.stringify({
     grant_type: "authorization_code",
@@ -124,21 +144,34 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
     body,
   })
 
+  const responseText = await response.text()
+  console.log("Token response status:", response.status)
+  console.log("Token response:", responseText)
+
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Token exchange failed: ${error}`)
+    throw new Error(`Token exchange failed: ${responseText}`)
   }
 
-  const tokens: EtsyTokens = await response.json()
+  let tokens: EtsyTokens
+  try {
+    tokens = JSON.parse(responseText)
+  } catch (e) {
+    throw new Error(`Failed to parse token response: ${responseText}`)
+  }
 
   // Store tokens in DB
-  await supabaseAdmin.from("etsy_tokens").upsert({
+  const { error: tokenError } = await supabaseAdmin.from("etsy_tokens").upsert({
     user_id: userId,
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
     expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
     created_at: new Date().toISOString(),
   })
+
+  if (tokenError) {
+    console.error("Failed to store tokens:", tokenError)
+    throw tokenError
+  }
 
   // Clean up auth session
   await supabaseAdmin.from("etsy_auth_sessions").delete().eq("user_id", userId)

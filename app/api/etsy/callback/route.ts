@@ -7,18 +7,22 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code")
   const state = searchParams.get("state") // Bu user_id olacak
   const error = searchParams.get("error")
+  const error_description = searchParams.get("error_description")
+
+  console.log("Etsy callback params:", { code, state, error, error_description })
 
   // Hata kontrolü
   if (error) {
-    console.error("Etsy OAuth error:", error)
+    console.error("Etsy OAuth error:", error, error_description)
     return NextResponse.redirect(
-      new URL(`/dashboard?error=${error}`, request.url)
+      new URL(`/onboarding?error=${error}`, request.url)
     )
   }
 
   if (!code || !state) {
+    console.error("Missing params:", { code, state })
     return NextResponse.redirect(
-      new URL("/dashboard?error=missing_params", request.url)
+      new URL("/onboarding?error=missing_params", request.url)
     )
   }
 
@@ -32,9 +36,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Token değişimi
+    console.log("Exchanging code for token...")
     await exchangeCodeForToken(code, state)
     
     // Etsy verilerini senkronize et
+    console.log("Syncing Etsy data...")
     await syncEtsyDataToDatabase(state)
 
     // Başarılı - dashboard'a yönlendir
@@ -44,7 +50,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Etsy callback error:", error)
     return NextResponse.redirect(
-      new URL("/dashboard?error=etsy_connection_failed", request.url)
+      new URL("/onboarding?error=etsy_connection_failed", request.url)
     )
   }
 }

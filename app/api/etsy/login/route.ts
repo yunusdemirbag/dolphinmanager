@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase"
 import { generatePKCE } from "@/lib/etsy-api"
 import { NextRequest, NextResponse } from "next/server"
+import crypto from "crypto"
 
 export async function GET(req: NextRequest) {
   // supabaseAdmin direkt kullan
@@ -9,8 +10,9 @@ export async function GET(req: NextRequest) {
     // Generate PKCE
     const { codeVerifier, codeChallenge } = generatePKCE()
     
-    // Oluştur ve kaydet
-    const state = Math.random().toString(36).substring(2, 15)
+    // Daha güvenilir state üretimi için UUID kullan
+    const state = crypto.randomUUID().replace(/-/g, "").substring(0, 10)
+    console.log("Generated state:", state)
     
     // Etsy OAuth URL
     const etsyClientId = process.env.ETSY_CLIENT_ID
@@ -30,15 +32,26 @@ export async function GET(req: NextRequest) {
     })
     
     // Create a temporary ID for this session
-    const tempUserId = `temp_${Math.random().toString(36).substring(2, 15)}`
+    const tempUserId = `temp_${crypto.randomUUID().substring(0, 8)}`
     
-    // Store in Supabase
-    await supabaseAdmin.from("oauth_states").insert({
+    // Store in Supabase - eskilerini temizle
+    // Önce eski kayıtları temizle
+    await supabaseAdmin.from("oauth_states").delete().lt("created_at", new Date(Date.now() - 86400000).toISOString())
+    
+    // Yeni state'i kaydet
+    const { data, error } = await supabaseAdmin.from("oauth_states").insert({
       state: state,
       code_verifier: codeVerifier,
       user_id: tempUserId,
       created_at: new Date().toISOString(),
     })
+    
+    if (error) {
+      console.error("Error storing state in Supabase:", error)
+      return NextResponse.json({ error: "Failed to store OAuth state" }, { status: 500 })
+    }
+    
+    console.log("State stored successfully:", state)
     
     // Etsy OAuth URL'sine yönlendir
     const authUrl = `https://www.etsy.com/oauth/connect?${etsyAuthParams.toString()}`

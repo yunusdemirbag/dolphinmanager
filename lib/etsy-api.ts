@@ -325,8 +325,8 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .update({
-        etsy_shop_name: "Connected",
-        etsy_shop_id: "pending",
+        etsy_shop_name: "Etsy Store Connected",
+        etsy_shop_id: "connected",
       })
       .eq("id", userId)
     

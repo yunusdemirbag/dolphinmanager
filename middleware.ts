@@ -3,14 +3,9 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export async function middleware(req: NextRequest) {
-  // Ana sayfayı ve tüm diğer sayfaları (API hariç) onboarding'e yönlendir
-  const isRootOrAuthPage = req.nextUrl.pathname === "/" || 
-                          req.nextUrl.pathname.startsWith("/auth") ||
-                          req.nextUrl.pathname.startsWith("/dashboard")
-  
-  // Onboarding sayfasını gösterilmesine izin ver
-  const isOnboardingPage = req.nextUrl.pathname.startsWith("/onboarding")
-  
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+
   // Statik kaynaklara ve API isteklerine izin ver
   const isApiOrStatic = req.nextUrl.pathname.startsWith("/api") || 
                        req.nextUrl.pathname.startsWith("/_next") || 
@@ -18,15 +13,49 @@ export async function middleware(req: NextRequest) {
                        req.nextUrl.pathname.endsWith(".svg") ||
                        req.nextUrl.pathname.endsWith(".png")
   
-  // Belirli hizmet sayfalarına izin ver
-  const isServicePage = req.nextUrl.pathname === "/terms" || 
-                       req.nextUrl.pathname === "/privacy"
+  if (isApiOrStatic) {
+    return res
+  }
+
+  // Kullanıcı oturumunu kontrol et
+  const { data: { user } } = await supabase.auth.getUser()
   
-  if (isRootOrAuthPage && !isApiOrStatic && !isOnboardingPage && !isServicePage) {
-    return NextResponse.redirect(new URL("/onboarding", req.url))
+  // Giriş yapmamış kullanıcıları auth sayfasına yönlendir
+  if (!user && !req.nextUrl.pathname.startsWith("/auth")) {
+    return NextResponse.redirect(new URL("/auth/login", req.url))
   }
   
-  return NextResponse.next()
+  // Giriş yapmış kullanıcı için Etsy bağlantısını kontrol et
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("etsy_shop_name")
+      .eq("id", user.id)
+      .single()
+    
+    const hasEtsyConnection = profile?.etsy_shop_name && profile.etsy_shop_name !== "pending"
+    
+    // Ana sayfa istekleri
+    if (req.nextUrl.pathname === "/") {
+      if (hasEtsyConnection) {
+        return NextResponse.redirect(new URL("/dashboard", req.url))
+      } else {
+        return NextResponse.redirect(new URL("/onboarding", req.url))
+      }
+    }
+    
+    // Etsy bağlantısı varsa onboarding'e erişimi engelle
+    if (hasEtsyConnection && req.nextUrl.pathname.startsWith("/onboarding")) {
+      return NextResponse.redirect(new URL("/dashboard", req.url))
+    }
+    
+    // Etsy bağlantısı yoksa dashboard'a erişimi engelle
+    if (!hasEtsyConnection && req.nextUrl.pathname.startsWith("/dashboard")) {
+      return NextResponse.redirect(new URL("/onboarding", req.url))
+    }
+  }
+  
+  return res
 }
 
 export const config = {

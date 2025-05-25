@@ -1,31 +1,26 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { getEtsyAuthUrl } from "@/lib/etsy-api"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const { userId } = await request.json()
     
-    // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
-      console.log("Auth error:", userError)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!userId) {
+      return NextResponse.json(
+        { error: "User ID is required" },
+        { status: 400 }
+      )
     }
 
-    console.log("Generating Etsy auth URL for user:", user.id)
-    
-    // Etsy auth URL'ini oluştur
-    const authUrl = await getEtsyAuthUrl(user.id)
+    const authUrl = await getEtsyAuthUrl(userId)
     
     return NextResponse.json({ authUrl })
-    
-  } catch (error) {
-    console.error("Etsy auth error:", error)
+  } catch (error: any) {
+    console.error("Etsy auth URL generation error:", error)
     return NextResponse.json(
-      { error: String(error) || "Failed to generate auth URL" },
+      { error: "Failed to generate auth URL", details: error.message },
       { status: 500 }
     )
   }

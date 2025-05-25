@@ -92,7 +92,6 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
       .insert({
         user_id: userId,
         code_verifier: codeVerifier,
-        state: userId,
       })
 
     if (error) {

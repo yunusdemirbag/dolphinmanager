@@ -64,9 +64,10 @@ interface StoresClientProps {
 
 export default function StoresClient({ user, storesData }: StoresClientProps) {
   const [stores, setStores] = useState<EtsyStore[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [etsyConnected, setEtsyConnected] = useState(false)
   const [reconnecting, setReconnecting] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const router = useRouter()
@@ -164,6 +165,39 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
       alert('Bağlantı hatası: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
       setReconnecting(false)
+    }
+  }
+
+  const handleResetEtsyConnection = async () => {
+    if (!confirm('Etsy bağlantısını tamamen sıfırlamak istediğinizden emin misiniz? Bu işlem tüm token\'ları ve bağlantı verilerini silecektir.')) {
+      return
+    }
+
+    setResetting(true)
+    try {
+      const response = await fetch('/api/etsy/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        alert('✅ Etsy bağlantısı başarıyla sıfırlandı! Şimdi yeniden bağlanabilirsiniz.')
+        setEtsyConnected(false)
+        setStores([])
+        // Sayfayı yenile
+        setTimeout(() => loadStores(), 1000)
+      } else {
+        const errorData = await response.json()
+        console.error('Reset error:', errorData)
+        alert(`Sıfırlama hatası: ${errorData.details || errorData.error}`)
+      }
+    } catch (error) {
+      console.error('Error resetting Etsy connection:', error)
+      alert('Sıfırlama hatası: ' + (error instanceof Error ? error.message : String(error)))
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -278,27 +312,35 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
                   </Badge>
                 )}
               </div>
-              <Button 
-                onClick={handleRefreshStores} 
-                disabled={refreshing}
-                variant="outline"
-                size="sm"
-              >
-                {refreshing ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4 mr-2" />
+              <div className="flex space-x-2">
+                {etsyConnected && (
+                  <>
+                    <button
+                      onClick={handleRefreshStores}
+                      disabled={refreshing}
+                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-50"
+                    >
+                      {refreshing ? 'Yenileniyor...' : 'Yenile'}
+                    </button>
+                    <button
+                      onClick={handleResetEtsyConnection}
+                      disabled={resetting}
+                      className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
+                    >
+                      {resetting ? 'Sıfırlanıyor...' : 'Bağlantıyı Sıfırla'}
+                    </button>
+                  </>
                 )}
-                Yenile
-              </Button>
-              <Button onClick={handleConnectEtsy} disabled={reconnecting}>
-                {reconnecting ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4 mr-2" />
+                {!etsyConnected && (
+                  <button
+                    onClick={handleConnectEtsy}
+                    disabled={reconnecting}
+                    className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 disabled:opacity-50"
+                  >
+                    {reconnecting ? 'Bağlanıyor...' : 'Etsy\'ye Bağlan'}
+                  </button>
                 )}
-                {reconnecting ? "Bağlanıyor..." : "Etsy Bağla"}
-              </Button>
+              </div>
             </div>
           </div>
         </div>

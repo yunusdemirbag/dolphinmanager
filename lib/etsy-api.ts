@@ -474,7 +474,14 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
             const data = JSON.parse(responseText)
             console.log("Shop endpoint parsed data:", JSON.stringify(data, null, 2))
             
-            const stores = data.results || data.shops || data || []
+            // Etsy API tek shop döndürürse onu array'e çevir
+            let stores = data.results || data.shops || data || []
+            
+            // Eğer tek obje döndürürse ve shop_id varsa, array'e çevir
+            if (!Array.isArray(stores) && stores.shop_id) {
+              console.log("Single shop object found, converting to array")
+              stores = [stores]
+            }
             
             if (Array.isArray(stores) && stores.length > 0) {
               console.log("SUCCESS! Found stores:", stores.length)
@@ -483,6 +490,7 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
             } else {
               console.log("Shop endpoint returned empty data")
               console.log("Data structure:", typeof data, Array.isArray(data))
+              console.log("Has shop_id:", !!data.shop_id)
             }
           } catch (parseError) {
             console.log("Shop endpoint JSON parse error:", parseError)

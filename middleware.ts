@@ -3,64 +3,32 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  // Protected routes
-  const protectedRoutes = ["/dashboard", "/products", "/orders", "/analytics", "/onboarding"]
-  const isProtectedRoute = protectedRoutes.some((route) => req.nextUrl.pathname.startsWith(route))
-
-  // Auth routes
-  const authRoutes = ["/auth/login", "/auth/register"]
-  const isAuthRoute = authRoutes.includes(req.nextUrl.pathname)
-
-  // Redirect logic
-  if (isProtectedRoute && !session) {
-    return NextResponse.redirect(new URL("/auth/login", req.url))
+  // Ana sayfayı ve tüm diğer sayfaları (API hariç) onboarding'e yönlendir
+  const isRootOrAuthPage = req.nextUrl.pathname === "/" || 
+                          req.nextUrl.pathname.startsWith("/auth") ||
+                          req.nextUrl.pathname.startsWith("/dashboard")
+  
+  // Onboarding sayfasını gösterilmesine izin ver
+  const isOnboardingPage = req.nextUrl.pathname.startsWith("/onboarding")
+  
+  // Statik kaynaklara ve API isteklerine izin ver
+  const isApiOrStatic = req.nextUrl.pathname.startsWith("/api") || 
+                       req.nextUrl.pathname.startsWith("/_next") || 
+                       req.nextUrl.pathname === "/favicon.ico" ||
+                       req.nextUrl.pathname.endsWith(".svg") ||
+                       req.nextUrl.pathname.endsWith(".png")
+  
+  // Belirli hizmet sayfalarına izin ver
+  const isServicePage = req.nextUrl.pathname === "/terms" || 
+                       req.nextUrl.pathname === "/privacy"
+  
+  if (isRootOrAuthPage && !isApiOrStatic && !isOnboardingPage && !isServicePage) {
+    return NextResponse.redirect(new URL("/onboarding", req.url))
   }
-
-  if (isAuthRoute && session) {
-    // Check if user needs onboarding
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("etsy_shop_name")
-      .eq("id", session.user.id)
-      .single()
-
-    if (!profile?.etsy_shop_name) {
-      return NextResponse.redirect(new URL("/onboarding", req.url))
-    } else {
-      return NextResponse.redirect(new URL("/dashboard", req.url))
-    }
-  }
-
-  // Redirect root to appropriate page
-  if (req.nextUrl.pathname === "/") {
-    if (session) {
-      // Check if user needs onboarding
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("etsy_shop_name")
-        .eq("id", session.user.id)
-        .single()
-
-      if (!profile?.etsy_shop_name) {
-        return NextResponse.redirect(new URL("/onboarding", req.url))
-      } else {
-        return NextResponse.redirect(new URL("/dashboard", req.url))
-      }
-    } else {
-      return NextResponse.redirect(new URL("/auth/login", req.url))
-    }
-  }
-
-  return res
+  
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 }

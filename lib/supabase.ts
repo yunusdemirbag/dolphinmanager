@@ -20,10 +20,10 @@ export const createClientSupabase = () => {
   return createClientComponentClient<Database>()
 }
 
-// Server-side Supabase client - only use in server components
-export const createServerSupabase = () => {
+// Server-side Supabase client with cookies - only use in server components
+export const createServerComponentSupabase = () => {
   if (typeof window !== "undefined") {
-    throw new Error("createServerSupabase should only be used in server components")
+    throw new Error("createServerComponentSupabase should only be used in server components")
   }
 
   const { cookies } = require("next/headers")
@@ -45,4 +45,9 @@ export const supabaseAdmin = createClient<Database>(
 // Simple client for basic operations (fallback)
 export const createSimpleClient = () => {
   return createClient<Database>(supabaseUrl, supabaseAnonKey)
+}
+
+// Server-side Supabase admin client for API routes
+export const createServerSupabase = () => {
+  return supabaseAdmin
 }

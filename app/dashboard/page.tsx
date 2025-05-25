@@ -1,166 +1,141 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { createClientSupabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ShoppingBag, Package, TrendingUp, DollarSign, Eye, Star, Plus, BarChart3, AlertTriangle } from "lucide-react"
-import { createClient } from "@/lib/supabase"
+import { Loader2, Store, Package, ShoppingBag, BarChart3, LogOut, Settings } from "lucide-react"
 
-export default function Dashboard() {
-  const router = useRouter()
+export default function DashboardPage() {
+  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<any>(null)
+  const supabase = createClientSupabase()
 
   useEffect(() => {
-    checkAuth()
+    const fetchProfile = async () => {
+      try {
+        // Profil bilgilerini getir
+        const { data } = await supabase.from("profiles").select("*").single()
+        setProfile(data)
+      } catch (error) {
+        console.error("Error fetching profile:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProfile()
   }, [])
 
-  const checkAuth = async () => {
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      router.push("/auth/login")
-    }
+  const handleLogout = async () => {
+    window.location.href = "/onboarding"
   }
 
-  const stats = [
-    {
-      title: "Toplam Satış",
-      value: "₺12,450",
-      change: "+12%",
-      icon: DollarSign,
-      color: "text-green-600",
-    },
-    {
-      title: "Aktif Ürünler",
-      value: "48",
-      change: "+3",
-      icon: Package,
-      color: "text-blue-600",
-    },
-    {
-      title: "Bekleyen Siparişler",
-      value: "7",
-      change: "-2",
-      icon: ShoppingBag,
-      color: "text-orange-600",
-    },
-    {
-      title: "Görüntülenme",
-      value: "1,234",
-      change: "+18%",
-      icon: Eye,
-      color: "text-purple-600",
-    },
-  ]
-
-  const recentOrders = [
-    {
-      id: "#1234",
-      customer: "Ayşe Yılmaz",
-      product: "Minimalist Mountain Canvas 16x20",
-      amount: "₺89",
-      status: "Hazırlanıyor",
-    },
-    { id: "#1235", customer: "Mehmet Kaya", product: "Boho Sunset Canvas 24x36", amount: "₺156", status: "Kargoda" },
-    {
-      id: "#1236",
-      customer: "Zehra Demir",
-      product: "Abstract Geometric Print 12x16",
-      amount: "₺67",
-      status: "Teslim Edildi",
-    },
-  ]
-
-  const topProducts = [
-    { name: "Minimalist Mountain Canvas", sales: 23, revenue: "₺2,047", rating: 4.8 },
-    { name: "Boho Sunset Canvas", sales: 18, revenue: "₺2,808", rating: 4.9 },
-    { name: "Abstract Geometric Print", sales: 15, revenue: "₺1,005", rating: 4.7 },
-  ]
-
-  const urgentTasks = [
-    { task: "5 ürün SEO optimizasyonu gerekli", type: "seo", count: 5 },
-    { task: "3 sipariş üretim aşamasında", type: "production", count: 3 },
-    { task: "2 üretici ödemesi gecikmiş", type: "payment", count: 2 },
-    { task: "Sevgililer Günü'ne 20 gün kaldı", type: "seasonal", count: 20 },
-  ]
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Yükleniyor...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Orders */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Son Siparişler</CardTitle>
-            <CardDescription>En son gelen siparişleriniz</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentOrders.map((order, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900">{order.customer}</p>
-                    <p className="text-sm text-gray-600">{order.product}</p>
-                    <p className="text-xs text-gray-500">{order.id}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">{order.amount}</p>
-                    <Badge
-                      variant={
-                        order.status === "Teslim Edildi"
-                          ? "default"
-                          : order.status === "Kargoda"
-                            ? "secondary"
-                            : "outline"
-                      }
-                      className="text-xs"
-                    >
-                      {order.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-lg">D</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Dolphin Manager</h1>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Çıkış
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
 
-        {/* Top Products */}
-        <Card>
-          <CardHeader>
-            <CardTitle>En Çok Satan Ürünler</CardTitle>
-            <CardDescription>Bu ayki performans liderleri</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topProducts.map((product, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{product.name}</p>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-sm text-gray-600">{product.sales} satış</span>
-                      <div className="flex items-center">
-                        <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                        <span className="text-xs text-gray-600 ml-1">{product.rating}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">{product.revenue}</p>
-                    <div className="flex items-center text-green-600">
-                      <TrendingUp className="w-3 h-3 mr-1" />
-                      <span className="text-xs">Yükseliş</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Banner */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 mb-8 text-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Hoş Geldiniz!</h2>
+              <p className="opacity-90">
+                {profile?.etsy_shop_name} mağazanız başarıyla bağlandı.
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+            <div className="bg-white/20 rounded-lg p-3">
+              <Store className="h-6 w-6" />
+            </div>
+          </div>
+        </div>
+
+        {/* Dashboard Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Package className="h-5 w-5 mr-2 text-blue-600" />
+                Ürünler
+              </CardTitle>
+              <CardDescription>Ürün yönetimi</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold mb-2">-</div>
+              <p className="text-sm text-gray-500">Toplam aktif ürün</p>
+              <Button className="w-full mt-4" variant="outline">
+                Ürünleri Görüntüle
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <ShoppingBag className="h-5 w-5 mr-2 text-green-600" />
+                Siparişler
+              </CardTitle>
+              <CardDescription>Sipariş takibi</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold mb-2">-</div>
+              <p className="text-sm text-gray-500">Bekleyen sipariş</p>
+              <Button className="w-full mt-4" variant="outline">
+                Siparişleri Görüntüle
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2 text-purple-600" />
+                Analitikler
+              </CardTitle>
+              <CardDescription>Performans takibi</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold mb-2">-</div>
+              <p className="text-sm text-gray-500">Bugünkü görüntülenme</p>
+              <Button className="w-full mt-4" variant="outline">
+                Analizleri Görüntüle
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
   )
 }

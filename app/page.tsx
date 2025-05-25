@@ -1,16 +1,16 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClientSupabase } from "@/lib/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ShoppingBag, Package, TrendingUp, DollarSign, Eye, Star, Plus, BarChart3 } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function Dashboard() {
   const router = useRouter()
   const supabase = createClientSupabase()
+  const [orders, setOrders] = useState<any[]>([])
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     checkStoreConnection()
@@ -19,70 +19,30 @@ export default function Dashboard() {
   const checkStoreConnection = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
       if (!session) {
         router.push("/auth/login")
         return
       }
-
       // Check if user has any stores connected
       const { data: profile } = await supabase.from("profiles").select("etsy_shop_name").eq("id", session.user.id).single()
-      
       if (!profile?.etsy_shop_name) {
         router.push("/onboarding")
         return
       }
+      // Gerçek sipariş ve ürünleri çek (örnek, kendi API'nıza göre düzenleyin)
+      const { data: ordersData } = await supabase.from("orders").select("*").eq("user_id", session.user.id)
+      const { data: productsData } = await supabase.from("products").select("*").eq("user_id", session.user.id)
+      setOrders(ordersData || [])
+      setProducts(productsData || [])
     } catch (error) {
       console.error("Error checking store connection:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const stats = [
-    {
-      title: "Toplam Satış",
-      value: "₺12,450",
-      change: "+12%",
-      icon: DollarSign,
-      color: "text-green-600",
-    },
-    {
-      title: "Aktif Ürünler",
-      value: "48",
-      change: "+3",
-      icon: Package,
-      color: "text-blue-600",
-    },
-    {
-      title: "Bekleyen Siparişler",
-      value: "7",
-      change: "-2",
-      icon: ShoppingBag,
-      color: "text-orange-600",
-    },
-    {
-      title: "Görüntülenme",
-      value: "1,234",
-      change: "+18%",
-      icon: Eye,
-      color: "text-purple-600",
-    },
-  ]
-
-  const recentOrders = [
-    { id: "#1234", customer: "Ayşe Yılmaz", product: "El Yapımı Kolye", amount: "₺89", status: "Hazırlanıyor" },
-    { id: "#1235", customer: "Mehmet Kaya", product: "Vintage Yüzük", amount: "₺156", status: "Kargoda" },
-    { id: "#1236", customer: "Zehra Demir", product: "Doğal Taş Bileklik", amount: "₺67", status: "Teslim Edildi" },
-  ]
-
-  const topProducts = [
-    { name: "El Yapımı Kolye", sales: 23, revenue: "₺2,047", rating: 4.8 },
-    { name: "Vintage Yüzük", sales: 18, revenue: "₺2,808", rating: 4.9 },
-    { name: "Doğal Taş Bileklik", sales: 15, revenue: "₺1,005", rating: 4.7 },
-  ]
-
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Hero Section with Logo */}
       <div className="text-center mb-12">
         <div className="flex justify-center mb-6">
           <div className="w-24 h-24 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl shadow-lg">
@@ -91,32 +51,8 @@ export default function Dashboard() {
         </div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Hoş Geldiniz!</h2>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Etsy mağazanızı yönetmek için gereken tüm araçlar burada. Satışlarınızı takip edin, ürünlerinizi optimize
-          edin ve AI destekli önerilerle büyüyün.
+          Etsy mağazanızı yönetmek için gereken tüm araçlar burada.
         </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon
-          return (
-            <Card key={index}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                    <p className={`text-sm ${stat.color}`}>{stat.change} bu ay</p>
-                  </div>
-                  <div className={`p-3 rounded-full bg-gray-100`}>
-                    <Icon className={`w-6 h-6 ${stat.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -124,12 +60,21 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Son Siparişler</CardTitle>
-            <CardDescription>En son gelen siparişleriniz</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-center h-40 text-gray-500">
-              Henüz sipariş bulunmuyor
-            </div>
+            {loading ? (
+              <div className="flex items-center justify-center h-40 text-gray-500">Yükleniyor...</div>
+            ) : orders.length === 0 ? (
+              <div className="flex items-center justify-center h-40 text-gray-500">Henüz sipariş bulunmuyor</div>
+            ) : (
+              <ul>
+                {orders.map((order) => (
+                  <li key={order.id} className="mb-2">
+                    {order.title} - {order.status}
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
 
@@ -137,48 +82,24 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>En Çok Satan Ürünler</CardTitle>
-            <CardDescription>Bu ayki performans liderleri</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-center h-40 text-gray-500">
-              Henüz ürün bulunmuyor
-            </div>
+            {loading ? (
+              <div className="flex items-center justify-center h-40 text-gray-500">Yükleniyor...</div>
+            ) : products.length === 0 ? (
+              <div className="flex items-center justify-center h-40 text-gray-500">Henüz ürün bulunmuyor</div>
+            ) : (
+              <ul>
+                {products.map((product) => (
+                  <li key={product.id} className="mb-2">
+                    {product.title}
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       </div>
-
-      {/* AI Suggestions */}
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <span className="mr-2">🤖</span>
-            AI Önerileri
-          </CardTitle>
-          <CardDescription>Satışlarınızı artırmak için kişiselleştirilmiş öneriler</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-900 mb-2">Fiyat Optimizasyonu</h4>
-              <p className="text-sm text-blue-700">
-                "El Yapımı Kolye" ürününüzün fiyatını %8 artırarak daha fazla kar elde edebilirsiniz.
-              </p>
-            </div>
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <h4 className="font-medium text-green-900 mb-2">Stok Uyarısı</h4>
-              <p className="text-sm text-green-700">
-                "Vintage Yüzük" stokları azalıyor. Yeni sipariş verme zamanı geldi.
-              </p>
-            </div>
-            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <h4 className="font-medium text-purple-900 mb-2">Trend Analizi</h4>
-              <p className="text-sm text-purple-700">
-                Doğal taş aksesuarlar bu sezon trend. Koleksiyonunuzu genişletmeyi düşünün.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </main>
   )
 }

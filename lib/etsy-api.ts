@@ -67,6 +67,12 @@ function generateCodeChallenge(verifier: string): string {
   return crypto.createHash("sha256").update(verifier).digest("base64url")
 }
 
+export function generatePKCE() {
+  const codeVerifier = generateCodeVerifier()
+  const codeChallenge = generateCodeChallenge(codeVerifier)
+  return { codeVerifier, codeChallenge }
+}
+
 export async function getEtsyAuthUrl(userId: string): Promise<string> {
   const codeVerifier = generateCodeVerifier()
   const codeChallenge = generateCodeChallenge(codeVerifier)

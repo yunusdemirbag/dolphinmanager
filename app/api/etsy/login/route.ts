@@ -1,40 +1,48 @@
-import { NextResponse } from "next/server"
-import { generatePKCE } from "@/lib/etsy-oauth"
-import { createClient } from "@/lib/supabase/server"
-import { cookies } from "next/headers"
+import { supabaseAdmin } from "@/lib/supabase"
+import { generatePKCE } from "@/lib/etsy-api"
+import { NextRequest, NextResponse } from "next/server"
 
-export async function GET() {
-  const { verifier, challenge } = generatePKCE()
-  const state = crypto.randomUUID()
-  const supabase = createClient(cookies())
-
-  // Kullanıcıyı session'dan bul
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://dolphin-app.vercel.app"
-    return NextResponse.redirect(`${baseUrl}/auth/login`)
+export async function GET(req: NextRequest) {
+  // supabaseAdmin direkt kullan
+  
+  try {
+    // Generate PKCE
+    const { codeVerifier, codeChallenge } = generatePKCE()
+    
+    // Oluştur ve kaydet
+    const state = Math.random().toString(36).substring(2, 15)
+    
+    // Etsy OAuth URL
+    const etsyClientId = process.env.ETSY_CLIENT_ID
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/etsy/callback`
+    
+    // Etsy OAuth parametreleri
+    const etsyAuthParams = new URLSearchParams({
+      response_type: "code",
+      client_id: etsyClientId!,
+      redirect_uri: redirectUri,
+      scope: "email_r shops_r listings_r transactions_r",
+      state: state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+    })
+    
+    // Create a temporary ID for this session
+    const tempUserId = `temp_${Math.random().toString(36).substring(2, 15)}`
+    
+    // Store in Supabase
+    await supabaseAdmin.from("oauth_states").insert({
+      state: state,
+      code_verifier: codeVerifier,
+      user_id: tempUserId,
+      created_at: new Date().toISOString(),
+    })
+    
+    // Etsy OAuth URL'sine yönlendir
+    const authUrl = `https://www.etsy.com/oauth/connect?${etsyAuthParams.toString()}`
+    return NextResponse.redirect(authUrl)
+  } catch (error) {
+    console.error("Etsy login error:", error)
+    return NextResponse.json({ error: "Etsy login failed" }, { status: 500 })
   }
-
-  // user_id ile insert et
-  const { data, error } = await supabase.from("etsy_auth_sessions").insert({
-    user_id: session.user.id,
-    state,
-    code_verifier: verifier,
-    created_at: new Date().toISOString(),
-  })
-  console.log("SUPABASE INSERT", { data, error })
-
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: process.env.ETSY_CLIENT_ID!,
-    redirect_uri: process.env.ETSY_REDIRECT_URI!,
-    scope: process.env.ETSY_SCOPE!,    // örn: "shops_r shops_w listings_r listings_w"
-    state,
-    code_challenge: challenge,
-    code_challenge_method: "S256",
-  })
-
-  return NextResponse.redirect(
-    `https://www.etsy.com/oauth/connect?${params.toString()}`
-  )
 } 

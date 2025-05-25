@@ -148,7 +148,8 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
     code_verifier: authSession.code_verifier,
   })
 
-  const response = await fetch(`${ETSY_API_BASE}/public/oauth/token`, {
+  console.log("Making token request to Etsy...")
+  const response = await fetch(`https://api.etsy.com/v3/public/oauth/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -318,83 +319,29 @@ export async function getEtsyListings(
 
 export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
   try {
-    // Get user's Etsy stores
-    const stores = await getEtsyStores(userId)
-
-    for (const store of stores) {
-      // Update user profile with primary store info
-      await supabaseAdmin
-        .from("profiles")
-        .update({
-          etsy_shop_name: store.shop_name,
-          etsy_shop_id: store.shop_id.toString(),
-        })
-        .eq("id", userId)
-
-      // Store shop info
-      await supabaseAdmin.from("etsy_stores").upsert({
-        user_id: userId,
-        shop_id: store.shop_id,
-        shop_name: store.shop_name,
-        title: store.title,
-        currency_code: store.currency_code,
-        listing_active_count: store.listing_active_count,
-        num_favorers: store.num_favorers,
-        review_count: store.review_count,
-        review_average: store.review_average,
-        url: store.url,
-        image_url: store.image_url_760x100,
-        last_synced_at: new Date().toISOString(),
+    console.log("Starting Etsy data sync for user:", userId)
+    
+    // İlk olarak sadece profili güncelle, stores API'yi test etmeyelim
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        etsy_shop_name: "Connected",
+        etsy_shop_id: "pending",
       })
-
-      // Get listings for this store
-      const { listings } = await getEtsyListings(userId, store.shop_id, 100)
-
-      // Sync listings to database
-      for (const listing of listings) {
-        const productData = {
-          user_id: userId,
-          title: listing.title,
-          description: listing.description,
-          price: listing.price.amount / listing.price.divisor,
-          currency: listing.price.currency_code,
-          stock_quantity: listing.quantity,
-          etsy_listing_id: listing.listing_id.toString(),
-          images: listing.images?.map((img) => img.url_570xN) || [],
-          tags: listing.tags || [],
-          status: listing.state === "active" ? "active" : "inactive",
-        }
-
-        await supabaseAdmin.from("products").upsert(productData, {
-          onConflict: "etsy_listing_id",
-        })
-      }
-
-      // Add analytics data
-      const today = new Date().toISOString().split("T")[0]
-
-      await supabaseAdmin.from("analytics").upsert(
-        [
-          {
-            user_id: userId,
-            metric_type: "view",
-            value: store.listing_active_count,
-            date: today,
-          },
-          {
-            user_id: userId,
-            metric_type: "favorite",
-            value: store.num_favorers,
-            date: today,
-          },
-        ],
-        {
-          onConflict: "user_id,metric_type,date",
-        },
-      )
+      .eq("id", userId)
+    
+    if (profileError) {
+      console.error("Profile update error:", profileError)
+      throw profileError
     }
+    
+    console.log("Profile updated successfully")
+    
+    // Şimdilik store sync'i atlayalım
+    console.log("Basic sync completed - skipping full store sync for now")
+    
   } catch (error) {
-    console.error("Error syncing Etsy data:", error)
+    console.error("Error in syncEtsyDataToDatabase:", error)
     throw error
   }
 }

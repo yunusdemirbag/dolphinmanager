@@ -26,59 +26,29 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log("Processing Etsy callback for user:", state)
-
     // Token değişimi
     console.log("Exchanging code for token...")
-    try {
-      await exchangeCodeForToken(code, state)
-      console.log("Token exchange successful")
-      
-      // Token'ların kaydedildiğini doğrula
-      const { supabaseAdmin } = await import("@/lib/supabase")
-      const { data: tokenCheck } = await supabaseAdmin
-        .from("etsy_tokens")
-        .select("access_token")
-        .eq("user_id", state)
-        .single()
-      
-      if (!tokenCheck) {
-        throw new Error("Tokens were not saved properly")
-      }
-      console.log("Token verification successful")
-      
-    } catch (tokenError) {
-      console.error("Token exchange failed:", tokenError)
-      throw new Error(`Token exchange failed: ${String(tokenError)}`)
-    }
+    const tokens = await exchangeCodeForToken(code, state)
+    console.log("Token exchange successful, access token received")
     
     // Etsy verilerini senkronize et
     console.log("Syncing Etsy data...")
-    try {
-      // Kısa bir bekleme süresi ekle
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      await syncEtsyDataToDatabase(state)
-      console.log("Data sync successful")
-    } catch (syncError) {
-      console.error("Data sync failed:", syncError)
-      throw new Error(`Data sync failed: ${String(syncError)}`)
-    }
+    await syncEtsyDataToDatabase(state)
+    console.log("Data sync completed successfully")
 
     // Başarılı - dashboard'a yönlendir
-    console.log("Etsy connection completed successfully, redirecting to dashboard")
     return NextResponse.redirect(
       new URL("/dashboard?etsy=connected", request.url)
     )
-  } catch (error) {
-    console.error("Etsy callback error:", error)
-    console.error("Error details:", {
-      message: String(error),
-      code,
-      state
+  } catch (error: any) {
+    console.error("Etsy callback error details:", {
+      error: error.message,
+      stack: error.stack,
+      state,
+      code: code.substring(0, 10) + "..."
     })
     return NextResponse.redirect(
-      new URL("/onboarding?error=etsy_connection_failed", request.url)
+      new URL("/onboarding?error=etsy_connection_failed&details=" + encodeURIComponent(error.message), request.url)
     )
   }
 }

@@ -399,6 +399,10 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
     const accessToken = await getValidAccessToken(userId)
     console.log("Access token:", accessToken ? "FOUND" : "MISSING")
 
+    // Access token'dan Etsy user ID'yi çıkar
+    const etsyUserId = accessToken.split('.')[0]
+    console.log("Extracted Etsy user ID from token:", etsyUserId)
+
     // 1. Basit ping testi
     console.log("=== PING TEST ===")
     try {
@@ -421,11 +425,11 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
       console.log("Ping exception:", pingError)
     }
 
-    // 2. DOĞRU User endpoint testi - Personal Access için /user kullan
-    console.log("=== USER ENDPOINT TEST (Personal Access) ===")
+    // 2. User endpoint testi - Etsy user ID ile
+    console.log("=== USER ENDPOINT TEST ===")
     let userInfo: any = null
     try {
-      const userResponse = await fetch(`${ETSY_API_BASE}/user`, {
+      const userResponse = await fetch(`${ETSY_API_BASE}/application/users/${etsyUserId}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "x-api-key": ETSY_CLIENT_ID,
@@ -440,25 +444,18 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
       } else {
         const userError = await userResponse.text()
         console.log("User endpoint error:", userError)
-        
-        // Eğer user endpoint bile çalışmıyorsa, token veya scope sorunu var
-        if (userResponse.status === 403 || userResponse.status === 401) {
-          console.log("CRITICAL: Authentication/Authorization failed!")
-          console.log("This indicates token or scope issues")
-          return []
-        }
       }
     } catch (userError) {
       console.log("User endpoint exception:", userError)
     }
 
-    // 3. DOĞRU Shop endpoint testi - Personal Access için /user/shops kullan
-    console.log("=== SHOP ENDPOINT TEST (Personal Access) ===")
+    // 3. Shop endpoint testi - Etsy user ID ile
+    console.log("=== SHOP ENDPOINT TEST ===")
     
     try {
-      console.log("Trying: /user/shops (Personal Access endpoint)")
+      console.log(`Trying: /application/users/${etsyUserId}/shops`)
       
-      const response = await fetch(`${ETSY_API_BASE}/user/shops`, {
+      const response = await fetch(`${ETSY_API_BASE}/application/users/${etsyUserId}/shops`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "x-api-key": ETSY_CLIENT_ID,
@@ -501,59 +498,48 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
         try {
           const errorData = JSON.parse(errorText)
           console.log("Shop endpoint error data:", JSON.stringify(errorData, null, 2))
-          
-          // Specific error handling
-          if (errorData.error === "Resource not found") {
-            console.log("ANALYSIS: Resource not found - trying alternative endpoints...")
-            
-            // Alternatif endpoint'leri dene
-            const alternativeEndpoints = [
-              '/user/shops',
-              '/shops',
-              '/application/shops'
-            ]
-            
-            for (const altEndpoint of alternativeEndpoints) {
-              console.log(`Trying alternative: ${altEndpoint}`)
-              
-              try {
-                const altResponse = await fetch(`${ETSY_API_BASE}${altEndpoint}`, {
-                  headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    "x-api-key": ETSY_CLIENT_ID,
-                  },
-                })
-                
-                console.log(`Alternative ${altEndpoint} status:`, altResponse.status)
-                
-                if (altResponse.ok) {
-                  const altText = await altResponse.text()
-                  console.log(`Alternative ${altEndpoint} response:`, altText)
-                  
-                  if (altText) {
-                    const altData = JSON.parse(altText)
-                    const altStores = altData.results || altData.shops || altData || []
-                    
-                    if (Array.isArray(altStores) && altStores.length > 0) {
-                      console.log(`SUCCESS with alternative ${altEndpoint}! Found:`, altStores.length)
-                      return altStores
-                    }
-                  }
-                } else {
-                  const altError = await altResponse.text()
-                  console.log(`Alternative ${altEndpoint} error:`, altError)
-                }
-              } catch (altError) {
-                console.log(`Alternative ${altEndpoint} exception:`, altError)
-              }
-            }
-          }
         } catch (e) {
           console.log("Could not parse error as JSON")
         }
       }
     } catch (fetchError) {
       console.log("Shop endpoint fetch exception:", fetchError)
+    }
+
+    // 4. Alternatif: Direkt shop ID ile deneme (eğer user ID aynı zamanda shop ID ise)
+    console.log("=== ALTERNATIVE: DIRECT SHOP ACCESS ===")
+    try {
+      console.log(`Trying: /application/shops/${etsyUserId}`)
+      
+      const shopResponse = await fetch(`${ETSY_API_BASE}/application/shops/${etsyUserId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "x-api-key": ETSY_CLIENT_ID,
+        },
+      })
+
+      console.log("Direct shop access status:", shopResponse.status)
+
+      if (shopResponse.ok) {
+        const shopText = await shopResponse.text()
+        console.log("Direct shop access response:", shopText)
+        
+        if (shopText) {
+          const shopData = JSON.parse(shopText)
+          console.log("Direct shop data:", JSON.stringify(shopData, null, 2))
+          
+          // Tek shop döndürürse array'e çevir
+          if (shopData && !Array.isArray(shopData)) {
+            console.log("SUCCESS! Found single shop via direct access")
+            return [shopData]
+          }
+        }
+      } else {
+        const shopError = await shopResponse.text()
+        console.log("Direct shop access error:", shopError)
+      }
+    } catch (directError) {
+      console.log("Direct shop access exception:", directError)
     }
 
     console.log("=== FINAL RESULT ===")

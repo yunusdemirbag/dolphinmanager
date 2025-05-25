@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
               page++;
               
               // API çağrıları arasında kısa bir bekleme ekleyelim (rate limit'i aşmamak için)
-              await new Promise(resolve => setTimeout(resolve, 100));
+              await new Promise(resolve => setTimeout(resolve, 500));
             }
           } else {
             hasMore = false;
@@ -190,7 +190,20 @@ export async function GET(request: NextRequest) {
           }
         } else {
           console.error(`Direct Etsy API error on page ${page}:`, listingsResponse.status, listingsResponse.statusText);
-          hasMore = false;
+          
+          // Rate limit aşıldıysa bekleyelim
+          if (listingsResponse.status === 429) {
+            console.log("Rate limit exceeded, pausing for 2 seconds before next attempt");
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Eğer birkaç denemeden sonra hala başarısız olursa, devam etmeyi bırak
+            if (page > 3) {
+              hasMore = false;
+              console.log("Multiple rate limit errors, stopping pagination");
+            }
+          } else {
+            hasMore = false;
+          }
         }
       } catch (error) {
         console.error(`Error fetching page ${page}:`, error);
@@ -310,11 +323,14 @@ export async function GET(request: NextRequest) {
     }
     
     console.error("No products found from Etsy API");
+    
+    // Demo ürünleri kaldırıyorum
     return NextResponse.json({ 
-      error: "No products found", 
+      success: false,
+      error: "Etsy API'den ürünler alınamadı. Rate limit aşıldı veya ürün bulunamadı.",
       products: [],
       source: "etsy_api_direct"
-    }, { status: 404 });
+    }, { status: 200 });
 
   } catch (error: any) {
     console.error("Products API error:", error);

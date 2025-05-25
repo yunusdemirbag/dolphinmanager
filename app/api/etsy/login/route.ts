@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       response_type: "code",
       client_id: etsyClientId!,
       redirect_uri: redirectUri,
-      scope: "email_r shops_r listings_r transactions_r",
+      scope: "email_r shops_r shops_w listings_r listings_w listings_d transactions_r transactions_w profile_r address_r address_w billing_r cart_r cart_w",
       state: state,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",

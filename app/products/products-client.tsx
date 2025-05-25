@@ -43,7 +43,8 @@ import {
   Save,
   X,
   Image as ImageIcon,
-  ExternalLink
+  ExternalLink,
+  Info
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
 
@@ -127,6 +128,8 @@ export default function ProductsClient() {
   const [analytics, setAnalytics] = useState<Record<number, { view: number; sale: number; revenue: number }>>({});
   const [shippingProfiles, setShippingProfiles] = useState<{ shipping_profile_id: number; title: string }[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isDemoData, setIsDemoData] = useState(false);
+  const [demoMessage, setDemoMessage] = useState("");
 
   // getProductImage fonksiyonunu sadeleştiriyorum:
   const getProductImage = (product: Product): string | null => {
@@ -180,6 +183,8 @@ export default function ProductsClient() {
 
   const loadProducts = async () => {
     setLoading(true)
+    setIsDemoData(false)
+    setDemoMessage("")
 
     try {
       // Gerçek Etsy ürünlerini çekmeye çalış
@@ -190,6 +195,12 @@ export default function ProductsClient() {
         console.log("Products API response:", data)
         
         if (data.products && data.products.length > 0) {
+          // Demo veri mi kontrol et
+          if (data.source === "demo") {
+            setIsDemoData(true)
+            setDemoMessage(data.message || "Etsy API'ye erişilemedi, demo ürünler gösteriliyor")
+          }
+          
           // Normalize product data to ensure consistent format
           const normalizedProducts = data.products.map((product: any) => {
             // Handle price field which could be a string or an object
@@ -714,378 +725,379 @@ export default function ProductsClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-              <Package className="h-8 w-8 text-blue-600 mr-3" />
-              Ürünler ({filteredProducts.length})
-            </h1>
-            <p className="text-gray-600 mt-2">Canvas wall art ürünlerinizi yönetin</p>
-            {taxonomyError && (
-              <p className="text-xs text-yellow-600 mt-1 flex items-center">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                {taxonomyError}
-              </p>
-            )}
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Ürünler</h1>
+        <Button onClick={handleOpenCreateModal} className="bg-purple-600 hover:bg-purple-700">
+          <Plus className="w-4 h-4 mr-2" />
+          Ürün Ekle
+        </Button>
+      </div>
+      
+      {isDemoData && (
+        <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded">
+          <div className="flex items-center">
+            <Info className="w-5 h-5 mr-2" />
+            <p>{demoMessage}</p>
           </div>
-          <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg" onClick={handleOpenCreateModal}>
-            <Plus className="h-5 w-5 mr-2" /> Ürün Ekle
+          <p className="text-sm mt-1">Not: Bu demo ürünler sadece arayüzü göstermek için oluşturulmuştur ve Etsy'de gerçek değildir.</p>
+        </div>
+      )}
+      
+      {taxonomyError && (
+        <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded">
+          <p>{taxonomyError}</p>
+        </div>
+      )}
+
+      <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Ürün ara..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger>
+              <SelectValue placeholder="Sırala" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_timestamp">Yeni Eklenen</SelectItem>
+              <SelectItem value="title">Başlık</SelectItem>
+              <SelectItem value="price">Fiyat</SelectItem>
+              <SelectItem value="quantity">Stok</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger>
+              <SelectValue placeholder="Durum" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tüm Durumlar</SelectItem>
+              <SelectItem value="active">Aktif</SelectItem>
+              <SelectItem value="inactive">Pasif</SelectItem>
+              <SelectItem value="draft">Taslak</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={loadProducts}>
+            <Filter className="h-4 w-4 mr-2" />
+            Yenile
           </Button>
         </div>
+      </div>
 
-        {/* Filters */}
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Ürün ara..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sırala" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="created_timestamp">Yeni Eklenen</SelectItem>
-                <SelectItem value="title">Başlık</SelectItem>
-                <SelectItem value="price">Fiyat</SelectItem>
-                <SelectItem value="quantity">Stok</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger>
-                <SelectValue placeholder="Durum" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tüm Durumlar</SelectItem>
-                <SelectItem value="active">Aktif</SelectItem>
-                <SelectItem value="inactive">Pasif</SelectItem>
-                <SelectItem value="draft">Taslak</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={loadProducts}>
-              <Filter className="h-4 w-4 mr-2" />
-              Yenile
+      {/* Products Grid */}
+      {filteredProducts.length === 0 ? (
+        <div className="text-center py-16 border border-dashed rounded-lg bg-gray-50">
+          <Package className="mx-auto h-14 w-14 text-blue-400 mb-4" />
+          <h3 className="mt-2 text-lg font-semibold text-gray-800">Henüz ürününüz yok</h3>
+          <p className="mt-1 text-base text-gray-500 max-w-xl mx-auto">Etsy mağazanızda hiç ürün bulunamadı. Hemen ilk ürününüzü ekleyin!</p>
+          <div className="mt-6">
+            <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg" onClick={handleOpenCreateModal}>
+              <Plus className="h-5 w-5 mr-2" /> Ürün Ekle
             </Button>
           </div>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product.listing_id} product={product} />
+          ))}
+        </div>
+      )}
 
-        {/* Products Grid */}
-        {filteredProducts.length === 0 ? (
-          <div className="text-center py-16 border border-dashed rounded-lg bg-gray-50">
-            <Package className="mx-auto h-14 w-14 text-blue-400 mb-4" />
-            <h3 className="mt-2 text-lg font-semibold text-gray-800">Henüz ürününüz yok</h3>
-            <p className="mt-1 text-base text-gray-500 max-w-xl mx-auto">Etsy mağazanızda hiç ürün bulunamadı. Hemen ilk ürününüzü ekleyin!</p>
-            <div className="mt-6">
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg" onClick={handleOpenCreateModal}>
-                <Plus className="h-5 w-5 mr-2" /> Ürün Ekle
-              </Button>
+      {/* Edit Modal */}
+      {showEditModal && (
+        <Dialog open={!!showEditModal} onOpenChange={() => setShowEditModal(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Ürün Düzenle</DialogTitle>
+              <DialogDescription>
+                {showEditModal.title} ürününü düzenleyin
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-title">Ürün Başlığı</Label>
+                <Input
+                  id="edit-title"
+                  value={showEditModal.title}
+                  onChange={(e) => setShowEditModal(prev => prev ? { ...prev, title: e.target.value } : null)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-description">Açıklama</Label>
+                <Textarea
+                  id="edit-description"
+                  value={showEditModal.description}
+                  onChange={(e) => setShowEditModal(prev => prev ? { ...prev, description: e.target.value } : null)}
+                  rows={4}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-price">Fiyat (USD)</Label>
+                  <Input
+                    id="edit-price"
+                    type="number"
+                    step="0.01"
+                    value={showEditModal.price.amount / showEditModal.price.divisor}
+                    onChange={(e) => setShowEditModal(prev => prev ? {
+                      ...prev,
+                      price: {
+                        ...prev.price,
+                        amount: Math.round(parseFloat(e.target.value) * prev.price.divisor)
+                      }
+                    } : null)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-quantity">Stok</Label>
+                  <Input
+                    id="edit-quantity"
+                    type="number"
+                    value={showEditModal.quantity}
+                    onChange={(e) => setShowEditModal(prev => prev ? { ...prev, quantity: parseInt(e.target.value) || 0 } : null)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-state">Durum</Label>
+                <Select 
+                  value={showEditModal.state} 
+                  onValueChange={(value: any) => setShowEditModal(prev => prev ? { ...prev, state: value } : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Aktif</SelectItem>
+                    <SelectItem value="inactive">Pasif</SelectItem>
+                    <SelectItem value="draft">Taslak</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.listing_id} product={product} />
-            ))}
-          </div>
-        )}
 
-        {/* Edit Modal */}
-        {showEditModal && (
-          <Dialog open={!!showEditModal} onOpenChange={() => setShowEditModal(null)}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Ürün Düzenle</DialogTitle>
-                <DialogDescription>
-                  {showEditModal.title} ürününü düzenleyin
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditModal(null)}>
+                İptal
+              </Button>
+              <Button onClick={() => showEditModal && handleUpdateProduct(showEditModal)} disabled={submitting}>
+                {submitting ? "Güncelleniyor..." : "Güncelle"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Yeni Ürün Ekle</DialogTitle>
+              <DialogDescription>Yeni bir ürün oluşturun</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="create-title">Ürün Başlığı</Label>
+                <Input
+                  id="create-title"
+                  value={createForm.title}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, title: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="create-description">Açıklama</Label>
+                <Textarea
+                  id="create-description"
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                  rows={4}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-title">Ürün Başlığı</Label>
+                  <Label htmlFor="create-price">Fiyat (USD)</Label>
                   <Input
-                    id="edit-title"
-                    value={showEditModal.title}
-                    onChange={(e) => setShowEditModal(prev => prev ? { ...prev, title: e.target.value } : null)}
+                    id="create-price"
+                    type="number"
+                    step="0.01"
+                    value={createForm.price}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                   />
                 </div>
-
                 <div>
-                  <Label htmlFor="edit-description">Açıklama</Label>
-                  <Textarea
-                    id="edit-description"
-                    value={showEditModal.description}
-                    onChange={(e) => setShowEditModal(prev => prev ? { ...prev, description: e.target.value } : null)}
-                    rows={4}
+                  <Label htmlFor="create-quantity">Stok</Label>
+                  <Input
+                    id="create-quantity"
+                    type="number"
+                    value={createForm.quantity}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-price">Fiyat (USD)</Label>
-                    <Input
-                      id="edit-price"
-                      type="number"
-                      step="0.01"
-                      value={showEditModal.price.amount / showEditModal.price.divisor}
-                      onChange={(e) => setShowEditModal(prev => prev ? {
-                        ...prev,
-                        price: {
-                          ...prev.price,
-                          amount: Math.round(parseFloat(e.target.value) * prev.price.divisor)
-                        }
-                      } : null)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-quantity">Stok</Label>
-                    <Input
-                      id="edit-quantity"
-                      type="number"
-                      value={showEditModal.quantity}
-                      onChange={(e) => setShowEditModal(prev => prev ? { ...prev, quantity: parseInt(e.target.value) || 0 } : null)}
-                    />
-                  </div>
-                </div>
-
+              </div>
+              <div>
+                <Label htmlFor="create-taxonomy">Kategori</Label>
+                <Select
+                  value={String(createForm.taxonomy_id)}
+                  onValueChange={(val) => setCreateForm(prev => ({ ...prev, taxonomy_id: parseInt(val) }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Kategori seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {taxonomyNodes.map((node) => (
+                      <SelectItem key={node.id} value={String(node.id)}>{node.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="create-shipping-profile">Kargo Profili</Label>
+                <Select
+                  value={String(createForm.shipping_profile_id || "")}
+                  onValueChange={(val) => setCreateForm(prev => ({ ...prev, shipping_profile_id: parseInt(val) }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Kargo profili seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shippingProfiles.map((profile) => (
+                      <SelectItem key={profile.shipping_profile_id} value={String(profile.shipping_profile_id)}>{profile.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-state">Durum</Label>
-                  <Select 
-                    value={showEditModal.state} 
-                    onValueChange={(value: any) => setShowEditModal(prev => prev ? { ...prev, state: value } : null)}
+                  <Label htmlFor="create-who-made">Kim Yaptı?</Label>
+                  <Select
+                    value={createForm.who_made}
+                    onValueChange={(val) => setCreateForm(prev => ({ ...prev, who_made: val as any }))}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Kim yaptı?" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">Aktif</SelectItem>
-                      <SelectItem value="inactive">Pasif</SelectItem>
-                      <SelectItem value="draft">Taslak</SelectItem>
+                      <SelectItem value="i_did">Ben yaptım</SelectItem>
+                      <SelectItem value="someone_else">Bir başkası</SelectItem>
+                      <SelectItem value="collective">Kolektif</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="create-when-made">Ne Zaman Yapıldı?</Label>
+                  <Select
+                    value={createForm.when_made}
+                    onValueChange={(val) => setCreateForm(prev => ({ ...prev, when_made: val }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ne zaman yapıldı?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="made_to_order">Siparişe özel</SelectItem>
+                      <SelectItem value="2020_2024">2020-2024</SelectItem>
+                      <SelectItem value="2010_2019">2010-2019</SelectItem>
+                      <SelectItem value="2000_2009">2000-2009</SelectItem>
+                      <SelectItem value="1990s">1990'lar</SelectItem>
+                      <SelectItem value="1980s">1980'ler</SelectItem>
+                      <SelectItem value="1970s">1970'ler</SelectItem>
+                      <SelectItem value="1960s">1960'lar</SelectItem>
+                      <SelectItem value="1950s">1950'ler</SelectItem>
+                      <SelectItem value="before_1950">1950'den önce</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowEditModal(null)}>
-                  İptal
-                </Button>
-                <Button onClick={() => showEditModal && handleUpdateProduct(showEditModal)} disabled={submitting}>
-                  {submitting ? "Güncelleniyor..." : "Güncelle"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-
-        {/* Create Modal */}
-        {showCreateModal && (
-          <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Yeni Ürün Ekle</DialogTitle>
-                <DialogDescription>Yeni bir ürün oluşturun</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="create-title">Ürün Başlığı</Label>
+              <div>
+                <Label htmlFor="create-state">Durum</Label>
+                <Select
+                  value={createForm.state || "active"}
+                  onValueChange={(val) => setCreateForm(prev => ({ ...prev, state: val as any }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Durum seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Aktif</SelectItem>
+                    <SelectItem value="draft">Taslak</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="create-image">Görsel Yükle</Label>
+                <Input
+                  id="create-image"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                />
+                {imageFile && <div className="mt-2 text-xs text-gray-500">Seçilen dosya: {imageFile.name}</div>}
+              </div>
+              <div>
+                <Label htmlFor="create-tags">Etiketler</Label>
+                <div className="flex gap-2 mb-2">
                   <Input
-                    id="create-title"
-                    value={createForm.title}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, title: e.target.value }))}
+                    id="create-tags"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                    placeholder="Etiket ekle..."
                   />
+                  <Button type="button" onClick={addTag}>Ekle</Button>
                 </div>
-                <div>
-                  <Label htmlFor="create-description">Açıklama</Label>
-                  <Textarea
-                    id="create-description"
-                    value={createForm.description}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
-                    rows={4}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="create-price">Fiyat (USD)</Label>
-                    <Input
-                      id="create-price"
-                      type="number"
-                      step="0.01"
-                      value={createForm.price}
-                      onChange={(e) => setCreateForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="create-quantity">Stok</Label>
-                    <Input
-                      id="create-quantity"
-                      type="number"
-                      value={createForm.quantity}
-                      onChange={(e) => setCreateForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="create-taxonomy">Kategori</Label>
-                  <Select
-                    value={String(createForm.taxonomy_id)}
-                    onValueChange={(val) => setCreateForm(prev => ({ ...prev, taxonomy_id: parseInt(val) }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Kategori seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {taxonomyNodes.map((node) => (
-                        <SelectItem key={node.id} value={String(node.id)}>{node.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="create-shipping-profile">Kargo Profili</Label>
-                  <Select
-                    value={String(createForm.shipping_profile_id || "")}
-                    onValueChange={(val) => setCreateForm(prev => ({ ...prev, shipping_profile_id: parseInt(val) }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Kargo profili seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {shippingProfiles.map((profile) => (
-                        <SelectItem key={profile.shipping_profile_id} value={String(profile.shipping_profile_id)}>{profile.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="create-who-made">Kim Yaptı?</Label>
-                    <Select
-                      value={createForm.who_made}
-                      onValueChange={(val) => setCreateForm(prev => ({ ...prev, who_made: val as any }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Kim yaptı?" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="i_did">Ben yaptım</SelectItem>
-                        <SelectItem value="someone_else">Bir başkası</SelectItem>
-                        <SelectItem value="collective">Kolektif</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="create-when-made">Ne Zaman Yapıldı?</Label>
-                    <Select
-                      value={createForm.when_made}
-                      onValueChange={(val) => setCreateForm(prev => ({ ...prev, when_made: val }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Ne zaman yapıldı?" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="made_to_order">Siparişe özel</SelectItem>
-                        <SelectItem value="2020_2024">2020-2024</SelectItem>
-                        <SelectItem value="2010_2019">2010-2019</SelectItem>
-                        <SelectItem value="2000_2009">2000-2009</SelectItem>
-                        <SelectItem value="1990s">1990'lar</SelectItem>
-                        <SelectItem value="1980s">1980'ler</SelectItem>
-                        <SelectItem value="1970s">1970'ler</SelectItem>
-                        <SelectItem value="1960s">1960'lar</SelectItem>
-                        <SelectItem value="1950s">1950'ler</SelectItem>
-                        <SelectItem value="before_1950">1950'den önce</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="create-state">Durum</Label>
-                  <Select
-                    value={createForm.state || "active"}
-                    onValueChange={(val) => setCreateForm(prev => ({ ...prev, state: val as any }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Durum seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Aktif</SelectItem>
-                      <SelectItem value="draft">Taslak</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="create-image">Görsel Yükle</Label>
-                  <Input
-                    id="create-image"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  />
-                  {imageFile && <div className="mt-2 text-xs text-gray-500">Seçilen dosya: {imageFile.name}</div>}
-                </div>
-                <div>
-                  <Label htmlFor="create-tags">Etiketler</Label>
-                  <div className="flex gap-2 mb-2">
-                    <Input
-                      id="create-tags"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                      placeholder="Etiket ekle..."
-                    />
-                    <Button type="button" onClick={addTag}>Ekle</Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {createForm.tags.map((tag) => (
-                      <Badge key={tag} className="flex items-center gap-1">
-                        {tag}
-                        <Button type="button" size="icon" variant="ghost" onClick={() => removeTag(tag)}><X className="w-3 h-3" /></Button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="create-materials">Malzemeler</Label>
-                  <div className="flex gap-2 mb-2">
-                    <Input
-                      id="create-materials"
-                      value={materialInput}
-                      onChange={(e) => setMaterialInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addMaterial())}
-                      placeholder="Malzeme ekle..."
-                    />
-                    <Button type="button" onClick={addMaterial}>Ekle</Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {createForm.materials.map((mat) => (
-                      <Badge key={mat} className="flex items-center gap-1">
-                        {mat}
-                        <Button type="button" size="icon" variant="ghost" onClick={() => removeMaterial(mat)}><X className="w-3 h-3" /></Button>
-                      </Badge>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  {createForm.tags.map((tag) => (
+                    <Badge key={tag} className="flex items-center gap-1">
+                      {tag}
+                      <Button type="button" size="icon" variant="ghost" onClick={() => removeTag(tag)}><X className="w-3 h-3" /></Button>
+                    </Badge>
+                  ))}
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-                  İptal
-                </Button>
-                <Button onClick={handleCreateProduct} disabled={submitting}>
-                  {submitting ? "Ekleniyor..." : "Ekle"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-      </main>
+              <div>
+                <Label htmlFor="create-materials">Malzemeler</Label>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    id="create-materials"
+                    value={materialInput}
+                    onChange={(e) => setMaterialInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addMaterial())}
+                    placeholder="Malzeme ekle..."
+                  />
+                  <Button type="button" onClick={addMaterial}>Ekle</Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {createForm.materials.map((mat) => (
+                    <Badge key={mat} className="flex items-center gap-1">
+                      {mat}
+                      <Button type="button" size="icon" variant="ghost" onClick={() => removeMaterial(mat)}><X className="w-3 h-3" /></Button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateModal(false)}>
+                İptal
+              </Button>
+              <Button onClick={handleCreateProduct} disabled={submitting}>
+                {submitting ? "Ekleniyor..." : "Ekle"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 } 

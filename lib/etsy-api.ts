@@ -8,8 +8,8 @@ const ETSY_OAUTH_BASE = "https://www.etsy.com/oauth"
 
 const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
 const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || ""
-// Personal Access için gerekli scope'lar - Gemini'nin önerdiği gibi
-const ETSY_SCOPE = process.env.ETSY_SCOPE || "shops_r shops_w listings_r listings_w listings_d transactions_r profile_r"
+// Personal Access için gerekli scope'lar - tüm gerekli izinleri içerecek şekilde güncellendi
+const ETSY_SCOPE = process.env.ETSY_SCOPE || "email_r shops_r shops_w listings_r listings_w listings_d transactions_r transactions_w profile_r address_r address_w billing_r cart_r cart_w"
 
 // Environment variables kontrolü
 function checkEtsyConfig() {
@@ -388,6 +388,54 @@ async function getValidAccessToken(userId: string): Promise<string> {
   return tokenData.access_token
 }
 
+// Veritabanından kaydedilen mağaza bilgilerini al
+async function getStoresFromDatabase(userId: string): Promise<EtsyStore[]> {
+  console.log("📦 Using database fallback for store data")
+  
+  try {
+    // Veritabanından mağaza bilgilerini al
+    const { data: storeData, error: storeError } = await supabaseAdmin
+      .from("etsy_stores")
+      .select("*")
+      .eq("user_id", userId)
+    
+    if (storeError) {
+      console.error("Database query error:", storeError)
+      return []
+    }
+    
+    if (!storeData || storeData.length === 0) {
+      console.log("No stores found in database")
+      return []
+    }
+    
+    console.log(`Found ${storeData.length} stores in database`)
+    
+    // Her mağaza için kullanıcıya özel görüntüleme bilgilerini ekle
+    return storeData.map(store => {
+      // Veritabanında bazı alanlar farklı isimle kaydedilmiş olabilir, onları normalize et
+      return {
+        shop_id: store.shop_id,
+        shop_name: store.shop_name,
+        title: store.title || store.shop_name,
+        announcement: store.announcement || "",
+        currency_code: store.currency_code || "USD",
+        is_vacation: store.is_vacation === true,
+        listing_active_count: store.listing_active_count || 0,
+        num_favorers: store.num_favorers || 0,
+        url: store.url || `https://www.etsy.com/shop/${store.shop_name}`,
+        image_url_760x100: store.image_url_760x100 || store.banner_image_url || "",
+        review_count: store.review_count || 0,
+        review_average: store.review_average || 0,
+        connection_status: "connected", // Veritabanında varsa bağlı kabul et
+      } as EtsyStore
+    })
+  } catch (error) {
+    console.error("Database fallback error:", error)
+    return []
+  }
+}
+
 export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
   try {
     console.log("=== ETSY API DEBUG START ===")
@@ -396,7 +444,7 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
     console.log("ETSY_REDIRECT_URI:", process.env.ETSY_REDIRECT_URI ? "SET" : "MISSING")
     console.log("ETSY_SCOPE:", ETSY_SCOPE)
     
-  const accessToken = await getValidAccessToken(userId)
+    const accessToken = await getValidAccessToken(userId)
     console.log("Access token:", accessToken ? "FOUND" : "MISSING")
 
     // Access token'dan Etsy user ID'yi çıkar
@@ -407,8 +455,8 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
     console.log("=== PING TEST ===")
     try {
       const pingResponse = await fetch(`${ETSY_API_BASE}/application/openapi-ping`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
           "x-api-key": ETSY_CLIENT_ID,
         },
       })
@@ -418,8 +466,18 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
         const pingText = await pingResponse.text()
         console.log("Ping response:", pingText)
       } else {
-        const pingError = await pingResponse.text()
+        const pingError = await pingResponse.json().catch(() => ({ error: pingResponse.statusText }))
         console.log("Ping error:", pingError)
+        
+        if (pingResponse.status === 429) {
+          console.error("Rate limit exceeded - using database fallback instead")
+          return await getStoresFromDatabase(userId)
+        }
+        
+        if (pingResponse.status === 401) {
+          console.error("Authentication failed - token may be invalid")
+          throw new Error("Etsy authentication failed. Please reconnect your account.")
+        }
       }
     } catch (pingError) {
       console.log("Ping exception:", pingError)
@@ -442,11 +500,26 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
         userInfo = await userResponse.json()
         console.log("User info SUCCESS:", JSON.stringify(userInfo, null, 2))
       } else {
-        const userError = await userResponse.text()
+        const userErrorRaw = await userResponse.text()
+        let userError
+        try {
+          userError = JSON.parse(userErrorRaw)
+        } catch (e) {
+          userError = { error: userErrorRaw }
+        }
         console.log("User endpoint error:", userError)
+        
+        if (userResponse.status === 403 && userError?.error === "insufficient_scope") {
+          console.error("Insufficient permissions - the app doesn't have required scopes")
+          console.error("Please reset your Etsy connection and reconnect with all required permissions")
+          throw new Error("Etsy connection lacks required permissions. Please reset and reconnect your account.")
+        }
       }
     } catch (userError) {
       console.log("User endpoint exception:", userError)
+      if (userError instanceof Error && userError.message.includes("Etsy connection lacks")) {
+        throw userError // Re-throw custom error
+      }
     }
 
     // 3. Shop endpoint testi - Etsy user ID ile

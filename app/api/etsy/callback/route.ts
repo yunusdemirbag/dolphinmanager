@@ -18,16 +18,15 @@ export async function GET(req: NextRequest) {
     // Önce tüm state kayıtlarını kontrol edelim (hata ayıklama için)
     const { data: allStates } = await supabaseAdmin
       .from("etsy_auth_sessions")
-      .select("state, created_at")
-      .order("created_at", { ascending: false })
+      .select("state")
       .limit(5)
     
     console.log("Recent states in DB:", allStates)
 
-    // State'e göre verifier'ı bul
+    // State'e göre code_verifier'ı bul
     const { data: sessionData, error: sessionError } = await supabaseAdmin
       .from("etsy_auth_sessions")
-      .select("code_verifier, user_id")
+      .select("code_verifier")
       .eq("state", state)
       .single()
 
@@ -42,6 +41,15 @@ export async function GET(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // Geçici kullanıcı ID'sini temp_users tablosundan al
+    const { data: tempUserData, error: tempUserError } = await supabaseAdmin
+      .from("temp_users")
+      .select("id")
+      .eq("state", state)
+      .single()
+    
+    const tempUserId = tempUserData?.id || `temp_${state}`
+    
     console.log("Found state in DB, proceeding with OAuth flow")
 
     // Etsy token değişimi
@@ -103,10 +111,6 @@ export async function GET(req: NextRequest) {
       const shop = etsyShopData.results[0] // İlk mağaza
 
       // Tüm bilgileri profile kaydet
-      const tempUserId = sessionData.user_id
-      
-      // Bu noktada yeni kullanıcı oluşturabilir veya mevcut bir kullanıcıya bağlayabilirsiniz
-      // Örnek olarak geçici bir kayıt yapıyoruz
       await supabaseAdmin.from("profiles").upsert({
         id: tempUserId,
         etsy_user_id: etsyUser.user_id.toString(),
@@ -127,6 +131,7 @@ export async function GET(req: NextRequest) {
 
       // State kaydını temizle
       await supabaseAdmin.from("etsy_auth_sessions").delete().eq("state", state)
+      await supabaseAdmin.from("temp_users").delete().eq("state", state)
 
       // Başarı sayfasına yönlendir
       return NextResponse.redirect(new URL("/dashboard", req.url))

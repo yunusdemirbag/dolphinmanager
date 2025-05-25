@@ -31,27 +31,29 @@ export async function GET(req: NextRequest) {
       code_challenge_method: "S256",
     })
     
-    // Create a temporary ID for this session
+    // Geçici kullanıcı ID'si
     const tempUserId = `temp_${crypto.randomUUID().substring(0, 8)}`
     
     console.log("Trying to store state in Supabase")
     
-    // etsy_auth_sessions tablosunu kullanalım - bu tablonun zaten var olduğunu görüyorum
+    // etsy_auth_sessions tablosunun yapısını kontrol et ve uygun şekilde kaydet
     try {
-      // Önce eski kayıtları temizleyelim
-      await supabaseAdmin
+      // Önce tablo yapısını incelemek için bir kayıt oluşturalım
+      // Supabase'in error mesajından sütun adlarını öğrenmek için
+      const { error: tableInfoError } = await supabaseAdmin
         .from("etsy_auth_sessions")
-        .delete()
-        .lt("created_at", new Date(Date.now() - 86400000).toISOString())
+        .select("*")
+        .limit(1)
       
-      // Yeni state'i kaydedelim
+      console.log("Table structure check:", tableInfoError ? tableInfoError.message : "success")
+      
+      // Basit bir yapı ile deneyelim - sadece state ve code_verifier
       const { data, error } = await supabaseAdmin
         .from("etsy_auth_sessions")
         .insert({
-          user_id: tempUserId,
           state: state,
-          code_verifier: codeVerifier,
-          created_at: new Date().toISOString(),
+          code_verifier: codeVerifier
+          // user_id sütunu olmadığı için eklenmedi
         })
       
       if (error) {
@@ -62,6 +64,13 @@ export async function GET(req: NextRequest) {
           details: error
         }, { status: 500 })
       }
+      
+      // Ayrı bir tablo kullanarak user_id bilgisini sakla
+      await supabaseAdmin.from("temp_users").upsert({
+        id: tempUserId,
+        state: state,
+        created_at: new Date().toISOString()
+      }).select()
       
       console.log("State stored successfully:", state)
     } catch (dbError) {

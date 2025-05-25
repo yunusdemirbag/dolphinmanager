@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
-import { getEtsyStores, getEtsyListings } from "@/lib/etsy-api"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { getEtsyStores } from "@/lib/etsy-api"
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,61 +19,52 @@ export async function GET(request: NextRequest) {
 
     try {
       // Etsy store bilgilerini çek
-      const stores = await getEtsyStores(user.id)
+      const etsyStores = await getEtsyStores(user.id)
       
-      if (stores.length === 0) {
+      if (etsyStores.length === 0) {
         return NextResponse.json({
-          totalListings: 0,
-          totalOrders: 0,
-          totalViews: 0,
-          stores: []
+          revenue: 0,
+          orders: 0,
+          views: 0,
+          favorites: 0,
+          conversion_rate: 0,
+          avg_order_value: 0,
+          connected: false,
+          message: "No Etsy stores connected"
         })
       }
 
-      const primaryStore = stores[0]
-      
-      // Listings bilgilerini çek
-      const { listings, count } = await getEtsyListings(user.id, primaryStore.shop_id, 100, 0)
-      
-      // İstatistikleri hesapla
-      const totalViews = listings.reduce((sum, listing) => sum + (listing.views || 0), 0)
-      const totalListings = count
-      
-      // Siparişler için şimdilik mock data (Etsy API'de orders endpoint'i farklı izinler gerektirir)
-      const totalOrders = Math.floor(totalListings * 0.1) // %10 conversion rate varsayımı
-      
-      console.log("Real Etsy data fetched successfully:", { totalListings, totalViews })
-      
+      // Basit istatistikler döndür (gerçek API'den gelecek)
       return NextResponse.json({
-        totalListings,
-        totalOrders,
-        totalViews,
-        stores: stores.map(store => ({
-          shop_id: store.shop_id,
-          shop_name: store.shop_name,
-          listing_active_count: store.listing_active_count
-        })),
-        isRealData: true
+        revenue: 0,
+        orders: 0,
+        views: 0,
+        favorites: 0,
+        conversion_rate: 0,
+        avg_order_value: 0,
+        connected: true
       })
 
-    } catch (etsyError) {
+    } catch (etsyError: any) {
       console.error("Etsy API error:", etsyError)
       
-      // Etsy API hatası durumunda boş veri döndür
+      // Etsy bağlantı sorunu varsa boş veri döndür
       return NextResponse.json({
-        totalListings: 0,
-        totalOrders: 0,
-        totalViews: 0,
-        stores: [],
-        note: "No Etsy connection available",
-        isRealData: false
+        revenue: 0,
+        orders: 0,
+        views: 0,
+        favorites: 0,
+        conversion_rate: 0,
+        avg_order_value: 0,
+        connected: false,
+        error: etsyError.message
       })
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Stats API error:", error)
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to fetch stats", details: error.message },
       { status: 500 }
     )
   }

@@ -90,100 +90,32 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
           setEtsyConnected(true)
           setLastUpdate(new Date().toLocaleString('tr-TR'))
         } else {
-          // Gerçek mağaza yok - demo veriler göster
-          setStores(getDemoStores())
+          // Gerçek mağaza yok - boş liste göster
+          setStores([])
           setEtsyConnected(false)
         }
       } else {
-        // API hatası - demo veriler göster
-        setStores(getDemoStores())
+        // API hatası - boş liste göster
+        setStores([])
         setEtsyConnected(false)
       }
     } catch (error) {
       console.error('Error loading stores:', error)
-      setStores(getDemoStores())
+      setStores([])
       setEtsyConnected(false)
     } finally {
       setLoading(false)
     }
   }
 
-  const getDemoStores = (): EtsyStore[] => [
-    {
-      shop_id: 1,
-      shop_name: "Canvas Dreams Studio",
-      title: "Minimalist canvas wall art and prints",
-      listing_active_count: 45,
-      num_favorers: 1250,
-      is_active: true,
-      review_average: 4.8,
-      review_count: 156,
-      currency_code: "USD",
-      url: "https://etsy.com/shop/canvasdreamsstudio",
-      last_synced_at: new Date().toISOString(),
-      connection_status: 'disconnected',
-      monthly_revenue: 12450,
-      monthly_orders: 89,
-      monthly_views: 8900,
-      conversion_rate: 1.2,
-      trend: 'up'
-    },
-    {
-      shop_id: 2,
-      shop_name: "Modern Wall Art Co",
-      title: "Contemporary canvas prints for modern homes",
-      listing_active_count: 32,
-      num_favorers: 890,
-      is_active: true,
-      review_average: 4.6,
-      review_count: 98,
-      currency_code: "USD",
-      url: "https://etsy.com/shop/modernwallartco",
-      last_synced_at: new Date().toISOString(),
-      connection_status: 'disconnected',
-      monthly_revenue: 8750,
-      monthly_orders: 56,
-      monthly_views: 5600,
-      conversion_rate: 1.0,
-      trend: 'down'
-    },
-    {
-      shop_id: 3,
-      shop_name: "Nature Canvas Art",
-      title: "Nature-inspired wall art and botanical prints",
-      listing_active_count: 28,
-      num_favorers: 2100,
-      is_active: true,
-      review_average: 4.9,
-      review_count: 203,
-      currency_code: "USD",
-      url: "https://etsy.com/shop/naturecanvasart",
-      last_synced_at: new Date().toISOString(),
-      connection_status: 'disconnected',
-      monthly_revenue: 15600,
-      monthly_orders: 112,
-      monthly_views: 12300,
-      conversion_rate: 0.9,
-      trend: 'up'
-    }
-  ]
-
   const handleConnectEtsy = async () => {
     setReconnecting(true)
     try {
-      const session = await supabase.auth.getSession()
-      if (!session.data.session) {
-        alert('Lütfen önce giriş yapın')
-        return
-      }
-
       const response = await fetch('/api/etsy/auth', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.data.session.access_token}`
-        },
-        body: JSON.stringify({ userId: user.id })
+          'Content-Type': 'application/json'
+        }
       })
       
       if (response.ok) {
@@ -419,26 +351,6 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
                   store={store} 
                   onDisconnect={handleDisconnectStore}
                   router={router}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Demo Stores - Sadece gerçek bağlantı yoksa göster */}
-        {!etsyConnected && disconnectedStores.length > 0 && (
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Demo Mağazalar ({disconnectedStores.length})
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {disconnectedStores.map((store) => (
-                <StoreCard 
-                  key={store.shop_id} 
-                  store={store} 
-                  onDisconnect={handleDisconnectStore}
-                  router={router}
-                  isDemo={true}
                 />
               ))}
             </div>

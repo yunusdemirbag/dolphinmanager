@@ -74,44 +74,53 @@ export function generatePKCE() {
 }
 
 export async function getEtsyAuthUrl(userId: string): Promise<string> {
-  const codeVerifier = generateCodeVerifier()
-  const codeChallenge = generateCodeChallenge(codeVerifier)
+  try {
+    console.log("Creating Etsy auth URL for user:", userId)
+    // PKCE oluştur
+    const codeVerifier = generateCodeVerifier()
+    const codeChallenge = generateCodeChallenge(codeVerifier)
 
-  console.log("Generated PKCE:", { 
-    verifierLength: codeVerifier.length,
-    challengeLength: codeChallenge.length 
-  })
+    // Önce eski kayıtları temizle
+    await supabaseAdmin
+      .from("etsy_auth_sessions")
+      .delete()
+      .eq("user_id", userId)
 
-  // Önce eski session'ı sil
-  await supabaseAdmin.from("etsy_auth_sessions").delete().eq("user_id", userId)
+    // Yeni kayıt oluştur - state olarak userId kullan
+    const { error } = await supabaseAdmin
+      .from("etsy_auth_sessions")
+      .insert({
+        user_id: userId,
+        code_verifier: codeVerifier,
+        state: userId,
+      })
 
-  // Yeni session'ı ekle
-  const { error } = await supabaseAdmin.from("etsy_auth_sessions").insert({
-    user_id: userId,
-    code_verifier: codeVerifier,
-    state: userId,
-    created_at: new Date().toISOString(),
-  })
+    if (error) {
+      console.error("Database error:", error)
+      throw new Error(`Failed to store auth session: ${error.message}`)
+    }
 
-  if (error) {
-    console.error("Failed to store code verifier:", error)
+    console.log("Auth session stored successfully")
+
+    // Etsy OAuth URL'ini oluştur
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: ETSY_CLIENT_ID,
+      redirect_uri: ETSY_REDIRECT_URI,
+      scope: ETSY_SCOPE,
+      state: userId, // state parametresi olarak userId
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+    })
+
+    const authUrl = `https://www.etsy.com/oauth/connect?${params.toString()}`
+    console.log("Generated auth URL")
+
+    return authUrl
+  } catch (error) {
+    console.error("getEtsyAuthUrl error:", error)
     throw error
   }
-
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: ETSY_CLIENT_ID,
-    redirect_uri: ETSY_REDIRECT_URI,
-    scope: ETSY_SCOPE,
-    state: userId,
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
-  })
-
-  const authUrl = `${ETSY_OAUTH_BASE}/connect?${params.toString()}`
-  console.log("Auth URL:", authUrl)
-  
-  return authUrl
 }
 
 export async function exchangeCodeForToken(code: string, userId: string): Promise<EtsyTokens> {

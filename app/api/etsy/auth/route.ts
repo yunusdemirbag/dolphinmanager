@@ -15,12 +15,22 @@ export async function POST(request: NextRequest) {
       )
     }
     
+    // Authorization header'ından token al
+    const authHeader = request.headers.get("authorization")
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: "Authorization header required" },
+        { status: 401 }
+      )
+    }
+
+    const token = authHeader.replace("Bearer ", "")
+    
     // Kullanıcı doğrulaması
-    const supabase = createServerSupabase()
-    const { data: { user }, error } = await supabase.auth.getUser()
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
     
     if (error || !user || user.id !== userId) {
-      console.error("User validation failed:", { error, user, userId })
+      console.error("User validation failed:", { error, user: user?.id, userId })
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

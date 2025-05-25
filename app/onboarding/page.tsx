@@ -21,6 +21,14 @@ export default function OnboardingPage() {
         return
       }
 
+      // Session token'ını al
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        alert("Session token bulunamadı. Lütfen tekrar giriş yapın.")
+        setLoading(false)
+        return
+      }
+
       console.log("Current user ID:", user.id)
 
       // /api/etsy/auth endpoint'ine POST request
@@ -28,6 +36,7 @@ export default function OnboardingPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ userId: user.id }),
       })

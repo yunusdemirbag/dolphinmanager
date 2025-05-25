@@ -79,74 +79,13 @@ export default function CostsPage() {
   }
 
   const loadCanvasVariations = () => {
-    // Canvas wall art için varsayılan varyasyonlar
-    const defaultVariations: Variation[] = [
-      {
-        id: "1",
-        name: "Boyut",
-        type: "size",
-        values: ["8x10 inch", "12x16 inch", "16x20 inch", "18x24 inch", "24x36 inch", "30x40 inch"]
-      },
-      {
-        id: "2",
-        name: "Çerçeve",
-        type: "frame",
-        values: ["Çerçevesiz", "Siyah Çerçeve", "Beyaz Çerçeve", "Ahşap Çerçeve", "Altın Çerçeve"]
-      },
-      {
-        id: "3",
-        name: "Malzeme",
-        type: "material",
-        values: ["Canvas", "Poster", "Premium Canvas", "Metal Print", "Akrilik"]
-      },
-      {
-        id: "4",
-        name: "Yönelim",
-        type: "orientation",
-        values: ["Dikey", "Yatay", "Kare"]
-      }
-    ]
-    setVariations(defaultVariations)
+    // Demo veri kaldırıldı - gerçek API'den veri çekilecek
+    setVariations([])
   }
 
   const loadCostData = () => {
-    // Örnek maliyet verileri
-    const sampleCosts: CostItem[] = [
-      {
-        id: "1",
-        variationCombination: ["16x20 inch", "Çerçevesiz", "Canvas", "Dikey"],
-        productionCost: 8.50,
-        shippingCost: 3.20,
-        etsyCommission: 6.5, // %6.5
-        totalCost: 11.70,
-        sellingPrice: 25.99,
-        profit: 14.29,
-        profitMargin: 55.0
-      },
-      {
-        id: "2",
-        variationCombination: ["24x36 inch", "Siyah Çerçeve", "Premium Canvas", "Yatay"],
-        productionCost: 15.80,
-        shippingCost: 5.50,
-        etsyCommission: 6.5,
-        totalCost: 21.30,
-        sellingPrice: 45.99,
-        profit: 24.69,
-        profitMargin: 53.7
-      },
-      {
-        id: "3",
-        variationCombination: ["12x16 inch", "Beyaz Çerçeve", "Canvas", "Kare"],
-        productionCost: 6.20,
-        shippingCost: 2.80,
-        etsyCommission: 6.5,
-        totalCost: 9.00,
-        sellingPrice: 19.99,
-        profit: 10.99,
-        profitMargin: 55.0
-      }
-    ]
-    setCostItems(sampleCosts)
+    // Demo veri kaldırıldı - gerçek API'den veri çekilecek
+    setCostItems([])
   }
 
   const addNewVariation = () => {

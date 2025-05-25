@@ -46,7 +46,9 @@ export default function Dashboard() {
       <div className="text-center mb-12">
         <div className="flex justify-center mb-6">
           <div className="w-24 h-24 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl shadow-lg">
-            <img src="/dolphin-logo.svg" alt="Dolphin Manager" className="w-16 h-16" />
+            <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center">
+              <span className="text-2xl font-bold text-white">DM</span>
+            </div>
           </div>
         </div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Hoş Geldiniz!</h2>

@@ -32,50 +32,8 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
   const [timeRange, setTimeRange] = useState("30d")
   const router = useRouter()
 
-  // Mock stores data - gerçek uygulamada API'den gelecek
-  const stores = [
-    {
-      id: "1",
-      shop_name: "ArtisanCrafts",
-      listing_active_count: 45,
-      num_favorers: 1250,
-      is_active: true,
-      image_url: null,
-    },
-    {
-      id: "2",
-      shop_name: "VintageFinds",
-      listing_active_count: 32,
-      num_favorers: 890,
-      is_active: true,
-      image_url: null,
-    },
-    {
-      id: "3",
-      shop_name: "HandmadeJewelry",
-      listing_active_count: 28,
-      num_favorers: 2100,
-      is_active: false,
-      image_url: null,
-    },
-    {
-      id: "4",
-      shop_name: "CeramicStudio",
-      listing_active_count: 67,
-      num_favorers: 1580,
-      is_active: true,
-      image_url: null,
-    },
-    {
-      id: "5",
-      shop_name: "WoodworkShop",
-      listing_active_count: 23,
-      num_favorers: 456,
-      is_active: true,
-      image_url: null,
-    },
-  ]
-
+  // Gerçek mağaza verilerini kullan - demo veri yok
+  const stores = dashboardData.stores || []
   const currentStore = stores.find((store) => store.id === selectedStore) || stores[0]
 
   useEffect(() => {
@@ -84,27 +42,20 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
     }
   }, [selectedStore, stores])
 
-  // Mock data for current store
+  // Sadece gerçek veriler - demo veri yok
   const storeData = {
-    revenue: 15420,
-    orders: 89,
-    views: 12300,
-    favorites: 445,
-    conversion_rate: 1.2,
-    avg_order_value: 173,
+    revenue: dashboardData.revenue || 0,
+    orders: dashboardData.orders || 0,
+    views: dashboardData.views || 0,
+    favorites: dashboardData.favorites || 0,
+    conversion_rate: dashboardData.conversion_rate || 0,
+    avg_order_value: dashboardData.avg_order_value || 0,
     products: dashboardData.products || [],
-    orders: dashboardData.orders || [],
+    ordersList: dashboardData.ordersList || [],
   }
 
-  const chartData = [
-    { name: "Pzt", orders: 12, revenue: 2400, views: 400 },
-    { name: "Sal", orders: 19, revenue: 1398, views: 300 },
-    { name: "Çar", orders: 8, revenue: 9800, views: 200 },
-    { name: "Per", orders: 27, revenue: 3908, views: 278 },
-    { name: "Cum", orders: 18, revenue: 4800, views: 189 },
-    { name: "Cmt", orders: 23, revenue: 3800, views: 239 },
-    { name: "Paz", orders: 15, revenue: 4300, views: 349 },
-  ]
+  // Gerçek chart verilerini kullan - demo veri yok
+  const chartData = dashboardData.chartData || []
 
   const handleStoreChange = (storeId: string) => {
     setSelectedStore(storeId)
@@ -118,9 +69,6 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <img src="/dolphin-logo.svg" alt="Dolphin Manager" className="w-6 h-6" />
-              </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
                 <p className="text-sm text-gray-600">Mağaza performansınızı takip edin</p>
@@ -174,8 +122,14 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
                   <p className="text-sm font-medium text-gray-600">Toplam Gelir</p>
                   <p className="text-2xl font-bold text-gray-900">₺{storeData.revenue.toLocaleString()}</p>
                   <div className="flex items-center mt-1">
-                    <ArrowUpRight className="w-4 h-4 text-green-600" />
-                    <span className="text-sm text-green-600">+12% bu ay</span>
+                    {dashboardData.revenueChange >= 0 ? (
+                      <ArrowUpRight className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <ArrowDownRight className="w-4 h-4 text-red-600" />
+                    )}
+                    <span className={`text-sm ${dashboardData.revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {dashboardData.revenueChange ? `${dashboardData.revenueChange > 0 ? '+' : ''}${dashboardData.revenueChange}%` : 'Veri yok'}
+                    </span>
                   </div>
                 </div>
                 <div className="p-3 rounded-full bg-orange-50">
@@ -192,8 +146,14 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
                   <p className="text-sm font-medium text-gray-600">Siparişler</p>
                   <p className="text-2xl font-bold text-gray-900">{storeData.orders}</p>
                   <div className="flex items-center mt-1">
-                    <ArrowUpRight className="w-4 h-4 text-green-600" />
-                    <span className="text-sm text-green-600">+8% bu ay</span>
+                    {dashboardData.ordersChange >= 0 ? (
+                      <ArrowUpRight className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <ArrowDownRight className="w-4 h-4 text-red-600" />
+                    )}
+                    <span className={`text-sm ${dashboardData.ordersChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {dashboardData.ordersChange ? `${dashboardData.ordersChange > 0 ? '+' : ''}${dashboardData.ordersChange}%` : 'Veri yok'}
+                    </span>
                   </div>
                 </div>
                 <div className="p-3 rounded-full bg-blue-50">
@@ -210,8 +170,14 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
                   <p className="text-sm font-medium text-gray-600">Görüntülenme</p>
                   <p className="text-2xl font-bold text-gray-900">{storeData.views.toLocaleString()}</p>
                   <div className="flex items-center mt-1">
-                    <ArrowUpRight className="w-4 h-4 text-green-600" />
-                    <span className="text-sm text-green-600">+15% bu ay</span>
+                    {dashboardData.viewsChange >= 0 ? (
+                      <ArrowUpRight className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <ArrowDownRight className="w-4 h-4 text-red-600" />
+                    )}
+                    <span className={`text-sm ${dashboardData.viewsChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {dashboardData.viewsChange ? `${dashboardData.viewsChange > 0 ? '+' : ''}${dashboardData.viewsChange}%` : 'Veri yok'}
+                    </span>
                   </div>
                 </div>
                 <div className="p-3 rounded-full bg-purple-50">
@@ -228,8 +194,14 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
                   <p className="text-sm font-medium text-gray-600">Dönüşüm Oranı</p>
                   <p className="text-2xl font-bold text-gray-900">%{storeData.conversion_rate}</p>
                   <div className="flex items-center mt-1">
-                    <ArrowDownRight className="w-4 h-4 text-red-600" />
-                    <span className="text-sm text-red-600">-0.2% bu ay</span>
+                    {dashboardData.conversionChange >= 0 ? (
+                      <ArrowUpRight className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <ArrowDownRight className="w-4 h-4 text-red-600" />
+                    )}
+                    <span className={`text-sm ${dashboardData.conversionChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {dashboardData.conversionChange ? `${dashboardData.conversionChange > 0 ? '+' : ''}${dashboardData.conversionChange}%` : 'Veri yok'}
+                    </span>
                   </div>
                 </div>
                 <div className="p-3 rounded-full bg-green-50">
@@ -246,7 +218,7 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <img src="/dolphin-logo.svg" alt="Store" className="w-8 h-8 opacity-70" />
+                  <Store className="w-8 h-8 text-orange-600" />
                 </div>
                 <div>
                   <CardTitle className="text-orange-900">{currentStore?.shop_name}</CardTitle>
@@ -295,15 +267,24 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
               <CardDescription>Son 7 günün sipariş ve gelir analizi</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="orders" fill="#F97316" name="Siparişler" />
-                </BarChart>
-              </ResponsiveContainer>
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="orders" fill="#F97316" name="Siparişler" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-300 flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Henüz chart verisi yok</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -313,15 +294,24 @@ export default function DashboardClient({ user, profile, dashboardData }: Dashbo
               <CardDescription>Haftalık görüntülenme sayıları</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="views" stroke="#8B5CF6" strokeWidth={2} name="Görüntülenme" />
-                </LineChart>
-              </ResponsiveContainer>
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="views" stroke="#8B5CF6" strokeWidth={2} name="Görüntülenme" />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-300 flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <Eye className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Henüz görüntülenme verisi yok</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

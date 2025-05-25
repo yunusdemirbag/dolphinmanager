@@ -51,77 +51,23 @@ export default function OrdersPage() {
     filterOrders()
   }, [orders, filterStatus, filterStore])
 
-  const loadOrders = () => {
-    // Mock sipariş verileri
-    const mockOrders: Order[] = [
-      {
-        id: "1",
-        order_number: "ETY-2024-001",
-        customer_name: "Ayşe Yılmaz",
-        customer_email: "ayse@email.com",
-        product_title: "Minimalist Mountain Canvas Wall Art 16x20",
-        product_image: "/placeholder.svg?height=100&width=100",
-        quantity: 1,
-        price: 34.99,
-        total: 34.99,
-        status: "new",
-        order_date: "2024-01-25T10:30:00Z",
-        estimated_delivery: "2024-02-05",
-        shipping_address: "İstanbul, Türkiye",
-        store_name: "ArtisanCrafts",
-        notes: "Müşteri hızlı teslimat istedi",
-      },
-      {
-        id: "2",
-        order_number: "ETY-2024-002",
-        customer_name: "Mehmet Kaya",
-        customer_email: "mehmet@email.com",
-        product_title: "Boho Sunset Canvas Print 24x36",
-        product_image: "/placeholder.svg?height=100&width=100",
-        quantity: 2,
-        price: 49.99,
-        total: 99.98,
-        status: "in_production",
-        order_date: "2024-01-24T14:15:00Z",
-        estimated_delivery: "2024-02-08",
-        shipping_address: "Ankara, Türkiye",
-        store_name: "BohoArt",
-      },
-      {
-        id: "3",
-        order_number: "ETY-2024-003",
-        customer_name: "Zehra Demir",
-        customer_email: "zehra@email.com",
-        product_title: "Abstract Geometric Art Print 12x16",
-        product_image: "/placeholder.svg?height=100&width=100",
-        quantity: 1,
-        price: 24.99,
-        total: 24.99,
-        status: "shipped",
-        order_date: "2024-01-22T09:45:00Z",
-        estimated_delivery: "2024-02-02",
-        shipping_address: "İzmir, Türkiye",
-        store_name: "ModernArt",
-      },
-      {
-        id: "4",
-        order_number: "ETY-2024-004",
-        customer_name: "Ali Özkan",
-        customer_email: "ali@email.com",
-        product_title: "Vintage Car Poster 8x10",
-        product_image: "/placeholder.svg?height=100&width=100",
-        quantity: 3,
-        price: 19.99,
-        total: 59.97,
-        status: "delivered",
-        order_date: "2024-01-20T16:20:00Z",
-        estimated_delivery: "2024-01-30",
-        shipping_address: "Bursa, Türkiye",
-        store_name: "VintageFinds",
-      },
-    ]
-
-    setOrders(mockOrders)
+  const loadOrders = async () => {
+    try {
+      // Gerçek sipariş verilerini API'den çek
+      const response = await fetch('/api/etsy/orders')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setOrders(data.orders || [])
+      } else {
+        // API hatası - boş liste göster
+        setOrders([])
+      }
+    } catch (error) {
+      console.error("Orders API error:", error)
+      // Hata durumunda boş liste göster
+      setOrders([])
+    }
   }
 
   const filterOrders = () => {

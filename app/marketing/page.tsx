@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,109 +25,44 @@ export default function MarketingPage() {
   const [campaignName, setCampaignName] = useState("")
   const [campaignBudget, setCampaignBudget] = useState("")
   const [couponCode, setCouponCode] = useState("")
+  const [etsyAdsData, setEtsyAdsData] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  // Mock marketing data
-  const etsyAdsData = {
-    active_campaigns: 3,
-    total_spend: 245,
-    total_clicks: 1250,
-    total_impressions: 15600,
-    conversion_rate: 2.4,
-    cost_per_click: 0.196,
-    return_on_ad_spend: 4.2,
+  useEffect(() => {
+    loadMarketingData()
+  }, [])
+
+  const loadMarketingData = async () => {
+    try {
+      // Gerçek marketing verilerini API'den çek
+      const response = await fetch('/api/etsy/marketing')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setEtsyAdsData(data)
+      } else {
+        // API hatası - boş veri göster
+        setEtsyAdsData(null)
+      }
+    } catch (error) {
+      console.error("Marketing API error:", error)
+      // Hata durumunda boş veri göster
+      setEtsyAdsData(null)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const campaigns = [
-    {
-      id: "1",
-      name: "Holiday Jewelry Collection",
-      type: "Etsy Ads",
-      status: "active",
-      budget: 50,
-      spent: 32.45,
-      clicks: 165,
-      impressions: 2100,
-      conversions: 8,
-      revenue: 456,
-      start_date: "2024-01-15",
-      end_date: "2024-02-15",
-    },
-    {
-      id: "2",
-      name: "Ceramic Mug Promotion",
-      type: "Etsy Ads",
-      status: "active",
-      budget: 30,
-      spent: 28.9,
-      clicks: 89,
-      impressions: 1200,
-      conversions: 3,
-      revenue: 168,
-      start_date: "2024-01-20",
-      end_date: "2024-02-20",
-    },
-    {
-      id: "3",
-      name: "Vintage Collection Boost",
-      type: "Etsy Ads",
-      status: "paused",
-      budget: 75,
-      spent: 45.2,
-      clicks: 234,
-      impressions: 3200,
-      conversions: 12,
-      revenue: 890,
-      start_date: "2024-01-10",
-      end_date: "2024-02-10",
-    },
-  ]
-
-  const coupons = [
-    {
-      id: "1",
-      code: "WELCOME20",
-      type: "percentage",
-      value: 20,
-      min_order: 50,
-      usage_count: 45,
-      usage_limit: 100,
-      start_date: "2024-01-01",
-      end_date: "2024-03-31",
-      status: "active",
-    },
-    {
-      id: "2",
-      code: "FREESHIP",
-      type: "free_shipping",
-      value: 0,
-      min_order: 75,
-      usage_count: 23,
-      usage_limit: 50,
-      start_date: "2024-01-15",
-      end_date: "2024-02-15",
-      status: "active",
-    },
-    {
-      id: "3",
-      code: "SAVE15",
-      type: "fixed",
-      value: 15,
-      min_order: 100,
-      usage_count: 12,
-      usage_limit: 25,
-      start_date: "2024-01-20",
-      end_date: "2024-02-20",
-      status: "active",
-    },
-  ]
-
+  // Demo veriler kaldırıldı - gerçek veriler API'den gelecek
+  const campaigns: any[] = []
+  const coupons: any[] = []
   const socialMediaStats = {
-    instagram_followers: 2450,
-    instagram_engagement: 4.2,
-    pinterest_followers: 1890,
-    pinterest_monthly_views: 15600,
-    facebook_followers: 890,
-    facebook_reach: 5600,
+    instagram_followers: 0,
+    instagram_engagement: 0,
+    pinterest_followers: 0,
+    pinterest_monthly_views: 0,
+    facebook_followers: 0,
+    facebook_reach: 0,
   }
 
   const getStatusColor = (status: string) => {
@@ -316,7 +251,7 @@ export default function MarketingPage() {
                     <p className="text-sm text-green-700">Son 30 gün</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-green-600">{etsyAdsData.return_on_ad_spend}x</p>
+                    <p className="text-2xl font-bold text-green-600">{etsyAdsData?.return_on_ad_spend}x</p>
                     <p className="text-sm text-green-600">ROAS</p>
                   </div>
                 </div>

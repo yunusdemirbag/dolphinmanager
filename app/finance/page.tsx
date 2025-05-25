@@ -58,93 +58,15 @@ export default function FinancePage() {
   }, [])
 
   const loadFinancialData = () => {
-    // Canvas wall art mağazaları için örnek finansal veriler
-    const mockStoreData: StoreFinance[] = [
-      {
-        id: "1",
-        storeName: "Canvas Dreams Studio",
-        totalSales: 2450.80,
-        etsyCommissions: 159.30,
-        productionCosts: 980.50,
-        shippingCosts: 245.20,
-        netProfit: 1065.80,
-        profitMargin: 43.5,
-        status: "profit",
-        expectedPayment: 1890.50,
-        nextPaymentDate: "2024-12-28",
-        pendingOrders: 12
-      },
-      {
-        id: "2",
-        storeName: "Modern Wall Art Co",
-        totalSales: 1820.40,
-        etsyCommissions: 118.30,
-        productionCosts: 890.20,
-        shippingCosts: 182.10,
-        netProfit: 629.80,
-        profitMargin: 34.6,
-        status: "profit",
-        expectedPayment: 1402.10,
-        nextPaymentDate: "2024-12-30",
-        pendingOrders: 8
-      },
-      {
-        id: "3",
-        storeName: "Minimalist Canvas",
-        totalSales: 980.60,
-        etsyCommissions: 63.74,
-        productionCosts: 520.30,
-        shippingCosts: 98.20,
-        netProfit: 298.36,
-        profitMargin: 30.4,
-        status: "neutral",
-        expectedPayment: 756.86,
-        nextPaymentDate: "2025-01-02",
-        pendingOrders: 5
-      },
-      {
-        id: "4",
-        storeName: "Vintage Prints Hub",
-        totalSales: 650.20,
-        etsyCommissions: 42.26,
-        productionCosts: 480.80,
-        shippingCosts: 85.40,
-        netProfit: 41.74,
-        profitMargin: 6.4,
-        status: "loss",
-        expectedPayment: 507.94,
-        nextPaymentDate: "2025-01-05",
-        pendingOrders: 3
-      },
-      {
-        id: "5",
-        storeName: "Nature Canvas Art",
-        totalSales: 1560.90,
-        etsyCommissions: 101.46,
-        productionCosts: 720.40,
-        shippingCosts: 156.20,
-        netProfit: 582.84,
-        profitMargin: 37.3,
-        status: "profit",
-        expectedPayment: 1204.44,
-        nextPaymentDate: "2024-12-29",
-        pendingOrders: 9
-      }
-    ]
+    // Demo veri kaldırıldı - gerçek API'den veri çekilecek
+    setStoreFinances([])
 
-    setStoreFinances(mockStoreData)
-
-    // Genel özet hesapla
-    const totalBalance = mockStoreData.reduce((sum, store) => sum + store.netProfit, 0)
-    const expectedIncome = mockStoreData.reduce((sum, store) => sum + store.expectedPayment, 0)
-    const pendingExpenses = mockStoreData.reduce((sum, store) => sum + store.productionCosts, 0) * 0.3 // Bekleyen üretici ödemeleri
-    const netPosition = totalBalance + expectedIncome - pendingExpenses
-
+    // Genel özet sıfırla
     setSummary({
-      totalBalance,
-      expectedIncome,
-      pendingExpenses,
-      netPosition,
+      totalBalance: 0,
+      expectedIncome: 0,
+      pendingExpenses: 0,
+      netPosition: 0,
       usdToTry: 38.93
     })
 

@@ -137,45 +137,9 @@ export default function DolphinAIPage() {
         newRecommendations = aiData.recommendations || []
         source = aiData.source || "fallback"
       } else {
-        // Fallback mock recommendations
-        newRecommendations = [
-          {
-            id: "1",
-            type: "size",
-            title: "16x20 inch boyutu çok satıyor",
-            description: "Son 30 günde 16x20 inch boyutundaki canvas'larınız %45 daha fazla satış aldı. Bu boyuta odaklanmanızı öneriyorum.",
-            confidence: 92,
-            priority: "high",
-            data: { size: "16x20", salesIncrease: 45 }
-          },
-          {
-            id: "2",
-            type: "style",
-            title: "Minimalist stil trend'de",
-            description: "Minimalist ve clean tasarımlar bu ay %38 daha fazla görüntüleniyor. Sade çizgiler ve az renk kullanımı öneriyorum.",
-            confidence: 87,
-            priority: "high",
-            data: { style: "minimalist", viewIncrease: 38 }
-          },
-          {
-            id: "3",
-            type: "theme",
-            title: "Doğa teması popüler",
-            description: "Dağ manzaraları, orman ve doğa temalı canvas'lar bu sezon çok aranıyor. Özellikle yeşil tonları tercih ediliyor.",
-            confidence: 84,
-            priority: "medium",
-            data: { theme: "nature", colors: ["green", "brown", "beige"] }
-          },
-          {
-            id: "4",
-            type: "seo",
-            title: "SEO optimizasyonu gerekli",
-            description: "Ürünlerinizin %60'ında 'wall art' ve 'canvas print' anahtar kelimeleri eksik. Bu kelimeleri ekleyerek görünürlüğü artırabilirsiniz.",
-            confidence: 95,
-            priority: "high",
-            data: { missingKeywords: ["wall art", "canvas print", "home decor"] }
-          }
-        ]
+        // AI API hatası - boş öneriler göster
+        newRecommendations = []
+        source = "error"
       }
 
       // Takvim etkinliklerini işle
@@ -195,33 +159,13 @@ export default function DolphinAIPage() {
 
     } catch (error) {
       console.error("Error generating recommendations:", error)
-      // Fallback mock recommendations
-      const mockRecommendations: AIRecommendation[] = [
-        {
-          id: "1",
-          type: "size",
-          title: "16x20 inch boyutu çok satıyor",
-          description: "Son 30 günde 16x20 inch boyutundaki canvas'larınız %45 daha fazla satış aldı. Bu boyuta odaklanmanızı öneriyorum.",
-          confidence: 92,
-          priority: "high",
-          data: { size: "16x20", salesIncrease: 45 }
-        },
-        {
-          id: "2",
-          type: "style",
-          title: "Minimalist stil trend'de",
-          description: "Minimalist ve clean tasarımlar bu ay %38 daha fazla görüntüleniyor. Sade çizgiler ve az renk kullanımı öneriyorum.",
-          confidence: 87,
-          priority: "high",
-          data: { style: "minimalist", viewIncrease: 38 }
-        }
-      ]
-      setRecommendations(mockRecommendations)
-      setAiSource("fallback")
+      // Hata durumunda boş öneriler göster
+      setRecommendations([])
+      setAiSource("error")
       setLastUpdate(new Date())
       
       // Hata durumunda da localStorage'a kaydet
-      saveDataToStorage(mockRecommendations, [], "fallback")
+      saveDataToStorage([], [], "error")
     } finally {
       setLoading(false)
     }

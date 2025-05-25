@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,86 +22,33 @@ import {
 export default function InventoryPage() {
   const [selectedStore, setSelectedStore] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
+  const [inventoryData, setInventoryData] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock inventory data
-  const inventoryData = [
-    {
-      id: "1",
-      title: "Handmade Silver Ring",
-      sku: "HSR-001",
-      store: "ArtisanCrafts",
-      current_stock: 3,
-      reserved_stock: 1,
-      available_stock: 2,
-      reorder_point: 5,
-      max_stock: 20,
-      cost_price: 25,
-      selling_price: 89,
-      last_sold: "2024-01-15",
-      sales_velocity: 2.5, // per week
-      status: "low_stock",
-      category: "Jewelry",
-      supplier: "Silver Supplies Co.",
-      lead_time: 7, // days
-    },
-    {
-      id: "2",
-      title: "Ceramic Coffee Mug",
-      sku: "CCM-002",
-      store: "CeramicStudio",
-      current_stock: 15,
-      reserved_stock: 2,
-      available_stock: 13,
-      reorder_point: 10,
-      max_stock: 50,
-      cost_price: 8,
-      selling_price: 28,
-      last_sold: "2024-01-20",
-      sales_velocity: 4.2,
-      status: "in_stock",
-      category: "Home & Living",
-      supplier: "Ceramic Supplies Ltd.",
-      lead_time: 14,
-    },
-    {
-      id: "3",
-      title: "Vintage Leather Bag",
-      sku: "VLB-003",
-      store: "VintageFinds",
-      current_stock: 0,
-      reserved_stock: 0,
-      available_stock: 0,
-      reorder_point: 3,
-      max_stock: 15,
-      cost_price: 45,
-      selling_price: 156,
-      last_sold: "2024-01-18",
-      sales_velocity: 1.8,
-      status: "out_of_stock",
-      category: "Bags & Purses",
-      supplier: "Vintage Leather Co.",
-      lead_time: 21,
-    },
-    {
-      id: "4",
-      title: "Wooden Cutting Board",
-      sku: "WCB-004",
-      store: "WoodworkShop",
-      current_stock: 25,
-      reserved_stock: 3,
-      available_stock: 22,
-      reorder_point: 8,
-      max_stock: 30,
-      cost_price: 15,
-      selling_price: 65,
-      last_sold: "2024-01-22",
-      sales_velocity: 3.1,
-      status: "overstocked",
-      category: "Kitchen & Dining",
-      supplier: "Wood Crafters Inc.",
-      lead_time: 10,
-    },
-  ]
+  useEffect(() => {
+    loadInventoryData()
+  }, [])
+
+  const loadInventoryData = async () => {
+    try {
+      // Gerçek envanter verilerini API'den çek
+      const response = await fetch('/api/etsy/inventory')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setInventoryData(data.inventory || [])
+      } else {
+        // API hatası - boş liste göster
+        setInventoryData([])
+      }
+    } catch (error) {
+      console.error("Inventory API error:", error)
+      // Hata durumunda boş liste göster
+      setInventoryData([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -150,9 +97,6 @@ export default function InventoryPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <img src="/dolphin-logo.svg" alt="Dolphin Manager" className="w-6 h-6" />
-              </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Stok Yönetimi</h1>
                 <p className="text-sm text-gray-600">Tüm mağazalarınızın stok durumunu takip edin</p>

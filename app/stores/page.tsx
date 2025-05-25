@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 import { supabaseAdmin } from "@/lib/supabase"
 import StoresClient from "./stores-client"
 
 async function getStoresData(userId: string) {
-  // If userId is placeholder or invalid, return empty data
-  if (!userId || userId === "placeholder-user-id") {
+  // If userId is invalid, return empty data
+  if (!userId) {
     return {
       stores: [],
       profile: null,
@@ -39,14 +41,16 @@ async function getStoresData(userId: string) {
 }
 
 export default async function StoresPage() {
-  // Placeholder user ID - in real app, get from session
-  const userId = "placeholder-user-id"
+  const supabase = createServerComponentClient({ cookies })
+  
+  // Gerçek kullanıcı ID'sini al
+  const { data: { user }, error } = await supabase.auth.getUser()
 
-  if (!userId) {
+  if (error || !user) {
     redirect("/auth/login")
   }
 
-  const storesData = await getStoresData(userId)
+  const storesData = await getStoresData(user.id)
 
-  return <StoresClient user={{ id: userId }} storesData={storesData} />
+  return <StoresClient user={user} storesData={storesData} />
 }

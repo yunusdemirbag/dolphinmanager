@@ -70,6 +70,8 @@ export default function ProductsPage() {
   }, [products, searchTerm, sortBy, filterStatus, filterStore])
 
   const loadProducts = async () => {
+    setLoading(true)
+
     const supabase = createClientSupabase()
     const {
       data: { user },
@@ -89,188 +91,21 @@ export default function ProductsPage() {
           if (data.products && data.products.length > 0) {
             setProducts(data.products)
           } else {
-            // Mock data for canvas wall art products
-            const mockProducts: Product[] = [
-              {
-                id: "1",
-                title: "Minimalist Mountain Canvas Wall Art - 16x20 inch",
-                description: "Beautiful minimalist mountain landscape perfect for modern home decor. High quality canvas print with premium materials.",
-                price: 25.99,
-                images: ["/api/placeholder/400/300"],
-                tags: ["wall art", "canvas print", "mountain", "minimalist", "home decor", "16x20"],
-                status: "active",
-                views: 1250,
-                sales: 45,
-                seoScore: 85,
-                created_at: "2024-12-15",
-                last_updated: "2024-12-20",
-                needs_optimization: false,
-                traffic_score: 78,
-                conversion_rate: 3.6,
-                store_name: "Canvas Dreams Studio"
-              },
-              {
-                id: "2", 
-                title: "Abstract Geometric Art Print",
-                description: "Modern abstract geometric design for contemporary spaces.",
-                price: 19.99,
-                images: ["/api/placeholder/400/300"],
-                tags: ["abstract", "geometric", "modern"],
-                status: "active",
-                views: 890,
-                sales: 23,
-                seoScore: 62,
-                created_at: "2024-12-10",
-                last_updated: "2024-12-18",
-                needs_optimization: true,
-                traffic_score: 45,
-                conversion_rate: 2.6,
-                store_name: "Modern Wall Art Co"
-              },
-              {
-                id: "3",
-                title: "Vintage Botanical Canvas - Nature Wall Decor",
-                description: "Vintage style botanical illustration perfect for nature lovers.",
-                price: 32.99,
-                images: ["/api/placeholder/400/300"],
-                tags: ["vintage", "botanical", "nature", "wall decor"],
-                status: "active",
-                views: 2100,
-                sales: 67,
-                seoScore: 91,
-                created_at: "2024-12-05",
-                last_updated: "2024-12-22",
-                needs_optimization: false,
-                traffic_score: 92,
-                conversion_rate: 3.2,
-                store_name: "Nature Canvas Art"
-              },
-              {
-                id: "4",
-                title: "Motivational Quote Canvas",
-                description: "Inspirational quote design for office or bedroom.",
-                price: 22.99,
-                images: ["/api/placeholder/400/300"],
-                tags: ["motivational", "quote", "inspiration"],
-                status: "draft",
-                views: 0,
-                sales: 0,
-                seoScore: 35,
-                created_at: "2024-12-23",
-                last_updated: "2024-12-23",
-                needs_optimization: true,
-                traffic_score: 0,
-                conversion_rate: 0,
-                store_name: "Minimalist Canvas"
-              },
-              {
-                id: "5",
-                title: "Ocean Waves Canvas Print - Coastal Decor",
-                description: "Serene ocean waves perfect for coastal themed rooms.",
-                price: 28.99,
-                images: ["/api/placeholder/400/300"],
-                tags: ["ocean", "waves", "coastal", "blue", "canvas print"],
-                status: "inactive",
-                views: 450,
-                sales: 12,
-                seoScore: 58,
-                created_at: "2024-11-28",
-                last_updated: "2024-12-01",
-                needs_optimization: true,
-                traffic_score: 32,
-                conversion_rate: 2.7,
-                store_name: "Vintage Prints Hub"
-              }
-            ]
-            setProducts(mockProducts)
+            // Gerçek veri yoksa boş liste göster
+            setProducts([])
           }
+        } else {
+          // API hatası - boş liste göster
+          setProducts([])
         }
       } catch (apiError) {
-        console.log("Using mock data due to API error:", apiError)
-        loadMockProducts()
+        console.log("API error:", apiError)
+        setProducts([])
       }
+    } else {
+      setProducts([])
     }
-  }
-
-  const loadMockProducts = () => {
-    // Mock data ile gerçek veriler karıştır
-    const mockProducts: Product[] = [
-      {
-        id: "1",
-        title: "Minimalist Mountain Canvas Wall Art",
-        description: "Beautiful minimalist mountain landscape perfect for modern home decor",
-        price: 29.99,
-        images: ["/placeholder.svg?height=300&width=300"],
-        tags: ["minimalist", "mountain", "landscape", "wall art", "canvas"],
-        status: "active",
-        views: 1250,
-        sales: 45,
-        seoScore: 85,
-        created_at: "2024-01-15",
-        last_updated: "2024-01-20",
-        needs_optimization: false,
-        traffic_score: 78,
-        conversion_rate: 3.6,
-        store_name: "Canvas Dreams Studio"
-      },
-      {
-        id: "2",
-        title: "Abstract Geometric Art Print",
-        description: "Modern abstract geometric design",
-        price: 24.99,
-        images: ["/placeholder.svg?height=300&width=300"],
-        tags: ["abstract", "geometric", "modern"],
-        status: "active",
-        views: 450,
-        sales: 8,
-        seoScore: 42,
-        created_at: "2024-01-10",
-        last_updated: "2024-01-10",
-        needs_optimization: true,
-        traffic_score: 25,
-        conversion_rate: 1.8,
-        store_name: "Modern Wall Art Co"
-      },
-      {
-        id: "3",
-        title: "Boho Sunset Canvas Print 16x20",
-        description:
-          "Stunning boho-style sunset canvas print perfect for bedroom or living room. High-quality canvas material with vibrant colors that won't fade.",
-        price: 34.99,
-        images: ["/placeholder.svg?height=300&width=300"],
-        tags: ["boho", "sunset", "canvas print", "16x20", "bedroom decor", "living room", "wall art"],
-        status: "active",
-        views: 2100,
-        sales: 89,
-        seoScore: 92,
-        created_at: "2024-01-05",
-        last_updated: "2024-01-22",
-        needs_optimization: false,
-        traffic_score: 95,
-        conversion_rate: 4.2,
-        store_name: "Nature Canvas Art"
-      },
-      {
-        id: "4",
-        title: "Vintage Car Poster",
-        description: "Classic vintage car poster",
-        price: 19.99,
-        images: ["/placeholder.svg?height=300&width=300"],
-        tags: ["vintage", "car"],
-        status: "draft",
-        views: 12,
-        sales: 0,
-        seoScore: 28,
-        created_at: "2024-01-25",
-        last_updated: "2024-01-25",
-        needs_optimization: true,
-        traffic_score: 5,
-        conversion_rate: 0,
-        store_name: "Minimalist Canvas"
-      },
-    ]
-
-    setProducts(mockProducts)
+    setLoading(false)
   }
 
   const filterAndSortProducts = () => {

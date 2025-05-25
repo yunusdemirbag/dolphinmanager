@@ -51,36 +51,48 @@ export default function AnalyticsPage() {
   const loadAnalyticsData = async () => {
     setLoading(true)
     
-    // Mock analytics data
-    const mockData: AnalyticsData = {
-      totalRevenue: 2847.50,
-      totalOrders: 142,
-      totalViews: 8420,
-      totalProducts: 25,
-      revenueChange: 12.5,
-      ordersChange: 8.3,
-      viewsChange: -2.1,
-      conversionRate: 1.69,
-      averageOrderValue: 20.05,
-      topProducts: [
-        { name: "Minimalist Mountain Canvas", sales: 45, revenue: 1349.55 },
-        { name: "Boho Sunset Canvas Print", sales: 32, revenue: 1119.68 },
-        { name: "Abstract Geometric Art", sales: 18, revenue: 449.82 },
-        { name: "Vintage Car Poster", sales: 12, revenue: 239.88 },
-        { name: "Nature Photography Print", sales: 8, revenue: 199.92 },
-      ],
-      salesByMonth: [
-        { month: "Oca", sales: 28, revenue: 560.50 },
-        { month: "Şub", sales: 35, revenue: 742.30 },
-        { month: "Mar", sales: 42, revenue: 891.20 },
-        { month: "Nis", sales: 38, revenue: 653.50 },
-      ]
-    }
-
-    setTimeout(() => {
-      setAnalyticsData(mockData)
+    try {
+      // Gerçek analytics verilerini API'den çek
+      const response = await fetch('/api/analytics')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setAnalyticsData(data)
+      } else {
+        // API hatası - boş veri göster
+        setAnalyticsData({
+          totalRevenue: 0,
+          totalOrders: 0,
+          totalViews: 0,
+          totalProducts: 0,
+          revenueChange: 0,
+          ordersChange: 0,
+          viewsChange: 0,
+          conversionRate: 0,
+          averageOrderValue: 0,
+          topProducts: [],
+          salesByMonth: []
+        })
+      }
+    } catch (error) {
+      console.error("Analytics API error:", error)
+      // Hata durumunda boş veri göster
+      setAnalyticsData({
+        totalRevenue: 0,
+        totalOrders: 0,
+        totalViews: 0,
+        totalProducts: 0,
+        revenueChange: 0,
+        ordersChange: 0,
+        viewsChange: 0,
+        conversionRate: 0,
+        averageOrderValue: 0,
+        topProducts: [],
+        salesByMonth: []
+      })
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   const formatCurrency = (amount: number) => {

@@ -26,8 +26,8 @@ interface ProductNeedingOptimization {
 }
 
 export default function SEOOptimizerPage() {
-  const [productTitle, setProductTitle] = useState("Handmade Silver Ring")
-  const [productTags, setProductTags] = useState("silver, ring, handmade, jewelry")
+  const [productTitle, setProductTitle] = useState("")
+  const [productTags, setProductTags] = useState("")
   const [productDescription, setProductDescription] = useState("")
   const [analyzing, setAnalyzing] = useState(false)
   const [productsNeedingHelp, setProductsNeedingHelp] = useState<ProductNeedingOptimization[]>([])
@@ -37,87 +37,14 @@ export default function SEOOptimizerPage() {
   }, [])
 
   const loadProductsNeedingOptimization = () => {
-    // Canvas wall art ürünleri için SEO ihtiyacı olan ürünler
-    const needsOptimization: ProductNeedingOptimization[] = [
-      {
-        id: "1",
-        title: "Abstract Art",
-        current_seo_score: 28,
-        issues: ["Başlık çok kısa", "Boyut bilgisi yok", "Az tag kullanılmış"],
-        views: 12,
-        sales: 0,
-        last_sale: null,
-        tags: ["abstract", "art"],
-        needs_title_change: true,
-        needs_tag_change: true,
-        no_sales: true,
-        low_traffic: true,
-      },
-      {
-        id: "2",
-        title: "Mountain Picture",
-        current_seo_score: 35,
-        issues: ["'Canvas' kelimesi yok", "Wall art belirtilmemiş", "Hedef kitle belirsiz"],
-        views: 45,
-        sales: 1,
-        last_sale: "2024-01-10",
-        tags: ["mountain", "picture", "nature"],
-        needs_title_change: true,
-        needs_tag_change: true,
-        no_sales: false,
-        low_traffic: true,
-      },
-      {
-        id: "3",
-        title: "Sunset Canvas",
-        current_seo_score: 42,
-        issues: ["Boyut bilgisi eksik", "SEO tagları zayıf", "Açıklama kısa"],
-        views: 89,
-        sales: 2,
-        last_sale: "2024-01-15",
-        tags: ["sunset", "canvas", "orange"],
-        needs_title_change: true,
-        needs_tag_change: false,
-        no_sales: false,
-        low_traffic: false,
-      },
-      {
-        id: "4",
-        title: "Geometric Design Print",
-        current_seo_score: 38,
-        issues: ["Modern kelimesi eksik", "Home decor vurgusu yok", "Renk bilgisi yok"],
-        views: 156,
-        sales: 0,
-        last_sale: null,
-        tags: ["geometric", "design", "print"],
-        needs_title_change: false,
-        needs_tag_change: true,
-        no_sales: true,
-        low_traffic: false,
-      },
-    ]
-
-    setProductsNeedingHelp(needsOptimization)
+    // Demo veri kaldırıldı - gerçek API'den veri çekilecek
+    setProductsNeedingHelp([])
   }
 
-  // Mock SEO analysis data
-  const seoScore = 72
-  const keywordData = [
-    { keyword: "canvas wall art", volume: 45000, competition: "Medium", difficulty: 55, trend: "up" },
-    { keyword: "wall art print", volume: 32000, competition: "High", difficulty: 70, trend: "up" },
-    { keyword: "home decor canvas", volume: 28000, competition: "Low", difficulty: 35, trend: "up" },
-    { keyword: "minimalist wall art", volume: 18000, competition: "Medium", difficulty: 45, trend: "up" },
-    { keyword: "canvas print 16x20", volume: 12000, competition: "Low", difficulty: 25, trend: "stable" },
-  ]
-
-  const tagSuggestions = [
-    { tag: "wall art", score: 98, reason: "En popüler canvas arama terimi" },
-    { tag: "canvas print", score: 95, reason: "Ürün türünü net belirtiyor" },
-    { tag: "home decor", score: 92, reason: "Hedef kitle için kritik" },
-    { tag: "16x20 inch", score: 88, reason: "Boyut aramaları çok popüler" },
-    { tag: "modern art", score: 85, reason: "Stil kategorisi güçlü" },
-    { tag: "living room art", score: 82, reason: "Kullanım alanı spesifik" },
-  ]
+  // Demo veriler kaldırıldı - gerçek veriler API'den gelecek
+  const seoScore = 0
+  const keywordData: any[] = []
+  const tagSuggestions: any[] = []
 
   const handleAnalyze = () => {
     setAnalyzing(true)
@@ -155,9 +82,6 @@ export default function SEOOptimizerPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <img src="/dolphin-logo.svg" alt="Dolphin Manager" className="w-6 h-6" />
-              </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">SEO Optimizer</h1>
                 <p className="text-sm text-gray-600">Canvas wall art ürünlerinizi Etsy'de daha görünür hale getirin</p>

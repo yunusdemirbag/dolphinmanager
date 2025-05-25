@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,87 +25,34 @@ import {
 
 export default function CustomerManagementPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loading, setLoading] = useState(true)
   const [messageText, setMessageText] = useState("")
 
-  // Mock customer data
-  const customers = [
-    {
-      id: "1",
-      name: "Sarah Johnson",
-      email: "sarah.j@email.com",
-      avatar: "/placeholder.svg",
-      location: "New York, USA",
-      joined: "2023-06-15",
-      total_orders: 8,
-      total_spent: 456,
-      avg_order_value: 57,
-      last_order: "2024-01-20",
-      favorite_category: "Jewelry",
-      status: "vip",
-      reviews: 5,
-      avg_rating: 4.8,
-      messages: 12,
-      last_message: "2024-01-22",
-      tags: ["repeat_customer", "high_value", "jewelry_lover"],
-    },
-    {
-      id: "2",
-      name: "Michael Chen",
-      email: "m.chen@email.com",
-      avatar: "/placeholder.svg",
-      location: "California, USA",
-      joined: "2023-09-22",
-      total_orders: 3,
-      total_spent: 189,
-      avg_order_value: 63,
-      last_order: "2024-01-18",
-      favorite_category: "Home & Living",
-      status: "regular",
-      reviews: 2,
-      avg_rating: 5.0,
-      messages: 4,
-      last_message: "2024-01-19",
-      tags: ["new_customer", "home_decor"],
-    },
-    {
-      id: "3",
-      name: "Emma Wilson",
-      email: "emma.w@email.com",
-      avatar: "/placeholder.svg",
-      location: "London, UK",
-      joined: "2022-12-10",
-      total_orders: 15,
-      total_spent: 1250,
-      avg_order_value: 83,
-      last_order: "2024-01-25",
-      favorite_category: "Vintage",
-      status: "vip",
-      reviews: 8,
-      avg_rating: 4.9,
-      messages: 23,
-      last_message: "2024-01-25",
-      tags: ["super_customer", "vintage_collector", "international"],
-    },
-    {
-      id: "4",
-      name: "David Rodriguez",
-      email: "d.rodriguez@email.com",
-      avatar: "/placeholder.svg",
-      location: "Texas, USA",
-      joined: "2024-01-05",
-      total_orders: 1,
-      total_spent: 45,
-      avg_order_value: 45,
-      last_order: "2024-01-15",
-      favorite_category: "Woodwork",
-      status: "new",
-      reviews: 1,
-      avg_rating: 4.0,
-      messages: 2,
-      last_message: "2024-01-16",
-      tags: ["first_time_buyer"],
-    },
-  ]
+  useEffect(() => {
+    loadCustomers()
+  }, [])
+
+  const loadCustomers = async () => {
+    try {
+      // Gerçek müşteri verilerini API'den çek
+      const response = await fetch('/api/etsy/customers')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setCustomers(data.customers || [])
+      } else {
+        // API hatası - boş liste göster
+        setCustomers([])
+      }
+    } catch (error) {
+      console.error("Customers API error:", error)
+      // Hata durumunda boş liste göster
+      setCustomers([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const recentMessages = [
     {
@@ -226,9 +173,6 @@ export default function CustomerManagementPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <img src="/dolphin-logo.svg" alt="Dolphin Manager" className="w-6 h-6" />
-              </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Müşteri Yönetimi</h1>
                 <p className="text-sm text-gray-600">Müşteri ilişkilerinizi güçlendirin</p>

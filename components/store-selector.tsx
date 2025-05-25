@@ -39,7 +39,7 @@ export default function StoreSelector({
     return (
       <div className="flex items-center space-x-3 px-3 py-2 bg-orange-50 rounded-lg border border-orange-200">
         <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-          <img src="/dolphin-logo.svg" alt="Store" className="w-5 h-5 opacity-70" />
+          <Store className="w-5 h-5 text-orange-600" />
         </div>
         <div>
           <p className="font-medium text-orange-900">{currentStore?.shop_name}</p>
@@ -57,7 +57,7 @@ export default function StoreSelector({
           className="flex items-center space-x-2 h-auto p-3 border-orange-200 hover:bg-orange-50"
         >
           <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-            <img src="/dolphin-logo.svg" alt="Store" className="w-5 h-5 opacity-70" />
+            <Store className="w-5 h-5 text-orange-600" />
           </div>
           <div className="text-left">
             <p className="font-medium text-sm">{currentStore?.shop_name}</p>
@@ -89,15 +89,7 @@ export default function StoreSelector({
           >
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                {store.image_url ? (
-                  <img
-                    src={store.image_url || "/placeholder.svg"}
-                    alt={store.shop_name}
-                    className="w-8 h-8 rounded-lg object-cover"
-                  />
-                ) : (
-                  <img src="/dolphin-logo.svg" alt="Store" className="w-6 h-6 opacity-70" />
-                )}
+                <Store className="w-6 h-6 text-orange-600" />
               </div>
               <div>
                 <p className="font-medium">{store.shop_name}</p>

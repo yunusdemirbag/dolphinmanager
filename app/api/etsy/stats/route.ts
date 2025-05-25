@@ -59,13 +59,13 @@ export async function GET(request: NextRequest) {
     } catch (etsyError) {
       console.error("Etsy API error:", etsyError)
       
-      // Etsy API hatası durumunda mock data döndür
+      // Etsy API hatası durumunda boş veri döndür
       return NextResponse.json({
-        totalListings: 25,
-        totalOrders: 8,
-        totalViews: 1420,
+        totalListings: 0,
+        totalOrders: 0,
+        totalViews: 0,
         stores: [],
-        note: "Using mock data due to API limitations",
+        note: "No Etsy connection available",
         isRealData: false
       })
     }

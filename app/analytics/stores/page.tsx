@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -21,101 +21,39 @@ import {
   AreaChart,
   Area,
 } from "recharts"
-import { TrendingUp, TrendingDown, Star, DollarSign, Eye, ShoppingBag, ArrowRight, Users, Package } from "lucide-react"
+import { TrendingUp, TrendingDown, Star, DollarSign, Eye, ShoppingBag, ArrowRight, Users, Package, Store } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export default function StoreAnalyticsPage() {
   const [timeRange, setTimeRange] = useState("30d")
+  const [stores, setStores] = useState([])
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  // Enhanced mock data with more realistic Etsy store information
-  const stores = [
-    {
-      id: "1",
-      shop_name: "ArtisanCrafts",
-      listing_active_count: 45,
-      num_favorers: 1250,
-      review_average: 4.8,
-      review_count: 156,
-      revenue: 12450,
-      views: 8900,
-      favorites: 234,
-      orders: 89,
-      conversion_rate: 1.2,
-      trend: "up",
-      category: "Home & Living",
-      avg_order_value: 140,
-      return_rate: 2.1,
-    },
-    {
-      id: "2",
-      shop_name: "VintageFinds",
-      listing_active_count: 32,
-      num_favorers: 890,
-      review_average: 4.6,
-      review_count: 98,
-      revenue: 8750,
-      views: 5600,
-      favorites: 167,
-      orders: 56,
-      conversion_rate: 1.0,
-      trend: "down",
-      category: "Clothing",
-      avg_order_value: 156,
-      return_rate: 3.2,
-    },
-    {
-      id: "3",
-      shop_name: "HandmadeJewelry",
-      listing_active_count: 28,
-      num_favorers: 2100,
-      review_average: 4.9,
-      review_count: 203,
-      revenue: 15600,
-      views: 12300,
-      favorites: 445,
-      orders: 112,
-      conversion_rate: 0.9,
-      trend: "up",
-      category: "Jewelry",
-      avg_order_value: 139,
-      return_rate: 1.8,
-    },
-    {
-      id: "4",
-      shop_name: "CeramicStudio",
-      listing_active_count: 67,
-      num_favorers: 1580,
-      review_average: 4.7,
-      review_count: 234,
-      revenue: 18900,
-      views: 15600,
-      favorites: 567,
-      orders: 145,
-      conversion_rate: 1.4,
-      trend: "up",
-      category: "Home & Living",
-      avg_order_value: 130,
-      return_rate: 2.5,
-    },
-    {
-      id: "5",
-      shop_name: "WoodworkShop",
-      listing_active_count: 23,
-      num_favorers: 456,
-      review_average: 4.5,
-      review_count: 67,
-      revenue: 5200,
-      views: 3400,
-      favorites: 89,
-      orders: 23,
-      conversion_rate: 0.7,
-      trend: "down",
-      category: "Home & Living",
-      avg_order_value: 226,
-      return_rate: 1.2,
-    },
-  ]
+  useEffect(() => {
+    loadStoreAnalytics()
+  }, [])
+
+  const loadStoreAnalytics = async () => {
+    try {
+      // Gerçek mağaza analytics verilerini API'den çek
+      const response = await fetch('/api/etsy/store-analytics')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setStores(data.stores || [])
+      } else {
+        // API hatası - boş liste göster
+        setStores([])
+      }
+    } catch (error) {
+      console.error("Store analytics API error:", error)
+      // Hata durumunda boş liste göster
+      setStores([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const chartData = stores.map((store) => ({
     name: store.shop_name,
@@ -161,9 +99,6 @@ export default function StoreAnalyticsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <img src="/dolphin-logo.svg" alt="Dolphin Manager" className="w-6 h-6" />
-              </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Tüm Mağaza Analitikleri</h1>
                 <p className="text-sm text-gray-600">{stores.length} mağaza karşılaştırması ve trend analizi</p>
@@ -300,7 +235,7 @@ export default function StoreAnalyticsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                          <img src="/dolphin-logo.svg" alt="Store" className="w-6 h-6 opacity-70" />
+                          <Store className="w-6 h-6 text-orange-600" />
                         </div>
                         <div>
                           <h3 className="font-semibold">{store.shop_name}</h3>
@@ -480,7 +415,7 @@ export default function StoreAnalyticsPage() {
                           <td className="py-3">
                             <div className="flex items-center space-x-3">
                               <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                                <img src="/dolphin-logo.svg" alt="Store" className="w-5 h-5 opacity-70" />
+                                <Store className="w-6 h-6 text-orange-600" />
                               </div>
                               <div>
                                 <span className="font-medium">{store.shop_name}</span>
@@ -633,7 +568,7 @@ export default function StoreAnalyticsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                          <img src="/dolphin-logo.svg" alt="Store" className="w-6 h-6 opacity-70" />
+                          <Store className="w-6 h-6 text-orange-600" />
                         </div>
                         <div>
                           <h3 className="font-semibold">{store.shop_name}</h3>

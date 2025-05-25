@@ -60,12 +60,11 @@ export async function GET(request: NextRequest) {
     } catch (etsyError) {
       console.error("Etsy API error:", etsyError)
       
-      // Etsy API hatası durumunda boş array döndür
+      // Etsy API hatası durumunda boş veri döndür
       return NextResponse.json({
         products: [],
         total: 0,
-        note: "Could not fetch products from Etsy API",
-        isRealData: false
+        note: "No Etsy connection available"
       })
     }
 

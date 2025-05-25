@@ -30,92 +30,31 @@ export default function SupplierPaymentsPage() {
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterSupplier, setFilterSupplier] = useState("all")
   const [exchangeRate] = useState(34.5) // USD/TL kuru
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadSupplierOrders()
   }, [])
 
-  const loadSupplierOrders = () => {
-    // Maliyetler sayfasından boyut bilgilerini al ve sipariş verilerini oluştur
-    const mockSupplierOrders: SupplierOrder[] = [
-      {
-        id: "1",
-        order_number: "SUP-2024-001",
-        product_title: "Minimalist Mountain Canvas",
-        size: "16x20 inch",
-        quantity: 5,
-        unit_cost: 8.0,
-        total_cost: 40.0,
-        supplier: "Canvas Pro Printing",
-        order_date: "2024-01-25",
-        due_date: "2024-02-05",
-        status: "pending",
-        store_name: "ArtisanCrafts",
-        customer_order_id: "ETY-2024-001",
-      },
-      {
-        id: "2",
-        order_number: "SUP-2024-002",
-        product_title: "Boho Sunset Canvas",
-        size: "24x36 inch",
-        quantity: 3,
-        unit_cost: 15.0,
-        total_cost: 45.0,
-        supplier: "Premium Canvas Co",
-        order_date: "2024-01-24",
-        due_date: "2024-02-03",
-        status: "pending",
-        store_name: "BohoArt",
-        customer_order_id: "ETY-2024-002",
-      },
-      {
-        id: "3",
-        order_number: "SUP-2024-003",
-        product_title: "Abstract Geometric Print",
-        size: "12x16 inch",
-        quantity: 2,
-        unit_cost: 5.5,
-        total_cost: 11.0,
-        supplier: "Quick Print Solutions",
-        order_date: "2024-01-22",
-        due_date: "2024-01-30",
-        status: "overdue",
-        store_name: "ModernArt",
-        customer_order_id: "ETY-2024-003",
-      },
-      {
-        id: "4",
-        order_number: "SUP-2024-004",
-        product_title: "Vintage Car Poster",
-        size: "8x10 inch",
-        quantity: 10,
-        unit_cost: 3.5,
-        total_cost: 35.0,
-        supplier: "Budget Print House",
-        order_date: "2024-01-20",
-        due_date: "2024-01-28",
-        status: "paid",
-        store_name: "VintageFinds",
-        customer_order_id: "ETY-2024-004",
-      },
-      {
-        id: "5",
-        order_number: "SUP-2024-005",
-        product_title: "Nature Landscape Canvas",
-        size: "30x40 inch",
-        quantity: 1,
-        unit_cost: 25.0,
-        total_cost: 25.0,
-        supplier: "Premium Canvas Co",
-        order_date: "2024-01-26",
-        due_date: "2024-02-10",
-        status: "pending",
-        store_name: "NatureArt",
-        customer_order_id: "ETY-2024-005",
-      },
-    ]
-
-    setSupplierOrders(mockSupplierOrders)
+  const loadSupplierOrders = async () => {
+    try {
+      // Gerçek tedarikçi sipariş verilerini API'den çek
+      const response = await fetch('/api/supplier-orders')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setSupplierOrders(data.orders || [])
+      } else {
+        // API hatası - boş liste göster
+        setSupplierOrders([])
+      }
+    } catch (error) {
+      console.error("Supplier orders API error:", error)
+      // Hata durumunda boş liste göster
+      setSupplierOrders([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const markAsPaid = (orderIds: string[]) => {

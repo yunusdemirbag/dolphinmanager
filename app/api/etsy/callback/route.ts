@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   try {
     // Önce tüm state kayıtlarını kontrol edelim (hata ayıklama için)
     const { data: allStates } = await supabaseAdmin
-      .from("oauth_states")
+      .from("etsy_auth_sessions")
       .select("state, created_at")
       .order("created_at", { ascending: false })
       .limit(5)
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     // State'e göre verifier'ı bul
     const { data: sessionData, error: sessionError } = await supabaseAdmin
-      .from("oauth_states")
+      .from("etsy_auth_sessions")
       .select("code_verifier, user_id")
       .eq("state", state)
       .single()
@@ -126,13 +126,13 @@ export async function GET(req: NextRequest) {
       })
 
       // State kaydını temizle
-      await supabaseAdmin.from("oauth_states").delete().eq("state", state)
+      await supabaseAdmin.from("etsy_auth_sessions").delete().eq("state", state)
 
       // Başarı sayfasına yönlendir
       return NextResponse.redirect(new URL("/dashboard", req.url))
     } catch (error) {
       console.error("Callback processing error:", error)
-      return NextResponse.json({ error: "Failed to process callback" }, { status: 500 })
+      return NextResponse.json({ error: "Failed to process callback", details: error }, { status: 500 })
     }
   } catch (error) {
     console.error("Callback processing error:", error)

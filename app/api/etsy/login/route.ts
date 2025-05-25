@@ -34,33 +34,52 @@ export async function GET(req: NextRequest) {
     // Create a temporary ID for this session
     const tempUserId = `temp_${crypto.randomUUID().substring(0, 8)}`
     
-    // Store in Supabase - eskilerini temizle
-    // Önce eski kayıtları temizle
-    await supabaseAdmin.from("oauth_states").delete().lt("created_at", new Date(Date.now() - 86400000).toISOString())
+    console.log("Trying to store state in Supabase")
     
-    // Yeni state'i kaydet
-    const { data, error } = await supabaseAdmin.from("oauth_states").insert({
-      state: state,
-      code_verifier: codeVerifier,
-      user_id: tempUserId,
-      created_at: new Date().toISOString(),
-    })
-    
-    if (error) {
-      console.error("Error storing state in Supabase:", error)
-      return NextResponse.json({ error: "Failed to store OAuth state" }, { status: 500 })
+    // etsy_auth_sessions tablosunu kullanalım - bu tablonun zaten var olduğunu görüyorum
+    try {
+      // Önce eski kayıtları temizleyelim
+      await supabaseAdmin
+        .from("etsy_auth_sessions")
+        .delete()
+        .lt("created_at", new Date(Date.now() - 86400000).toISOString())
+      
+      // Yeni state'i kaydedelim
+      const { data, error } = await supabaseAdmin
+        .from("etsy_auth_sessions")
+        .insert({
+          user_id: tempUserId,
+          state: state,
+          code_verifier: codeVerifier,
+          created_at: new Date().toISOString(),
+        })
+      
+      if (error) {
+        console.error("Error storing state in Supabase:", error)
+        console.error("Error details:", JSON.stringify(error))
+        return NextResponse.json({ 
+          error: "Failed to store OAuth state",
+          details: error
+        }, { status: 500 })
+      }
+      
+      console.log("State stored successfully:", state)
+    } catch (dbError) {
+      console.error("Exception during DB operation:", dbError)
+      return NextResponse.json({ 
+        error: "Database exception",
+        details: dbError
+      }, { status: 500 })
     }
-    
-    console.log("State stored successfully:", state)
     
     // Etsy OAuth URL'sine yönlendir
     const authUrl = `https://www.etsy.com/oauth/connect?${etsyAuthParams.toString()}`
     
-    console.log("Auth URL: ", authUrl) // Debug için
+    console.log("Auth URL: ", authUrl)
     
     return NextResponse.redirect(authUrl)
   } catch (error) {
     console.error("Etsy login error:", error)
-    return NextResponse.json({ error: "Etsy login failed" }, { status: 500 })
+    return NextResponse.json({ error: "Etsy login failed", details: error }, { status: 500 })
   }
 } 

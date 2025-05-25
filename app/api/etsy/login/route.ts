@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { generatePKCE } from "@/lib/etsy-oauth"
 import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
@@ -7,10 +7,8 @@ export async function GET() {
   const { verifier, challenge } = generatePKCE()
   const state = crypto.randomUUID()
 
-  // PKCE verisini Supabase'e kaydet
-  const cookieStore = cookies()
-  const supabase = createClient(cookieStore)
-  
+  // State ve code_verifier'ı Supabase'e kaydet
+  const supabase = createClient(cookies())
   await supabase.from("etsy_auth_sessions").insert({
     state,
     code_verifier: verifier,

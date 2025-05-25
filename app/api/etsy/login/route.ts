@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
     
     // Etsy OAuth URL
     const etsyClientId = process.env.ETSY_CLIENT_ID
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/etsy/callback`
+    
+    // Tam URL kullan - Etsy'de kayıtlı olan URL olmalı
+    const redirectUri = "https://dolphin-app.vercel.app/api/etsy/callback"
     
     // Etsy OAuth parametreleri
     const etsyAuthParams = new URLSearchParams({
@@ -40,6 +42,9 @@ export async function GET(req: NextRequest) {
     
     // Etsy OAuth URL'sine yönlendir
     const authUrl = `https://www.etsy.com/oauth/connect?${etsyAuthParams.toString()}`
+    
+    console.log("Auth URL: ", authUrl) // Debug için
+    
     return NextResponse.redirect(authUrl)
   } catch (error) {
     console.error("Etsy login error:", error)

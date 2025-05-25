@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const body = qs.stringify({
       grant_type: "authorization_code",
       client_id: process.env.ETSY_CLIENT_ID!,
-      redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/etsy/callback`,
+      redirect_uri: "https://dolphin-app.vercel.app/api/etsy/callback",
       code,
       code_verifier: sessionData.code_verifier,
     })

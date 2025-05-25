@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { exchangeCodeForToken, syncEtsyDataToDatabase } from "@/lib/etsy-api"
-import { createServerSupabase } from "@/lib/supabase"
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -27,13 +26,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Kullanıcı kontrolü
-    const supabase = createServerSupabase()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user || user.id !== state) {
-      throw new Error("Unauthorized")
-    }
+    console.log("Processing Etsy callback for user:", state)
 
     // Token değişimi
     console.log("Exchanging code for token...")

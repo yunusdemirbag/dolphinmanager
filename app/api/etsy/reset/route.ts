@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
 import { supabaseAdmin } from "@/lib/supabase"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     
     // Kullanıcı doğrulama
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -39,13 +38,41 @@ export async function POST(request: NextRequest) {
     } else {
       console.log("Auth sessions deleted successfully")
     }
+    
+    // 3. Etsy mağaza verilerini sil
+    const { error: storeError } = await supabaseAdmin
+      .from("etsy_stores")
+      .delete()
+      .eq("user_id", user.id)
+      
+    if (storeError) {
+      console.error("Error deleting store data:", storeError)
+    } else {
+      console.log("Store data deleted successfully")
+    }
+    
+    // 4. Etsy ürün verilerini sil (eğer etsy_listings tablosu varsa)
+    try {
+      const { error: listingsError } = await supabaseAdmin
+        .from("etsy_listings")
+        .delete()
+        .eq("user_id", user.id)
+        
+      if (listingsError) {
+        console.error("Error deleting listing data:", listingsError)
+      } else {
+        console.log("Listing data deleted successfully")
+      }
+    } catch (listingsTableError) {
+      console.log("Listings table might not exist yet:", listingsTableError)
+    }
 
-    // 3. Profile'daki Etsy bilgilerini temizle
+    // 5. Profile'daki Etsy bilgilerini temizle
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .update({
         etsy_shop_name: null,
-        etsy_shop_id: null,
+        etsy_shop_id: null
       })
       .eq("id", user.id)
 

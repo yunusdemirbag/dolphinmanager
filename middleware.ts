@@ -1,61 +1,84 @@
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { createServerClient } from "@supabase/ssr"
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
-
-  // Statik kaynaklara ve API isteklerine izin ver
-  const isApiOrStatic = req.nextUrl.pathname.startsWith("/api") || 
-                       req.nextUrl.pathname.startsWith("/_next") || 
-                       req.nextUrl.pathname === "/favicon.ico" ||
-                       req.nextUrl.pathname.endsWith(".svg") ||
-                       req.nextUrl.pathname.endsWith(".png")
   
-  if (isApiOrStatic) {
-    return res
-  }
-
-  // Kullanıcı oturumunu kontrol et
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  // Giriş yapmamış kullanıcıları auth sayfasına yönlendir
-  if (!user && !req.nextUrl.pathname.startsWith("/auth")) {
-    return NextResponse.redirect(new URL("/auth/login", req.url))
-  }
-  
-  // Giriş yapmış kullanıcı için Etsy bağlantısını kontrol et
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("etsy_shop_name")
-      .eq("id", user.id)
-      .single()
-    
-    const hasEtsyConnection = profile?.etsy_shop_name && profile.etsy_shop_name !== "pending"
-    
-    // Ana sayfa istekleri
-    if (req.nextUrl.pathname === "/") {
-      if (hasEtsyConnection) {
-        return NextResponse.redirect(new URL("/dashboard", req.url))
-      } else {
-        return NextResponse.redirect(new URL("/onboarding", req.url))
-      }
+  // Create a Supabase client configured for the middleware
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (name) => req.cookies.get(name)?.value,
+        set: (name, value, options) => {
+          res.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove: (name, options) => {
+          res.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+        },
+      },
     }
+  )
+  
+  try {
+    // Refresh session if expired - required for Server Components
+    const { data: { session } } = await supabase.auth.getSession()
     
-    // Etsy bağlantısı varsa onboarding'e erişimi engelle
-    if (hasEtsyConnection && req.nextUrl.pathname.startsWith("/onboarding")) {
+    // Statik kaynaklara ve API isteklerine izin ver
+    const isApiOrStatic = req.nextUrl.pathname.startsWith("/api") || 
+                        req.nextUrl.pathname.startsWith("/_next") || 
+                        req.nextUrl.pathname === "/favicon.ico" ||
+                        req.nextUrl.pathname.endsWith(".svg") ||
+                        req.nextUrl.pathname.endsWith(".png")
+    
+    if (isApiOrStatic) {
+      return res
+    }
+
+    // Ana sayfa isteklerini dashboard'a yönlendir
+    if (req.nextUrl.pathname === "/") {
       return NextResponse.redirect(new URL("/dashboard", req.url))
     }
     
-    // Etsy bağlantısı yoksa dashboard'a erişimi engelle
-    if (!hasEtsyConnection && req.nextUrl.pathname.startsWith("/dashboard")) {
-      return NextResponse.redirect(new URL("/onboarding", req.url))
+    // Onboarding sayfasına erişildiğinde dashboard'a yönlendir
+    if (req.nextUrl.pathname === "/onboarding") {
+      return NextResponse.redirect(new URL("/dashboard", req.url))
     }
+
+    // Auth sayfaları kontrolleri - eğer oturum açıksa dashboard'a yönlendir
+    const authPages = ["/auth/login", "/auth/register"]
+    if (authPages.includes(req.nextUrl.pathname) && session) {
+      return NextResponse.redirect(new URL("/dashboard", req.url))
+    }
+    
+    // Korumalı sayfalar - oturum yoksa login'e yönlendir
+    const protectedPages = ["/dashboard", "/stores", "/products"]
+    if (protectedPages.some(page => req.nextUrl.pathname.startsWith(page)) && !session) {
+      return NextResponse.redirect(new URL("/auth/login", req.url))
+    }
+    
+    return res
+  } catch (error) {
+    console.error("Middleware error:", error)
+    
+    // Hata durumunda ana sayfaya yönlendir
+    const isAuthPage = req.nextUrl.pathname.startsWith("/auth")
+    if (!isAuthPage) {
+      return NextResponse.redirect(new URL("/auth/login", req.url))
+    }
+    
+    return res
   }
-  
-  return res
 }
 
 export const config = {

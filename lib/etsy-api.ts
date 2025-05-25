@@ -106,7 +106,7 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
     checkEtsyConfig()
     
     // PKCE oluştur - örnekteki gibi
-    const codeVerifier = generateCodeVerifier()
+  const codeVerifier = generateCodeVerifier()
     const codeChallenge = generateCodeChallenge(codeVerifier)
     
     console.log("Generated PKCE:", { 
@@ -127,7 +127,7 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
         .from("etsy_auth_sessions")
         .update({
           code_verifier: codeVerifier,
-          state: userId,
+    state: userId,
           created_at: new Date().toISOString()
         })
         .eq("user_id", userId)
@@ -173,22 +173,22 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
   try {
     // Store'dan code verifier'ı al - örnekteki gibi
     const { data: authSession, error: sessionError } = await supabaseAdmin
-      .from("etsy_auth_sessions")
-      .select("code_verifier")
-      .eq("user_id", userId)
-      .single()
+    .from("etsy_auth_sessions")
+    .select("code_verifier")
+    .eq("user_id", userId)
+    .single()
 
     if (sessionError || !authSession?.code_verifier) {
       console.error("Code verifier not found:", sessionError)
-      throw new Error("Code verifier not found")
-    }
+    throw new Error("Code verifier not found")
+  }
 
     console.log("Found code verifier, making token request...")
 
     // Token isteği - örnekteki gibi
     const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
       method: 'POST',
-      headers: {
+    headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'x-api-key': ETSY_CLIENT_ID,
       },
@@ -199,15 +199,15 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
         'code': code,
         'code_verifier': authSession.code_verifier,
       })
-    })
+  })
 
-    if (!response.ok) {
+  if (!response.ok) {
       const errorText = await response.text()
       console.error("Token exchange error:", response.status, errorText)
       throw new Error(`Token exchange failed: ${response.status} - ${errorText}`)
-    }
+  }
 
-    const tokens: EtsyTokens = await response.json()
+  const tokens: EtsyTokens = await response.json()
     console.log("Token exchange successful")
 
     // Code verifier'ı temizle
@@ -219,12 +219,12 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
     // Token'ları veritabanına kaydet - DEBUG bilgisi ekle
     console.log("Storing tokens for user_id:", userId)
     const tokenData = {
-      user_id: userId,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+    user_id: userId,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
       token_type: tokens.token_type || 'Bearer',
-      created_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
     console.log("Token data to store:", { 
@@ -262,7 +262,7 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
       console.log("Token verification successful:", verifyData)
     }
 
-    return tokens
+  return tokens
 
   } catch (error) {
     console.error("Token exchange error:", error)
@@ -274,20 +274,20 @@ export async function refreshEtsyToken(userId: string): Promise<EtsyTokens> {
   console.log("Refreshing token for user:", userId)
   
   try {
-    const { data: tokenData } = await supabaseAdmin
-      .from("etsy_tokens")
-      .select("refresh_token")
-      .eq("user_id", userId)
-      .single()
+  const { data: tokenData } = await supabaseAdmin
+    .from("etsy_tokens")
+    .select("refresh_token")
+    .eq("user_id", userId)
+    .single()
 
     if (!tokenData?.refresh_token) {
-      throw new Error("No refresh token found")
-    }
+    throw new Error("No refresh token found")
+  }
 
     // Refresh token isteği - örnekteki gibi
     const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
       method: 'POST',
-      headers: {
+    headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'x-api-key': ETSY_CLIENT_ID,
       },
@@ -296,26 +296,26 @@ export async function refreshEtsyToken(userId: string): Promise<EtsyTokens> {
         'client_id': ETSY_CLIENT_ID,
         'refresh_token': tokenData.refresh_token,
       })
-    })
+  })
 
-    if (!response.ok) {
+  if (!response.ok) {
       const errorText = await response.text()
       console.error("Token refresh error:", response.status, errorText)
       throw new Error(`Token refresh failed: ${response.status} - ${errorText}`)
-    }
+  }
 
-    const tokens: EtsyTokens = await response.json()
+  const tokens: EtsyTokens = await response.json()
     console.log("Token refresh successful")
 
     // Token'ları güncelle
     const { error: updateError } = await supabaseAdmin.from("etsy_tokens").upsert({
-      user_id: userId,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+    user_id: userId,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
       token_type: tokens.token_type || 'Bearer',
-      updated_at: new Date().toISOString(),
-    })
+    updated_at: new Date().toISOString(),
+  })
 
     if (updateError) {
       console.error("Token update error:", updateError)
@@ -323,7 +323,7 @@ export async function refreshEtsyToken(userId: string): Promise<EtsyTokens> {
     }
 
     console.log("Tokens updated successfully")
-    return tokens
+  return tokens
 
   } catch (error) {
     console.error("Token refresh error:", error)
@@ -396,7 +396,7 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
     console.log("ETSY_REDIRECT_URI:", process.env.ETSY_REDIRECT_URI ? "SET" : "MISSING")
     console.log("ETSY_SCOPE:", ETSY_SCOPE)
     
-    const accessToken = await getValidAccessToken(userId)
+  const accessToken = await getValidAccessToken(userId)
     console.log("Access token:", accessToken ? "FOUND" : "MISSING")
 
     // Access token'dan Etsy user ID'yi çıkar
@@ -407,8 +407,8 @@ export async function getEtsyStores(userId: string): Promise<EtsyStore[]> {
     console.log("=== PING TEST ===")
     try {
       const pingResponse = await fetch(`${ETSY_API_BASE}/application/openapi-ping`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
           "x-api-key": ETSY_CLIENT_ID,
         },
       })
@@ -566,6 +566,7 @@ export async function getEtsyListings(
   shopId: number,
   limit = 25,
   offset = 0,
+  state: 'active' | 'inactive' | 'draft' | 'expired' | 'all' = 'active',
 ): Promise<{
   listings: EtsyListing[]
   count: number
@@ -575,26 +576,52 @@ export async function getEtsyListings(
   const params = new URLSearchParams({
     limit: limit.toString(),
     offset: offset.toString(),
-    includes: "Images",
+    includes: "Images,Tags",
   })
 
-  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/active?${params}`, {
+  // state parametresini URL'ye ekle
+  if (state !== 'all') {
+    params.append('state', state);
+  }
+
+  // Endpoint'i state parametresine göre değiştir
+  let endpoint = `${ETSY_API_BASE}/application/shops/${shopId}/listings`;
+  if (state === 'active') {
+    endpoint += '/active';
+  } else if (state === 'all') {
+    // Tüm durumlar için farklı bir endpoint kullanılmaz
+  } else {
+    // Belirli bir durum için sorgu yapılıyor
+    params.append('state', state);
+  }
+
+  console.log(`Fetching Etsy listings: ${endpoint}?${params.toString()}`);
+
+  try {
+    const response = await fetch(`${endpoint}?${params}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "x-api-key": ETSY_CLIENT_ID,
+        "x-api-key": ETSY_CLIENT_ID,
     },
   })
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    console.error("Etsy API error:", errorData)
-    throw new Error(`Failed to fetch listings: ${errorData.error || response.statusText}`)
+      const errorData = await response.json().catch(() => ({}))
+      console.error("Etsy API error:", errorData)
+      throw new Error(`Failed to fetch listings: ${errorData.error || response.statusText}`)
   }
 
   const data = await response.json()
   return {
     listings: data.results || [],
     count: data.count || 0,
+    }
+  } catch (error) {
+    console.error("getEtsyListings error:", error);
+    return {
+      listings: [],
+      count: 0
+    };
   }
 }
 
@@ -617,7 +644,7 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
           etsy_shop_id: primaryStore.shop_id.toString(),
         })
         .eq("id", userId)
-      
+
       if (profileError) {
         console.error("Profile update error:", profileError)
         throw profileError

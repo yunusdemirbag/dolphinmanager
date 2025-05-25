@@ -1,5 +1,6 @@
 import { createClientComponentClient, createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { createClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr"
 import type { Database } from "@/types/database.types"
 
 // Environment variables check
@@ -17,7 +18,11 @@ if (!supabaseAnonKey) {
 
 // Client-side Supabase client
 export const createClientSupabase = () => {
-  return createClientComponentClient<Database>()
+  // Next.js 15 için modern API kullanımı
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }
 
 // Server-side Supabase client with cookies - only use in server components

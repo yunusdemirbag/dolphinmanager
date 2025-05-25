@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase/server"
 import { getEtsyAuthUrl } from "@/lib/etsy-api"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     
     // Kullanıcı doğrulama
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -31,7 +30,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     
     // Kullanıcı doğrulama
     const { data: { user }, error: userError } = await supabase.auth.getUser()

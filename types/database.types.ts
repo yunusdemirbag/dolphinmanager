@@ -162,6 +162,61 @@ export interface Database {
           created_at?: string
         }
       }
+      etsy_images: {
+        Row: {
+          id: number
+          listing_id: number
+          image_url: string
+          local_path: string
+          original_url: string
+          cached_at: string
+          last_updated: string
+          status: string
+        }
+        Insert: {
+          id?: number
+          listing_id: number
+          image_url: string
+          local_path: string
+          original_url: string
+          cached_at?: string
+          last_updated?: string
+          status?: string
+        }
+        Update: {
+          id?: number
+          listing_id?: number
+          image_url?: string
+          local_path?: string
+          original_url?: string
+          cached_at?: string
+          last_updated?: string
+          status?: string
+        }
+      }
+      cron_logs: {
+        Row: {
+          id: string
+          task_name: string
+          result: string
+          details: any
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_name: string
+          result: string
+          details?: any
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_name?: string
+          result?: string
+          details?: any
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

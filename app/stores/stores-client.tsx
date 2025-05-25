@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import {
   Store,
@@ -29,10 +29,24 @@ import {
   Link,
   Unlink,
   Activity,
-  DollarSign
+  DollarSign,
+  Loader2,
+  LogOut,
+  AlertTriangle,
+  RotateCcw,
+  Check,
+  Heart
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClientSupabase } from "@/lib/supabase"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog"
 
 interface EtsyStore {
   shop_id: number
@@ -52,6 +66,8 @@ interface EtsyStore {
   monthly_views?: number
   conversion_rate?: number
   trend?: 'up' | 'down' | 'stable'
+  avatar_url?: string
+  icon_url_fullxfull?: string
 }
 
 interface StoresClientProps {
@@ -70,6 +86,8 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   const [resetting, setResetting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false)
   const router = useRouter()
   const supabase = createClientSupabase()
 
@@ -117,56 +135,62 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
       
       if (response.ok) {
         const data = await response.json()
+        console.log("Stores API response:", data);
+        
         if (data.stores && data.stores.length > 0) {
-          // Gerçek mağaza verileri var - sadece bunları göster
-          setStores(data.stores)
-          setEtsyConnected(true)
-          setLastUpdate(new Date().toLocaleString('tr-TR'))
+          // Add connection_status property if not exists
+          const enhancedStores = data.stores.map((store: any) => ({
+            ...store,
+            connection_status: store.connection_status || (data.source === 'database_fallback' ? 'connected' : 'connected'),
+            // Default values for missing properties
+            shop_id: store.shop_id || 0,
+            shop_name: store.shop_name || 'Unknown',
+            title: store.title || store.shop_name || 'Unknown Store',
+            listing_active_count: store.listing_active_count || 0,
+            num_favorers: store.num_favorers || 0,
+            review_average: store.review_average || 0,
+            review_count: store.review_count || 0
+          }));
+          
+          setStores(enhancedStores);
+          setEtsyConnected(true);
+          setLastUpdate(new Date().toLocaleString('tr-TR'));
         } else {
           // Gerçek mağaza yok - boş liste göster
-          setStores([])
-          setEtsyConnected(false)
+          setStores([]);
+          setEtsyConnected(false);
         }
       } else {
         // API hatası - boş liste göster
-        setStores([])
-        setEtsyConnected(false)
+        console.error("API error:", response.status, response.statusText);
+        setStores([]);
+        setEtsyConnected(false);
       }
     } catch (error) {
-      console.error('Error loading stores:', error)
-      setStores([])
-      setEtsyConnected(false)
+      console.error('Error loading stores:', error);
+      setStores([]);
+      setEtsyConnected(false);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
-  const handleConnectEtsy = async () => {
-    setReconnecting(true)
-    try {
-      const response = await fetch('/api/etsy/auth', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (response.ok) {
-        const { authUrl } = await response.json()
-        // Aynı sekmede Etsy OAuth'a yönlendir
-        window.location.href = authUrl
-      } else {
-        const errorData = await response.json()
-        console.error('Auth error:', errorData)
-        alert(`Etsy bağlantısı başlatılamadı: ${errorData.details || errorData.error}`)
-      }
-    } catch (error) {
-      console.error('Error connecting to Etsy:', error)
-      alert('Bağlantı hatası: ' + (error instanceof Error ? error.message : String(error)))
-    } finally {
-      setReconnecting(false)
-    }
-  }
+  const handleConnectEtsy = () => {
+    // PKCE için state oluştur
+    const state = Math.random().toString(36).substring(2);
+    sessionStorage.setItem('etsy_oauth_state', state);
+    
+    // Etsy OAuth URL'ini oluştur
+    const etsyAuthUrl = new URL('https://www.etsy.com/oauth/connect');
+    etsyAuthUrl.searchParams.append('response_type', 'code');
+    etsyAuthUrl.searchParams.append('client_id', process.env.NEXT_PUBLIC_ETSY_CLIENT_ID as string);
+    etsyAuthUrl.searchParams.append('redirect_uri', process.env.NEXT_PUBLIC_ETSY_REDIRECT_URI as string);
+    etsyAuthUrl.searchParams.append('scope', 'shops_r shops_w listings_r listings_w listings_d transactions_r profile_r');
+    etsyAuthUrl.searchParams.append('state', state);
+    
+    // Etsy'ye yönlendir
+    window.location.href = etsyAuthUrl.toString();
+  };
 
   const handleResetEtsyConnection = async () => {
     if (!confirm('Etsy bağlantısını tamamen sıfırlamak istediğinizden emin misiniz? Bu işlem tüm token\'ları ve bağlantı verilerini silecektir.')) {
@@ -207,21 +231,42 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
     setRefreshing(false)
   }
 
-  const handleDisconnectStore = async (shopId: number) => {
-    if (confirm('Bu mağazanın bağlantısını kesmek istediğinizden emin misiniz?')) {
-      try {
-        const response = await fetch(`/api/etsy/stores/${shopId}/disconnect`, {
-          method: 'POST'
-        })
-        
-        if (response.ok) {
-          await loadStores()
-          alert('Mağaza bağlantısı kesildi')
-        }
-      } catch (error) {
-        console.error('Error disconnecting store:', error)
-        alert('Bağlantı kesilemedi')
+  const handleDisconnectStore = async () => {
+    setReconnecting(true)
+    try {
+      // Fetch the first store to disconnect
+      const storeToDisconnect = stores?.[0]?.shop_id;
+      
+      if (!storeToDisconnect) {
+        alert('Bağlantı kesilecek mağaza bulunamadı');
+        return;
       }
+      
+      const response = await fetch(`/api/etsy/stores/${storeToDisconnect}/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        setEtsyConnected(false)
+        setStores([])
+        alert('✅ Etsy bağlantısı başarıyla kesildi!')
+        
+        // Sayfayı yenile
+        setTimeout(() => loadStores(), 1000)
+      } else {
+        const errorData = await response.json()
+        console.error('Disconnect error:', errorData)
+        alert(`Bağlantı kesme hatası: ${errorData.details || errorData.error}`)
+      }
+    } catch (error) {
+      console.error('Error disconnecting Etsy store:', error)
+      alert('Bağlantı kesme hatası: ' + (error instanceof Error ? error.message : String(error)))
+    } finally {
+      setReconnecting(false)
+      setDisconnectDialogOpen(false)
     }
   }
 
@@ -230,22 +275,22 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
       case 'connected':
         return (
           <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
-            <CheckCircle className="h-3 w-3 mr-1" />
+            <Check className="h-3 w-3 mr-1" />
             Bağlı
           </Badge>
         )
-      case 'error':
-        return (
-          <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50">
-            <XCircle className="h-3 w-3 mr-1" />
-            Hata
-          </Badge>
-        )
-      default:
+      case 'disconnected':
         return (
           <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50">
             <Unlink className="h-3 w-3 mr-1" />
             Bağlantısız
+          </Badge>
+        )
+      default:
+        return (
+          <Badge variant="outline" className="border-gray-500 text-gray-700 bg-gray-50">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Bilinmiyor
           </Badge>
         )
     }
@@ -277,402 +322,174 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   const connectedStores = stores.filter(s => s.connection_status === 'connected')
   const disconnectedStores = stores.filter(s => s.connection_status !== 'connected')
 
+  // Calculate summary stats
+  const totalStores = stores.length;
+  const totalProducts = stores.reduce((sum, s) => sum + (s.listing_active_count || 0), 0);
+  const totalFollowers = stores.reduce((sum, s) => sum + (s.num_favorers || 0), 0);
+  const totalRevenue = stores.reduce((sum, s) => sum + (s.monthly_revenue || 0), 0);
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <Store className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Etsy Mağazalarım</h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Canvas wall art mağazalarınızı yönetin
-                  {lastUpdate && (
-                    <span className="ml-2">• Son güncelleme: {lastUpdate}</span>
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              {/* Global Etsy Connection Status */}
-              <div className="flex items-center space-x-2">
-                {etsyConnected ? (
-                  <Badge variant="outline" className="border-green-500 text-green-700">
-                    <Wifi className="h-3 w-3 mr-1" />
-                    Etsy Bağlı ({connectedStores.length})
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="border-red-500 text-red-700">
-                    <WifiOff className="h-3 w-3 mr-1" />
-                    Etsy Bağlantısız
-                  </Badge>
-                )}
-              </div>
-              <div className="flex space-x-2">
-                {etsyConnected && (
-                  <>
-                    <button
-                      onClick={handleRefreshStores}
-                      disabled={refreshing}
-                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 disabled:opacity-50"
-                    >
-                      {refreshing ? 'Yenileniyor...' : 'Yenile'}
-                    </button>
-                    <button
-                      onClick={handleResetEtsyConnection}
-                      disabled={resetting}
-                      className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
-                    >
-                      {resetting ? 'Sıfırlanıyor...' : 'Bağlantıyı Sıfırla'}
-                    </button>
-                  </>
-                )}
-                {!etsyConnected && (
-                  <button
-                    onClick={handleConnectEtsy}
-                    disabled={reconnecting}
-                    className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 disabled:opacity-50"
-                  >
-                    {reconnecting ? 'Bağlanıyor...' : 'Etsy\'ye Bağlan'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+    <div className="container pb-16 flex flex-col items-center min-h-screen bg-[#f7f8fa]">
+      {/* Header section */}
+      <div className="w-full flex flex-col items-center justify-center mt-8 mb-6">
+        <h1 className="text-4xl font-extrabold tracking-tight text-center text-gray-900 flex items-center gap-3">
+          <Store className="h-9 w-9 text-blue-600" /> Etsy Mağazalarım
+        </h1>
+        <p className="text-lg text-gray-500 text-center mt-2">Canvas wall art mağazalarınızı yönetin</p>
+        <div className="text-xs text-gray-400 mt-1">Son güncelleme: {lastUpdate || '-'}</div>
+      </div>
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-5xl mb-10">
+        <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+          <span className="text-sm text-gray-500 mb-1">Toplam Mağaza</span>
+          <span className="text-2xl font-bold text-blue-700 flex items-center gap-2"><Store className="h-6 w-6" />{totalStores}</span>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Connection Status Alert - Sadece gerçek bağlantı yoksa göster */}
-        {!etsyConnected && (
-          <div className="space-y-4 mb-6">
-            <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
-              <AlertCircle className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800 dark:text-orange-200">
-                <strong>Etsy API bağlantısı yok</strong> - Gerçek mağaza verilerinizi görmek için Etsy hesabınızı bağlayın.
-              </AlertDescription>
-            </Alert>
-            
-            {/* Debug Panel */}
-            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm text-blue-800 dark:text-blue-200">🔧 Bağlantı Sorun Giderme</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-semibold mb-2">Adım 1: Bağlantıyı Sıfırla</h4>
-                    <p className="text-xs mb-2">Eski token'ları temizle</p>
-                    <button
-                      onClick={handleResetEtsyConnection}
-                      disabled={resetting}
-                      className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
-                    >
-                      {resetting ? 'Sıfırlanıyor...' : '🗑️ Sıfırla'}
-                    </button>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2">Adım 2: Yeniden Bağlan</h4>
-                    <p className="text-xs mb-2">Etsy'de tüm izinleri ver</p>
-                    <button
-                      onClick={handleConnectEtsy}
-                      disabled={reconnecting}
-                      className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 disabled:opacity-50"
-                    >
-                      {reconnecting ? 'Bağlanıyor...' : '🔗 Bağlan'}
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-4 p-3 bg-white dark:bg-gray-800 rounded border text-xs">
-                  <h5 className="font-semibold mb-1">💡 Önemli Notlar:</h5>
-                  <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
-                    <li>Etsy'de bağlantı sırasında <strong>tüm izinleri</strong> verin</li>
-                    <li>Özellikle "mağaza bilgilerini okuma" iznini verin</li>
-                    <li>Eğer hala çalışmazsa, Vercel loglarını kontrol edin</li>
-                    <li>Sorun devam ederse, Etsy Developer hesabınızı kontrol edin</li>
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Stats Overview - Sadece gerçek mağazalar için */}
-        {etsyConnected && connectedStores.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Toplam Mağaza</p>
-                    <p className="text-2xl font-bold">{connectedStores.length}</p>
-                  </div>
-                  <Store className="h-8 w-8 text-blue-600" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Toplam Ürün</p>
-                    <p className="text-2xl font-bold">
-                      {connectedStores.reduce((sum, store) => sum + store.listing_active_count, 0)}
-                    </p>
-                  </div>
-                  <Package className="h-8 w-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Toplam Takipçi</p>
-                    <p className="text-2xl font-bold">
-                      {connectedStores.reduce((sum, store) => sum + store.num_favorers, 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <Users className="h-8 w-8 text-purple-600" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Aylık Gelir</p>
-                    <p className="text-2xl font-bold">
-                      ${connectedStores.reduce((sum, store) => sum + (store.monthly_revenue || 0), 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <DollarSign className="h-8 w-8 text-yellow-600" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Connected Stores - Sadece gerçek bağlı mağazalar */}
-        {connectedStores.length > 0 && (
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Bağlı Mağazalar ({connectedStores.length})
-              </h2>
-              {connectedStores.length < 5 && (
-                <Button onClick={handleConnectEtsy} disabled={reconnecting} size="sm">
-                  {reconnecting ? (
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4 mr-2" />
-                  )}
-                  Yeni Mağaza Ekle
-                </Button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {connectedStores.map((store) => (
-                <StoreCard 
-                  key={store.shop_id} 
-                  store={store} 
-                  onDisconnect={handleDisconnectStore}
-                  router={router}
+        <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+          <span className="text-sm text-gray-500 mb-1">Toplam Ürün</span>
+          <span className="text-2xl font-bold text-green-700 flex items-center gap-2"><Package className="h-6 w-6" />{totalProducts}</span>
+        </div>
+        <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+          <span className="text-sm text-gray-500 mb-1">Toplam Takipçi</span>
+          <span className="text-2xl font-bold text-purple-700 flex items-center gap-2"><Heart className="h-6 w-6" />{totalFollowers}</span>
+        </div>
+        <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+          <span className="text-sm text-gray-500 mb-1">Aylık Gelir</span>
+          <span className="text-2xl font-bold text-yellow-700 flex items-center gap-2"><DollarSign className="h-6 w-6" />${totalRevenue.toLocaleString()}</span>
+        </div>
+      </div>
+      {/* Add store button */}
+      <div className="w-full flex justify-end max-w-5xl mb-6">
+        <Button onClick={handleConnectEtsy} size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 border-0 text-white px-8 py-3 text-lg rounded-xl">
+          <Store className="w-5 h-5 mr-2" />
+          Yeni Mağaza Ekle
+        </Button>
+      </div>
+      {/* Bağlı Mağazalar başlığı */}
+      {stores.length > 0 && (
+        <div className="w-full max-w-5xl mb-4">
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Bağlı Mağazalar ({stores.length})</h2>
+        </div>
+      )}
+      {/* Store list */}
+      {loading ? (
+        <div className="flex justify-center items-center min-h-[300px] w-full">
+          <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
+          <span className="ml-3 text-gray-500">Mağazalar yükleniyor...</span>
+        </div>
+      ) : stores.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-2xl bg-white text-center mb-8 w-full max-w-2xl shadow-sm">
+          <Store className="h-14 w-14 text-gray-300 mb-4" />
+          <h3 className="text-2xl font-semibold mb-2">Henüz bir Etsy mağazanız bağlı değil</h3>
+          <p className="text-gray-500 mb-6 max-w-md">
+            Etsy mağazanızı bağlayarak ürünlerinizi, siparişlerinizi ve istatistiklerinizi tek bir yerden yönetebilirsiniz.
+          </p>
+          <Button onClick={handleConnectEtsy} size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 border-0 text-white px-8 py-3 text-lg rounded-xl">
+            <Store className="w-5 h-5 mr-2" />
+            Etsy Mağazası Bağla
+          </Button>
+          <p className="text-xs text-gray-400 mt-4">
+            Sadece bir kez giriş yapmanız gerekir. Verileriniz güvende tutulur.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
+          {stores.map((store) => (
+            <Card key={store.shop_id} className="relative group shadow-xl border-0 bg-white rounded-2xl p-0 flex flex-col min-h-[340px]">
+              <div className="flex flex-col md:flex-row items-center gap-6 p-6">
+                <img 
+                  src={store.avatar_url || store.icon_url_fullxfull || `https://www.etsy.com/images/avatars/default_shop.png`} 
+                  alt={`${store.title} Logo`} 
+                  className="h-20 w-20 rounded-full border-4 border-white bg-white object-cover shadow-lg mb-2 md:mb-0"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = `https://www.etsy.com/images/avatars/default_shop.png`;
+                  }}
                 />
-              ))}
-            </div>
-            {connectedStores.length >= 5 && (
-              <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 mr-2" />
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    <strong>Maksimum mağaza sayısına ulaştınız.</strong> Etsy Personal Access en fazla 5 mağaza bağlantısına izin verir.
-                  </p>
+                <div className="flex-1 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <a href={store.url} target="_blank" rel="noopener noreferrer" className="text-lg font-bold text-blue-700 hover:underline flex items-center">
+                      {store.title}
+                      <ExternalLink className="h-4 w-4 ml-1 text-blue-400" />
+                    </a>
+                    {store.connection_status === 'connected' ? (
+                      <Badge className="bg-green-100 text-green-700 ml-2">Bağlı</Badge>
+                    ) : (
+                      <Badge className="bg-red-100 text-red-700 ml-2">Bağlantı Yok</Badge>
+                    )}
+                  </div>
+                  <div className="flex gap-4 flex-wrap text-sm mt-1">
+                    <span className="flex items-center gap-1 text-yellow-600 font-semibold"><Star className="h-4 w-4" />{store.review_average?.toFixed(2) || 0} <span className="text-gray-500">({store.review_count})</span></span>
+                    <span className="flex items-center gap-1 text-purple-600 font-semibold"><Heart className="h-4 w-4" />{store.num_favorers}</span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                    <div className="bg-gray-50 rounded-lg p-2 flex flex-col items-center">
+                      <span className="text-xs text-gray-500">Aylık Gelir</span>
+                      <span className="font-bold text-yellow-700">${store.monthly_revenue?.toLocaleString() || '-'}</span>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-2 flex flex-col items-center">
+                      <span className="text-xs text-gray-500">Sipariş</span>
+                      <span className="font-bold text-blue-700">{store.monthly_orders || '-'}</span>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-2 flex flex-col items-center">
+                      <span className="text-xs text-gray-500">Görüntülenme</span>
+                      <span className="font-bold text-green-700">{store.monthly_views || '-'}</span>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-2 flex flex-col items-center">
+                      <span className="text-xs text-gray-500">Dönüşüm</span>
+                      <span className="font-bold text-indigo-700">{store.conversion_rate ? `${store.conversion_rate}%` : '-'}</span>
+                    </div>
+                  </div>
+                  {/* Aktif ürün barı */}
+                  <div className="w-full mt-2">
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Aktif Ürünler</span>
+                      <span>{store.listing_active_count}/100</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-2 bg-blue-500 rounded-full" style={{ width: `${Math.min(100, (store.listing_active_count / 100) * 100)}%` }}></div>
+                    </div>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex gap-2 mt-4">
+                    <Button size="sm" className="bg-black text-white flex-1"><ArrowRight className="h-4 w-4 mr-1" /> Yönet</Button>
+                    <Button size="sm" variant="outline" onClick={handleRefreshStores}><RefreshCw className="h-4 w-4 mr-1" /> Yenile</Button>
+                    <Button size="sm" variant="outline" onClick={handleResetEtsyConnection}><Unlink className="h-4 w-4 mr-1" /> Bağlantıyı Sıfırla</Button>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Empty State - Hiç mağaza yoksa */}
-        {stores.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <Store className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Mağaza bulunamadı</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Etsy mağazanızı bağlayarak başlayın.
+            </Card>
+          ))}
+        </div>
+      )}
+      {/* Disconnect Dialog */}
+      <Dialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mağaza Bağlantısını Kes</DialogTitle>
+            <DialogDescription>
+              Bu işlem mağazanızın Dolphin Manager ile bağlantısını kesecektir. Verileriniz silinmeyecek, sadece eşleştirme kaldırılacaktır.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-amber-600 font-medium mb-2 flex items-center">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Bu işlemi gerçekleştirmek istediğinizden emin misiniz?
             </p>
-            <div className="mt-6">
-              <Button onClick={handleConnectEtsy} disabled={reconnecting}>
-                {reconnecting ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4 mr-2" />
-                )}
-                İlk Mağazanızı Bağlayın
-              </Button>
-            </div>
+            <p className="text-sm text-gray-500">
+              Mağazanızı daha sonra tekrar bağlayabilirsiniz. Ancak mevcut senkronizasyon durumunuz sıfırlanacaktır.
+            </p>
           </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="text-center py-12">
-            <RefreshCw className="mx-auto h-8 w-8 text-gray-400 animate-spin" />
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Mağazalar yükleniyor...</p>
-          </div>
-        )}
-      </main>
-    </div>
-  )
-}
-
-// Store Card Component
-function StoreCard({ 
-  store, 
-  onDisconnect, 
-  router, 
-  isDemo = false 
-}: { 
-  store: EtsyStore
-  onDisconnect: (shopId: number) => void
-  router: any
-  isDemo?: boolean
-}) {
-  const getConnectionStatusBadge = (status: string) => {
-    switch (status) {
-      case 'connected':
-        return (
-          <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Bağlı
-          </Badge>
-        )
-      case 'error':
-        return (
-          <Badge variant="outline" className="border-red-500 text-red-700 bg-red-50">
-            <XCircle className="h-3 w-3 mr-1" />
-            Hata
-          </Badge>
-        )
-      default:
-        return (
-          <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50">
-            <Unlink className="h-3 w-3 mr-1" />
-            {isDemo ? 'Demo' : 'Bağlantısız'}
-          </Badge>
-        )
-    }
-  }
-
-  const getTrendIcon = (trend?: string) => {
-    if (trend === 'up') {
-      return <TrendingUp className="w-4 h-4 text-green-600" />
-    } else if (trend === 'down') {
-      return <TrendingUp className="w-4 h-4 text-red-600 rotate-180" />
-    }
-    return <Activity className="w-4 h-4 text-gray-600" />
-  }
-
-  return (
-    <Card className="hover:shadow-lg transition-shadow duration-200">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center space-x-2 mb-1">
-              <h3 className="font-semibold text-lg text-gray-900 dark:text-white">{store.shop_name}</h3>
-              <div className={`w-2 h-2 rounded-full ${
-                store.connection_status === 'connected' ? 'bg-green-500' :
-                store.connection_status === 'error' ? 'bg-red-500' : 'bg-orange-500'
-              }`} />
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{store.title}</p>
-            <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-              <span className="flex items-center">
-                <Star className="w-3 h-3 mr-1 text-yellow-500" />
-                {store.review_average} ({store.review_count})
-              </span>
-              <span className="flex items-center">
-                <Users className="w-3 h-3 mr-1" />
-                {store.num_favorers.toLocaleString()}
-              </span>
-            </div>
-          </div>
-          {getConnectionStatusBadge(store.connection_status)}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Performance Metrics */}
-        {store.monthly_revenue && (
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Aylık Gelir</span>
-                {getTrendIcon(store.trend)}
-              </div>
-              <div className="font-semibold text-green-600">${store.monthly_revenue.toLocaleString()}</div>
-            </div>
-            <div>
-              <div className="text-gray-600 dark:text-gray-400">Sipariş</div>
-              <div className="font-semibold">{store.monthly_orders}</div>
-            </div>
-            <div>
-              <div className="text-gray-600 dark:text-gray-400">Görüntülenme</div>
-              <div className="font-semibold">{store.monthly_views?.toLocaleString()}</div>
-            </div>
-            <div>
-              <div className="text-gray-600 dark:text-gray-400">Dönüşüm</div>
-              <div className="font-semibold">{store.conversion_rate}%</div>
-            </div>
-          </div>
-        )}
-
-        {/* Products Progress */}
-        <div>
-          <div className="flex justify-between text-sm mb-1">
-            <span className="text-gray-600 dark:text-gray-400">Aktif Ürünler</span>
-            <span className="font-medium">{store.listing_active_count}/100</span>
-          </div>
-          <Progress value={(store.listing_active_count / 100) * 100} className="h-2" />
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex space-x-2 pt-2">
-          <Button
-            onClick={() => {
-              localStorage.setItem("selectedStore", store.shop_id.toString())
-              router.push("/dashboard")
-            }}
-            className="flex-1"
-            size="sm"
-            disabled={isDemo}
-          >
-            <ArrowRight className="w-3 h-3 mr-1" />
-            {isDemo ? 'Demo' : 'Yönet'}
-          </Button>
-          <Button
-            onClick={() => window.open(store.url, '_blank')}
-            variant="outline"
-            size="sm"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </Button>
-          {store.connection_status === 'connected' && (
-            <Button
-              onClick={() => onDisconnect(store.shop_id)}
-              variant="outline"
-              size="sm"
-              className="text-red-600 hover:text-red-700"
-            >
-              <Unlink className="w-3 h-3" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDisconnectDialogOpen(false)}>
+              İptal
             </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            <Button variant="destructive" onClick={handleDisconnectStore} disabled={reconnecting}>
+              {reconnecting ? <Loader2 className="w-4 w-4 mr-2 animate-spin" /> : <LogOut className="h-4 w-4 mr-2" />}
+              Bağlantıyı Kes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }

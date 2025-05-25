@@ -29,23 +29,27 @@ export default function LoginPage() {
     setError(null)
 
     try {
+      console.log("Login attempt for:", email)
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
+        console.error("Login error:", error.message)
         setError(error.message)
         return
       }
 
       if (data.user) {
-        router.push("/onboarding")
+        console.log("Login successful, redirecting to dashboard")
+        // Doğrudan dashboard'a yönlendir
+        router.push("/dashboard")
         router.refresh()
       }
     } catch (err) {
+      console.error("Unexpected login error:", err)
       setError("Beklenmeyen bir hata oluştu")
-      console.error("Login error:", err)
     } finally {
       setLoading(false)
     }

@@ -65,50 +65,40 @@ export async function GET(request: NextRequest) {
           source: useCacheOnly ? "cached_data" : "etsy_api"
         })
       }
-    } catch (etsyError) {
-      console.log("⚠️ Etsy API failed, trying database fallback:", etsyError)
+    } catch (error) {
+      console.error("Error fetching Etsy stores:", error)
     }
 
-    // Etsy API başarısız olursa veritabanından veri çek
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("etsy_shop_name, etsy_shop_id")
-      .eq("id", user.id)
-      .single()
-
-    if (profileError) {
-      console.error("Profile query error:", profileError)
-      // Profil bulunamadıysa bile varsayılan mağaza döndür
-      console.log("📦 Using default fallback store")
+    // Etsy'den veri yoksa profile'a bakalım
+    let profile = null;
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
       
-      const defaultStore = {
-        shop_id: 51859104,
-        shop_name: "CanvasesWorldTR",
-        title: "CanvasesWorldTR",
-        announcement: "Canvas wall art ve dekoratif ürünler",
-        currency_code: "USD",
-        is_vacation: false,
-        listing_active_count: 763,
-        num_favorers: 10,
-        url: "https://www.etsy.com/shop/CanvasesWorldTR",
-        image_url_760x100: "",
-        review_count: 12,
-        review_average: 4.4167,
-        avatar_url: null,
-        connection_status: 'demo',
-        is_active: true,
-        last_synced_at: new Date().toISOString()
+      if (error) {
+        console.error("Error getting profile data:", error);
+      } else {
+        profile = data;
       }
-
-      return NextResponse.json({
-        stores: [defaultStore],
-        connected: true,
-        source: "default_fallback"
-      })
+    } catch (err) {
+      console.error("Exception getting profile:", err);
     }
+    
+    // Check if user has an active Etsy connection
+    // First, check if they have tokens
+    const { data: tokens, error: tokenError } = await supabase
+      .from("etsy_tokens")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle()
+    
+    const hasActiveTokens = !!tokens
 
-    // Eğer profile'da Etsy bilgisi varsa mock store oluştur
-    if (profile?.etsy_shop_name && profile.etsy_shop_name !== "pending") {
+    // Eğer profile'da Etsy bilgisi varsa ve token kayıtları varsa mock store oluştur
+    if (profile?.etsy_shop_name && profile.etsy_shop_name !== "pending" && hasActiveTokens) {
       console.log("📦 Using database fallback for store:", profile.etsy_shop_name)
       
       const mockStore = {
@@ -134,6 +124,16 @@ export async function GET(request: NextRequest) {
         stores: [mockStore],
         connected: true,
         source: "database_fallback"
+      })
+    }
+
+    // Eğer bağlantı kesildiyse boş array döndür (demo gösterme)
+    if (!hasActiveTokens) {
+      console.log("🔌 No active Etsy connection, returning empty stores array")
+      return NextResponse.json({
+        stores: [],
+        connected: false,
+        source: "no_connection"
       })
     }
 
@@ -165,12 +165,12 @@ export async function GET(request: NextRequest) {
       source: "default_fallback"
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Stores API error:", error)
     return NextResponse.json(
       { 
         error: "Failed to fetch stores", 
-        details: error.message,
+        details: error instanceof Error ? error.message : String(error),
         stores: [],
         connected: false
       },

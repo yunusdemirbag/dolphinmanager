@@ -140,8 +140,6 @@ export default function ProductsClient() {
   const [analytics, setAnalytics] = useState<Record<number, { view: number; sale: number; revenue: number }>>({});
   const [shippingProfiles, setShippingProfiles] = useState<{ shipping_profile_id: number; title: string }[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [isDemoData, setIsDemoData] = useState(false);
-  const [demoMessage, setDemoMessage] = useState("");
   const [refreshing, setRefreshing] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [refreshStatus, setRefreshStatus] = useState<{
@@ -152,6 +150,7 @@ export default function ProductsClient() {
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
   const [selectAllChecked, setSelectAllChecked] = useState(false)
   const [currentStore, setCurrentStore] = useState<{ shop_name: string; shop_id: number } | null>(null);
+  const [reconnectRequired, setReconnectRequired] = useState(false);
 
   // getProductImage fonksiyonunu sadeleştiriyorum:
   const getProductImage = (product: Product): string | null => {
@@ -315,37 +314,46 @@ export default function ProductsClient() {
       
       if (storesRes.ok) {
         const storesData = await storesRes.json()
+        if (storesData.error === 'RECONNECT_REQUIRED') {
+          setReconnectRequired(true);
+          setProducts([])
+          setFilteredProducts([])
+          setLoading(false)
+          return;
+        }
         if (storesData.stores && storesData.stores.length > 0) {
           shopId = storesData.stores[0].shop_id as number;
           setCurrentStore(storesData.stores[0]);
-          
           // İlgili mağazadan ürünleri çek
           const listingsRes = await fetch(`/api/etsy/listings?shop_id=${shopId}`)
-          
           if (listingsRes.ok) {
             const listingsData = await listingsRes.json()
             const listings = listingsData.listings || []
-            
             setProducts(listings)
             setFilteredProducts(listings)
-            setIsDemoData(listingsData.isDemoData || false)
-            setDemoMessage(listingsData.message || "")
             return
           }
         }
+      } else {
+        // Eğer hata RECONNECT_REQUIRED ise
+        const errorData = await storesRes.json().catch(() => ({}));
+        if (errorData.error === 'RECONNECT_REQUIRED') {
+          setReconnectRequired(true);
+          setProducts([])
+          setFilteredProducts([])
+          setLoading(false)
+          return;
+        }
       }
-      
       // API yanıt vermezse veya hata olursa boş ürün listesi göster
       setProducts([])
       setFilteredProducts([])
-      setIsDemoData(false)
-      setDemoMessage("")
     } catch (error) {
-      console.error("Error loading products:", error)
+      if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
+        setReconnectRequired(true);
+      }
       setProducts([])
       setFilteredProducts([])
-      setIsDemoData(false)
-      setDemoMessage("")
     } finally {
       setLoading(false)
     }
@@ -831,9 +839,8 @@ export default function ProductsClient() {
           <div className="flex flex-col gap-2 mt-auto">
             <ProductStatus status={product.state} />
             <Button
-              variant="outline"
               size="sm"
-              className="w-full"
+              className="w-full bg-black hover:bg-gray-800 text-white"
               onClick={(e) => {
                 e.stopPropagation();
                 window.open(product.url, '_blank');
@@ -915,6 +922,33 @@ export default function ProductsClient() {
     );
   };
 
+  // Etsy yeniden bağlantı fonksiyonu
+  const handleReconnectEtsy = async () => {
+    // Etsy OAuth bağlantı URL'sini al
+    const res = await fetch('/api/etsy/auth-url');
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert('Bağlantı URL alınamadı!');
+    }
+  };
+
+  if (reconnectRequired) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-8 text-center max-w-md">
+          <AlertTriangle className="w-10 h-10 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Etsy hesabınızın bağlantısı koptu</h2>
+          <p className="mb-4">Ürünlerinizi görebilmek için Etsy hesabınızı tekrar bağlamanız gerekiyor.</p>
+          <Button className="bg-black text-white px-6 py-3 text-lg" onClick={handleReconnectEtsy}>
+            Etsy Hesabını Tekrar Bağla
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -965,16 +999,6 @@ export default function ProductsClient() {
           <span>Otomatik yenileme: 3 saatte bir</span>
           <span className="mx-2">•</span>
           <span>Daha hızlı yenileme için <span className="text-blue-600 font-medium">Dashboard</span> sayfasını kullanabilirsiniz</span>
-        </div>
-      )}
-      
-      {isDemoData && false && (
-        <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded">
-          <div className="flex items-center">
-            <Info className="w-5 h-5 mr-2" />
-            <p>{demoMessage}</p>
-          </div>
-          <p className="text-sm mt-1">Not: Bu demo ürünler sadece arayüzü göstermek için oluşturulmuştur ve Etsy'de gerçek değildir.</p>
         </div>
       )}
       
@@ -1060,11 +1084,10 @@ export default function ProductsClient() {
         
         <div className="flex gap-2 items-center">
           <Button
-            variant="outline"
             size="sm"
             onClick={() => refreshProducts()}
             disabled={refreshing}
-            className="bg-orange-600 hover:bg-orange-700 text-white"
+            className="bg-black hover:bg-gray-800 text-white"
           >
             {refreshing ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1077,7 +1100,7 @@ export default function ProductsClient() {
           <Button
             size="sm"
             onClick={handleOpenCreateModal}
-            className="bg-orange-600 hover:bg-orange-700 text-white"
+            className="bg-black hover:bg-gray-800 text-white"
           >
             <Plus className="w-4 h-4 mr-2" />
             Yeni Ürün
@@ -1092,7 +1115,7 @@ export default function ProductsClient() {
           <h3 className="mt-2 text-lg font-semibold text-gray-800">Henüz ürününüz yok</h3>
           <p className="mt-1 text-base text-gray-500 max-w-xl mx-auto">Etsy mağazanızda hiç ürün bulunamadı. Hemen ilk ürününüzü ekleyin!</p>
           <div className="mt-6">
-            <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg" onClick={handleOpenCreateModal}>
+            <Button size="lg" className="bg-black hover:bg-gray-800 text-white px-8 py-3 text-lg" onClick={handleOpenCreateModal}>
               <Plus className="h-5 w-5 mr-2" /> Ürün Ekle
             </Button>
           </div>

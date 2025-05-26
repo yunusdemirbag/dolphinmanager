@@ -508,6 +508,12 @@ async function refreshEtsyToken(userId: string): Promise<string> {
 
     if (!response.ok) {
       const errorText = await response.text();
+      // Eğer refresh token hatası varsa Supabase'dan tokenı sil
+      if (response.status === 400 && errorText.includes('invalid_grant')) {
+        // Tokenı sil
+        await supabaseAdmin.from('etsy_tokens').delete().eq('user_id', userId);
+        throw new Error('RECONNECT_REQUIRED');
+      }
       throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
     }
 
@@ -712,7 +718,7 @@ async function getStoredEtsyData(userId: string, shopId: number, type: 'store' |
 }
 
 // Global flag to control automatic API fetching vs using cache
-export let shouldUseOnlyCachedData = true;
+export let shouldUseOnlyCachedData = false;
 
 // Function to toggle the cached data only mode
 export function toggleCachedDataOnlyMode(useOnlyCachedData: boolean): void {
@@ -726,20 +732,8 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
     console.log("=== ETSY API DEBUG BAŞLANGIÇ ===")
     console.log("Kullanıcı ID:", userId)
     
-    // If we're in cached-only mode and not explicitly skipping the cache, try database first
-    if (shouldUseOnlyCachedData && !skipCache) {
-      // First check database
-      const storedStores = await getStoredEtsyData(userId, 0, 'store');
-      if (storedStores) {
-        console.log("📦 Using stored store data (cached-only mode)");
-        return storedStores;
-      }
-      
-      // If no database data, fall back to database helper
-      console.log("No stored data found, using database fallback (cached-only mode)");
-      return getStoresFromDatabase(userId);
-    }
-    
+    // Her zaman gerçek API'den veri çek, demo/store fallback asla kullanma
+
     // Continue with regular flow if not in cached-only mode or skipCache is true
     // Önce veritabanından mağaza verilerini kontrol et
     const storedStores = await getStoredEtsyData(userId, 0, 'store');
@@ -813,19 +807,7 @@ export async function getEtsyListings(
   const cacheKey = `etsy_listings_${userId}_${shopId}_${limit}_${offset}_${state}`;
   
   try {
-    // If we're in cached-only mode and not explicitly skipping the cache, try database first
-    if (shouldUseOnlyCachedData && !skipCache) {
-      const storedListings = await getStoredEtsyData(userId, shopId, 'listings');
-      if (storedListings) {
-        console.log("📦 Using stored listings data (cached-only mode)");
-        return storedListings;
-      }
-      
-      // Fall back to mock data if necessary
-      console.log(`📦 No stored listings found, generating mock listings (cached-only mode)`);
-      const mockData = generateMockListings(limit, shopId);
-      return mockData;
-    }
+    // Her zaman gerçek API'den veri çek, demo/mock data asla kullanma
     
     // Önce veritabanından listing verilerini kontrol et
     const storedListings = await getStoredEtsyData(userId, shopId, 'listings');
@@ -837,9 +819,8 @@ export async function getEtsyListings(
     const accessToken = await getValidAccessToken(userId);
     
     if (!accessToken) {
-      console.log(`📦 No valid access token for user ${userId} - generating mock listings`);
-      const mockData = generateMockListings(limit, shopId);
-      return mockData;
+      console.log(`📦 No valid access token for user ${userId} - gerçek ürün çekilemiyor`);
+      return { listings: [], count: 0 };
     }
     
     const params = new URLSearchParams({

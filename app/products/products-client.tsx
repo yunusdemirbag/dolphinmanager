@@ -81,6 +81,7 @@ interface Product {
   tags: string[]
   state: "active" | "inactive" | "draft"
   views?: number
+  sold?: number
   quantity: number
   created_timestamp: number
   last_modified_timestamp: number
@@ -248,17 +249,7 @@ export default function ProductsClient() {
   }, [searchTerm, sortBy, filterStatus, sortOrder])
 
   useEffect(() => {
-    async function loadAnalytics() {
-      // Burada Supabase'den analytics verilerini çekebilirsin
-      // Örnek: /api/analytics/products endpointi ile
-      // Şimdilik sahte veri ile dolduruyorum
-      const fake: Record<number, { view: number; sale: number; revenue: number }> = {};
-      products.forEach((p) => {
-        fake[p.listing_id] = { view: Math.floor(Math.random() * 1000), sale: Math.floor(Math.random() * 50), revenue: Math.floor(Math.random() * 10000) };
-      });
-      setAnalytics(fake);
-    }
-    if (products.length > 0) loadAnalytics();
+    // Artık sahte analytics verisi yok, sadece gerçek Etsy verisi kullanılacak
   }, [products]);
 
   // Otomatik yenileme timer'ını başlat
@@ -369,7 +360,13 @@ export default function ProductsClient() {
     try {
       // 1. Önce mağaza bilgisini al
       console.log("Fetching Etsy stores...");
-      const storesRes = await fetch('/api/etsy/stores');
+      const storesRes = await fetch('/api/etsy/stores', {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'X-Skip-Cache': 'true' // Her zaman taze veri iste
+        }
+      });
       
       console.log("Etsy stores API response status:", storesRes.status);
       
@@ -614,6 +611,16 @@ export default function ProductsClient() {
       if (sortBy === "quantity") {
         return sortOrder === 'asc' ? a.quantity - b.quantity : b.quantity - a.quantity;
       }
+      if (sortBy === "views") {
+        return sortOrder === 'asc'
+          ? ((a.metrics?.views ?? a.views ?? 0) - (b.metrics?.views ?? b.views ?? 0))
+          : ((b.metrics?.views ?? b.views ?? 0) - (a.metrics?.views ?? a.views ?? 0));
+      }
+      if (sortBy === "sold") {
+        return sortOrder === 'asc'
+          ? ((a.metrics?.sold ?? a.sold ?? 0) - (b.metrics?.sold ?? b.sold ?? 0))
+          : ((b.metrics?.sold ?? b.sold ?? 0) - (a.metrics?.sold ?? a.sold ?? 0));
+      }
       // created_timestamp veya default
       return sortOrder === 'asc'
         ? a.created_timestamp - b.created_timestamp
@@ -675,7 +682,7 @@ export default function ProductsClient() {
   }
 
   const handleUpdateProduct = async (product: Product) => {
-    setSubmitting(true)
+    setSubmitting(true);
     try {
       const response = await fetch(`/api/etsy/listings/${product.listing_id}`, {
         method: 'PATCH',
@@ -689,46 +696,76 @@ export default function ProductsClient() {
           quantity: product.quantity,
           state: product.state
         })
-      })
+      });
 
       if (response.ok) {
-        alert("✅ Ürün başarıyla güncellendi!")
-        setShowEditModal(null)
-        loadProducts()
+        toast({
+          title: "Başarılı",
+          description: "Ürün başarıyla güncellendi",
+          variant: "default",
+        });
+        setShowEditModal(null);
+        await loadProducts();
       } else {
-        const errorData = await response.json()
-        alert(`❌ Hata: ${errorData.details || errorData.error}`)
+        const errorData = await response.json();
+        toast({
+          title: "Ürün güncellenemedi",
+          description: errorData.details || errorData.error || "Bilinmeyen bir hata oluştu",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error("Update product error:", error)
-      alert("❌ Ürün güncellenirken hata oluştu!")
+      console.error("Update product error:", error);
+      toast({
+        title: "Hata",
+        description: "Ürün güncellenirken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.",
+        variant: "destructive",
+      });
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const handleDeleteProduct = async (listingId: number) => {
     if (!confirm("Bu ürünü silmek istediğinizden emin misiniz?")) {
-      return
+      return;
     }
 
     try {
+      toast({
+        title: "İşlem sürüyor",
+        description: "Ürün siliniyor, lütfen bekleyin...",
+        variant: "default",
+      });
+
       const response = await fetch(`/api/etsy/listings/${listingId}`, {
         method: 'DELETE'
-      })
+      });
 
       if (response.ok) {
-        alert("✅ Ürün başarıyla silindi!")
-        loadProducts()
+        toast({
+          title: "Başarılı",
+          description: "Ürün başarıyla silindi",
+          variant: "default",
+        });
+        await loadProducts();
       } else {
-        const errorData = await response.json()
-        alert(`❌ Hata: ${errorData.details || errorData.error}`)
+        const errorData = await response.json();
+        toast({
+          title: "Ürün silinemedi",
+          description: errorData.details || errorData.error || "Bilinmeyen bir hata oluştu",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error("Delete product error:", error)
-      alert("❌ Ürün silinirken hata oluştu!")
+      console.error("Delete product error:", error);
+      toast({
+        title: "Hata",
+        description: "Ürün silinirken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.",
+        variant: "destructive",
+      });
     }
-  }
+  };
 
   const addTag = () => {
     if (tagInput.trim() && !createForm.tags.includes(tagInput.trim())) {
@@ -1097,6 +1134,8 @@ export default function ProductsClient() {
           <div className="flex flex-row items-center gap-3 mb-2">
             <span className="text-lg font-bold text-primary">{formatPrice(product.price)}</span>
             <span className="text-xs text-gray-500">Stok: {product.quantity}</span>
+            <span className="text-xs text-gray-500">Görüntüleme: {product.metrics?.views ?? product.views ?? 0}</span>
+            <span className="text-xs text-gray-500">Satış: {product.metrics?.sold ?? product.sold ?? 0}</span>
           </div>
           {/* Butonlar */}
           <div className="flex flex-row gap-2 mt-2 w-full justify-between">
@@ -1215,13 +1254,37 @@ export default function ProductsClient() {
 
   // Etsy yeniden bağlantı fonksiyonu
   const handleReconnectEtsy = async () => {
-    // Etsy OAuth bağlantı URL'sini al
-    const res = await fetch('/api/etsy/auth-url');
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert('Bağlantı URL alınamadı!');
+    try {
+      setRefreshing(true);
+      // Etsy OAuth bağlantı URL'sini al
+      const res = await fetch('/api/etsy/auth-url');
+      const data = await res.json();
+      if (data.url) {
+        toast({
+          title: "Etsy bağlantısı yenileniyor",
+          description: "Etsy sayfasına yönlendiriliyorsunuz. Lütfen Etsy hesabınıza izin verin.",
+          variant: "default",
+        });
+        // Kısa bir süre bekleyip yönlendir
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 1500);
+      } else {
+        toast({
+          title: "Hata",
+          description: "Bağlantı URL'si alınamadı: " + (data.error || "Bilinmeyen hata"),
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Auth URL error:", error);
+      toast({
+        title: "Hata",
+        description: "Bağlantı başlatılırken bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -1233,8 +1296,8 @@ export default function ProductsClient() {
           <div className="flex items-center bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-lg px-4 py-3 shadow-md">
             <AlertTriangle className="w-5 h-5 mr-2" />
             <span className="flex-1">Etsy bağlantınızda sorun var, lütfen hesabınızı tekrar bağlayın.</span>
-            <Button size="sm" className="bg-black text-white ml-2" onClick={handleReconnectEtsy}>
-              Bağlantıyı Yenile
+            <Button size="sm" className="bg-black text-white ml-2" onClick={handleReconnectEtsy} disabled={refreshing}>
+              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Bağlantıyı Yenile"}
             </Button>
             <button className="ml-2 text-yellow-800 hover:text-yellow-900" onClick={() => setShowReconnectBanner(false)}>
               <X className="w-4 h-4" />
@@ -1244,8 +1307,9 @@ export default function ProductsClient() {
         {/* Sayfanın geri kalanı gri arka planla kapalı */}
         <div className="min-h-screen bg-gray-50 flex items-center justify-center opacity-60 pointer-events-none select-none">
           <div className="text-center">
-            <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-400">Ürünler yüklenemedi.</p>
+            <Store className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-600 mb-2">Etsy Bağlantısı Gerekli</h2>
+            <p className="text-gray-500 max-w-md">Ürünleri görüntülemek ve yönetmek için Etsy hesabınıza yeniden bağlanmanız gerekiyor.</p>
           </div>
         </div>
       </div>
@@ -1281,12 +1345,14 @@ export default function ProductsClient() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="flex flex-col items-center mb-6">
-        <h1 className="text-2xl font-bold">Ürünler</h1>
-        <div className="flex items-center gap-2 mt-2">
-          <CurrentStoreNameBadge shopName={currentStore?.shop_name} />
+      <div className="w-full px-8 py-8">
+        <div className="flex flex-col items-start mb-6">
+          <h1 className="text-2xl font-bold">Ürünler</h1>
+          <div className="flex items-center gap-2 mt-2">
+            <CurrentStoreNameBadge shopName={currentStore?.shop_name} />
+          </div>
+          <div className="text-gray-500 text-base mt-2 mb-2">Etsy Mağazanızdaki Tüm Ürünleri Buradan Yönetin.</div>
         </div>
-        <div className="text-gray-500 text-base mt-2 mb-2">Etsy Mağazanızdaki Tüm Ürünleri Buradan Yönetin.</div>
       </div>
       
       {/* Yenileme durumu bildirimi */}
@@ -1346,6 +1412,12 @@ export default function ProductsClient() {
                 <SelectItem value="quantity">
                   <Package className="inline w-4 h-4 mr-2 text-gray-400" /> Stok
                 </SelectItem>
+                <SelectItem value="views">
+                  <Eye className="inline w-4 h-4 mr-2 text-gray-400" /> Görüntüleme
+                </SelectItem>
+                <SelectItem value="sold">
+                  <ShoppingCart className="inline w-4 h-4 mr-2 text-gray-400" /> Satış
+                </SelectItem>
               </SelectContent>
             </Select>
             <button
@@ -1402,7 +1474,12 @@ export default function ProductsClient() {
               onClick={() => setGridType('grid3')}
               title="3'lü Izgara"
             >
-              <LayoutGrid className="w-5 h-5" />
+              {/* 3'lü grid için tek satırda 3 kare ikon */}
+              <span className="inline-flex items-center h-5">
+                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1.5px]" />
+                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1.5px]" />
+                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1.5px]" />
+              </span>
             </button>
             <button
               type="button"
@@ -1410,7 +1487,14 @@ export default function ProductsClient() {
               onClick={() => setGridType('grid5')}
               title="5'li Izgara"
             >
-              <LayoutGrid className="w-5 h-5" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }} />
+              {/* 5'li grid için tek satırda 5 kare ikon */}
+              <span className="inline-flex items-center h-5">
+                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
+                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
+                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
+                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
+                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
+              </span>
             </button>
             <button
               type="button"

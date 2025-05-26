@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       // Token var mı kontrol et - bağlantı durumunu belirlemek için
       const { data: tokenData, error: tokenError } = await supabase
         .from("etsy_tokens")
-        .select("expires_at, created_at, access_token")
+        .select("expires_at, created_at, access_token, refresh_token")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -43,7 +43,10 @@ export async function GET(request: NextRequest) {
         console.log("Token query error:", tokenError.message);
       }
 
-      const hasValidToken = tokenData && tokenData.access_token && tokenData.expires_at && new Date(tokenData.expires_at) > new Date();
+      const now = new Date();
+      const expires = tokenData?.expires_at ? new Date(tokenData.expires_at) : null;
+      const hasValidToken = tokenData && tokenData.access_token && tokenData.refresh_token && expires && expires > now;
+      
       console.log(`User has valid Etsy token: ${hasValidToken}`, tokenData ? {
         expires_at: tokenData.expires_at,
         created_at: tokenData.created_at,
@@ -90,6 +93,41 @@ export async function GET(request: NextRequest) {
         // Token varsa bağlı ama mağaza yok, yoksa bağlı değil
         if (hasValidToken) {
           console.log("User has Etsy tokens, but no shops found. Informing client.");
+          
+          // Token son kullanma tarihi yaklaşıyorsa otomatik yenilemeyi dene
+          const timeUntilExpiry = expires ? expires.getTime() - now.getTime() : -1;
+          if (tokenData && timeUntilExpiry > 0 && timeUntilExpiry < 24 * 60 * 60 * 1000) { // 24 saatten az kaldıysa
+            console.log(`Token will expire soon (${Math.round(timeUntilExpiry / (60 * 60 * 1000))} hours left). Attempting refresh...`);
+            
+            try {
+              // Yenileme API'sini çağır
+              const refreshResponse = await fetch('/api/etsy/refresh-token', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ userId: user.id }),
+              });
+              
+              if (refreshResponse.ok) {
+                console.log("Token refreshed successfully");
+                // Başarılı yenileme durumunda normal yanıt ver, yeniden bağlantı gerekmez
+              } else {
+                console.log("Token refresh failed, will notify client to reconnect");
+                return NextResponse.json({
+                  error: "TOKEN_REFRESH_FAILED",
+                  stores: [],
+                  count: 0,
+                  connected: false,
+                  message: "Token yenilemesi başarısız oldu. Lütfen Etsy hesabınıza yeniden bağlanın.",
+                  source: "token_refresh_failed"
+                });
+              }
+            } catch (refreshError) {
+              console.error("Error refreshing token:", refreshError);
+            }
+          }
+          
           return NextResponse.json({ 
             stores: [], 
             count: 0, 

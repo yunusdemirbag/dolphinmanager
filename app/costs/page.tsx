@@ -25,6 +25,7 @@ import {
   Trash2,
   Save
 } from "lucide-react"
+import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 
 interface Variation {
   id: string
@@ -56,12 +57,30 @@ export default function CostsPage() {
     values: [""]
   })
   const [editingCost, setEditingCost] = useState<string | null>(null)
+  const [currentStore, setCurrentStore] = useState<{ shop_name: string; shop_id: number } | null>(null)
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     loadCanvasVariations()
     loadCostData()
     fetchExchangeRate()
+    loadCurrentStore()
   }, [])
+
+  const loadCurrentStore = async () => {
+    try {
+      const response = await fetch('/api/etsy/stores')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.stores && data.stores.length > 0) {
+          setCurrentStore(data.stores[0])
+        }
+      }
+    } catch (error) {
+      console.error("Error loading current store:", error)
+    }
+  }
 
   const fetchExchangeRate = async () => {
     setLoadingRate(true)
@@ -132,37 +151,12 @@ export default function CostsPage() {
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-              <DollarSign className="h-8 w-8 text-green-600 mr-3" />
-              Maliyetler
-            </h1>
-            <p className="text-gray-600 mt-2">Canvas wall art varyasyonları için maliyet yönetimi</p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Maliyetler</h1>
+          <div className="flex items-start gap-2 mt-2">
+            {isClient && <CurrentStoreNameBadge shopName={currentStore?.shop_name} />}
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <div className="text-sm text-gray-600">
-                USD/TRY: <span className="font-semibold">₺{usdToTry}</span>
-              </div>
-              {loadingRate && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              )}
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={fetchExchangeRate}
-                disabled={loadingRate}
-                className="text-xs"
-              >
-                Güncelle
-              </Button>
-            </div>
-            <Button className="bg-green-600 hover:bg-green-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Yeni Maliyet
-            </Button>
-          </div>
+          <div className="text-gray-500 text-base mt-2 mb-2">Tüm Ürünlerinizin Maliyetlerini Kolayca Analiz Edin Ve Yönetin.</div>
         </div>
 
         <Tabs defaultValue="costs" className="space-y-6">

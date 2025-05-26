@@ -16,6 +16,7 @@ import {
   Clock,
   CreditCard
 } from "lucide-react"
+import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 
 interface StoreFinance {
   id: string
@@ -41,6 +42,8 @@ interface FinancialSummary {
 }
 
 export default function FinancePage() {
+  const [currentStore, setCurrentStore] = useState<{ shop_name: string; shop_id: number } | null>(null)
+  const [isClient, setIsClient] = useState(false);
   const [storeFinances, setStoreFinances] = useState<StoreFinance[]>([])
   const [summary, setSummary] = useState<FinancialSummary>({
     totalBalance: 0,
@@ -51,13 +54,41 @@ export default function FinancePage() {
   })
   const [loading, setLoading] = useState(true)
   const [loadingRate, setLoadingRate] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<{
+    totalRevenue: number
+    totalOrders: number
+    averageOrderValue: number
+    profitMargin: number
+  }>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    averageOrderValue: 0,
+    profitMargin: 0
+  })
 
   useEffect(() => {
-    loadFinancialData()
+    setIsClient(true);
+    loadCurrentStore()
+    loadFinanceData()
     fetchExchangeRate()
   }, [])
 
-  const loadFinancialData = async () => {
+  const loadCurrentStore = async () => {
+    try {
+      const response = await fetch('/api/etsy/stores')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.stores && data.stores.length > 0) {
+          setCurrentStore(data.stores[0])
+        }
+      }
+    } catch (error) {
+      console.error("Error loading current store:", error)
+    }
+  }
+
+  const loadFinanceData = async () => {
     setLoading(true)
     try {
       // Gerçek Etsy finansal verilerini çek
@@ -179,18 +210,12 @@ export default function FinancePage() {
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-              <DollarSign className="h-8 w-8 text-green-600 mr-3" />
-              Finans
-            </h1>
-            <p className="text-gray-600 mt-2">Canvas wall art mağazalarınızın finansal durumu</p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Finans</h1>
+          <div className="flex items-start gap-2 mt-2">
+            {isClient && <CurrentStoreNameBadge shopName={currentStore?.shop_name} />}
           </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-500">USD/TRY Kuru</div>
-            <div className="text-xl font-bold text-blue-600">₺{summary.usdToTry}</div>
-          </div>
+          <div className="text-gray-500 text-base mt-2 mb-2">Mağazanızın Finansal Performansını Detaylıca İnceleyin.</div>
         </div>
 
         {/* Financial Summary */}
@@ -270,99 +295,12 @@ export default function FinancePage() {
                         {formatCurrency(store.netProfit)}
                       </div>
                     </div>
-                    <div>
-                      <span className="text-gray-600">Etsy Komisyon:</span>
-                      <div className="font-semibold text-red-600">{formatCurrency(store.etsyCommissions)}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Kâr Marjı:</span>
-                      <div className={`font-semibold ${store.profitMargin >= 30 ? 'text-green-600' : store.profitMargin >= 15 ? 'text-yellow-600' : 'text-red-600'}`}>
-                        {store.profitMargin.toFixed(1)}%
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Profit Margin Progress */}
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">Kâr Marjı</span>
-                      <span className="font-semibold">{store.profitMargin.toFixed(1)}%</span>
-                    </div>
-                    <Progress 
-                      value={store.profitMargin} 
-                      className="h-2"
-                    />
-                  </div>
-
-                  {/* Expected Payment */}
-                  <div className="bg-blue-50 p-3 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm text-gray-600">Beklenen Ödeme</div>
-                        <div className="font-semibold text-blue-600">{formatCurrency(store.expectedPayment)}</div>
-                        <div className="text-xs text-gray-500">{formatCurrency(store.expectedPayment, "TRY")}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-600">Tarih</div>
-                        <div className="font-semibold">{new Date(store.nextPaymentDate).toLocaleDateString('tr-TR')}</div>
-                        <div className="text-xs text-gray-500">
-                          {getDaysUntilPayment(store.nextPaymentDate)} gün kaldı
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Pending Orders */}
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Bekleyen Sipariş:</span>
-                    <Badge variant="outline">{store.pendingOrders} adet</Badge>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
-
-        {/* Upcoming Payments */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Calendar className="h-5 w-5 mr-2 text-purple-600" />
-              Yaklaşan Ödemeler
-            </CardTitle>
-            <CardDescription>
-              Bu hafta ve gelecek hafta beklenen Etsy ödemeleri
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {storeFinances
-                .sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime())
-                .map((store) => {
-                  const daysUntil = getDaysUntilPayment(store.nextPaymentDate)
-                  return (
-                    <div key={store.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <CreditCard className="h-5 w-5 text-green-600" />
-                        <div>
-                          <div className="font-semibold">{store.storeName}</div>
-                          <div className="text-sm text-gray-600">
-                            {new Date(store.nextPaymentDate).toLocaleDateString('tr-TR')}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-green-600">{formatCurrency(store.expectedPayment)}</div>
-                        <div className="text-sm text-gray-500">
-                          {daysUntil === 0 ? 'Bugün' : daysUntil === 1 ? 'Yarın' : `${daysUntil} gün`}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-            </div>
-          </CardContent>
-        </Card>
       </main>
     </div>
   )

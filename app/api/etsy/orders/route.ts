@@ -91,36 +91,19 @@ export async function GET(request: NextRequest) {
       console.error("Database orders fetch error:", dbError);
     }
 
-    // Hem API hem de veritabanı başarısız olursa mock veriler döndür
-    console.log("📦 Generating mock orders data");
-    
-    // Demo siparişler oluştur
-    const demoOrders = Array.from({ length: 15 }, (_, i) => ({
-      order_id: 10000 + i,
-      shop_id: parseInt(shopId),
-      buyer_name: `Demo Müşteri ${i + 1}`,
-      order_total: Math.round((25 + Math.random() * 50) * 100) / 100,
-      currency_code: "USD",
-      status: ["pending", "paid", "completed", "cancelled"][Math.floor(Math.random() * 4)],
-      created_at: new Date(Date.now() - i * 86400000 * 2).toISOString(),
-      updated_at: new Date(Date.now() - i * 86400000).toISOString(),
-      items_count: 1 + Math.floor(Math.random() * 3),
-      shipping_address: "123 Demo St, Demo City, DC, 12345, US"
-    }));
-    
-    // Pagination için sadece gerekli kısmı döndür
-    const paginatedOrders = demoOrders.slice(offset, offset + limit);
-    
+    // Demo/mock sipariş oluşturma ve döndürme kodları kaldırıldı
+    // Eğer veri yoksa boş dizi dön
     return NextResponse.json({
-      orders: paginatedOrders,
+      orders: [],
       pagination: {
-        total: demoOrders.length,
+        total: 0,
         limit,
         offset,
         page,
-        pages: Math.ceil(demoOrders.length / limit)
+        pages: 0
       },
-      source: "mock_data"
+      source: "none",
+      message: "Hiçbir sipariş bulunamadı."
     });
     
   } catch (error: any) {

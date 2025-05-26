@@ -16,8 +16,14 @@ import {
   ArrowRight,
   RefreshCw,
   Bot,
-  Clock
+  Clock,
+  Heart,
+  Snowflake,
+  Sun,
+  Leaf,
+  Flower
 } from "lucide-react"
+import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 
 interface AIRecommendation {
   id: string
@@ -47,6 +53,22 @@ export default function DolphinAIPage() {
   const [loading, setLoading] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [aiSource, setAiSource] = useState<"openai" | "fallback" | null>(null)
+  const [currentStore, setCurrentStore] = useState<{ shop_name: string; shop_id: number } | null>(null)
+  const [isClient, setIsClient] = useState(false);
+
+  const loadCurrentStore = async () => {
+    try {
+      const response = await fetch('/api/etsy/stores')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.stores && data.stores.length > 0) {
+          setCurrentStore(data.stores[0])
+        }
+      }
+    } catch (error) {
+      console.error("Error loading current store:", error)
+    }
+  }
 
   const aiTools = [
     {
@@ -100,6 +122,8 @@ export default function DolphinAIPage() {
   ]
 
   useEffect(() => {
+    setIsClient(true);
+    loadCurrentStore()
     // Sayfa yüklendiğinde localStorage'dan verileri yükle
     loadDataFromStorage()
   }, [])
@@ -189,7 +213,7 @@ export default function DolphinAIPage() {
       } else {
         // AI API hatası - boş öneriler göster
         newRecommendations = []
-        source = "error"
+        source = "fallback"
       }
 
       // Takvim etkinliklerini işle
@@ -211,11 +235,11 @@ export default function DolphinAIPage() {
       console.error("Error generating recommendations:", error)
       // Hata durumunda boş öneriler göster
       setRecommendations([])
-      setAiSource("error")
+      setAiSource("fallback")
       setLastUpdate(new Date())
       
       // Hata durumunda da localStorage'a kaydet
-      saveDataToStorage([], [], "error")
+      saveDataToStorage([], [], "fallback")
     } finally {
       setLoading(false)
     }
@@ -253,17 +277,12 @@ export default function DolphinAIPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Dolphin AI Araçları</h1>
-              <p className="text-gray-600">Yapay zeka destekli araçlarla işletmenizi büyütün ve rekabette öne geçin</p>
-            </div>
-            <Badge variant="outline" className="bg-blue-50 text-blue-800 flex items-center gap-1 py-1.5">
-              <Bot className="h-3 w-3" />
-              Claude 3.7 Sonnet ile güçlendirilmiştir
-            </Badge>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Dolphin AI</h1>
+          <div className="flex items-start gap-2 mt-2">
+            {isClient && <CurrentStoreNameBadge shopName={currentStore?.shop_name} />}
           </div>
+          <div className="text-gray-500 text-base mt-2 mb-2">Yapay Zeka Destekli Mağaza Yönetimi Ve Analiz Araçları.</div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

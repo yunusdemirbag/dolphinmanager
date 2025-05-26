@@ -1,11 +1,16 @@
 type CacheItem<T> = {
   data: T;
   expiresAt: number;
-  lastUpdated: number; // Ne zaman eklendiği veya güncellendiği
+  timestamp: number; // When the item was added to cache
 };
 
 interface CacheOptions {
   ttl?: number; // Time to live in milliseconds (default: 3 hours)
+}
+
+interface CacheMetadata {
+  timestamp: number;
+  expiresAt: number;
 }
 
 class CacheManager {
@@ -38,7 +43,7 @@ class CacheManager {
   /**
    * Get data and metadata from cache
    */
-  getWithMetadata<T>(key: string): { data: T, lastUpdated: number } | null {
+  getWithMetadata<T>(key: string): { data: T, timestamp: number } | null {
     const item = this.cache.get(key);
     
     if (!item) {
@@ -52,7 +57,7 @@ class CacheManager {
 
     return { 
       data: item.data as T,
-      lastUpdated: item.lastUpdated
+      timestamp: item.timestamp
     };
   }
 
@@ -61,11 +66,11 @@ class CacheManager {
    */
   set<T>(key: string, data: T, options: CacheOptions = {}): void {
     const ttl = options.ttl || this.defaultTtl;
-    
+    const now = Date.now();
     this.cache.set(key, {
       data,
-      expiresAt: Date.now() + ttl,
-      lastUpdated: Date.now()
+      expiresAt: now + ttl,
+      timestamp: now
     });
   }
 
@@ -111,6 +116,54 @@ class CacheManager {
         this.cache.delete(key);
       }
     }
+  }
+
+  /**
+   * Get metadata about a cached item
+   */
+  getMetadata(key: string): CacheMetadata | null {
+    const item = this.cache.get(key);
+    
+    if (!item) {
+      return null;
+    }
+    
+    return {
+      timestamp: item.timestamp,
+      expiresAt: item.expiresAt
+    };
+  }
+
+  /**
+   * Check if an item exists in the cache and is not expired
+   */
+  has(key: string): boolean {
+    const item = this.cache.get(key);
+    
+    if (!item) {
+      return false;
+    }
+    
+    if (Date.now() > item.expiresAt) {
+      this.cache.delete(key);
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * Remove an item from the cache
+   */
+  delete(key: string): void {
+    this.cache.delete(key);
+  }
+
+  /**
+   * Get all cache keys
+   */
+  keys(): string[] {
+    return Array.from(this.cache.keys());
   }
 }
 

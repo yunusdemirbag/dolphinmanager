@@ -51,6 +51,7 @@ import {
   Clock
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
+import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 
 interface ShopSettings {
   shop_id: number
@@ -282,28 +283,12 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-              <Settings className="h-8 w-8 text-blue-600 mr-3" />
-              Ayarlar
-            </h1>
-            <p className="text-gray-600 mt-2">Mağaza ve uygulama ayarlarınızı yönetin</p>
+        <div className="flex flex-col items-center mb-6">
+          <h1 className="text-2xl font-bold">Ayarlar</h1>
+          <div className="flex items-center gap-2 mt-2">
+            <CurrentStoreNameBadge />
           </div>
-          <div className="flex items-center space-x-2">
-            {etsyConnected ? (
-              <Badge variant="outline" className="border-green-500 text-green-700">
-                <Wifi className="h-3 w-3 mr-1" />
-                Etsy Bağlı
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="border-red-500 text-red-700">
-                <WifiOff className="h-3 w-3 mr-1" />
-                Etsy Bağlantısız
-              </Badge>
-            )}
-          </div>
+          <div className="text-gray-500 text-base mt-2 mb-2">Mağaza Ayarlarınızı Ve Tercihlerinizi Yönetin.</div>
         </div>
 
         <Tabs defaultValue="shop" className="space-y-6">

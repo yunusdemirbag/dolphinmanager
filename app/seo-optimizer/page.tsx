@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Search, TrendingUp, Target, Lightbulb, AlertTriangle, Tag, Plus, Zap, Eye, ShoppingCart } from "lucide-react"
+import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 
 interface ProductNeedingOptimization {
   id: string
@@ -31,10 +32,41 @@ export default function SEOOptimizerPage() {
   const [productDescription, setProductDescription] = useState("")
   const [analyzing, setAnalyzing] = useState(false)
   const [productsNeedingHelp, setProductsNeedingHelp] = useState<ProductNeedingOptimization[]>([])
+  const [currentStore, setCurrentStore] = useState<{ shop_name: string; shop_id: number } | null>(null)
+  const [isClient, setIsClient] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<{
+    totalRevenue: number
+    totalOrders: number
+    averageOrderValue: number
+    profitMargin: number
+  }>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    averageOrderValue: 0,
+    profitMargin: 0
+  })
 
   useEffect(() => {
+    setIsClient(true)
+    loadCurrentStore()
     loadProductsNeedingOptimization()
   }, [])
+
+  const loadCurrentStore = async () => {
+    try {
+      const response = await fetch('/api/etsy/stores')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.stores && data.stores.length > 0) {
+          setCurrentStore(data.stores[0])
+        }
+      }
+    } catch (error) {
+      console.error("Error loading current store:", error)
+    }
+  }
 
   const loadProductsNeedingOptimization = () => {
     // Demo veri kaldırıldı - gerçek API'den veri çekilecek
@@ -80,24 +112,21 @@ export default function SEOOptimizerPage() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-3">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">SEO Optimizer</h1>
-                <p className="text-sm text-gray-600">Canvas wall art ürünlerinizi Etsy'de daha görünür hale getirin</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="outline" className="text-orange-600 border-orange-300">
-                <AlertTriangle className="w-3 h-3 mr-1" />
-                {productsNeedingHelp.length} ürün yardım bekliyor
-              </Badge>
-            </div>
+          <div className="flex flex-col items-center py-4">
+            <h1 className="text-2xl font-bold text-gray-900">SEO Optimizer</h1>
+            {isClient && <CurrentStoreNameBadge shopName={currentStore?.shop_name} />}
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">SEO Optimizasyonu</h1>
+          <div className="flex items-start gap-2 mt-2">
+            {isClient && <CurrentStoreNameBadge shopName={currentStore?.shop_name} />}
+          </div>
+          <div className="text-gray-500 text-base mt-2 mb-2">Ürünlerinizin SEO Performansını İyileştirin Ve Daha Fazla Müşteriye Ulaşın.</div>
+        </div>
         <Tabs defaultValue="needs-help" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="needs-help">Yardım Gerekli</TabsTrigger>

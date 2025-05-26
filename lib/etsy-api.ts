@@ -1,16 +1,117 @@
 import crypto from "crypto"
 import qs from "querystring"
 import { supabaseAdmin } from "./supabase"
-import { createClient } from "@/lib/supabase/server"
 import { cacheManager } from "./cache"
 import { fetchWithCache } from "./api-utils"
-import { 
-  generateMockStores, 
-  generateMockListings, 
-  generateMockReceipts, 
-  generateMockPayments, 
-  generateMockLedgerEntries 
-} from "./mock-data"
+// Mock data importları geçici olarak kaldırıldı
+// Gerekirse burada yeniden implement edilebilir
+
+// Geçici mock fonksiyonlar
+function generateMockListings(limit = 10, shopId = 1) {
+  return {
+    listings: Array(limit).fill(null).map((_, i) => ({
+      listing_id: i + 1,
+      shop_id: shopId,
+      title: `Mock Listing ${i + 1}`,
+      state: "active" as "active" | "inactive" | "draft",
+      price: { amount: 1000, divisor: 100, currency_code: "USD" },
+      tags: [],
+      images: [],
+      user_id: 1,
+      description: "Mock description",
+      url: "https://example.com",
+      quantity: 10
+    })),
+    count: limit
+  };
+}
+
+function generateMockReceipts(limit = 10, shopId = 1) {
+  return {
+    receipts: Array(limit).fill(null).map((_, i) => ({
+      receipt_id: i + 1,
+      shop_id: shopId,
+      receipt_type: 0,
+      seller_user_id: 1,
+      seller_email: "seller@example.com",
+      buyer_user_id: 100 + i,
+      buyer_email: "buyer@example.com",
+      name: "Mock Buyer",
+      first_line: "123 Main St",
+      second_line: "",
+      city: "Anytown",
+      state: "CA",
+      zip: "12345",
+      formatted_address: "123 Main St, Anytown, CA 12345",
+      country_iso: "US",
+      payment_method: "credit_card",
+      payment_email: "buyer@example.com",
+      message_from_seller: "",
+      message_from_buyer: "",
+      message_from_payment: "",
+      is_paid: true,
+      is_shipped: false,
+      create_timestamp: Date.now() / 1000 - 86400 * i,
+      update_timestamp: Date.now() / 1000,
+      grandtotal: { amount: 1500, divisor: 100, currency_code: "USD" },
+      subtotal: { amount: 1000, divisor: 100, currency_code: "USD" },
+      total_price: { amount: 1000, divisor: 100, currency_code: "USD" },
+      total_shipping_cost: { amount: 500, divisor: 100, currency_code: "USD" },
+      total_tax_cost: { amount: 0, divisor: 100, currency_code: "USD" },
+      total_vat_cost: { amount: 0, divisor: 100, currency_code: "USD" },
+      discount_amt: { amount: 0, divisor: 100, currency_code: "USD" },
+      gift_wrap_price: { amount: 0, divisor: 100, currency_code: "USD" }
+    })),
+    count: limit
+  };
+}
+
+function generateMockPayments(limit = 10, shopId = 1) {
+  return {
+    payments: Array(limit).fill(null).map((_, i) => ({
+      payment_id: i + 1,
+      buyer_user_id: 100 + i,
+      shop_id: shopId,
+      receipt_id: i + 1,
+      amount_gross: { amount: 1500, divisor: 100, currency_code: "USD" },
+      amount_fees: { amount: 150, divisor: 100, currency_code: "USD" },
+      amount_net: { amount: 1350, divisor: 100, currency_code: "USD" },
+      posted_gross: { amount: 1500, divisor: 100, currency_code: "USD" },
+      posted_fees: { amount: 150, divisor: 100, currency_code: "USD" },
+      posted_net: { amount: 1350, divisor: 100, currency_code: "USD" },
+      adjusted_gross: { amount: 0, divisor: 100, currency_code: "USD" },
+      adjusted_fees: { amount: 0, divisor: 100, currency_code: "USD" },
+      adjusted_net: { amount: 0, divisor: 100, currency_code: "USD" },
+      currency: "USD",
+      shop_currency: "USD",
+      buyer_currency: "USD",
+      shipping_user_id: 100 + i,
+      shipping_address_id: 200 + i,
+      billing_address_id: 200 + i,
+      status: "paid",
+      shipped_timestamp: 0,
+      create_timestamp: Date.now() / 1000 - 86400 * i,
+      update_timestamp: Date.now() / 1000
+    })),
+    count: limit
+  };
+}
+
+function generateMockLedgerEntries(limit = 10, shopId = 1) {
+  return {
+    entries: Array(limit).fill(null).map((_, i) => ({
+      entry_id: i + 1,
+      ledger_id: 1,
+      sequence_number: i,
+      amount: { amount: i % 2 === 0 ? 1500 : -150, divisor: 100, currency_code: "USD" },
+      currency: "USD",
+      description: i % 2 === 0 ? "Payment" : "Fee",
+      balance: { amount: 10000 - (i * 100), divisor: 100, currency_code: "USD" },
+      create_date: Date.now() / 1000 - 86400 * i
+    })),
+    count: limit
+  };
+}
 
 // Etsy API v3 endpoints
 const ETSY_API_BASE = "https://api.etsy.com/v3"
@@ -283,132 +384,208 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
   }
 }
 
-export async function refreshEtsyToken(userId: string): Promise<EtsyTokens> {
-  console.log("Refreshing token for user:", userId)
-  
-  try {
-  const { data: tokenData } = await supabaseAdmin
-    .from("etsy_tokens")
-    .select("refresh_token")
-    .eq("user_id", userId)
-    .single()
+// Rate limit kontrolü için yardımcı fonksiyonlar
+const rateLimiter = {
+  lastRequestTime: 0,
+  minInterval: 100, // 100ms = saniyede 10 istek
+  queue: [] as (() => Promise<any>)[],
+  isProcessing: false,
 
-    if (!tokenData?.refresh_token) {
-    throw new Error("No refresh token found")
+  async processQueue() {
+    if (this.isProcessing || this.queue.length === 0) return;
+    
+    this.isProcessing = true;
+    while (this.queue.length > 0) {
+      const now = Date.now();
+      const timeSinceLastRequest = now - this.lastRequestTime;
+      
+      if (timeSinceLastRequest < this.minInterval) {
+        await new Promise(resolve => setTimeout(resolve, this.minInterval - timeSinceLastRequest));
+      }
+      
+      const request = this.queue.shift();
+      if (request) {
+        this.lastRequestTime = Date.now();
+        try {
+          await request();
+        } catch (error) {
+          console.error("Rate limited request failed:", error);
+        }
+      }
+    }
+    this.isProcessing = false;
+  },
+
+  async addToQueue<T>(request: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await request();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      this.processQueue();
+    });
   }
+};
 
-    // Refresh token isteği - örnekteki gibi
-    const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
-      method: 'POST',
-    headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'x-api-key': ETSY_CLIENT_ID,
-      },
-      body: qs.stringify({
-        'grant_type': 'refresh_token',
-        'client_id': ETSY_CLIENT_ID,
-        'refresh_token': tokenData.refresh_token,
-      })
-  })
-
-  if (!response.ok) {
-      const errorText = await response.text()
-      console.error("Token refresh error:", response.status, errorText)
-      throw new Error(`Token refresh failed: ${response.status} - ${errorText}`)
-  }
-
-  const tokens: EtsyTokens = await response.json()
-    console.log("Token refresh successful")
-
-    // Token'ları güncelle
-    const { error: updateError } = await supabaseAdmin.from("etsy_tokens").upsert({
-    user_id: userId,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-    expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-      token_type: tokens.token_type || 'Bearer',
-    updated_at: new Date().toISOString(),
-  })
-
-    if (updateError) {
-      console.error("Token update error:", updateError)
-      throw new Error(`Failed to update tokens: ${updateError.message}`)
+// Rate limit kontrolü ile API çağrısı yapan yardımcı fonksiyon
+async function rateLimitedFetch<T>(
+  url: string,
+  options: RequestInit,
+  cacheKey?: string,
+  skipCache = false
+): Promise<T> {
+  return rateLimiter.addToQueue(async () => {
+    if (cacheKey && !skipCache) {
+      const cachedData = cacheManager.get<T>(cacheKey);
+      if (cachedData) {
+        console.log(`📦 Using cached data for ${cacheKey}`);
+        return cachedData;
+      }
     }
 
-    console.log("Tokens updated successfully")
-  return tokens
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      if (response.status === 429) {
+        console.error("Rate limit exceeded, waiting before retry...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return rateLimitedFetch(url, options, cacheKey, skipCache);
+      }
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
 
+    const data = await response.json();
+    
+    if (cacheKey) {
+      cacheManager.set(cacheKey, data);
+    }
+    
+    return data;
+  });
+}
+
+// refreshEtsyToken fonksiyonunu güncelle
+async function refreshEtsyToken(userId: string): Promise<string> {
+  try {
+    // Önce en son token'ı bul
+    const { data: tokenData, error: tokenError } = await supabaseAdmin
+      .from("etsy_tokens")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (tokenError) {
+      console.error("Token query error:", tokenError);
+      throw new Error(`Token query failed: ${tokenError.message}`);
+    }
+
+    if (!tokenData || tokenData.length === 0) {
+      throw new Error("No token found for user");
+    }
+
+    // En son oluşturulan token'ı kullan
+    const latestToken = tokenData[0];
+    console.log(`Using latest token created at: ${latestToken.created_at}`);
+
+    // Token yenileme isteği
+    const response = await fetch(`${ETSY_OAUTH_BASE}/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-api-key": ETSY_CLIENT_ID,
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: ETSY_CLIENT_ID,
+        refresh_token: latestToken.refresh_token,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
+    }
+
+    const newTokens = await response.json();
+
+    // Yeni token'ı veritabanına kaydet
+    const { error: updateError } = await supabaseAdmin
+      .from("etsy_tokens")
+      .upsert({
+        user_id: userId,
+        access_token: newTokens.access_token,
+        refresh_token: newTokens.refresh_token,
+        expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+    if (updateError) {
+      console.error("Token update error:", updateError);
+      throw new Error(`Failed to update token: ${updateError.message}`);
+    }
+
+    console.log("Token refreshed successfully");
+    return newTokens.access_token;
   } catch (error) {
-    console.error("Token refresh error:", error)
-    throw error
+    console.error("Token refresh error:", error);
+    throw error;
   }
 }
 
-async function getValidAccessToken(userId: string): Promise<string> {
-  console.log("Getting valid access token for user_id:", userId)
-  
-  const { data: tokenData, error: tokenError } = await supabaseAdmin
-    .from("etsy_tokens")
-    .select("access_token, expires_at, refresh_token, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single()
-
-  console.log("Token query result:", { 
-    found: !!tokenData, 
-    error: tokenError?.message,
-    user_id: userId 
-  })
-
-  if (tokenError) {
-    console.error("Token query error:", tokenError)
-  }
-
-  if (!tokenData) {
-    console.log("No tokens found for user_id:", userId)
-    
-    // Debug: Tüm token'ları listele
-    const { data: allTokens } = await supabaseAdmin
+async function getValidAccessToken(userId: string): Promise<string | null> {
+  try {
+    // En son token'ı bul
+    const { data: tokenData, error: tokenError } = await supabaseAdmin
       .from("etsy_tokens")
-      .select("user_id, created_at")
+      .select("*")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(10)
-    
-    console.log("All tokens in database:", allTokens)
-    
-    throw new Error("No Etsy tokens found. Please reconnect your Etsy account.")
+      .limit(1);
+
+    if (tokenError) {
+      console.error("Token query error:", tokenError);
+      return null;
+    }
+
+    if (!tokenData || tokenData.length === 0) {
+      console.log("No token found for user");
+      return null;
+    }
+
+    // En son token'ı kullan
+    const latestToken = tokenData[0];
+    console.log("Token found:", {
+      expires_at: latestToken.expires_at,
+      created_at: latestToken.created_at,
+      access_token_length: latestToken.access_token.length
+    });
+
+    // Token'ın geçerliliğini kontrol et
+    const expiresAt = new Date(latestToken.expires_at).getTime();
+    const now = Date.now();
+
+    if (now >= expiresAt) {
+      console.log("Token expired, refreshing...");
+      return refreshEtsyToken(userId);
+    }
+
+    return latestToken.access_token;
+  } catch (error) {
+    console.error("Error getting valid access token:", error);
+    return null;
   }
-
-  console.log("Token found:", {
-    expires_at: tokenData.expires_at,
-    created_at: tokenData.created_at,
-    access_token_length: tokenData.access_token.length
-  })
-
-  // Check if token is expired
-  const expiresAt = new Date(tokenData.expires_at)
-  const now = new Date()
-
-  if (expiresAt <= now) {
-    console.log("Token expired, refreshing...")
-    // Token expired, refresh it
-    const newTokens = await refreshEtsyToken(userId)
-    return newTokens.access_token
-  }
-
-  console.log("Token is valid, returning access token")
-  return tokenData.access_token
 }
 
 // Veritabanı yedekleme fonksiyonu
 async function getStoresFromDatabase(userId: string): Promise<EtsyStore[]> {
   try {
-    // createClient() Promise döndürdüğü için await kullanıyoruz
-    const supabase = await createClient()
-    
-    // Önce kullanıcının profil bilgilerini kontrol et
-    const { data: profile } = await supabase
+    // supabaseAdmin kullanarak direkt erişim
+    const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('etsy_shop_id, etsy_shop_name')
       .eq('id', userId)
@@ -437,7 +614,7 @@ async function getStoresFromDatabase(userId: string): Promise<EtsyStore[]> {
     }
     
     // Profilde yoksa, etsy_stores tablosundan dene
-    const { data: stores, error } = await supabase
+    const { data: stores, error } = await supabaseAdmin
       .from('etsy_stores')
       .select('*')
       .eq('user_id', userId)
@@ -445,70 +622,102 @@ async function getStoresFromDatabase(userId: string): Promise<EtsyStore[]> {
     
     if (error) {
       console.error("Veritabanı yedekleme hatası:", error)
-      // Mockup veri döndür
-      return [{
-        shop_id: 51859104,
-        shop_name: "CanvasesWorldTR",
-        title: "CanvasesWorldTR",
-        announcement: "Canvas wall art ve dekoratif ürünler",
-        currency_code: "USD",
-        is_vacation: false,
-        listing_active_count: 763,
-        num_favorers: 10,
-        url: "https://www.etsy.com/shop/CanvasesWorldTR",
-        image_url_760x100: "",
-        review_count: 12,
-        review_average: 4.4167,
-        is_active: true,
-        last_synced_at: new Date().toISOString(),
-        avatar_url: null
-      }]
+      // Mockup veri döndürme kaldırıldı
+      return []
     }
     
     if (stores && stores.length > 0) {
       return stores
     }
     
-    // Hiçbir veri bulunamadıysa varsayılan bir mağaza döndür
-    console.log("No stores found in database, returning default store")
-    return [{
-      shop_id: 51859104,
-      shop_name: "CanvasesWorldTR",
-      title: "CanvasesWorldTR",
-      announcement: "Canvas wall art ve dekoratif ürünler",
-      currency_code: "USD",
-      is_vacation: false,
-      listing_active_count: 763,
-      num_favorers: 10,
-      url: "https://www.etsy.com/shop/CanvasesWorldTR",
-      image_url_760x100: "",
-      review_count: 12,
-      review_average: 4.4167,
-      is_active: true,
-      last_synced_at: new Date().toISOString(),
-      avatar_url: null
-    }]
+    // Hiçbir veri bulunamadıysa boş dizi döndür
+    console.log("No stores found in database, returning empty array")
+    return []
   } catch (error) {
     console.error("Veritabanı yedekleme istisnası:", error)
-    // Hata durumunda yine varsayılan bir mağaza döndür
-    return [{
-      shop_id: 51859104,
-      shop_name: "CanvasesWorldTR",
-      title: "CanvasesWorldTR",
-      announcement: "Canvas wall art ve dekoratif ürünler",
-      currency_code: "USD",
-      is_vacation: false,
-      listing_active_count: 763,
-      num_favorers: 10,
-      url: "https://www.etsy.com/shop/CanvasesWorldTR",
-      image_url_760x100: "",
-      review_count: 12,
-      review_average: 4.4167,
-      is_active: true,
-      last_synced_at: new Date().toISOString(),
-      avatar_url: null
-    }]
+    // Hata durumunda da boş dizi döndür
+    return []
   }
+}
+
+// Veritabanına veri kaydetme fonksiyonu
+async function storeEtsyData(userId: string, shopId: number, data: any, type: 'store' | 'listings' | 'stats' | 'receipts' | 'payments') {
+  try {
+    const tableName = `etsy_${type}_data`;
+    const { error } = await supabaseAdmin
+      .from(tableName)
+      .upsert({
+        user_id: userId,
+        shop_id: shopId,
+        data: data,
+        last_updated: new Date().toISOString()
+      }, {
+        onConflict: 'user_id,shop_id'
+      });
+
+    if (error) {
+      console.error(`Error storing ${type} data:`, error);
+      throw error;
+    }
+
+    // Önbelleğe de kaydet
+    const cacheKey = `etsy_${type}_${userId}_${shopId}`;
+    cacheManager.set(cacheKey, data, { ttl: 24 * 60 * 60 * 1000 }); // 24 saat
+
+    console.log(`✅ Stored ${type} data for shop ${shopId}`);
+  } catch (error) {
+    console.error(`Failed to store ${type} data:`, error);
+    throw error;
+  }
+}
+
+// Veritabanından veri okuma fonksiyonu
+async function getStoredEtsyData(userId: string, shopId: number, type: 'store' | 'listings' | 'stats' | 'receipts' | 'payments') {
+  try {
+    // Önce önbellekten kontrol et
+    const cacheKey = `etsy_${type}_${userId}_${shopId}`;
+    const cachedData = cacheManager.get(cacheKey);
+    if (cachedData) {
+      console.log(`📦 Using cached ${type} data`);
+      return cachedData;
+    }
+
+    // Önbellekte yoksa veritabanından oku
+    const tableName = `etsy_${type}_data`;
+    const { data, error } = await supabaseAdmin
+      .from(tableName)
+      .select('*')
+      .eq('user_id', userId)
+      .eq('shop_id', shopId)
+      .order('last_updated', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      console.error(`Error getting ${type} data:`, error);
+      return null;
+    }
+
+    if (data) {
+      // Veritabanından okunan veriyi önbelleğe al
+      cacheManager.set(cacheKey, data.data, { ttl: 24 * 60 * 60 * 1000 }); // 24 saat
+      return data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Failed to get ${type} data:`, error);
+    return null;
+  }
+}
+
+// Global flag to control automatic API fetching vs using cache
+export let shouldUseOnlyCachedData = true;
+
+// Function to toggle the cached data only mode
+export function toggleCachedDataOnlyMode(useOnlyCachedData: boolean): void {
+  shouldUseOnlyCachedData = useOnlyCachedData;
+  console.log(`API mode set to: ${shouldUseOnlyCachedData ? 'Cached data only (using database/cache)' : 'Allow fresh API calls'}`);
 }
 
 // getEtsyStores fonksiyonunu güncelle
@@ -517,59 +726,59 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
     console.log("=== ETSY API DEBUG BAŞLANGIÇ ===")
     console.log("Kullanıcı ID:", userId)
     
-    const cacheKey = `etsy_stores_${userId}`;
-    
-    // Çevre değişkenlerini kontrol et
-    if (!process.env.ETSY_CLIENT_ID) {
-      throw new Error("ETSY_CLIENT_ID ayarlanmamış")
+    // If we're in cached-only mode and not explicitly skipping the cache, try database first
+    if (shouldUseOnlyCachedData && !skipCache) {
+      // First check database
+      const storedStores = await getStoredEtsyData(userId, 0, 'store');
+      if (storedStores) {
+        console.log("📦 Using stored store data (cached-only mode)");
+        return storedStores;
+      }
+      
+      // If no database data, fall back to database helper
+      console.log("No stored data found, using database fallback (cached-only mode)");
+      return getStoresFromDatabase(userId);
     }
-    if (!process.env.ETSY_REDIRECT_URI) {
-      throw new Error("ETSY_REDIRECT_URI ayarlanmamış")
+    
+    // Continue with regular flow if not in cached-only mode or skipCache is true
+    // Önce veritabanından mağaza verilerini kontrol et
+    const storedStores = await getStoredEtsyData(userId, 0, 'store');
+    if (storedStores && !skipCache) {
+      console.log("📦 Using stored store data");
+      return storedStores;
     }
-    if (!process.env.ETSY_SCOPE) {
-      throw new Error("ETSY_SCOPE ayarlanmamış")
-    }
     
-    console.log("ETSY_CLIENT_ID:", process.env.ETSY_CLIENT_ID ? "AYARLI" : "AYARLI DEĞİL")
-    console.log("ETSY_REDIRECT_URI:", process.env.ETSY_REDIRECT_URI ? "AYARLI" : "AYARLI DEĞİL")
-    console.log("ETSY_SCOPE:", process.env.ETSY_SCOPE)
-    
-    // Geçerli access token al
-    console.log("Kullanıcı için geçerli access token alınıyor:", userId)
-    const accessToken = await getValidAccessToken(userId)
-    console.log("Access token:", accessToken ? "BULUNDU" : "BULUNAMADI")
-    
+    // Veritabanında yoksa veya skipCache true ise API'den çek
+    const accessToken = await getValidAccessToken(userId);
     if (!accessToken) {
-      console.error("Geçerli access token bulunamadı - veritabanı yedeklemesi kullanılıyor")
-      return getStoresFromDatabase(userId)
+      console.error("Geçerli access token bulunamadı - veritabanı yedeklemesi kullanılıyor");
+      return getStoresFromDatabase(userId);
     }
     
     // Token'dan Etsy kullanıcı ID'sini çıkar
-    const etsyUserId = accessToken.split('.')[0]
-    console.log("Token'dan çıkarılan Etsy kullanıcı ID'si:", etsyUserId)
+    const etsyUserId = accessToken.split('.')[0];
+    console.log("Token'dan çıkarılan Etsy kullanıcı ID'si:", etsyUserId);
     
     try {
-      // Ping endpoint testi
-      console.log("=== PING TESTİ ===")
-      
       // Mağazaları al
-      const data = await fetchWithCache<{results: EtsyStore[]}>(`${ETSY_API_BASE}/application/users/${etsyUserId}/shops`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "x-api-key": process.env.ETSY_CLIENT_ID,
-        },
-        cacheKey,
-        skipCache,
-        mockDataGenerator: () => {
-          console.log("📦 Generating mock stores data");
-          return { results: generateMockStores() };
+      const data = await rateLimitedFetch<{results: EtsyStore[]}>(
+        `${ETSY_API_BASE}/application/users/${etsyUserId}/shops`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "x-api-key": process.env.ETSY_CLIENT_ID,
+          }
         }
-      });
+      );
       
       const stores = data.results || [];
       
       if (Array.isArray(stores) && stores.length > 0) {
         console.log("BAŞARILI! Bulunan mağaza sayısı:", stores.length);
+        
+        // Mağaza verilerini veritabanına kaydet
+        await storeEtsyData(userId, 0, stores, 'store');
+        
         console.log("=== ETSY API DEBUG SONU ===");
         return stores;
       }
@@ -581,30 +790,15 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
     }
     
     // API'den veri alınamadıysa veritabanından dene
-    const dbStores = await getStoresFromDatabase(userId);
-    
-    // Veritabanından alınan verileri önbelleğe al (eğer varsa)
-    if (dbStores && dbStores.length > 0) {
-      cacheManager.set(cacheKey, dbStores);
-      console.log("📦 Cached database stores data");
-      return dbStores;
-    }
-    
-    // Veritabanında da yoksa, sahte veri oluştur
-    console.log("📦 Using database fallback for store data");
-    const mockStores = generateMockStores();
-    
-    // Sahte verileri kısa süreli önbelleğe al
-    cacheManager.set(cacheKey, mockStores, { ttl: 5 * 60 * 1000 }); // 5 dakika
-    return mockStores;
+    return getStoresFromDatabase(userId);
     
   } catch (error) {
     console.error("getEtsyStores kritik hata:", error);
-    const mockStores = generateMockStores();
-    return mockStores;
+    return getStoresFromDatabase(userId);
   }
 }
 
+// getEtsyListings fonksiyonunu güncelle
 export async function getEtsyListings(
   userId: string,
   shopId: number,
@@ -619,6 +813,27 @@ export async function getEtsyListings(
   const cacheKey = `etsy_listings_${userId}_${shopId}_${limit}_${offset}_${state}`;
   
   try {
+    // If we're in cached-only mode and not explicitly skipping the cache, try database first
+    if (shouldUseOnlyCachedData && !skipCache) {
+      const storedListings = await getStoredEtsyData(userId, shopId, 'listings');
+      if (storedListings) {
+        console.log("📦 Using stored listings data (cached-only mode)");
+        return storedListings;
+      }
+      
+      // Fall back to mock data if necessary
+      console.log(`📦 No stored listings found, generating mock listings (cached-only mode)`);
+      const mockData = generateMockListings(limit, shopId);
+      return mockData;
+    }
+    
+    // Önce veritabanından listing verilerini kontrol et
+    const storedListings = await getStoredEtsyData(userId, shopId, 'listings');
+    if (storedListings && !skipCache) {
+      console.log("📦 Using stored listings data");
+      return storedListings;
+    }
+
     const accessToken = await getValidAccessToken(userId);
     
     if (!accessToken) {
@@ -644,26 +859,27 @@ export async function getEtsyListings(
     
     console.log(`Fetching Etsy listings: ${endpoint}?${params.toString()}`);
     
-    const data = await fetchWithCache<{results: EtsyListing[], count: number}>(
+    const data = await rateLimitedFetch<{results: EtsyListing[], count: number}>(
       `${endpoint}?${params}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "x-api-key": ETSY_CLIENT_ID,
-        },
-        cacheKey,
-        skipCache,
-        mockDataGenerator: () => {
-          console.log(`📦 Generating mock listings data for shop ${shopId}`);
-          return generateMockListings(limit, shopId);
         }
-      }
+      },
+      cacheKey,
+      skipCache
     );
     
-    return {
+    const result = {
       listings: data.results || [],
       count: data.count || 0
     };
+
+    // Listing verilerini veritabanına kaydet
+    await storeEtsyData(userId, shopId, result, 'listings');
+    
+    return result;
   } catch (error) {
     console.error("getEtsyListings error:", error);
     
@@ -674,9 +890,8 @@ export async function getEtsyListings(
       return cachedData;
     }
     
-    // Generate mock data as a last resort
-    console.log(`📦 Using mock listings data for shop ${shopId}`);
-    return generateMockListings(limit, shopId);
+    // Gerçek veri yoksa boş dizi döndür
+    return { listings: [], count: 0 };
   }
 }
 
@@ -685,7 +900,7 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
     console.log("Starting Etsy data sync for user:", userId)
     
     // Önce stores bilgisini çek
-    const stores = await getEtsyStores(userId)
+    const stores = await getEtsyStores(userId, true) // force refresh
     console.log("Fetched stores:", stores.length)
     
     if (stores.length > 0) {
@@ -697,6 +912,7 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
         .update({
           etsy_shop_name: primaryStore.shop_name,
           etsy_shop_id: primaryStore.shop_id.toString(),
+          last_synced_at: new Date().toISOString()
         })
         .eq("id", userId)
 
@@ -707,14 +923,26 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
       
       console.log("Profile updated with real store data:", primaryStore.shop_name)
       
-      // Listings bilgisini çek (opsiyonel)
-      try {
-        const { listings, count } = await getEtsyListings(userId, primaryStore.shop_id, 25, 0)
-        console.log(`Fetched ${listings.length} listings out of ${count} total`)
-      } catch (listingsError) {
-        console.warn("Could not fetch listings, but store connection is successful:", listingsError)
-        // Listings çekilemese bile store bağlantısı başarılı
-      }
+      // Tüm verileri paralel olarak çek ve kaydet
+      await Promise.all([
+        // Listings
+        getEtsyListings(userId, primaryStore.shop_id, 100, 0, 'active', true)
+          .then(({ listings }) => storeEtsyData(userId, primaryStore.shop_id, listings, 'listings')),
+        
+        // Stats
+        getEtsyStats(userId, primaryStore.shop_id, true)
+          .then(stats => storeEtsyData(userId, primaryStore.shop_id, stats, 'stats')),
+        
+        // Receipts
+        getEtsyReceipts(userId, primaryStore.shop_id, 100, 0, true)
+          .then(({ receipts }) => storeEtsyData(userId, primaryStore.shop_id, receipts, 'receipts')),
+        
+        // Payments
+        getEtsyPayments(userId, primaryStore.shop_id, 100, 0, true)
+          .then(({ payments }) => storeEtsyData(userId, primaryStore.shop_id, payments, 'payments'))
+      ])
+      
+      console.log("All data synced successfully")
       
     } else {
       // Store bulunamadı ama token geçerli - bu normal olabilir
@@ -723,12 +951,12 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
         .update({
           etsy_shop_name: "Etsy Bağlantısı Aktif",
           etsy_shop_id: "connected",
+          last_synced_at: new Date().toISOString()
         })
         .eq("id", userId)
       
       if (profileError) {
         console.error("Profile update error:", profileError)
-        // Bu durumda bile hata fırlatma, sadece logla
         console.warn("Could not update profile but connection is successful")
       }
       
@@ -747,17 +975,16 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
         .update({
           etsy_shop_name: "Etsy Bağlandı (Sınırlı Erişim)",
           etsy_shop_id: "limited",
+          last_synced_at: new Date().toISOString()
         })
         .eq("id", userId)
       
       console.log("Marked as limited access due to API restrictions")
     } catch (fallbackError) {
       console.error("Fallback update also failed:", fallbackError)
-      // Artık hata fırlatma, sadece logla
       console.warn("Could not update profile even with fallback")
     }
     
-    // Artık hata fırlatmıyoruz - bağlantı başarılı sayılsın
     console.log("Sync completed with limitations")
   }
 }
@@ -967,9 +1194,8 @@ export async function getEtsyPayments(
       return cachedData;
     }
     
-    // Generate mock data as a last resort
-    console.log(`📦 Using mock payments data for shop ${shopId}`);
-    return generateMockPayments(limit, shopId);
+    // Gerçek veri yoksa boş dizi döndür
+    return { payments: [], count: 0 };
   }
 }
 
@@ -1030,9 +1256,8 @@ export async function getEtsyReceipts(
       return cachedData;
     }
     
-    // Generate mock data as a last resort
-    console.log(`📦 Using mock receipts data for shop ${shopId}`);
-    return generateMockReceipts(limit, shopId);
+    // Gerçek veri yoksa boş dizi döndür
+    return { receipts: [], count: 0 };
   }
 }
 
@@ -1102,9 +1327,8 @@ export async function getEtsyLedgerEntries(
       return cachedData;
     }
     
-    // Generate mock data as a last resort
-    console.log(`📦 Using mock ledger entries for shop ${shopId}`);
-    return generateMockLedgerEntries(limit, shopId);
+    // Gerçek veri yoksa boş dizi döndür
+    return { entries: [], count: 0 };
   }
 }
 
@@ -1816,6 +2040,127 @@ export async function getEtsyDataWithRefreshControl(
       success: false,
       message: `Veri yenileme hatası: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`,
       timestamp: Date.now()
+    };
+  }
+}
+
+// Veritabanı tablolarını oluştur
+export async function createEtsyDataTables(): Promise<void> {
+  try {
+    console.log("Creating Etsy data tables...");
+
+    // Mağaza verileri tablosu
+    const { error: storeError } = await supabaseAdmin.rpc('create_etsy_store_data_table');
+    if (storeError) {
+      console.error("Error creating store data table:", storeError);
+      throw storeError;
+    }
+
+    // Ürün listeleri tablosu
+    const { error: listingsError } = await supabaseAdmin.rpc('create_etsy_listings_data_table');
+    if (listingsError) {
+      console.error("Error creating listings data table:", listingsError);
+      throw listingsError;
+    }
+
+    // Mağaza istatistikleri tablosu
+    const { error: statsError } = await supabaseAdmin.rpc('create_etsy_stats_data_table');
+    if (statsError) {
+      console.error("Error creating stats data table:", statsError);
+      throw statsError;
+    }
+
+    // Siparişler tablosu
+    const { error: receiptsError } = await supabaseAdmin.rpc('create_etsy_receipts_data_table');
+    if (receiptsError) {
+      console.error("Error creating receipts data table:", receiptsError);
+      throw receiptsError;
+    }
+
+    // Ödemeler tablosu
+    const { error: paymentsError } = await supabaseAdmin.rpc('create_etsy_payments_data_table');
+    if (paymentsError) {
+      console.error("Error creating payments data table:", paymentsError);
+      throw paymentsError;
+    }
+
+    console.log("✅ All Etsy data tables created successfully");
+  } catch (error) {
+    console.error("Failed to create Etsy data tables:", error);
+    throw error;
+  }
+}
+
+// Etsy mağaza istatistiklerini getir
+export async function getEtsyStats(
+  userId: string,
+  shopId: number,
+  skipCache = false
+): Promise<{
+  totalListings: number;
+  totalOrders: number;
+  totalViews: number;
+  totalRevenue: number;
+}> {
+  const cacheKey = `etsy_stats_${userId}_${shopId}`;
+  
+  try {
+    // Önce önbellekten kontrol et
+    if (!skipCache) {
+      const cachedStats = cacheManager.get<{
+        totalListings: number;
+        totalOrders: number;
+        totalViews: number;
+        totalRevenue: number;
+      }>(cacheKey);
+      
+      if (cachedStats) {
+        console.log(`📦 Using cached stats data`);
+        return cachedStats;
+      }
+    }
+
+    // Etsy mağazalarını çek
+    const stores = await getEtsyStores(userId, skipCache);
+    
+    if (stores && stores.length > 0) {
+      // Eğer shopId belirtilmişse o mağazayı bul, değilse ilkini kullan
+      const store = shopId ? 
+        stores.find(s => s.shop_id === shopId) : 
+        stores[0];
+      
+      if (store) {
+        // İstatistikleri hesapla
+        const stats = {
+          totalListings: store.listing_active_count || 0,
+          totalOrders: store.review_count || 0, // Review count'u order sayısı olarak kullan
+          totalViews: store.num_favorers * 100 || 0, // Tahmini
+          totalRevenue: (store.review_count || 0) * 25.99, // Ortalama fiyat
+        };
+        
+        // Önbelleğe kaydet
+        cacheManager.set(cacheKey, stats, { ttl: 3 * 60 * 60 * 1000 }); // 3 saat
+        
+        return stats;
+      }
+    }
+    
+    // Veri yoksa boş değerler döndür
+    return {
+      totalListings: 0,
+      totalOrders: 0,
+      totalViews: 0,
+      totalRevenue: 0
+    };
+  } catch (error) {
+    console.error("getEtsyStats error:", error);
+    
+    // Hata durumunda varsayılan değerler
+    return {
+      totalListings: 0,
+      totalOrders: 0,
+      totalViews: 0,
+      totalRevenue: 0
     };
   }
 }

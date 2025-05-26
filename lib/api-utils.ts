@@ -110,6 +110,137 @@ export class RateLimitTracker {
   }
 }
 
+// Global rate limit tracking
+let globalRateLimitInfo = {
+  maxRequestsPerDay: 5000,
+  currentRequests: 0,
+  dailyReset: Date.now() + (24 * 60 * 60 * 1000), // Default to 24 hours from now
+  lastUpdated: Date.now()
+};
+
+/**
+ * Gets the current rate limit status
+ */
+export function getRateLimitStatus(): {
+  maxRequestsPerDay: number;
+  currentRequests: number;
+  remainingRequests: number;
+  percentageUsed: number;
+  dailyReset: number;
+  lastUpdated: number;
+} {
+  // Check if we need to reset the counter (new day)
+  const now = Date.now();
+  if (now > globalRateLimitInfo.dailyReset) {
+    globalRateLimitInfo = {
+      ...globalRateLimitInfo,
+      currentRequests: 0,
+      dailyReset: now + (24 * 60 * 60 * 1000),
+      lastUpdated: now
+    };
+  }
+
+  return {
+    ...globalRateLimitInfo,
+    remainingRequests: Math.max(0, globalRateLimitInfo.maxRequestsPerDay - globalRateLimitInfo.currentRequests),
+    percentageUsed: (globalRateLimitInfo.currentRequests / globalRateLimitInfo.maxRequestsPerDay) * 100
+  };
+}
+
+/**
+ * Updates the rate limit tracking information after an API call
+ */
+export async function updateRateLimitInfo(requestCount: number = 1): Promise<void> {
+  const now = Date.now();
+  
+  // If we're past the reset time, reset the counter
+  if (now > globalRateLimitInfo.dailyReset) {
+    globalRateLimitInfo = {
+      ...globalRateLimitInfo,
+      currentRequests: requestCount,
+      dailyReset: now + (24 * 60 * 60 * 1000),
+      lastUpdated: now
+    };
+  } else {
+    // Otherwise increment the counter
+    globalRateLimitInfo = {
+      ...globalRateLimitInfo,
+      currentRequests: globalRateLimitInfo.currentRequests + requestCount,
+      lastUpdated: now
+    };
+  }
+  
+  try {
+    // Update rate limit information in the database if supabaseAdmin is available
+    const { supabaseAdmin } = await import('./supabase');
+    
+    if (!supabaseAdmin) return;
+    
+    // Get current user - we may not have the user in some contexts
+    let userId = null;
+    try {
+      const { data } = await supabaseAdmin.auth.getSession();
+      userId = data.session?.user?.id;
+    } catch (error) {
+      console.log("Cannot get current user for rate limit update");
+      return;
+    }
+    
+    if (!userId) return;
+    
+    // First check if entry exists
+    const { data: rateLimitData } = await supabaseAdmin
+      .from("rate_limits")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+    
+    // Reset time (next day at midnight)
+    const resetTime = new Date();
+    resetTime.setDate(resetTime.getDate() + 1);
+    resetTime.setHours(0, 0, 0, 0);
+    
+    if (rateLimitData) {
+      // Check if we need to reset the counter (new day)
+      const resetAt = new Date(rateLimitData.reset_at);
+      
+      if (now > resetAt.getTime()) {
+        // New day - reset counter
+        await supabaseAdmin
+          .from("rate_limits")
+          .update({
+            used_count: requestCount,
+            reset_at: resetTime.toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq("user_id", userId);
+      } else {
+        // Same day - increment counter
+        await supabaseAdmin
+          .from("rate_limits")
+          .update({
+            used_count: rateLimitData.used_count + requestCount,
+            updated_at: new Date().toISOString()
+          })
+          .eq("user_id", userId);
+      }
+    } else {
+      // Create new entry
+      await supabaseAdmin
+        .from("rate_limits")
+        .insert({
+          user_id: userId,
+          used_count: requestCount,
+          limit: 40, // Default Etsy API limit per day
+          reset_at: resetTime.toISOString()
+        });
+    }
+  } catch (error) {
+    console.error("Failed to update rate limit info in database:", error);
+    // Continue even if database update fails - we still have in-memory tracking
+  }
+}
+
 /**
  * Enhanced fetch with caching, rate limiting, and retry functionality
  */
@@ -161,30 +292,25 @@ export async function fetchWithCache<T>(
     throw new Error(`Rate limited: Retry after ${retrySeconds} seconds`);
   }
   
-  // Check cache if we have a cache key and aren't skipping cache
+  // Try to get from cache first
   if (cacheKey && !skipCache) {
     const cachedData = cacheManager.get<T>(cacheKey);
     if (cachedData) {
       console.log(`📦 Using cached data for ${cacheKey}`);
       
-      // If we have stale data, revalidate in the background
-      if (staleWhileRevalidateAge) {
-        const cacheItem = (cacheManager as any).cache.get(cacheKey);
-        const cacheAge = Date.now() - (cacheItem.expiresAt - cacheTTL);
-        
-        if (cacheAge > staleWhileRevalidateAge) {
-          console.log(`🔄 Stale cache detected for ${cacheKey}, revalidating in background`);
-          // Don't await - let it happen in the background
-          fetchAndUpdateCache(url, fetchOptions, cacheKey, cacheTTL, retries, retryDelay, mockDataGenerator)
-            .catch(err => console.error(`Background revalidation failed for ${cacheKey}:`, err));
-        }
+      // If the data is stale, trigger a background refresh
+      const cacheMetadata = cacheManager.getMetadata(cacheKey);
+      if (cacheMetadata && Date.now() - cacheMetadata.timestamp > staleWhileRevalidateAge) {
+        console.log(`🔄 Data is stale, triggering background refresh for ${cacheKey}`);
+        fetchAndUpdateCache(url, fetchOptions, cacheKey, cacheTTL, 0, retryDelay, mockDataGenerator)
+          .catch(error => console.error(`Background refresh failed for ${cacheKey}:`, error));
       }
       
       return cachedData;
     }
   }
   
-  // No cache hit, fetch from network
+  // If no cache or skipCache is true, fetch fresh data
   return fetchAndUpdateCache(url, fetchOptions, cacheKey, cacheTTL, retries, retryDelay, mockDataGenerator);
 }
 
@@ -211,6 +337,9 @@ async function fetchAndUpdateCache<T>(
         // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, retryDelay * 1000));
       }
+      
+      // Update the rate limit tracking before making a request
+      updateRateLimitInfo(1);
       
       const response = await fetch(url, fetchOptions);
       

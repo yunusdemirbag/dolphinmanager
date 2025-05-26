@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
-import { getEtsyStores } from "@/lib/etsy-api"
+import { getEtsyStores, shouldUseOnlyCachedData } from "@/lib/etsy-api"
 
 interface EtsyStore {
   shop_id: number
@@ -30,11 +30,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // Check for the X-Use-Cache-Only header
+    const useCacheOnly = request.headers.get('X-Use-Cache-Only') === 'true' || shouldUseOnlyCachedData
+    
     console.log("Fetching Etsy stores for user:", user.id)
+    console.log("Cached-only mode:", useCacheOnly ? "ENABLED" : "DISABLED")
 
     try {
-      // Önce gerçek Etsy API'sini dene
-      const etsyStores = await getEtsyStores(user.id)
+      // If useCacheOnly is true, we'll force the API to only use cached data
+      // skipCache parameter is the opposite - if true, it forces fresh data from API
+      const skipCache = !useCacheOnly
+      const etsyStores = await getEtsyStores(user.id, skipCache)
       
       if (etsyStores && etsyStores.length > 0) {
         console.log("✅ Real Etsy data found:", etsyStores.length, "stores")
@@ -56,7 +62,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           stores: storeData,
           connected: true,
-          source: "etsy_api"
+          source: useCacheOnly ? "cached_data" : "etsy_api"
         })
       }
     } catch (etsyError) {

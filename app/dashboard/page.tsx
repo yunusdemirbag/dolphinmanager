@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react"
 import { createClientSupabase } from "@/lib/supabase"
 import DashboardClient from "./dashboard-client"
-import { Loader2 } from "lucide-react"
+import { Loader2, Info } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+// Server-side import'u client component'te kullanmamak için bu değişkeni kendimiz oluşturalım
+const shouldUseOnlyCachedData = true; // Varsayılan olarak önbellekten veri çekmeyi etkinleştir
+// import { shouldUseOnlyCachedData } from "@/lib/etsy-api"
 
 interface CalendarEvent {
   date: string
@@ -36,6 +40,8 @@ export default function DashboardPage() {
     viewsChange: 0,
     conversionChange: 0
   })
+  const [dataSource, setDataSource] = useState<"cache" | "api">("cache")
+  const [lastDataFetch, setLastDataFetch] = useState<Date | null>(null)
   const supabase = createClientSupabase()
 
   useEffect(() => {
@@ -45,14 +51,31 @@ export default function DashboardPage() {
         const { data: { user } } = await supabase.auth.getUser()
         setUser(user)
 
-        // Profil bilgilerini getir
+        // Profil bilgilerini getir (last_sync_attempt_at dahil)
         const { data: profileData } = await supabase.from("profiles").select("*").single()
         setProfile(profileData)
 
-        // Paralel olarak stores ve stats verilerini çek
+        // Son veri çekme zamanını profilden al
+        if (profileData?.last_sync_attempt_at) {
+          const lastFetchDate = new Date(profileData.last_sync_attempt_at);
+          setLastDataFetch(lastFetchDate);
+          console.log(`📅 Son veri çekme zamanı: ${lastFetchDate.toLocaleString()}`);
+        }
+        
+        // Sayfa her yenilendiğinde API çağrısı yapmak yerine her zaman önbellek kullan
+        // skipCache=false parametresi ile verilerin API'den değil önbellekten çekilmesini sağla
+        const apiOptions = {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Use-Cache-Only': 'true' // Özel header ile sadece önbellek kullanımını belirt
+          }
+        };
+        
+        // Paralel olarak stores ve stats verilerini çek (her durumda önbellekten)
         const [storesResponse, statsResponse] = await Promise.all([
-          fetch('/api/etsy/stores'),
-          fetch('/api/etsy/stats')
+          fetch('/api/etsy/stores', apiOptions),
+          fetch('/api/etsy/stats', apiOptions)
         ])
 
         let stores = []
@@ -68,6 +91,9 @@ export default function DashboardPage() {
           const storesData = await storesResponse.json()
           stores = storesData.stores || []
           console.log("📊 Stores loaded:", stores.length, "stores, source:", storesData.source)
+          
+          // Set data source for notification
+          setDataSource(storesData.source === "api" ? "api" : "cache")
         }
 
         // Stats verilerini işle
@@ -83,7 +109,7 @@ export default function DashboardPage() {
         }
 
         // Dashboard verilerini güncelle
-        setDashboardData({
+        const dashboardData = {
           stores: stores,
           revenue: stats.totalRevenue,
           orders: stats.totalOrders,
@@ -99,11 +125,13 @@ export default function DashboardPage() {
           viewsChange: 0,
           conversionChange: 0,
           totalListings: stats.totalListings
-        })
-
+        };
+        
+        setDashboardData(dashboardData);
+        
       } catch (error) {
         console.error("Error fetching data:", error)
-        // Hata durumunda boş veri göster
+        // Hata durumunda da mevcut verileri göster
         setDashboardData({
           stores: [],
           revenue: 0,
@@ -120,7 +148,7 @@ export default function DashboardPage() {
           viewsChange: 0,
           conversionChange: 0,
           totalListings: 0
-        })
+        });
       } finally {
         setLoading(false)
       }
@@ -148,10 +176,21 @@ export default function DashboardPage() {
   }
 
   return (
-    <DashboardClient 
-      user={user}
-      profile={profile}
-      dashboardData={dashboardData}
-    />
+    <>
+      {shouldUseOnlyCachedData && (
+        <Alert className="max-w-5xl mx-auto mt-4 bg-blue-50 border-blue-200">
+          <Info className="w-4 h-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            Etsy API çağrı limitlerini korumak için veriler önbellekten yükleniyor. Güncel verileri görmek için "Verileri Güncelle" butonuna tıklayın.
+          </AlertDescription>
+        </Alert>
+      )}
+      <DashboardClient 
+        user={user}
+        profile={profile}
+        dashboardData={dashboardData}
+        lastDataFetch={lastDataFetch}
+      />
+    </>
   )
 }

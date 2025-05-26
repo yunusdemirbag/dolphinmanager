@@ -35,7 +35,8 @@ import {
   AlertTriangle,
   RotateCcw,
   Check,
-  Heart
+  Heart,
+  Clock
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClientSupabase } from "@/lib/supabase"
@@ -47,6 +48,8 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog"
+import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
+import { RateLimitIndicator } from "@/components/ui/rate-limit-indicator"
 
 interface EtsyStore {
   shop_id: number
@@ -88,6 +91,12 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false)
+  const [currentStore, setCurrentStore] = useState<EtsyStore | null>(null)
+  const [refreshStatus, setRefreshStatus] = useState<{
+    success?: boolean;
+    message?: string;
+  }>({})
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const router = useRouter()
   const supabase = createClientSupabase()
 
@@ -155,6 +164,7 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
           setStores(enhancedStores);
           setEtsyConnected(true);
           setLastUpdate(new Date().toLocaleString('tr-TR'));
+          setLastRefresh(new Date());
         } else {
           // Gerçek mağaza yok - boş liste göster
           setStores([]);
@@ -227,9 +237,64 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   }
 
   const handleRefreshStores = async () => {
-    setRefreshing(true)
-    await loadStores()
-    setRefreshing(false)
+    try {
+      if (refreshing) return; // Zaten yenileme işlemi devam ediyorsa çık
+      
+      // Son yenilemeden bu yana 5 dakika geçmediyse kullanıcıya sor
+      if (lastRefresh && (Date.now() - lastRefresh.getTime() < 5 * 60 * 1000)) {
+        const confirmRefresh = confirm(
+          "Son yenilemeden henüz 5 dakika geçmedi. API çağrı limitlerini aşmamak için gereksiz yenilemeler yapmamaya özen gösterilmelidir. Yine de yenilemek istiyor musunuz?"
+        );
+        
+        if (!confirmRefresh) return;
+      }
+      
+      setRefreshing(true);
+      setRefreshStatus({ message: "Etsy verileri yenileniyor..." });
+      
+      // API'ye istek gönder
+      const response = await fetch("/api/etsy/refresh", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          forceRefresh: true // Önbelleği temizle ve yeni veri çek
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Başarılı yenileme sonrası mağaza verilerini yeniden yükle
+        await loadStores();
+        setLastRefresh(new Date());
+        
+        setRefreshStatus({
+          success: true,
+          message: "Etsy verileri başarıyla yenilendi"
+        });
+      } else {
+        setRefreshStatus({
+          success: false,
+          message: `Yenileme hatası: ${result.message}`
+        });
+        console.error("Veri yenileme hatası:", result.message);
+      }
+    } catch (error) {
+      setRefreshStatus({
+        success: false,
+        message: "Veri yenileme sırasında bir hata oluştu"
+      });
+      console.error("Veri yenileme hatası:", error);
+    } finally {
+      setRefreshing(false);
+      
+      // 5 saniye sonra bildirim mesajını temizle
+      setTimeout(() => {
+        setRefreshStatus({});
+      }, 5000);
+    }
   }
 
   const handleDisconnectStore = async () => {
@@ -329,32 +394,80 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   const totalFollowers = stores.reduce((sum, s) => sum + (s.num_favorers || 0), 0);
   const totalRevenue = stores.reduce((sum, s) => sum + (s.monthly_revenue || 0), 0);
 
+  const handleStoreSelect = (store: EtsyStore) => {
+    setCurrentStore(store);
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
+      <div className="flex flex-col items-center mb-6">
+        <h1 className="text-2xl font-bold">Mağazalar</h1>
+        <CurrentStoreNameBadge />
+      </div>
+      
+      {/* Rate Limit Indicator */}
+      <div className="mb-6">
+        <RateLimitIndicator />
+      </div>
+      
+      {/* Yenileme durumu bildirimi */}
+      {refreshStatus.message && (
+        <div className={`mb-4 p-3 rounded border flex items-center ${
+          refreshStatus.success === undefined
+            ? 'bg-blue-50 border-blue-200 text-blue-700'  // Bilgi
+            : refreshStatus.success
+              ? 'bg-green-50 border-green-200 text-green-700'  // Başarılı
+              : 'bg-red-50 border-red-200 text-red-700'  // Hata
+        }`}>
+          {refreshStatus.success === undefined ? (
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+          ) : refreshStatus.success ? (
+            <CheckCircle className="w-4 h-4 mr-2" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 mr-2" />
+          )}
+          <span>{refreshStatus.message}</span>
+        </div>
+      )}
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
             <Store className="h-8 w-8 text-indigo-500" />
             Mağazalarım
           </h1>
+          <div className='text-gray-500 text-sm mb-6'>{currentStore?.shop_name || 'Mağaza'}</div>
           <p className="text-gray-600 mt-2">Etsy mağazalarınızı tek yerden yönetin</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleRefreshStores} disabled={refreshing}>
+          <Button 
+            variant="outline" 
+            onClick={handleRefreshStores} 
+            disabled={refreshing}
+            className="bg-black hover:bg-gray-800 text-white border-none"
+          >
             {refreshing ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4 mr-2" />
             )}
-            Yenile
+            {refreshing ? 'Yenileniyor...' : 'Verileri Güncelle'}
           </Button>
-          <Button onClick={handleConnectEtsy}>
+          <Button onClick={handleConnectEtsy} className="bg-black hover:bg-gray-800 text-white">
             <Plus className="h-4 w-4 mr-2" />
             Mağaza Ekle
           </Button>
         </div>
       </div>
+
+      {/* Son yenileme bilgisi */}
+      {lastRefresh && (
+        <div className="text-xs text-gray-500 mb-4 flex items-center">
+          <Clock className="w-3 h-3 mr-1" />
+          Son yenileme: {lastRefresh.toLocaleString()}
+        </div>
+      )}
 
       {/* İstatistikler */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -547,15 +660,15 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
                       
                       {/* Actions */}
                       <div className="flex gap-2 mt-6 justify-end">
-                        <Button size="sm" variant="outline" onClick={() => setDisconnectDialogOpen(true)}>
+                        <Button size="sm" variant="outline" onClick={() => setDisconnectDialogOpen(true)} className="bg-black hover:bg-gray-800 text-white border-none">
                           <Unlink className="h-4 w-4 mr-1" />
                           Bağlantıyı Kes
                         </Button>
-                        <Button size="sm" variant="outline" onClick={handleResetEtsyConnection}>
-                          <RotateCcw className="h-4 w-4 mr-1" />
+                        <Button size="sm" variant="outline" onClick={handleResetEtsyConnection} className="bg-black hover:bg-gray-800 text-white border-none">
+                          <RotateCcw className="h-4 w-4 mr-2" />
                           Sıfırla
                         </Button>
-                        <Button size="sm">
+                        <Button size="sm" className="bg-black hover:bg-gray-800 text-white">
                           <ArrowRight className="h-4 w-4 mr-1" />
                           Yönet
                         </Button>
@@ -588,10 +701,10 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDisconnectDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setDisconnectDialogOpen(false)} className="border-gray-300">
               İptal
             </Button>
-            <Button variant="destructive" onClick={handleDisconnectStore} disabled={reconnecting}>
+            <Button variant="destructive" onClick={handleDisconnectStore} disabled={reconnecting} className="bg-black hover:bg-gray-800 text-white border-none">
               {reconnecting ? <Loader2 className="w-4 w-4 mr-2 animate-spin" /> : <LogOut className="h-4 w-4 mr-2" />}
               Bağlantıyı Kes
             </Button>

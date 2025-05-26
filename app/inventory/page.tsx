@@ -17,13 +17,45 @@ import {
   Eye,
   BarChart3,
   DollarSign,
+  CheckCircle,
+  Clock,
+  Info,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { RateLimitIndicator } from "@/components/ui/rate-limit-indicator"
+import { shouldUseOnlyCachedData } from "@/lib/etsy-api"
+
+interface InventoryItem {
+  id: number
+  title: string
+  sku: string
+  store: string
+  current_stock: number
+  reserved_stock: number
+  available_stock: number
+  status: string
+  sales_velocity: number
+  reorder_point: number
+  lead_time: number
+  cost_price: number
+  category: string
+}
 
 export default function InventoryPage() {
   const [selectedStore, setSelectedStore] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
-  const [inventoryData, setInventoryData] = useState([])
+  const [inventoryData, setInventoryData] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [timeRange, setTimeRange] = useState("30d")
+  const [view, setView] = useState("grid")
+  const [sortBy, setSortBy] = useState("newest")
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [refreshStatus, setRefreshStatus] = useState<{
+    success?: boolean;
+    message?: string;
+  }>({})
+  const router = useRouter()
 
   useEffect(() => {
     loadInventoryData()
@@ -80,15 +112,76 @@ export default function InventoryPage() {
     }
   }
 
-  const calculateReorderSuggestion = (item: any) => {
+  const calculateReorderSuggestion = (item: InventoryItem) => {
     const weeksToReorder = (item.reorder_point - item.current_stock) / item.sales_velocity
     const suggestedQuantity = Math.ceil(item.sales_velocity * (item.lead_time / 7) + item.reorder_point)
     return { weeksToReorder: Math.max(0, weeksToReorder), suggestedQuantity }
   }
 
   const lowStockItems = inventoryData.filter((item) => item.status === "low_stock" || item.status === "out_of_stock")
-  const totalValue = inventoryData.reduce((sum, item) => sum + item.current_stock * item.cost_price, 0)
+  const totalValue = inventoryData.reduce((sum, item) => sum + (item.current_stock * item.cost_price), 0)
   const totalItems = inventoryData.reduce((sum, item) => sum + item.current_stock, 0)
+
+  const refreshData = async () => {
+    try {
+      if (refreshing) return // Zaten yenileme işlemi devam ediyorsa çık
+      
+      // Son yenilemeden bu yana 5 dakika geçmediyse kullanıcıya sor
+      if (lastRefresh && (Date.now() - lastRefresh.getTime() < 5 * 60 * 1000)) {
+        const confirmRefresh = confirm(
+          "Son yenilemeden henüz 5 dakika geçmedi. API çağrı limitlerini aşmamak için gereksiz yenilemeler yapmamaya özen gösterilmelidir. Yine de yenilemek istiyor musunuz?"
+        );
+        
+        if (!confirmRefresh) return;
+      }
+      
+      setRefreshing(true)
+      setRefreshStatus({ message: "Stok verileri yenileniyor..." })
+      
+      // API'ye istek gönder
+      const response = await fetch("/api/etsy/refresh", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          forceRefresh: true // Önbelleği temizle ve yeni veri çek
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Başarılı yenileme sonrası sayfayı yenile
+        router.refresh() // Next.js sayfayı yeniler ve en güncel verileri alır
+        setLastRefresh(new Date())
+        
+        setRefreshStatus({
+          success: true,
+          message: "Stok verileri başarıyla yenilendi"
+        })
+      } else {
+        setRefreshStatus({
+          success: false,
+          message: `Yenileme hatası: ${result.message}`
+        })
+        console.error("Veri yenileme hatası:", result.message)
+      }
+    } catch (error) {
+      setRefreshStatus({
+        success: false,
+        message: "Veri yenileme sırasında bir hata oluştu"
+      })
+      console.error("Veri yenileme hatası:", error)
+    } finally {
+      setRefreshing(false)
+      
+      // 5 saniye sonra bildirim mesajını temizle
+      setTimeout(() => {
+        setRefreshStatus({})
+      }, 5000)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -103,11 +196,16 @@ export default function InventoryPage() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="outline">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Stokları Senkronize Et
+              <Button 
+                variant="outline"
+                onClick={refreshData}
+                disabled={refreshing}
+                className="bg-black hover:bg-gray-800 text-white border-none"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshing ? 'Yenileniyor...' : 'Verileri Güncelle'}
               </Button>
-              <Button className="bg-orange-600 hover:bg-orange-700">
+              <Button className="bg-black hover:bg-gray-800 text-white">
                 <Plus className="w-4 h-4 mr-2" />
                 Yeni Ürün Ekle
               </Button>
@@ -116,60 +214,105 @@ export default function InventoryPage() {
         </div>
       </header>
 
+      {/* Cached data notification */}
+      {shouldUseOnlyCachedData && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+          <Alert className="bg-blue-50 border-blue-200">
+            <Info className="w-4 h-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              Etsy API çağrı limitlerini korumak için veriler önbellekten yükleniyor. Güncel verileri görmek için "Verileri Güncelle" butonuna tıklayın.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Rate Limit Indicator */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+        <RateLimitIndicator />
+      </div>
+
+      {/* Yenileme durumu bildirimi */}
+      {refreshStatus.message && (
+        <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 p-3 rounded border flex items-center ${
+          refreshStatus.success === undefined
+            ? 'bg-blue-50 border-blue-200 text-blue-700'  // Bilgi
+            : refreshStatus.success
+              ? 'bg-green-50 border-green-200 text-green-700'  // Başarılı
+              : 'bg-red-50 border-red-200 text-red-700'  // Hata
+        }`}>
+          {refreshStatus.success === undefined ? (
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+          ) : refreshStatus.success ? (
+            <CheckCircle className="w-4 h-4 mr-2" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 mr-2" />
+          )}
+          <span>{refreshStatus.message}</span>
+        </div>
+      )}
+
+      {/* Son yenileme bilgisi */}
+      {lastRefresh && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-2 text-xs text-gray-500 flex items-center">
+          <Clock className="w-3 h-3 mr-1" />
+          Son yenileme: {lastRefresh.toLocaleString()}
+        </div>
+      )}
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-orange-200">
+          <Card className="border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Toplam Stok Değeri</p>
                   <p className="text-2xl font-bold text-gray-900">₺{totalValue.toLocaleString()}</p>
                 </div>
-                <div className="p-3 rounded-full bg-orange-50">
-                  <DollarSign className="w-6 h-6 text-orange-600" />
+                <div className="p-3 rounded-full bg-gray-100">
+                  <DollarSign className="w-6 h-6 text-black" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-blue-200">
+          <Card className="border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Toplam Ürün</p>
                   <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
                 </div>
-                <div className="p-3 rounded-full bg-blue-50">
-                  <Package className="w-6 h-6 text-blue-600" />
+                <div className="p-3 rounded-full bg-gray-100">
+                  <Package className="w-6 h-6 text-black" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-red-200">
+          <Card className="border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Düşük Stok Uyarısı</p>
                   <p className="text-2xl font-bold text-gray-900">{lowStockItems.length}</p>
                 </div>
-                <div className="p-3 rounded-full bg-red-50">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                <div className="p-3 rounded-full bg-gray-100">
+                  <AlertTriangle className="w-6 h-6 text-black" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-green-200">
+          <Card className="border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Aktif Mağaza</p>
                   <p className="text-2xl font-bold text-gray-900">5</p>
                 </div>
-                <div className="p-3 rounded-full bg-green-50">
-                  <BarChart3 className="w-6 h-6 text-green-600" />
+                <div className="p-3 rounded-full bg-gray-100">
+                  <BarChart3 className="w-6 h-6 text-black" />
                 </div>
               </div>
             </CardContent>
@@ -244,7 +387,7 @@ export default function InventoryPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {inventoryData.map((item) => (
+                      {inventoryData.map((item: InventoryItem) => (
                         <tr key={item.id} className="border-b hover:bg-gray-50">
                           <td className="py-3">
                             <div>
@@ -277,10 +420,10 @@ export default function InventoryPage() {
                           </td>
                           <td className="text-center py-3">
                             <div className="flex items-center justify-center space-x-2">
-                              <Button size="sm" variant="outline">
+                              <Button size="sm" variant="outline" className="border-gray-300">
                                 <Edit className="w-3 h-3" />
                               </Button>
-                              <Button size="sm" variant="outline">
+                              <Button size="sm" variant="outline" className="border-gray-300">
                                 <Eye className="w-3 h-3" />
                               </Button>
                             </div>
@@ -316,7 +459,7 @@ export default function InventoryPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <Button className="bg-orange-600 hover:bg-orange-700">
+                        <Button className="bg-black hover:bg-gray-800 text-white">
                           <Plus className="w-4 h-4 mr-2" />
                           Sipariş Ver
                         </Button>
@@ -362,7 +505,7 @@ export default function InventoryPage() {
                               <p className="text-sm text-gray-600">
                                 Maliyet: ₺{(suggestion.suggestedQuantity * item.cost_price).toLocaleString()}
                               </p>
-                              <Button size="sm" className="mt-2 bg-orange-600 hover:bg-orange-700">
+                              <Button size="sm" className="mt-2 bg-black hover:bg-gray-800 text-white">
                                 Sipariş Oluştur
                               </Button>
                             </div>

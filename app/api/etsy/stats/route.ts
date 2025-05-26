@@ -1,24 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { getEtsyStores } from "@/lib/etsy-api"
+import { supabaseAdmin } from "@/lib/supabase"
+import { getEtsyStores, shouldUseOnlyCachedData } from "@/lib/etsy-api"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
-    // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser()
     
     if (userError || !user) {
       console.log("Stats API auth error:", userError, "No user found")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // Check for the X-Use-Cache-Only header
+    const useCacheOnly = request.headers.get('X-Use-Cache-Only') === 'true' || shouldUseOnlyCachedData
+    
     console.log("Fetching Etsy stats for user:", user.id)
+    console.log("Cached-only mode:", useCacheOnly ? "ENABLED" : "DISABLED")
 
     try {
-      // Önce gerçek Etsy API'sini dene
-      const etsyStores = await getEtsyStores(user.id)
+      // If useCacheOnly is true, we'll force the API to only use cached data
+      // skipCache parameter is the opposite - if true, it forces fresh data from API
+      const skipCache = !useCacheOnly
+      const etsyStores = await getEtsyStores(user.id, skipCache)
       
       if (etsyStores && etsyStores.length > 0) {
         // İlk store'un istatistiklerini hesapla
@@ -28,6 +31,7 @@ export async function GET(request: NextRequest) {
           totalOrders: store.review_count || 0, // Review count'u order sayısı olarak kullan
           totalViews: store.num_favorers * 100 || 0, // Tahmini
           totalRevenue: (store.review_count || 0) * 25.99, // Ortalama fiyat
+          source: useCacheOnly ? "cached_data" : "etsy_api"
         }
         
         console.log("✅ Real Etsy stats found")
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
     console.log("📦 Using database fallback for stats")
     
     // Kullanıcının profil verisini kontrol et
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("etsy_shop_name")
       .eq("id", user.id)

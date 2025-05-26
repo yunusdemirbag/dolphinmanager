@@ -41,6 +41,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 
 // Düzenlenebilir hücreler için interface'ler
 interface EditableCellProps {
@@ -351,24 +352,10 @@ export default function OrdersPage() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <ShoppingCart className="h-8 w-8 text-orange-500" />
-            Siparişler
-          </h1>
-          <p className="text-gray-600 mt-2">Tüm siparişlerinizi tek yerden yönetin</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchOrders}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Yenile
-          </Button>
-          <Button>
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            Yeni Sipariş
-          </Button>
-        </div>
+      <div className="flex flex-col items-center mb-6">
+        <h1 className="text-2xl font-bold">Siparişler</h1>
+        <CurrentStoreNameBadge />
+        <div className="text-gray-500 text-base mt-2 mb-2">Tüm Etsy Siparişlerinizi Tek Ekrandan Takip Edin Ve Yönetin.</div>
       </div>
 
       {/* İstatistikler */}

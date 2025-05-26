@@ -21,7 +21,7 @@ import {
 import { usePathname, useRouter } from "next/navigation"
 import { createClientSupabase } from "@/lib/supabase"
 
-export function Sidebar() {
+export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -67,21 +67,21 @@ export function Sidebar() {
 
   return (
     <div 
-      className={`${isExpanded ? 'w-64' : 'w-16'} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-screen fixed left-0 top-0 z-40 flex flex-col transition-all duration-300 ease-in-out`}
+      className={`${isExpanded ? 'w-64' : 'w-16'} bg-white border-r border-gray-200 h-screen fixed left-0 top-0 z-40 flex flex-col transition-all duration-300 ease-in-out`}
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
     >
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-b border-gray-200">
         <div 
           className="flex items-center space-x-3 cursor-pointer" 
           onClick={() => handleNavigation("/dashboard")}
         >
-          <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 bg-black rounded-xl flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-lg">D</span>
           </div>
           {isExpanded && (
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white whitespace-nowrap">Dolphin Manager</h1>
+            <h1 className="text-xl font-bold text-black whitespace-nowrap">Dolphin Manager</h1>
           )}
         </div>
       </div>
@@ -91,7 +91,7 @@ export function Sidebar() {
         {menuItems.map((section, sectionIndex) => (
           <div key={sectionIndex} className="mb-6">
             {isExpanded && (
-              <h3 className="px-6 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
+              <h3 className="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 {section.section}
               </h3>
             )}
@@ -105,12 +105,12 @@ export function Sidebar() {
                     onClick={() => handleNavigation(item.path)}
                     className={`w-full flex items-center ${isExpanded ? 'px-3' : 'px-2 justify-center'} py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                       isActive
-                        ? "bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-r-2 border-blue-700 dark:border-blue-400"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
+                        ? "bg-gray-100 text-black border-r-2 border-black"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-black"
                     }`}
                     title={!isExpanded ? item.label : undefined}
                   >
-                    <Icon className={`h-5 w-5 ${isActive ? "text-blue-700 dark:text-blue-300" : "text-gray-400 dark:text-gray-500"} ${isExpanded ? 'mr-3' : ''} flex-shrink-0`} />
+                    <Icon className={`h-5 w-5 ${isActive ? "text-black" : "text-gray-400"} ${isExpanded ? 'mr-3' : ''} flex-shrink-0`} />
                     {isExpanded && (
                       <span className="whitespace-nowrap">{item.label}</span>
                     )}
@@ -118,15 +118,36 @@ export function Sidebar() {
                 )
               })}
             </nav>
+            {/* Ayarlar'dan sonra mağaza adı */}
+            {section.section === "YÖNETİM" && isExpanded && (
+              <div className="mt-8 mb-2 flex flex-col items-start">
+                {currentStoreName && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium mt-2 shadow-sm">
+                    <Store className="w-4 h-4 mr-1 text-black" />
+                    {currentStoreName}
+                  </span>
+                )}
+              </div>
+            )}
+            {section.section === "YÖNETİM" && !isExpanded && (
+              <div className="mt-4 flex flex-col items-center">
+                {currentStoreName && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-[10px] font-medium mt-2 shadow-sm">
+                    <Store className="w-3 h-3 mr-1 text-black" />
+                    {currentStoreName.length > 10 ? currentStoreName.slice(0, 10) + '…' : currentStoreName}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-t border-gray-200">
         <Button 
           variant="ghost" 
-          className={`w-full ${isExpanded ? 'justify-start' : 'justify-center px-2'} text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700`}
+          className={`w-full ${isExpanded ? 'justify-start' : 'justify-center px-2'} text-gray-600 hover:text-black hover:bg-gray-50`}
           onClick={handleLogout}
           title={!isExpanded ? "Çıkış" : undefined}
         >

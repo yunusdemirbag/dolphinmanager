@@ -113,74 +113,19 @@ export async function GET(request: NextRequest) {
       console.error("Database products fetch error:", dbError)
     }
 
-    // Hem API hem de veritabanı başarısız olursa mock veriler döndür
-    console.log("📦 Generating mock listings data")
-    
-    // Örnek ürün kategorileri
-    const categories = [
-      "Canvas Tablo", 
-      "Modern Canvas", 
-      "Minimalist Canvas", 
-      "Dekoratif Canvas", 
-      "Poster", 
-      "Duvar Süsü"
-    ]
-    
-    // Örnek görsel URL'leri
-    const mockImageURLs = [
-      "https://i.etsystatic.com/12345678/r/il/123456/1234567890/il_570xN.1234567890_abcd.jpg",
-      "https://i.etsystatic.com/12345678/r/il/654321/0987654321/il_570xN.0987654321_wxyz.jpg",
-      "https://i.etsystatic.com/12345678/r/il/abcdef/1122334455/il_570xN.1122334455_abcd.jpg"
-    ]
-    
-    // Demo ürünler oluştur
-    const demoListings = Array.from({ length: 25 }, (_, i) => {
-      const price = Math.round((15 + Math.random() * 70) * 100) / 100
-      const category = categories[Math.floor(Math.random() * categories.length)]
-      const views = Math.floor(Math.random() * 500)
-      const quantity = Math.floor(Math.random() * 10) + 1
-      
-      return {
-        listing_id: 100000 + i,
-        user_id: parseInt(user.id),
-        shop_id: parseInt(shopId),
-        title: `${category} - Model ${i + 1}`,
-        description: `Güzel bir ${category.toLowerCase()}. Evinize şıklık katacak özel tasarım.`,
-        state: "active",
-        quantity,
-        url: `https://www.etsy.com/listing/${100000 + i}`,
-        views,
-        price: {
-          amount: price * 100,
-          divisor: 100,
-          currency_code: "USD"
-        },
-        tags: [category, "Duvar Dekor", "Ev Dekorasyon", "Modern Sanat"],
-        images: mockImageURLs.map((url, imgIndex) => ({
-          listing_id: 100000 + i,
-          listing_image_id: imgIndex + 1,
-          url_75x75: url,
-          url_170x135: url,
-          url_570xN: url,
-          url_fullxfull: url,
-          alt_text: `${category} - Model ${i + 1}`
-        }))
-      }
-    })
-    
-    // Pagination için sadece gerekli kısmı döndür
-    const paginatedListings = demoListings.slice(offset, offset + limit)
-    
+    // Demo/mock ürün oluşturma ve döndürme kodları kaldırıldı
+    // Eğer veri yoksa boş dizi dön
     return NextResponse.json({
-      listings: paginatedListings,
+      listings: [],
       pagination: {
-        total: demoListings.length,
+        total: 0,
         limit,
         offset,
         page,
-        pages: Math.ceil(demoListings.length / limit)
+        pages: 0
       },
-      source: "mock_data"
+      source: "none",
+      message: "Hiçbir ürün bulunamadı."
     })
     
   } catch (error: any) {

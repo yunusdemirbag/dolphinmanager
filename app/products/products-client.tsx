@@ -49,9 +49,16 @@ import {
   RefreshCw,
   Clock,
   Check,
-  MoreHorizontal
+  MoreHorizontal,
+  Loader2,
+  LayoutGrid,
+  List,
+  ArrowDownUp,
+  ChevronDown,
+  Store
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
+import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 
 interface Product {
   listing_id: number
@@ -144,6 +151,7 @@ export default function ProductsClient() {
   const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
   const [selectAllChecked, setSelectAllChecked] = useState(false)
+  const [currentStore, setCurrentStore] = useState<{ shop_name: string; shop_id: number } | null>(null);
 
   // getProductImage fonksiyonunu sadeleştiriyorum:
   const getProductImage = (product: Product): string | null => {
@@ -231,6 +239,15 @@ export default function ProductsClient() {
     try {
       if (refreshing) return // Zaten yenileme işlemi devam ediyorsa çık
       
+      // Son yenilemeden bu yana 5 dakika geçmediyse kullanıcıya sor
+      if (lastRefresh && (Date.now() - lastRefresh.getTime() < 5 * 60 * 1000)) {
+        const confirmRefresh = confirm(
+          "Son yenilemeden henüz 5 dakika geçmedi. API çağrı limitlerini aşmamak için gereksiz yenilemeler yapmamaya özen gösterilmelidir. Yine de yenilemek istiyor musunuz?"
+        );
+        
+        if (!confirmRefresh) return;
+      }
+      
       setRefreshing(true)
       if (showNotification) {
         setRefreshStatus({ message: "Ürün verileri yenileniyor..." })
@@ -294,12 +311,13 @@ export default function ProductsClient() {
     try {
       // Kullanıcı ve mağaza id'sini çek
       const storesRes = await fetch('/api/etsy/stores')
-      let shopId = null
+      let shopId: number | null = null;
       
       if (storesRes.ok) {
         const storesData = await storesRes.json()
         if (storesData.stores && storesData.stores.length > 0) {
-          shopId = storesData.stores[0].shop_id
+          shopId = storesData.stores[0].shop_id as number;
+          setCurrentStore(storesData.stores[0]);
           
           // İlgili mağazadan ürünleri çek
           const listingsRes = await fetch(`/api/etsy/listings?shop_id=${shopId}`)
@@ -320,14 +338,14 @@ export default function ProductsClient() {
       // API yanıt vermezse veya hata olursa boş ürün listesi göster
       setProducts([])
       setFilteredProducts([])
-      setIsDemoData(true)
-      setDemoMessage("Etsy mağazanızdan ürünler yüklenemedi. Lütfen daha sonra tekrar deneyin.")
+      setIsDemoData(false)
+      setDemoMessage("")
     } catch (error) {
       console.error("Error loading products:", error)
       setProducts([])
       setFilteredProducts([])
-      setIsDemoData(true)
-      setDemoMessage("Ürünler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.")
+      setIsDemoData(false)
+      setDemoMessage("")
     } finally {
       setLoading(false)
     }
@@ -910,14 +928,12 @@ export default function ProductsClient() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col items-center mb-6">
         <h1 className="text-2xl font-bold">Ürünler</h1>
-        <div className="flex gap-2">
-          <Button onClick={handleOpenCreateModal} className="bg-purple-600 hover:bg-purple-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Ürün Ekle
-          </Button>
+        <div className="flex items-center gap-2 mt-2">
+          <CurrentStoreNameBadge shopName={currentStore?.shop_name} />
         </div>
+        <div className="text-gray-500 text-base mt-2 mb-2">Etsy Mağazanızdaki Tüm Ürünleri Buradan Yönetin.</div>
       </div>
       
       {/* Yenileme durumu bildirimi */}
@@ -952,7 +968,7 @@ export default function ProductsClient() {
         </div>
       )}
       
-      {isDemoData && (
+      {isDemoData && false && (
         <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded">
           <div className="flex items-center">
             <Info className="w-5 h-5 mr-2" />
@@ -1008,9 +1024,9 @@ export default function ProductsClient() {
         </div>
       </div>
 
-      {/* Toplu İşlemler */}
-      {filteredProducts.length > 0 && (
-        <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-wrap items-center gap-4">
+      {/* Üst Filtreleme ve İşlem Butonları */}
+      <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
+        <div className="flex flex-wrap gap-2 items-center">
           <div className="flex items-center gap-2">
             <Checkbox 
               id="select-all"
@@ -1041,7 +1057,33 @@ export default function ProductsClient() {
             </>
           )}
         </div>
-      )}
+        
+        <div className="flex gap-2 items-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refreshProducts()}
+            disabled={refreshing}
+            className="bg-orange-600 hover:bg-orange-700 text-white"
+          >
+            {refreshing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            {refreshing ? 'Yenileniyor...' : 'Verileri Güncelle'}
+          </Button>
+          
+          <Button
+            size="sm"
+            onClick={handleOpenCreateModal}
+            className="bg-orange-600 hover:bg-orange-700 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Yeni Ürün
+          </Button>
+        </div>
+      </div>
 
       {/* Products Grid */}
       {filteredProducts.length === 0 ? (

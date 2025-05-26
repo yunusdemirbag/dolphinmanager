@@ -19,10 +19,15 @@ if (!supabaseAnonKey) {
 // Client-side Supabase client
 export const createClientSupabase = () => {
   // Next.js 15 için modern API kullanımı
-  return createBrowserClient(
+  const client = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
+  
+  // Log client creation to debug
+  console.log("Supabase client created with URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+  
+  return client
 }
 
 // Server-side Supabase client with cookies - only use in server components

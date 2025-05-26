@@ -59,6 +59,7 @@ import {
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
+import { toast } from "@/components/ui/use-toast"
 
 interface Product {
   listing_id: number
@@ -71,6 +72,7 @@ interface Product {
   }
   images: Array<{
     url_570xN: string
+    url_fullxfull?: string
     alt_text: string
     cache_key?: string
   }>
@@ -153,30 +155,68 @@ export default function ProductsClient() {
   const [reconnectRequired, setReconnectRequired] = useState(false);
   const [showReconnectBanner, setShowReconnectBanner] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
-
-  // getProductImage fonksiyonunu sadeleştiriyorum:
-  const getProductImage = (product: Product): string | null => {
-    if (product.images && product.images.length > 0 && product.images[0].url_570xN) {
-      return product.images[0].url_570xN;
-    }
-    return null;
-  }
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageSize, setPageSize] = useState(100); // Varsayılan sayfa boyutu
 
   // ProductImage bileşenini daha güvenli hale getiriyorum:
   const ProductImage = ({ product }: { product: Product }) => {
-    const imageSrc = Array.isArray(product.images) && product.images.length > 0 && product.images[0]?.url_570xN ? product.images[0].url_570xN : null;
-    if (!imageSrc) return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
-        <ImageIcon className="w-10 h-10" />
-      </div>
-    );
+    const [imageSrc, setImageSrc] = useState<string>("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
+    
+    // Client-side'da resim URL'sini ayarlıyoruz (SSR/client hydration uyumsuzluğunu önlemek için)
+    useEffect(() => {
+      if (Array.isArray(product.images) && product.images.length > 0 && product.images[0].url_570xN) {
+        // API'den gelen resim URL'sini kullan
+        setImageSrc(product.images[0].url_570xN);
+      } else if (product.listing_id) {
+        // Etsy'nin standart listing ID formatını kullan
+        setImageSrc(`https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${product.listing_id}`);
+      } else {
+        // Varsayılan placeholder
+        setImageSrc("https://via.placeholder.com/570x570.png?text=No+Image");
+      }
+    }, [product]);
+    
     return (
-      <img 
-        src={imageSrc}
-        alt={product.title}
-        className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"
-        loading="lazy"
-      />
+      <div className="relative w-full h-full">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+        
+        {imageSrc && (
+          <img 
+            src={imageSrc}
+            alt={product.title}
+            className={`w-full h-full object-cover transform hover:scale-105 transition-transform duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+            loading="lazy"
+            onLoad={() => setIsLoading(false)}
+            onError={(e) => {
+              setHasError(true);
+              setIsLoading(false);
+              const target = e.target as HTMLImageElement;
+              target.onerror = null; // Sonsuz döngüyü engelle
+              
+              // Alternatif resim dene
+              if (target.src !== `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${product.listing_id}`) {
+                setImageSrc(`https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${product.listing_id}`);
+              } else {
+                setImageSrc("https://via.placeholder.com/570x570.png?text=No+Image");
+              }
+            }}
+          />
+        )}
+        
+        {hasError && process.env.NODE_ENV === 'development' && (
+          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs p-1 truncate">
+            ID: {product.listing_id}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -307,95 +347,180 @@ export default function ProductsClient() {
     }
   }
 
-  const loadProducts = async () => {
-    setLoading(true)
+  const loadProducts = async (page = currentPage) => {
+    setLoading(true);
+    setReconnectRequired(false); // Reset reconnect flag
+    setSessionExpired(false); // Reset session expired flag
+    setCurrentStore(null); // Reset current store
+    
+    // Debug log ekleyelim
+    console.log("Loading products - page:", page, "currentPage:", currentPage);
+    
+    // Sadece ilk sayfa yüklenirken tüm ürünleri temizle
+    if (page === 1) {
+      setProducts([]); // Clear products initially
+      setFilteredProducts([]);
+    }
+    
     try {
-      // Kullanıcı ve mağaza id'sini çek
-      let storesRes, storesData;
-      try {
-        storesRes = await fetch('/api/etsy/stores')
-        storesData = await storesRes.json()
-        if (storesData.error === 'Unauthorized') {
+      // 1. Önce mağaza bilgisini al
+      console.log("Fetching Etsy stores...");
+      const storesRes = await fetch('/api/etsy/stores');
+      
+      console.log("Etsy stores API response status:", storesRes.status);
+      
+      if (!storesRes.ok) {
+        console.error(`Stores API error: ${storesRes.status}`);
+        if (storesRes.status === 401) {
           setSessionExpired(true);
-          setProducts([])
-          setFilteredProducts([])
-          setLoading(false)
-          return;
-        }
-      } catch (err) {
-        setReconnectRequired(true);
-        setProducts([])
-        setFilteredProducts([])
-        setLoading(false)
-        return;
-      }
-      let shopId: number | null = null;
-      if (storesRes.ok) {
-        if (storesData.error === 'RECONNECT_REQUIRED') {
+        } else {
           setReconnectRequired(true);
-          setProducts([])
-          setFilteredProducts([])
-          setLoading(false)
-          return;
         }
-        if (storesData.stores && storesData.stores.length > 0) {
-          shopId = storesData.stores[0].shop_id as number;
-          setCurrentStore(storesData.stores[0]);
-          // İlgili mağazadan ürünleri çek
-          let listingsRes, listingsData;
-          try {
-            listingsRes = await fetch(`/api/etsy/listings?shop_id=${shopId}`)
-            listingsData = await listingsRes.json()
-            if (listingsData.error === 'Unauthorized') {
-              setSessionExpired(true);
-              setProducts([])
-              setFilteredProducts([])
-              setLoading(false)
-              return;
-            }
-          } catch (err) {
-            setReconnectRequired(true);
-            setProducts([])
-            setFilteredProducts([])
-            setLoading(false)
-            return;
-          }
-          if (listingsRes.ok) {
-            if (listingsData.error === 'RECONNECT_REQUIRED') {
-              setReconnectRequired(true);
-              setProducts([])
-              setFilteredProducts([])
-              setLoading(false)
-              return;
-            }
-            const listings = listingsData.listings || []
-            setProducts(listings)
-            setFilteredProducts(listings)
-            return
-          } else {
-            setReconnectRequired(true);
-            setProducts([])
-            setFilteredProducts([])
-            setLoading(false)
-            return;
-          }
-        }
-      } else {
-        setReconnectRequired(true);
-        setProducts([])
-        setFilteredProducts([])
-        setLoading(false)
+        setLoading(false);
         return;
       }
-      // API yanıt vermezse veya hata olursa boş ürün listesi göster
-      setProducts([])
-      setFilteredProducts([])
+      
+      const storesData = await storesRes.json();
+      console.log("Stores API response:", JSON.stringify(storesData, null, 2));
+      
+      // Etsy hesabına bağlı değilse veya Etsy'ye yeniden bağlanması gerekiyorsa
+      if (storesData.error === 'RECONNECT_REQUIRED') {
+        console.log("Store reconnection required");
+        setReconnectRequired(true);
+        setLoading(false);
+        return;
+      }
+      
+      if (!storesData.stores || storesData.stores.length === 0) {
+        console.log("No stores found in response:", storesData);
+        if (storesData.connected === false) {
+          setReconnectRequired(true);
+        } else {
+          toast({
+            title: "Mağaza bulunamadı",
+            description: "Etsy hesabınızda aktif bir mağaza bulunamadı. Lütfen Etsy'de bir mağaza oluşturun.",
+            variant: "destructive"
+          });
+        }
+        setLoading(false);
+        return;
+      }
+      
+      // 2. İlk mağazayı seç ve ürünleri çek
+      const firstStore = storesData.stores[0];
+      console.log("Selected store:", JSON.stringify(firstStore, null, 2));
+      setCurrentStore(firstStore);
+      
+      if (!firstStore.shop_id) {
+        console.error("No valid shop_id in store data:", firstStore);
+        toast({
+          title: "Mağaza ID bulunamadı",
+          description: "Mağaza bilgisinde geçerli bir ID bulunamadı. Lütfen tekrar Etsy'ye bağlanın.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // 3. Ürünleri çek
+      console.log(`Fetching products for shop: ${firstStore.shop_id}, page: ${page}, limit: ${pageSize}`);
+      try {
+        const listingsRes = await fetch(`/api/etsy/listings?shop_id=${firstStore.shop_id}&page=${page}&limit=${pageSize}`);
+        
+        if (!listingsRes.ok) {
+          console.error(`Listings API error: ${listingsRes.status}`);
+          if (listingsRes.status === 401) {
+            setSessionExpired(true);
+          } else {
+            toast({
+              title: "Ürünler yüklenemedi",
+              description: `Hata kodu: ${listingsRes.status}. Lütfen tekrar deneyin.`,
+              variant: "destructive"
+            });
+          }
+          setLoading(false);
+          return;
+        }
+        
+        const listingsData = await listingsRes.json();
+        console.log("Listings API response:", listingsData);
+        
+        if (listingsData.error) {
+          console.error("Listings API returned error:", listingsData.error);
+          toast({
+            title: "Etsy API Hatası",
+            description: listingsData.message || listingsData.error,
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+        
+        if (!listingsData.listings || !Array.isArray(listingsData.listings)) {
+          console.error("Invalid listings data format:", listingsData);
+          toast({
+            title: "Veri formatı hatası",
+            description: "Ürün verileri beklendiği formatta değil. Teknik destek ile iletişime geçin.",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+        
+        // 4. Ürünleri işle ve state'e ata
+        const productsData = listingsData.listings.map((listing: any) => ({
+          ...listing,
+          // Eksik alanları varsayılan değerlerle doldur
+          created_timestamp: listing.created_timestamp || Date.now() / 1000,
+          last_modified_timestamp: listing.last_modified_timestamp || Date.now() / 1000,
+          metrics: listing.metrics || { views: 0, favorites: 0, sold: 0 }
+        }));
+        
+        // Sayfalama bilgilerini güncelle
+        setCurrentPage(listingsData.page || page);
+        setTotalPages(listingsData.total_pages || 1);
+        setTotalCount(listingsData.count || 0);
+        
+        // İlk sayfa ise products state'ini sıfırla, değilse mevcut ürünlere ekle
+        if (page === 1) {
+          setProducts(productsData);
+          setFilteredProducts(productsData);
+        } else {
+          setProducts(prevProducts => [...prevProducts, ...productsData]);
+          setFilteredProducts(prevProducts => [...prevProducts, ...productsData]);
+        }
+        
+        if (page === 1 && productsData.length === 0) {
+          toast({
+            title: "Ürün bulunamadı",
+            description: "Etsy mağazanızda aktif ürün bulunamadı veya API erişim izni yok.",
+            variant: "default"
+          });
+        } else if (page === 1) {
+          toast({
+            title: "Ürünler yüklendi",
+            description: `${productsData.length} ürün başarıyla yüklendi. Toplam: ${listingsData.count || productsData.length}`,
+            variant: "default"
+          });
+        }
+        
+      } catch (listingsError) {
+        console.error("Listings API fetch error:", listingsError);
+        toast({
+          title: "Ürünler yüklenemedi",
+          description: "Etsy API ile iletişimde bir sorun oluştu. Bu genellikle yanlış shop_id kullanıldığında veya API izni olmadığında görülür.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
-      setReconnectRequired(true);
-      setProducts([])
-      setFilteredProducts([])
+      console.error("Error loading products:", error);
+      toast({
+        title: "Ürünler yüklenirken hata",
+        description: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu.",
+        variant: "destructive"
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -461,7 +586,7 @@ export default function ProductsClient() {
     if (searchTerm) {
       filtered = filtered.filter(product => 
         product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+        (Array.isArray(product.tags) && product.tags.some(tag => tag?.toLowerCase().includes(searchTerm.toLowerCase())))
       )
     }
 
@@ -485,6 +610,10 @@ export default function ProductsClient() {
       }
     })
 
+    // Eğer filtreleme veya sıralama aktifse, sayfalama butonlarını gizle
+    const isFiltering = searchTerm || filterStatus !== "all" || sortBy !== "created_timestamp";
+    
+    // Filtrelenmiş ürünleri state'e kaydet
     setFilteredProducts(filtered)
   }
 
@@ -830,8 +959,8 @@ export default function ProductsClient() {
         }}
         style={{ cursor: 'pointer' }}
       >
-        <div className="relative aspect-square bg-gray-50">
-          <div className="absolute top-2 left-2 z-10">
+        <div className="relative aspect-square bg-gray-50 overflow-hidden">
+          <div className="absolute top-2 left-2 z-30">
             <Checkbox 
               checked={isSelected}
               onCheckedChange={() => toggleProductSelection(product.listing_id)}
@@ -840,13 +969,44 @@ export default function ProductsClient() {
             />
           </div>
           <div 
-            className="w-full h-full" 
+            className="w-full h-full overflow-hidden group relative" 
             onClick={(e) => {
               e.stopPropagation();
               toggleProductSelection(product.listing_id);
             }}
           >
-            <ProductImage product={product} />
+            {/* Yükleme animasyonu ve resim içeriği */}
+            <div className="absolute inset-0 bg-gray-200 animate-pulse z-0"></div>
+            <div className="relative z-10 w-full h-full">
+              <ProductImage product={product} />
+            </div>
+            
+            {/* Ürün detay katmanı - hover olunca görünür */}
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100 z-20">
+              <Button
+                variant="default"
+                className="bg-white text-black hover:bg-gray-100 shadow-lg"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(product.url, '_blank');
+                }}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" /> Etsy'de Görüntüle
+              </Button>
+            </div>
+            
+            {/* Durum rozeti */}
+            <div className="absolute top-2 right-2 z-30">
+              <ProductStatus status={product.state} />
+            </div>
+            
+            {/* Ürün ID'si - geliştirme modunda göster */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs p-1 truncate z-20">
+                ID: {product.listing_id}
+              </div>
+            )}
           </div>
         </div>
         <div className="p-4 flex flex-col flex-1">
@@ -878,16 +1038,6 @@ export default function ProductsClient() {
           </div>
           <div className="flex flex-col gap-2 mt-auto">
             <ProductStatus status={product.state} />
-            <Button
-              size="sm"
-              className="w-full bg-black hover:bg-gray-800 text-white"
-              onClick={(e) => {
-                e.stopPropagation();
-                window.open(product.url, '_blank');
-              }}
-            >
-              <ExternalLink className="h-4 w-4 mr-2" /> Etsy'de Gör
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -1097,7 +1247,7 @@ export default function ProductsClient() {
               <SelectItem value="draft">Taslak</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={loadProducts}>
+          <Button variant="outline" onClick={() => loadProducts()}>
             <Filter className="h-4 w-4 mr-2" />
             Yenile
           </Button>
@@ -1163,11 +1313,75 @@ export default function ProductsClient() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.listing_id} product={product} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProducts.map((product) => (
+              <ProductCard key={product.listing_id} product={product} />
+            ))}
+          </div>
+          
+          {/* Sayfalama Kontrolleri */}
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center mt-8 border-t pt-6">
+              <div className="text-sm text-gray-500">
+                {searchTerm || filterStatus !== "all" ? (
+                  <>Filtrelenmiş sonuçlar: {filteredProducts.length} ürün</>
+                ) : (
+                  <>Toplam {totalCount} ürün • Sayfa {currentPage} / {totalPages}</>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {!(searchTerm || filterStatus !== "all") && (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      disabled={currentPage <= 1}
+                      onClick={() => loadProducts(currentPage - 1)}
+                    >
+                      Önceki Sayfa
+                    </Button>
+                    {currentPage < totalPages && (
+                      <Button 
+                        variant="outline"
+                        onClick={() => loadProducts(currentPage + 1)}
+                      >
+                        Sonraki Sayfa
+                      </Button>
+                    )}
+                    {currentPage < totalPages && (
+                      <Button 
+                        variant="default"
+                        className="bg-black text-white hover:bg-gray-800"
+                        onClick={() => {
+                          const confirmed = confirm(`Bu işlem tüm sayfaları yükleyecek. Toplam ${totalCount} ürün için ${totalPages - currentPage} sayfa daha yüklenecek. Devam etmek istiyor musunuz?`);
+                          if (confirmed) {
+                            toast({
+                              title: "Tüm ürünler yükleniyor",
+                              description: "Bu işlem biraz zaman alabilir...",
+                            });
+                            // Tüm sayfaları yükle
+                            const loadAllPages = async () => {
+                              for (let p = currentPage + 1; p <= totalPages; p++) {
+                                await loadProducts(p);
+                              }
+                              toast({
+                                title: "Tüm ürünler yüklendi",
+                                description: `${totalCount} ürün başarıyla yüklendi.`,
+                              });
+                            };
+                            loadAllPages();
+                          }
+                        }}
+                      >
+                        Tüm Ürünleri Yükle
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Edit Modal */}

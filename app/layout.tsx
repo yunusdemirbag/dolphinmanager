@@ -11,7 +11,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="tr">
-      <body className="bg-gray-50">
+      <body className="bg-gray-50" suppressHydrationWarning>
         <SidebarWithStoreName />
         <main className="ml-16 md:ml-64 min-h-screen">{children}</main>
       </body>

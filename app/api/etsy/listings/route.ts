@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getEtsyListings } from "@/lib/etsy-api"
+import { getEtsyListings, getEtsyStores } from "@/lib/etsy-api"
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,127 +16,87 @@ export async function GET(request: NextRequest) {
 
     // Parametreleri al
     const searchParams = request.nextUrl.searchParams
-    const shopId = searchParams.get("shopId") || "1" // Varsayılan mağaza ID'si
+    const shop_id_param = searchParams.get("shop_id") || "0" // "shop_id" parametresi
     const page = parseInt(searchParams.get("page") || "1")
-    const limit = parseInt(searchParams.get("limit") || "20")
+    const limit = parseInt(searchParams.get("limit") || "100") // Varsayılan limiti 100'e çıkardık
     const offset = (page - 1) * limit
-    const state = searchParams.get("state") || "active"
+    const state = (searchParams.get("state") || "active") as "active" | "inactive" | "draft" | "expired" | "all"
+    const skipCache = searchParams.get("skip_cache") === "true"
 
-    console.log(`Fetching Etsy listings for user: ${user.id}, shop: ${shopId}, state: ${state}, page: ${page}, limit: ${limit}`)
+    console.log(`API parameters: page=${page}, limit=${limit}, offset=${offset}, state=${state}, skipCache=${skipCache}`)
 
-    try {
-      // Önce gerçek Etsy API'sini dene
-      const { listings, count } = await getEtsyListings(
-        user.id, 
-        parseInt(shopId), 
-        limit, 
-        offset, 
-        state as any
-      )
-      
-      if (listings && listings.length > 0) {
-        console.log("✅ Real Etsy listings found:", listings.length)
-        
-        return NextResponse.json({
-          listings,
-          pagination: {
-            total: count,
-            limit,
-            offset,
+    // shop_id parametresi yoksa, kullanıcının mağazalarını al ve ilk mağazayı kullan
+    if (!shop_id_param || shop_id_param === "0") {
+      console.log("No shop_id provided, attempting to find user's first store")
+      try {
+        const stores = await getEtsyStores(user.id, skipCache)
+        if (stores && stores.length > 0) {
+          const firstStoreId = stores[0].shop_id
+          console.log(`Found user's first store: ${firstStoreId}`)
+          
+          // İlk mağazanın ürünlerini getir
+          const { listings, count } = await getEtsyListings(user.id, firstStoreId, limit, offset, state, skipCache)
+          console.log(`Retrieved ${listings.length} listings from a total of ${count}`)
+          
+          return NextResponse.json({
+            listings,
+            count,
             page,
-            pages: Math.ceil(count / limit)
-          },
-          source: "etsy_api"
-        })
+            limit,
+            total_pages: Math.ceil(count / limit),
+            shop_id: firstStoreId
+          })
+        } else {
+          console.log("No stores found for user")
+          return NextResponse.json({ 
+            error: "No stores found", 
+            listings: [], 
+            count: 0 
+          }, { status: 404 })
+        }
+      } catch (error) {
+        console.error("Error getting user's stores:", error)
+        return NextResponse.json({ 
+          error: "Failed to find user's stores", 
+          listings: [], 
+          count: 0 
+        }, { status: 500 })
       }
-    } catch (etsyError) {
-      console.error("Etsy Listings API error:", etsyError)
     }
 
-    // API hatası durumunda veritabanından verileri çekmeye çalış
-    try {
-      const { data: products, error: productsError, count } = await supabase
-        .from("products")
-        .select("*", { count: "exact" })
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .range(offset, offset + limit - 1)
-
-      if (productsError) {
-        console.error("Database products error:", productsError)
-      }
-
-      if (products && products.length > 0) {
-        console.log("📦 Using database products:", products.length)
-        
-        // Ürünleri Etsy listing formatına çevir
-        const listings = products.map(product => ({
-          listing_id: product.id,
-          user_id: parseInt(user.id),
-          shop_id: parseInt(shopId),
-          title: product.name || product.title || "Ürün",
-          description: product.description || "",
-          state: product.status || "active",
-          quantity: product.stock || 1,
-          url: product.url || `https://www.etsy.com/listing/${product.id}`,
-          views: product.views || 0,
-          price: {
-            amount: product.price * 100, // Cent olarak
-            divisor: 100,
-            currency_code: product.currency || "USD"
-          },
-          tags: product.tags ? product.tags.split(",") : [],
-          images: product.images ? product.images.map((url: string, i: number) => ({
-            listing_id: product.id,
-            listing_image_id: i + 1,
-            url_75x75: url,
-            url_170x135: url,
-            url_570xN: url,
-            url_fullxfull: url,
-            alt_text: product.name || "Ürün görseli"
-          })) : []
-        }))
-        
-        return NextResponse.json({
-          listings,
-          pagination: {
-            total: count || products.length,
-            limit,
-            offset,
-            page,
-            pages: Math.ceil((count || products.length) / limit)
-          },
-          source: "database"
-        })
-      }
-    } catch (dbError) {
-      console.error("Database products fetch error:", dbError)
-    }
-
-    // Demo/mock ürün oluşturma ve döndürme kodları kaldırıldı
-    // Eğer veri yoksa boş dizi dön
-    return NextResponse.json({
-      listings: [],
-      pagination: {
-        total: 0,
-        limit,
-        offset,
-        page,
-        pages: 0
-      },
-      source: "none",
-      message: "Hiçbir ürün bulunamadı."
-    })
+    // shop_id'yi sayıya dönüştür
+    const shop_id = parseInt(shop_id_param)
     
-  } catch (error: any) {
-    console.error("Listings API error:", error)
-    return NextResponse.json(
-      { 
-        error: "Failed to fetch listings", 
-        details: error.message,
-        listings: []
-      },
-      { status: 500 }
-    )
+    if (isNaN(shop_id) || shop_id <= 0) {
+      console.log("Invalid shop_id (not a valid number):", shop_id_param)
+      return NextResponse.json({ 
+        error: "Invalid shop_id", 
+        listings: [], 
+        count: 0 
+      }, { status: 400 })
+    }
+
+    // Etsy'den ürünleri çek
+    console.log(`Fetching listings for user ${user.id}, shop ${shop_id}, page ${page}, limit ${limit}, state ${state}`)
+    const { listings, count } = await getEtsyListings(user.id, shop_id, limit, offset, state, skipCache)
+    console.log(`Retrieved ${listings.length} listings from a total of ${count}`)
+
+    // Sonuçları döndür
+    return NextResponse.json({
+      listings,
+      count,
+      page,
+      limit,
+      total_pages: Math.ceil(count / limit),
+      shop_id: shop_id
+    })
+  } catch (error) {
+    console.error("Error in listings API:", error)
+    return NextResponse.json({ 
+      error: "Internal server error", 
+      message: error instanceof Error ? error.message : "Unknown error",
+      listings: [], 
+      count: 0 
+    }, { status: 500 })
   }
 } 

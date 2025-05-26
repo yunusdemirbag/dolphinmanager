@@ -589,60 +589,101 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
 
 // Veritabanı yedekleme fonksiyonu
 async function getStoresFromDatabase(userId: string): Promise<EtsyStore[]> {
+  console.log(`DEBUG: getStoresFromDatabase called for userId: ${userId}`);
   try {
-    // supabaseAdmin kullanarak direkt erişim
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('etsy_shop_id, etsy_shop_name')
-      .eq('id', userId)
-      .single()
-    
-    if (profile?.etsy_shop_id && profile?.etsy_shop_name) {
-      // Profilde mağaza bilgisi varsa, onu kullan
-      console.log("📦 Using database fallback for store:", profile.etsy_shop_name)
-      return [{
-        shop_id: parseInt(profile.etsy_shop_id) || 1,
-        shop_name: profile.etsy_shop_name,
-        title: profile.etsy_shop_name,
-        announcement: "Canvas wall art ve dekoratif ürünler",
-        currency_code: "USD",
-        is_vacation: false,
-        listing_active_count: 763,
-        num_favorers: 10,
-        url: `https://www.etsy.com/shop/${profile.etsy_shop_name}`,
-        image_url_760x100: "",
-        review_count: 12,
-        review_average: 4.4167,
-        is_active: true,
-        last_synced_at: new Date().toISOString(),
-        avatar_url: null
-      }]
-    }
-    
-    // Profilde yoksa, etsy_stores tablosundan dene
-    const { data: stores, error } = await supabaseAdmin
+    // 1. Öncelikle etsy_stores tablosunu kontrol et (daha güvenilir veri olabilir)
+    const { data: storesFromTable, error: storesTableError } = await supabaseAdmin
       .from('etsy_stores')
       .select('*')
       .eq('user_id', userId)
-      .order('last_synced_at', { ascending: false })
-    
-    if (error) {
-      console.error("Veritabanı yedekleme hatası:", error)
-      // Mockup veri döndürme kaldırıldı
-      return []
+      .order('last_synced_at', { ascending: false });
+
+    if (storesTableError) {
+      console.error("Error fetching from etsy_stores table:", storesTableError);
+      // Hata olsa bile profile fallback'i deneyebiliriz.
+    }
+
+    if (storesFromTable && storesFromTable.length > 0) {
+      const validStores = storesFromTable.map((store: any) => {
+        const shopId = parseInt(String(store.shop_id));
+        return {
+          ...store,
+          shop_id: !isNaN(shopId) && shopId > 0 ? shopId : null,
+        };
+      }).filter(store => store.shop_id !== null) as EtsyStore[];
+
+      if (validStores.length > 0) {
+        console.log(`📦 Using database fallback from etsy_stores: ${validStores.length} stores found.`);
+        return validStores;
+      }
+    }
+    console.log(`DEBUG: No valid stores found in etsy_stores table for userId: ${userId}`);
+
+    // 2. profiles tablosunu fallback olarak kullan
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('etsy_shop_id, etsy_shop_name')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Error fetching profile for fallback (after etsy_stores check):", profileError.message);
+      // PGRST116 (no rows) burada hata olarak gelmemeli, maybeSingle() bunu null olarak döndürmeli.
+      // Diğer hatalar için loglama önemli.
+    }
+
+    if (profile && profile.etsy_shop_id && profile.etsy_shop_name) {
+      console.log("📦 Using database fallback for store from profile (after etsy_stores check):", profile.etsy_shop_name);
+      
+      let shopIdToUse: number | null = null;
+      const parsedShopId = parseInt(profile.etsy_shop_id);
+
+      if (!isNaN(parsedShopId) && parsedShopId > 0) {
+        shopIdToUse = parsedShopId;
+      } else {
+        const extractedNumbers = String(profile.etsy_shop_id).match(/\d+/);
+        if (extractedNumbers) {
+          const extractedId = parseInt(extractedNumbers[0]);
+          if (!isNaN(extractedId) && extractedId > 0) {
+            shopIdToUse = extractedId;
+          }
+        }
+      }
+
+      if (shopIdToUse) {
+        console.log(`Valid shop_id determined from profile: ${shopIdToUse}`);
+        // Bu veriler genellikle eksik olacağından, sadece temel bilgileri döndür
+        return [{
+          shop_id: shopIdToUse,
+          shop_name: profile.etsy_shop_name,
+          title: profile.etsy_shop_name,
+          // Diğer alanlar API'den veya etsy_stores tablosundan gelmeli
+          listing_active_count: 0, 
+          num_favorers: 0,
+          currency_code: "USD", // Varsayılan
+          url: `https://www.etsy.com/shop/${profile.etsy_shop_name}`,
+          // Aşağıdakiler eksik olabilir veya varsayılan değerler
+          announcement: "",
+          is_vacation: false,
+          image_url_760x100: "",
+          review_count: 0,
+          review_average: 0,
+          is_active: true, // Varsayılan
+          last_synced_at: new Date().toISOString(),
+          avatar_url: null
+        }];
+      } else {
+        console.warn(`Could not determine a valid shop_id from profile.etsy_shop_id: ${profile.etsy_shop_id} (after etsy_stores check)`);
+      }
+    } else {
+      console.log("No valid profile data or etsy_shop_id for fallback (after etsy_stores check).");
     }
     
-    if (stores && stores.length > 0) {
-      return stores
-    }
-    
-    // Hiçbir veri bulunamadıysa boş dizi döndür
-    console.log("No stores found in database, returning empty array")
-    return []
-  } catch (error) {
-    console.error("Veritabanı yedekleme istisnası:", error)
-    // Hata durumunda da boş dizi döndür
-    return []
+    console.log("No stores found in any database fallback (etsy_stores or profiles).");
+    return [];
+  } catch (error: any) {
+    console.error("Critical exception in getStoresFromDatabase:", error.message);
+    return [];
   }
 }
 
@@ -729,66 +770,171 @@ export function toggleCachedDataOnlyMode(useOnlyCachedData: boolean): void {
 // getEtsyStores fonksiyonunu güncelle
 export async function getEtsyStores(userId: string, skipCache = false): Promise<EtsyStore[]> {
   try {
-    console.log("=== ETSY API DEBUG BAŞLANGIÇ ===")
-    console.log("Kullanıcı ID:", userId)
+    console.log(`=== getEtsyStores called for userId: ${userId} ===`);
     
-    // Her zaman gerçek API'den veri çek, demo/store fallback asla kullanma
-
-    // Continue with regular flow if not in cached-only mode or skipCache is true
-    // Önce veritabanından mağaza verilerini kontrol et
-    const storedStores = await getStoredEtsyData(userId, 0, 'store');
-    if (storedStores && !skipCache) {
-      console.log("📦 Using stored store data");
-      return storedStores;
-    }
-    
-    // Veritabanında yoksa veya skipCache true ise API'den çek
+    // Token kontrolü - kullanıcının Etsy ile bağlı olup olmadığını anlamak için
     const accessToken = await getValidAccessToken(userId);
     if (!accessToken) {
-      console.error("Geçerli access token bulunamadı - veritabanı yedeklemesi kullanılıyor");
-      return getStoresFromDatabase(userId);
+      console.log("No valid access token for getEtsyStores - user needs to connect Etsy account");
+      return []; // Token yoksa bağlantı yok demektir, boş dizi döndür
     }
     
     // Token'dan Etsy kullanıcı ID'sini çıkar
-    const etsyUserId = accessToken.split('.')[0];
-    console.log("Token'dan çıkarılan Etsy kullanıcı ID'si:", etsyUserId);
+    const etsyApiUserId = accessToken.split('.')[0];
+    console.log(`Extracted Etsy User ID from token: ${etsyApiUserId}`);
     
     try {
-      // Mağazaları al
-      const data = await rateLimitedFetch<{results: EtsyStore[]}>(
-        `${ETSY_API_BASE}/application/users/${etsyUserId}/shops`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "x-api-key": process.env.ETSY_CLIENT_ID,
-          }
+      console.log(`Fetching shops for Etsy User ID: ${etsyApiUserId}`);
+      
+      // Etsy API'ye istek gönder
+      const response = await fetch(`${ETSY_API_BASE}/application/users/${etsyApiUserId}/shops`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "x-api-key": ETSY_CLIENT_ID,
         }
-      );
+      });
       
-      const stores = data.results || [];
-      
-      if (Array.isArray(stores) && stores.length > 0) {
-        console.log("BAŞARILI! Bulunan mağaza sayısı:", stores.length);
-        
-        // Mağaza verilerini veritabanına kaydet
-        await storeEtsyData(userId, 0, stores, 'store');
-        
-        console.log("=== ETSY API DEBUG SONU ===");
-        return stores;
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
       }
       
-      console.log("API yanıtında mağaza bulunamadı - veritabanı yedeklemesi kullanılıyor");
-    } catch (apiError) {
-      console.error("Etsy API hatası:", apiError);
-      console.log("Veritabanı yedeklemesi kullanılıyor");
+      // API yanıtını işle
+      const data = await response.json();
+      console.log(`Raw API response from shops endpoint (first 300 chars):`, JSON.stringify(data).substring(0, 300) + "...");
+      
+      // Burada doğrudan mağaza nesnesi geliyor, bunu işleyelim
+      if (data && data.shop_id && data.shop_name) {
+        console.log(`Found direct shop object with ID: ${data.shop_id}`);
+        
+        // Mağaza verilerini işle
+        const validShop: EtsyStore = {
+          shop_id: data.shop_id,
+          shop_name: data.shop_name,
+          title: data.title || data.shop_name,
+          announcement: data.announcement || "",
+          currency_code: data.currency_code || "USD",
+          is_vacation: data.is_vacation || false,
+          listing_active_count: data.listing_active_count || 0,
+          num_favorers: data.num_favorers || 0,
+          url: data.url || `https://www.etsy.com/shop/${data.shop_name}`,
+          image_url_760x100: data.image_url_760x100 || "",
+          review_count: data.review_count || 0,
+          review_average: data.review_average || 0,
+          is_active: true,
+          last_synced_at: new Date().toISOString(),
+          avatar_url: (data as any).icon_url_fullxfull || null
+        };
+        
+        console.log(`Successfully processed shop: ${validShop.shop_id} - ${validShop.shop_name}`);
+        
+        // Mağaza bilgilerini veritabanına kaydet
+        try {
+          // 1. Önce profiles tablosunu güncelle
+          const { error: profileError } = await supabaseAdmin
+            .from("profiles")
+            .update({
+              etsy_shop_id: validShop.shop_id.toString(),
+              etsy_shop_name: validShop.shop_name,
+              last_synced_at: validShop.last_synced_at
+            })
+            .eq("id", userId);
+            
+          if (profileError) {
+            console.error("Error updating profile with Etsy shop data:", profileError);
+          } else {
+            console.log("✅ Profile updated with Etsy shop data");
+          }
+          
+          // 2. etsy_stores tablosuna ekle/güncelle
+          const { error: storesError } = await supabaseAdmin
+            .from("etsy_stores")
+            .upsert({
+              user_id: userId,
+              shop_id: validShop.shop_id,
+              shop_name: validShop.shop_name,
+              title: validShop.title,
+              announcement: validShop.announcement,
+              currency_code: validShop.currency_code,
+              is_vacation: validShop.is_vacation,
+              listing_active_count: validShop.listing_active_count,
+              num_favorers: validShop.num_favorers,
+              url: validShop.url,
+              image_url_760x100: validShop.image_url_760x100,
+              review_count: validShop.review_count,
+              review_average: validShop.review_average,
+              is_active: validShop.is_active,
+              last_synced_at: validShop.last_synced_at,
+              avatar_url: validShop.avatar_url
+            }, {
+              onConflict: 'user_id,shop_id'
+            });
+            
+          if (storesError) {
+            console.error("Error storing Etsy shop data:", storesError);
+          } else {
+            console.log("✅ Etsy shop data stored in database");
+          }
+        } catch (dbError) {
+          console.error("Database error while storing shop data:", dbError);
+        }
+        
+        return [validShop];
+      } else if (data && Array.isArray(data.results) && data.results.length > 0) {
+        // Bir dizi içinde mağazalar döndü
+        console.log(`Found ${data.results.length} shops in results array`);
+        
+        // Mağaza verilerini işle
+        const validShops = data.results.map((shop: any) => ({
+          shop_id: shop.shop_id,
+          shop_name: shop.shop_name,
+          title: shop.title || shop.shop_name,
+          announcement: shop.announcement || "",
+          currency_code: shop.currency_code || "USD",
+          is_vacation: shop.is_vacation || false,
+          listing_active_count: shop.listing_active_count || 0,
+          num_favorers: shop.num_favorers || 0,
+          url: shop.url || `https://www.etsy.com/shop/${shop.shop_name}`,
+          image_url_760x100: shop.image_url_760x100 || "",
+          review_count: shop.review_count || 0,
+          review_average: shop.review_average || 0,
+          is_active: true,
+          last_synced_at: new Date().toISOString(),
+          avatar_url: shop.icon_url_fullxfull || null
+        }));
+        
+        console.log(`Successfully processed ${validShops.length} shops`);
+        
+        // İlk mağazayı veritabanına kaydet
+        if (validShops.length > 0) {
+          const firstShop = validShops[0];
+          try {
+            await supabaseAdmin
+              .from("profiles")
+              .update({
+                etsy_shop_id: firstShop.shop_id.toString(),
+                etsy_shop_name: firstShop.shop_name,
+                last_synced_at: firstShop.last_synced_at
+              })
+              .eq("id", userId);
+              
+            console.log("✅ Profile updated with first Etsy shop data");
+          } catch (dbError) {
+            console.error("Database error while storing first shop data:", dbError);
+          }
+        }
+        
+        return validShops;
+      } else {
+        console.log("No valid shop data found in API response");
+        return [];
+      }
+    } catch (error: any) {
+      console.error(`Error fetching Etsy shops: ${error.message}`);
+      return [];
     }
-    
-    // API'den veri alınamadıysa veritabanından dene
-    return getStoresFromDatabase(userId);
-    
-  } catch (error) {
-    console.error("getEtsyStores kritik hata:", error);
-    return getStoresFromDatabase(userId);
+  } catch (error: any) {
+    console.error(`Critical error in getEtsyStores: ${error.message}`);
+    return [];
   }
 }
 
@@ -804,29 +950,58 @@ export async function getEtsyListings(
   listings: EtsyListing[]
   count: number
 }> {
-  const cacheKey = `etsy_listings_${userId}_${shopId}_${limit}_${offset}_${state}`;
-  
   try {
-    // Her zaman gerçek API'den veri çek, demo/mock data asla kullanma
+    const cacheKey = `etsy_listings_${userId}_${shopId}_${limit}_${offset}_${state}`;
     
-    // Önce veritabanından listing verilerini kontrol et
-    const storedListings = await getStoredEtsyData(userId, shopId, 'listings');
-    if (storedListings && !skipCache) {
-      console.log("📦 Using stored listings data");
-      return storedListings;
-    }
-
-    const accessToken = await getValidAccessToken(userId);
+    console.log(`Fetching Etsy listings for user: ${userId}, shop: ${shopId}, state: ${state}, page: ${offset/limit + 1}, limit: ${limit}`)
+    
+    // Öncelikle token kontrolü yap
+    const accessToken = await getValidAccessToken(userId)
     
     if (!accessToken) {
-      console.log(`📦 No valid access token for user ${userId} - gerçek ürün çekilemiyor`);
-      return { listings: [], count: 0 };
+      console.log(`📦 No valid access token for user ${userId} - gerçek ürün çekilemiyor`)
+      // Eğer token yoksa boş veri döndür
+      return {
+        listings: [],
+        count: 0
+      }
     }
+    
+    // shopId'nin gerçekten sayı olup olmadığını kontrol et
+    if (!shopId || isNaN(Number(shopId))) {
+      console.error(`Invalid shop ID: ${shopId}`);
+      return {
+        listings: [],
+        count: 0
+      };
+    }
+    
+    // Etsy API'den gerçek mağaza bilgilerini al
+    // Doğru shop_id kullandığımızdan emin olmak için
+    try {
+      const stores = await getEtsyStores(userId, skipCache);
+      if (stores && stores.length > 0) {
+        // Eğer verilen shopId, Etsy API'den gelen mağaza listesinde yoksa,
+        // ilk mağazayı kullan
+        const storeExists = stores.some(store => store.shop_id === shopId);
+        if (!storeExists) {
+          const firstStore = stores[0];
+          console.log(`⚠️ Provided shop_id ${shopId} not found in user's stores. Using first store: ${firstStore.shop_id}`);
+          shopId = firstStore.shop_id;
+        }
+      }
+    } catch (error) {
+      console.warn("Could not verify shop_id against user's stores:", error);
+      // Devam et, shopId doğru olabilir
+    }
+    
+    // Debug: Daha detaylı shop ID bilgisi
+    console.log(`DEBUG ETSY API: Using shop ID=${shopId}, type=${typeof shopId}, isNaN=${isNaN(shopId)}`);
     
     const params = new URLSearchParams({
       limit: limit.toString(),
       offset: offset.toString(),
-      includes: "Images,Tags",
+      includes: "Images,Tags,ShopSectionIds,Inventory,Videos", // Daha fazla detay eklendi
     });
     
     // Endpoint'i state parametresine göre değiştir
@@ -838,40 +1013,80 @@ export async function getEtsyListings(
       params.append('state', state);
     }
     
-    console.log(`Fetching Etsy listings: ${endpoint}?${params.toString()}`);
+    // Debug: Daha detaylı endpoint log'u
+    console.log(`DEBUG ETSY API: Full endpoint: ${endpoint}?${params.toString()}`);
     
-    const data = await rateLimitedFetch<{results: EtsyListing[], count: number}>(
-      `${endpoint}?${params}`,
-      {
+    try {
+      const response = await fetch(`${endpoint}?${params}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "x-api-key": ETSY_CLIENT_ID,
         }
-      },
-      cacheKey,
-      skipCache
-    );
-    
-    const result = {
-      listings: data.results || [],
-      count: data.count || 0
-    };
-
-    // Listing verilerini veritabanına kaydet
-    await storeEtsyData(userId, shopId, result, 'listings');
-    
-    return result;
-  } catch (error) {
-    console.error("getEtsyListings error:", error);
-    
-    // Check if we have stale cached data
-    const cachedData = cacheManager.get<{listings: EtsyListing[], count: number}>(cacheKey);
-    if (cachedData) {
-      console.log(`📦 Using cached listings data after error: ${cachedData.listings.length} listings`);
-      return cachedData;
+      });
+      
+      if (!response.ok) {
+        // 404 hatası - mağaza bulunamadı veya erişim yok
+        if (response.status === 404) {
+          console.error(`Shop ID ${shopId} not found or no access to listings. Status: 404`);
+          return {
+            listings: [],
+            count: 0
+          };
+        }
+        
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // API yanıtını incelemek için log'lama yapalım
+      console.log(`API response received. Listings count: ${data.count || 0}`);
+      if (data.results && data.results.length > 0) {
+        console.log(`First listing ID: ${data.results[0].listing_id}`);
+        console.log(`First listing has images: ${data.results[0].images ? 'Yes' : 'No'}`);
+        if (data.results[0].images && data.results[0].images.length > 0) {
+          console.log(`First image URL: ${data.results[0].images[0].url_570xN || 'Not available'}`);
+        }
+      }
+      
+      // Resim verilerini doğru formatta olduğundan emin olalım
+      const processedResults = data.results ? data.results.map((listing: any) => {
+        // Resim verilerini kontrol et ve düzelt
+        if (listing.images && Array.isArray(listing.images)) {
+          listing.images = listing.images.map((image: any) => ({
+            ...image,
+            url_570xN: image.url_570xN || `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${listing.listing_id}`,
+            url_fullxfull: image.url_fullxfull || image.url_570xN || null,
+            alt_text: image.alt_text || listing.title || 'Product image'
+          }));
+        } else {
+          // Resim verisi yoksa varsayılan oluştur
+          listing.images = [{
+            url_570xN: `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${listing.listing_id}`,
+            url_fullxfull: null,
+            alt_text: listing.title || 'Product image'
+          }];
+        }
+        return listing;
+      }) : [];
+      
+      const result = {
+        listings: processedResults,
+        count: data.count || 0
+      };
+      
+      return result;
+    } catch (error) {
+      console.error("getEtsyListings error:", error);
+      
+      // Eğer API çağrısında hata varsa (404 gibi), boş sonuç döndür
+      return { 
+        listings: [], 
+        count: 0 
+      };
     }
-    
-    // Gerçek veri yoksa boş dizi döndür
+  } catch (error) {
+    console.error("Critical error in getEtsyListings:", error);
     return { listings: [], count: 0 };
   }
 }

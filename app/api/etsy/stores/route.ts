@@ -1,22 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
-import { getEtsyStores, shouldUseOnlyCachedData } from "@/lib/etsy-api"
-
-interface EtsyStore {
-  shop_id: number
-  shop_name: string
-  title: string
-  listing_active_count: number
-  num_favorers: number
-  is_active: boolean
-  review_average: number
-  review_count: number
-  currency_code: string
-  url: string
-  last_synced_at: string
-  avatar_url: string | null
-}
+import { getEtsyStores } from "@/lib/etsy-api"
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,155 +10,124 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
-      console.log("Products API auth error:", userError, "No user found")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      console.log("Stores API auth error:", userError ? userError.message : "No user found");
+      return NextResponse.json({ error: "Unauthorized", stores: [], connected: false }, { status: 401 })
     }
 
-    // Check for the X-Use-Cache-Only header
-    const useCacheOnly = request.headers.get('X-Use-Cache-Only') === 'true' || shouldUseOnlyCachedData
-    
-    console.log("Fetching Etsy stores for user:", user.id)
-    console.log("Cached-only mode:", useCacheOnly ? "ENABLED" : "DISABLED")
+    // API isteği parametreleri
+    const skipCache = request.headers.get('X-Skip-Cache') === 'true';
+    console.log(`Fetching Etsy stores for user: ${user.id}, Skip cache: ${skipCache}`);
 
     try {
-      // If useCacheOnly is true, we'll force the API to only use cached data
-      // skipCache parameter is the opposite - if true, it forces fresh data from API
-      const skipCache = !useCacheOnly
-      const etsyStores = await getEtsyStores(user.id, skipCache)
+      // Etsy mağazalarını çek
+      const etsyStores = await getEtsyStores(user.id, skipCache);
+      console.log(`getEtsyStores returned ${etsyStores ? etsyStores.length : 0} stores`);
       
+      // getEtsyStores'dan gelen yanıtı detaylı logla
       if (etsyStores && etsyStores.length > 0) {
-        console.log("✅ Real Etsy data found:", etsyStores.length, "stores")
+        console.log("First store raw data:", JSON.stringify(etsyStores[0], null, 2));
+      } else {
+        console.log("No stores returned from getEtsyStores");
+      }
+
+      // Token var mı kontrol et - bağlantı durumunu belirlemek için
+      const { data: tokenData, error: tokenError } = await supabase
+        .from("etsy_tokens")
+        .select("expires_at, created_at, access_token")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (tokenError) {
+        console.log("Token query error:", tokenError.message);
+      }
+
+      const hasValidToken = tokenData && tokenData.access_token && tokenData.expires_at && new Date(tokenData.expires_at) > new Date();
+      console.log(`User has valid Etsy token: ${hasValidToken}`, tokenData ? {
+        expires_at: tokenData.expires_at,
+        created_at: tokenData.created_at,
+        token_length: tokenData.access_token ? tokenData.access_token.length : 0
+      } : "No token data");
+
+      // Mağaza verisi var mı kontrol et
+      if (etsyStores && etsyStores.length > 0) {
+        console.log("✅ Etsy stores found:", etsyStores.length, "stores");
+        
+        // Debug: Mağaza bilgilerini log'la
+        console.log("First store details:", {
+          shop_id: etsyStores[0].shop_id,
+          shop_name: etsyStores[0].shop_name,
+          type_shop_id: typeof etsyStores[0].shop_id
+        });
+        
+        // Mağaza verilerini düzenle ve döndür
         const storeData = etsyStores.map(store => ({
           shop_id: store.shop_id,
           shop_name: store.shop_name,
-          title: store.title,
-          listing_active_count: store.listing_active_count,
-          num_favorers: store.num_favorers,
-          is_active: store.is_active || true,
-          review_average: store.review_average,
-          review_count: store.review_count,
-          currency_code: store.currency_code,
-          url: store.url,
+          title: store.title || store.shop_name,
+          listing_active_count: store.listing_active_count || 0,
+          num_favorers: store.num_favorers || 0,
+          is_active: typeof store.is_active === 'boolean' ? store.is_active : true,
+          review_average: store.review_average || 0,
+          review_count: store.review_count || 0,
+          currency_code: store.currency_code || "USD",
+          url: store.url || `https://www.etsy.com/shop/${store.shop_name}`,
           last_synced_at: store.last_synced_at || new Date().toISOString(),
-          connection_status: 'connected',
           avatar_url: store.avatar_url || null
-        }))
+        }));
+        
         return NextResponse.json({
           stores: storeData,
+          count: storeData.length,
           connected: true,
-          source: useCacheOnly ? "cached_data" : "etsy_api"
-        })
-      }
-    } catch (error) {
-      console.error("Error fetching Etsy stores:", error)
-    }
-
-    // Etsy'den veri yoksa profile'a bakalım
-    let profile = null;
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-      
-      if (error) {
-        console.error("Error getting profile data:", error);
+          source: "api" 
+        });
       } else {
-        profile = data;
+        // Mağaza bulunamadı
+        console.log("No Etsy stores found for user after API and DB checks");
+        
+        // Token varsa bağlı ama mağaza yok, yoksa bağlı değil
+        if (hasValidToken) {
+          console.log("User has Etsy tokens, but no shops found. Informing client.");
+          return NextResponse.json({ 
+            stores: [], 
+            count: 0, 
+            connected: true,
+            message: "Etsy hesabınızda herhangi bir mağaza bulunamadı. Lütfen Etsy'de bir mağaza oluşturun.",
+            source: "no_shops_found_with_active_connection"
+          });
+        } else {
+          console.log("User has no valid Etsy tokens. Reconnect required.");
+          return NextResponse.json({
+            error: "RECONNECT_REQUIRED",
+            stores: [],
+            count: 0,
+            connected: false,
+            message: "Etsy hesabınıza yeniden bağlanmanız gerekiyor.",
+            source: "no_etsy_connection"
+          });
+        }
       }
-    } catch (err) {
-      console.error("Exception getting profile:", err);
-    }
-    
-    // Check if user has an active Etsy connection
-    // First, check if they have tokens
-    const { data: tokens, error: tokenError } = await supabase
-      .from("etsy_tokens")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle()
-    
-    const hasActiveTokens = !!tokens
-
-    // Eğer profile'da Etsy bilgisi varsa ve token kayıtları varsa mock store oluştur
-    if (profile?.etsy_shop_name && profile.etsy_shop_name !== "pending" && hasActiveTokens) {
-      console.log("📦 Using database fallback for store:", profile.etsy_shop_name)
-      
-      const mockStore = {
-        shop_id: parseInt(profile.etsy_shop_id) || 51859104,
-        shop_name: profile.etsy_shop_name,
-        title: profile.etsy_shop_name,
-        announcement: "Canvas wall art ve dekoratif ürünler",
-        currency_code: "USD",
-        is_vacation: false,
-        listing_active_count: 763,
-        num_favorers: 10,
-        url: `https://www.etsy.com/shop/${profile.etsy_shop_name}`,
-        image_url_760x100: "",
-        review_count: 12,
-        review_average: 4.4167,
-        avatar_url: null,
-        connection_status: 'connected',
-        is_active: true,
-        last_synced_at: new Date().toISOString()
-      }
-
+    } catch (etsyError) {
+      console.error("Error fetching Etsy stores:", etsyError);
+      // Etsy API hatası
       return NextResponse.json({
-        stores: [mockStore],
-        connected: true,
-        source: "database_fallback"
-      })
-    }
-
-    // Eğer bağlantı kesildiyse boş array döndür (demo gösterme)
-    if (!hasActiveTokens) {
-      console.log("🔌 No active Etsy connection, returning empty stores array")
-      return NextResponse.json({
+        error: "ETSY_API_ERROR",
+        message: etsyError instanceof Error ? etsyError.message : "Etsy API ile iletişimde bir sorun oluştu.",
         stores: [],
         connected: false,
-        source: "no_connection"
-      })
+        source: "etsy_api_error"
+      }, { status: 500 });
     }
-
-    // Hiçbir veri yoksa varsayılan mağaza döndür
-    console.log("📦 Using default store data")
-    
-    const defaultStore = {
-      shop_id: 51859104,
-      shop_name: "CanvasesWorldTR",
-      title: "CanvasesWorldTR",
-      announcement: "Canvas wall art ve dekoratif ürünler",
-      currency_code: "USD",
-      is_vacation: false,
-      listing_active_count: 763,
-      num_favorers: 10,
-      url: "https://www.etsy.com/shop/CanvasesWorldTR",
-      image_url_760x100: "",
-      review_count: 12,
-      review_average: 4.4167,
-      avatar_url: null,
-      connection_status: 'demo',
-      is_active: true,
-      last_synced_at: new Date().toISOString()
-    }
-
-    return NextResponse.json({
-      stores: [defaultStore],
-      connected: true,
-      source: "default_fallback"
-    })
-
   } catch (error) {
-    console.error("Stores API error:", error)
-    return NextResponse.json(
-      { 
-        error: "Failed to fetch stores", 
-        details: error instanceof Error ? error.message : String(error),
-        stores: [],
-        connected: false
-      },
-      { status: 500 }
-    )
+    console.error("Error in stores API:", error);
+    return NextResponse.json({ 
+      error: "Internal server error", 
+      stores: [], 
+      count: 0, 
+      connected: false,
+      message: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu."
+    }, { status: 500 });
   }
 } 

@@ -97,6 +97,7 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
     message?: string;
   }>({})
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [sessionExpired, setSessionExpired] = useState(false)
   const router = useRouter()
   const supabase = createClientSupabase()
 
@@ -140,8 +141,14 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
     setLoading(true)
     try {
       // Gerçek Etsy mağaza verilerini çekmeye çalış
-      const response = await fetch('/api/etsy/stores')
-      
+      const response = await fetch('/api/etsy/stores', { credentials: 'include' })
+      if (response.status === 401) {
+        setSessionExpired(true)
+        setStores([])
+        setEtsyConnected(false)
+        setLoading(false)
+        return
+      }
       if (response.ok) {
         const data = await response.json()
         console.log("Stores API response:", data);
@@ -207,16 +214,20 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
     if (!confirm('Etsy bağlantısını tamamen sıfırlamak istediğinizden emin misiniz? Bu işlem tüm token\'ları ve bağlantı verilerini silecektir.')) {
       return
     }
-
     setResetting(true)
     try {
       const response = await fetch('/api/etsy/reset', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include'
       })
-      
+      if (response.status === 401) {
+        setSessionExpired(true)
+        setResetting(false)
+        return
+      }
       if (response.ok) {
         alert('✅ Etsy bağlantısı başarıyla sıfırlandı! Şimdi yeniden bağlanabilirsiniz.')
         setEtsyConnected(false)
@@ -300,21 +311,24 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   const handleDisconnectStore = async () => {
     setReconnecting(true)
     try {
-      // Fetch the first store to disconnect
       const storeToDisconnect = stores?.[0]?.shop_id;
-      
       if (!storeToDisconnect) {
         alert('Bağlantı kesilecek mağaza bulunamadı');
         return;
       }
-      
       const response = await fetch(`/api/etsy/stores/${storeToDisconnect}/disconnect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include'
       })
-      
+      if (response.status === 401) {
+        setSessionExpired(true)
+        setReconnecting(false)
+        setDisconnectDialogOpen(false)
+        return
+      }
       if (response.ok) {
         setEtsyConnected(false)
         setStores([])
@@ -396,6 +410,23 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
 
   const handleStoreSelect = (store: EtsyStore) => {
     setCurrentStore(store);
+  }
+
+  // Oturum süresi dolduysa kullanıcıya uyarı göster
+  if (sessionExpired) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px]">
+        <Alert className="mb-4" variant="destructive">
+          <AlertTitle>Oturumunuz sona erdi</AlertTitle>
+          <AlertDescription>
+            Lütfen tekrar giriş yapın. Oturumunuz sona erdiği için mağaza işlemleri gerçekleştirilemiyor.
+          </AlertDescription>
+        </Alert>
+        <Button className="bg-black text-white" onClick={() => window.location.href = '/login'}>
+          Giriş Yap
+        </Button>
+      </div>
+    )
   }
 
   return (

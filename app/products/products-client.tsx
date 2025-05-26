@@ -152,6 +152,7 @@ export default function ProductsClient() {
   const [currentStore, setCurrentStore] = useState<{ shop_name: string; shop_id: number } | null>(null);
   const [reconnectRequired, setReconnectRequired] = useState(false);
   const [showReconnectBanner, setShowReconnectBanner] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   // getProductImage fonksiyonunu sadeleştiriyorum:
   const getProductImage = (product: Product): string | null => {
@@ -314,6 +315,13 @@ export default function ProductsClient() {
       try {
         storesRes = await fetch('/api/etsy/stores')
         storesData = await storesRes.json()
+        if (storesData.error === 'Unauthorized') {
+          setSessionExpired(true);
+          setProducts([])
+          setFilteredProducts([])
+          setLoading(false)
+          return;
+        }
       } catch (err) {
         setReconnectRequired(true);
         setProducts([])
@@ -338,6 +346,13 @@ export default function ProductsClient() {
           try {
             listingsRes = await fetch(`/api/etsy/listings?shop_id=${shopId}`)
             listingsData = await listingsRes.json()
+            if (listingsData.error === 'Unauthorized') {
+              setSessionExpired(true);
+              setProducts([])
+              setFilteredProducts([])
+              setLoading(false)
+              return;
+            }
           } catch (err) {
             setReconnectRequired(true);
             setProducts([])
@@ -981,6 +996,22 @@ export default function ProductsClient() {
             <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-400">Ürünler yüklenemedi.</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Oturum süresi dolduysa uyarı göster
+  if (sessionExpired) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-8 text-center max-w-md">
+          <AlertTriangle className="w-10 h-10 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Oturumunuz sona erdi</h2>
+          <p className="mb-4">Devam edebilmek için tekrar giriş yapmanız gerekiyor.</p>
+          <Button className="bg-black text-white px-6 py-3 text-lg" onClick={() => window.location.href = '/auth/login'}>
+            Giriş Yap
+          </Button>
         </div>
       </div>
     );

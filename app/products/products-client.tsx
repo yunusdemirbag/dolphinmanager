@@ -55,7 +55,9 @@ import {
   List,
   ArrowDownUp,
   ChevronDown,
-  Store
+  Store,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
@@ -118,6 +120,7 @@ export default function ProductsClient() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState("created_timestamp")
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [filterStatus, setFilterStatus] = useState("all")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState<Product | null>(null)
@@ -159,6 +162,7 @@ export default function ProductsClient() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(100); // Varsayılan sayfa boyutu
+  const [gridType, setGridType] = useState<'grid3' | 'grid5' | 'list'>('grid3');
 
   // ProductImage bileşenini daha güvenli hale getiriyorum:
   const ProductImage = ({ product }: { product: Product }) => {
@@ -241,7 +245,7 @@ export default function ProductsClient() {
 
   useEffect(() => {
     filterAndSortProducts()
-  }, [products, searchTerm, sortBy, filterStatus])
+  }, [searchTerm, sortBy, filterStatus, sortOrder])
 
   useEffect(() => {
     async function loadAnalytics() {
@@ -597,18 +601,24 @@ export default function ProductsClient() {
 
     // Sort
     filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "title":
-          return a.title.localeCompare(b.title)
-        case "price":
-          return (b.price.amount / b.price.divisor) - (a.price.amount / a.price.divisor)
-        case "quantity":
-          return b.quantity - a.quantity
-        case "created_timestamp":
-        default:
-          return b.created_timestamp - a.created_timestamp
+      if (sortBy === "title") {
+        return sortOrder === 'asc'
+          ? a.title.localeCompare(b.title)
+          : b.title.localeCompare(a.title);
       }
-    })
+      if (sortBy === "price") {
+        const aPrice = a.price.amount / a.price.divisor;
+        const bPrice = b.price.amount / b.price.divisor;
+        return sortOrder === 'asc' ? aPrice - bPrice : bPrice - aPrice;
+      }
+      if (sortBy === "quantity") {
+        return sortOrder === 'asc' ? a.quantity - b.quantity : b.quantity - a.quantity;
+      }
+      // created_timestamp veya default
+      return sortOrder === 'asc'
+        ? a.created_timestamp - b.created_timestamp
+        : b.created_timestamp - a.created_timestamp;
+    });
 
     // Eğer filtreleme veya sıralama aktifse, sayfalama butonlarını gizle
     const isFiltering = searchTerm || filterStatus !== "all" || sortBy !== "created_timestamp";
@@ -937,148 +947,241 @@ export default function ProductsClient() {
     );
   }, [filteredProducts, selectedProducts]);
 
-  const ProductCard = ({ product }: { product: Product }) => {
+  const ProductCard = ({ product, listView = false }: { product: Product, listView?: boolean }) => {
     const isSelected = selectedProducts.includes(product.listing_id);
 
-    return (
-      <div 
-        className={`bg-white rounded-xl shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300 ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}`}
-        onClick={(e) => {
-          // Düğmelerin bulunduğu bölüme tıklandığında seçim yapmayı engelleme
-          if (
-            (e.target as HTMLElement).tagName === 'BUTTON' || 
-            (e.target as HTMLElement).closest('button') || 
-            (e.target as HTMLElement).tagName === 'A' || 
-            (e.target as HTMLElement).closest('a')
-          ) {
-            return;
-          }
-          
-          // Butona tıklanmadıysa ürünü seç/seçimi kaldır
-          toggleProductSelection(product.listing_id);
-        }}
-        style={{ cursor: 'pointer' }}
-      >
-        <div className="relative aspect-square bg-gray-50 overflow-hidden">
-          <div className="absolute top-2 left-2 z-30">
-            <Checkbox 
-              checked={isSelected}
-              onCheckedChange={() => toggleProductSelection(product.listing_id)}
-              className="bg-white border-gray-300 rounded-sm"
-              onClick={(e) => e.stopPropagation()} // Checkbox'a tıklandığında event'in yayılmasını engelle
-            />
+    if (listView) {
+      // Modern sıralı liste görünümü
+      return (
+        <div
+          className={`bg-white rounded-2xl shadow-sm overflow-hidden flex flex-row items-center min-h-[180px] hover:shadow-lg transition-shadow duration-300 border border-gray-100 ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+          style={{ cursor: 'pointer' }}
+          onClick={(e) => {
+            if (
+              (e.target as HTMLElement).tagName === 'BUTTON' ||
+              (e.target as HTMLElement).closest('button') ||
+              (e.target as HTMLElement).tagName === 'A' ||
+              (e.target as HTMLElement).closest('a')
+            ) {
+              return;
+            }
+            toggleProductSelection(product.listing_id);
+          }}
+        >
+          {/* Görsel */}
+          <div className="relative w-[140px] h-[140px] bg-gray-50 flex-shrink-0 flex items-center justify-center overflow-hidden">
+            <ProductImage product={product} />
+            <div className="absolute top-2 left-2 z-30">
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={() => toggleProductSelection(product.listing_id)}
+                className="bg-white border-gray-300 rounded-sm"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
           </div>
-          <div 
-            className="w-full h-full overflow-hidden group relative" 
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleProductSelection(product.listing_id);
-            }}
-          >
-            {/* Yükleme animasyonu ve resim içeriği */}
-            <div className="absolute inset-0 bg-gray-200 animate-pulse z-0"></div>
-            <div className="relative z-10 w-full h-full">
-              <ProductImage product={product} />
-            </div>
-            
-            {/* Ürün detay katmanı - hover olunca görünür */}
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100 z-20">
-              <Button
-                variant="default"
-                className="bg-white text-black hover:bg-gray-100 shadow-lg"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(product.url, '_blank');
-                }}
-              >
-                <ExternalLink className="h-4 w-4 mr-2" /> Etsy'de Görüntüle
-              </Button>
-            </div>
-            
-            {/* Durum rozeti */}
-            <div className="absolute top-2 right-2 z-30">
-              <ProductStatus status={product.state} />
-            </div>
-            
-            {/* Ürün ID'si - geliştirme modunda göster */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs p-1 truncate z-20">
-                ID: {product.listing_id}
+          {/* Bilgi alanı */}
+          <div className="flex-1 flex flex-col justify-between px-6 py-4 min-w-0">
+            <div className="flex flex-col gap-1 min-w-0">
+              <h3 className="text-lg font-bold text-gray-900 truncate mb-1">{product.title}</h3>
+              <div className="text-gray-500 text-sm truncate mb-2">{product.description?.slice(0, 80)}{product.description && product.description.length > 80 ? '...' : ''}</div>
+              <div className="flex flex-row items-center gap-6 mb-2">
+                <span className="text-xl font-bold text-primary">{formatPrice(product.price)}</span>
+                <span className="text-xs text-gray-500">Stok: {product.quantity}</span>
+                <span className="text-xs text-gray-500">Görüntüleme: {product.metrics?.views || 0}</span>
+                <span className="text-xs text-gray-500">Favori: {product.metrics?.favorites || 0}</span>
+                <span className="text-xs text-gray-500">Satış: {product.metrics?.sold || 0}</span>
               </div>
-            )}
-          </div>
-        </div>
-        <div className="p-4 flex flex-col flex-1">
-          <h3 className="text-base font-semibold text-gray-800 mb-1 line-clamp-2 min-h-[48px]">
-            {product.title}
-          </h3>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-lg font-bold text-primary">
-              {formatPrice(product.price)}
-            </span>
-            <span className="text-xs text-gray-500">
-              Stok: {product.quantity}
-            </span>
-          </div>
-          {/* Metrics */}
-          <div className="grid grid-cols-3 gap-2 mt-2 mb-2">
-            <div className="text-center">
-              <div className="text-xs text-gray-500 flex items-center justify-center gap-1"><Eye className="w-3 h-3" />Views</div>
-              <div className="font-semibold text-sm">{product.metrics?.views || 0}</div>
             </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500 flex items-center justify-center gap-1"><Star className="w-3 h-3" />Favorites</div>
-              <div className="font-semibold text-sm">{product.metrics?.favorites || 0}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500 flex items-center justify-center gap-1"><ShoppingCart className="w-3 h-3" />Sold</div>
-              <div className="font-semibold text-sm">{product.metrics?.sold || 0}</div>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 mt-auto">
-            <ProductStatus status={product.state} />
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCopyProduct(product);
-              }}
-            >
-              <Copy className="h-4 w-4 mr-2" /> Kopyala
-            </Button>
-            <div className="grid grid-cols-2 gap-2">
+            {/* Butonlar */}
+            <div className="flex flex-row gap-2 mt-2 w-full justify-between">
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
+                className="flex-1 min-w-0"
+                title="Düzenle"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowEditModal(product);
                 }}
               >
-                <Edit className="h-4 w-4 mr-2" /> Düzenle
+                <Edit className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"
-                size="sm"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                size="icon"
+                className="flex-1 min-w-0"
+                title="Kopyala"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyProduct(product);
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="flex-1 min-w-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                title="Sil"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDeleteProduct(product.listing_id);
                 }}
               >
-                <Trash2 className="h-4 w-4 mr-2" /> Sil
+                <Trash2 className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className={
+                  'flex-1 min-w-0 ' +
+                  (product.state === 'active'
+                    ? 'text-green-600 hover:text-green-700'
+                    : product.state === 'inactive'
+                      ? 'text-red-600 hover:text-red-700'
+                      : 'text-yellow-700 hover:text-yellow-800')
+                }
+                title={product.state === 'active' ? 'Aktif/Pasif Yap' : 'Aktif Yap'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const newState = product.state === 'active' ? 'inactive' : 'active';
+                  handleUpdateProduct({ ...product, state: newState });
+                }}
+              >
+                {product.state === 'active' ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
               </Button>
             </div>
+          </div>
+        </div>
+      );
+    }
+    // Grid (3'lü, 5'li) görünüm
+    return (
+      <div
+        className={`bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col relative hover:shadow-lg transition-shadow duration-300 border border-gray-100 ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+        style={{ cursor: 'pointer', minHeight: 340 }}
+        onClick={(e) => {
+          if (
+            (e.target as HTMLElement).tagName === 'BUTTON' ||
+            (e.target as HTMLElement).closest('button') ||
+            (e.target as HTMLElement).tagName === 'A' ||
+            (e.target as HTMLElement).closest('a')
+          ) {
+            return;
+          }
+          toggleProductSelection(product.listing_id);
+        }}
+      >
+        {/* Checkbox ve durum etiketi */}
+        <div className="absolute top-2 left-2 z-30">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => toggleProductSelection(product.listing_id)}
+            className="bg-white border-gray-300 rounded-sm"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+        {/* <div className="absolute top-2 right-2 z-30">
+          <ProductStatus status={product.state} grid />
+        </div> */}
+        {/* Ürün görseli */}
+        <div className="w-full aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
+          <ProductImage product={product} />
+        </div>
+        {/* Bilgi alanı */}
+        <div className="flex-1 flex flex-col justify-between px-4 py-3">
+          <h3 className="text-base font-bold text-gray-900 truncate mb-1">{product.title}</h3>
+          <div className="text-gray-500 text-xs truncate mb-2">{product.description?.slice(0, 60)}{product.description && product.description.length > 60 ? '...' : ''}</div>
+          <div className="flex flex-row items-center gap-3 mb-2">
+            <span className="text-lg font-bold text-primary">{formatPrice(product.price)}</span>
+            <span className="text-xs text-gray-500">Stok: {product.quantity}</span>
+          </div>
+          {/* Butonlar */}
+          <div className="flex flex-row gap-2 mt-2 w-full justify-between">
+            <Button
+              variant="outline"
+              size="icon"
+              className="flex-1 min-w-0"
+              title="Düzenle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEditModal(product);
+              }}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="flex-1 min-w-0"
+              title="Kopyala"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCopyProduct(product);
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="flex-1 min-w-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+              title="Sil"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteProduct(product.listing_id);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={
+                'flex-1 min-w-0 ' +
+                (product.state === 'active'
+                  ? 'text-green-600 hover:text-green-700'
+                  : product.state === 'inactive'
+                    ? 'text-red-600 hover:text-red-700'
+                    : 'text-yellow-700 hover:text-yellow-800')
+              }
+              title={product.state === 'active' ? 'Aktif/Pasif Yap' : 'Aktif Yap'}
+              onClick={(e) => {
+                e.stopPropagation();
+                const newState = product.state === 'active' ? 'inactive' : 'active';
+                handleUpdateProduct({ ...product, state: newState });
+              }}
+            >
+              {product.state === 'active' ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+            </Button>
           </div>
         </div>
       </div>
     );
   };
 
-  const ProductStatus = ({ status }: { status: string }) => {
+  const ProductStatus = ({ status, grid }: { status: string, grid?: boolean }) => {
+    if (grid) {
+      // Oval, filled color modern badge
+      let bg = 'bg-gray-300', text = 'text-white';
+      if (status === 'active') {
+        bg = 'bg-green-500'; text = 'text-white';
+      } else if (status === 'inactive') {
+        bg = 'bg-red-500'; text = 'text-white';
+      } else if (status === 'draft') {
+        bg = 'bg-yellow-300'; text = 'text-black';
+      }
+      const label = status === 'active' ? 'Aktif' : status === 'inactive' ? 'Pasif' : 'Taslak';
+      return (
+        <span className={`px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${bg} ${text} border border-white/70`} style={{letterSpacing: 0.5}}>
+          {label}
+        </span>
+      );
+    }
+    // Old style (list view or other)
     const getStatusColor = (status: string) => {
       switch (status) {
         case 'active':
@@ -1091,7 +1194,6 @@ export default function ProductsClient() {
           return 'bg-gray-100 text-gray-800';
       }
     };
-
     const getStatusText = (status: string) => {
       switch (status) {
         case 'active':
@@ -1104,7 +1206,6 @@ export default function ProductsClient() {
           return status;
       }
     };
-
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
         {getStatusText(status)}
@@ -1215,88 +1316,162 @@ export default function ProductsClient() {
       )}
 
       <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-2 w-full">
+          {/* Arama kutusu */}
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
             <Input
-              placeholder="Ürün ara..."
+              placeholder="Ürün adı, etiket veya açıklama ara..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-4 py-2 rounded-full border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all bg-gray-50 text-sm shadow-none"
             />
           </div>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger>
-              <SelectValue placeholder="Sırala" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created_timestamp">Yeni Eklenen</SelectItem>
-              <SelectItem value="title">Başlık</SelectItem>
-              <SelectItem value="price">Fiyat</SelectItem>
-              <SelectItem value="quantity">Stok</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger>
-              <SelectValue placeholder="Durum" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tüm Durumlar</SelectItem>
-              <SelectItem value="active">Aktif</SelectItem>
-              <SelectItem value="inactive">Pasif</SelectItem>
-              <SelectItem value="draft">Taslak</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" onClick={() => loadProducts()}>
-            <Filter className="h-4 w-4 mr-2" />
-            Yenile
-          </Button>
+          {/* Sıralama dropdown + artan/azalan toggle */}
+          <div className="flex items-center gap-2 min-w-[180px]">
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="rounded-full border border-gray-200 bg-gray-50 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                <SelectValue placeholder="Sırala" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl shadow-lg">
+                <SelectItem value="created_timestamp">
+                  <Clock className="inline w-4 h-4 mr-2 text-gray-400" /> Yeni Eklenen
+                </SelectItem>
+                <SelectItem value="title">
+                  <ArrowDownUp className="inline w-4 h-4 mr-2 text-gray-400" /> Başlık
+                </SelectItem>
+                <SelectItem value="price">
+                  <BarChart3 className="inline w-4 h-4 mr-2 text-gray-400" /> Fiyat
+                </SelectItem>
+                <SelectItem value="quantity">
+                  <Package className="inline w-4 h-4 mr-2 text-gray-400" /> Stok
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <button
+              type="button"
+              className={`ml-1 rounded-full border border-gray-200 bg-gray-50 p-2 hover:bg-primary/10 transition-colors ${sortOrder === 'asc' ? 'text-primary' : 'text-gray-500'}`}
+              onClick={() => setSortOrder((prev) => prev === 'asc' ? 'desc' : 'asc')}
+              title={sortOrder === 'asc' ? 'Artan Sırala' : 'Azalan Sırala'}
+            >
+              {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+            </button>
+          </div>
+          {/* Durum filtresi dropdown */}
+          <div className="min-w-[140px]">
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="rounded-full border border-gray-200 bg-gray-50 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                <SelectValue placeholder="Durum" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl shadow-lg">
+                <SelectItem value="all">
+                  <List className="inline w-4 h-4 mr-2 text-gray-400" /> Tüm Durumlar
+                </SelectItem>
+                <SelectItem value="active">
+                  <CheckCircle className="inline w-4 h-4 mr-2 text-green-500" /> Aktif
+                </SelectItem>
+                <SelectItem value="inactive">
+                  <X className="inline w-4 h-4 mr-2 text-red-500" /> Pasif
+                </SelectItem>
+                <SelectItem value="draft">
+                  <Clock className="inline w-4 h-4 mr-2 text-yellow-500" /> Taslak
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Yenile butonu */}
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              className="rounded-full p-2 hover:bg-primary/10 transition-colors"
+              onClick={() => loadProducts()}
+              title="Yenile"
+            >
+              {loading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              ) : (
+                <RefreshCw className="h-5 w-5 text-gray-500" />
+              )}
+            </Button>
+          </div>
+          {/* Görünüm seçici */}
+          <div className="flex items-center gap-1 ml-auto">
+            <button
+              type="button"
+              className={`rounded-full p-2 border ${gridType === 'grid3' ? 'bg-primary/10 border-primary text-primary' : 'bg-gray-50 border-gray-200 text-gray-500'} hover:bg-primary/10 transition-colors`}
+              onClick={() => setGridType('grid3')}
+              title="3'lü Izgara"
+            >
+              <LayoutGrid className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              className={`rounded-full p-2 border ${gridType === 'grid5' ? 'bg-primary/10 border-primary text-primary' : 'bg-gray-50 border-gray-200 text-gray-500'} hover:bg-primary/10 transition-colors`}
+              onClick={() => setGridType('grid5')}
+              title="5'li Izgara"
+            >
+              <LayoutGrid className="w-5 h-5" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }} />
+            </button>
+            <button
+              type="button"
+              className={`rounded-full p-2 border ${gridType === 'list' ? 'bg-primary/10 border-primary text-primary' : 'bg-gray-50 border-gray-200 text-gray-500'} hover:bg-primary/10 transition-colors`}
+              onClick={() => setGridType('list')}
+              title="Liste Görünümü"
+            >
+              <List className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Üst Filtreleme ve İşlem Butonları */}
       <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-        <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex items-center gap-2">
-            <Checkbox 
-              id="select-all"
-              checked={selectAllChecked}
-              onCheckedChange={toggleSelectAll}
-              className="border-gray-300"
-            />
-            <Label htmlFor="select-all" className="cursor-pointer">
-              Tümünü Seç ({selectAllChecked ? filteredProducts.length : 0}/{filteredProducts.length})
-            </Label>
-          </div>
-          
+        <div className="flex flex-wrap gap-2 items-center w-full">
+          <Checkbox 
+            id="select-all"
+            checked={selectAllChecked}
+            onCheckedChange={toggleSelectAll}
+            className="border-gray-300"
+          />
+          <Label htmlFor="select-all" className="cursor-pointer">
+            {selectAllChecked ? 'Seçimi Kaldır' : 'Tümünü Seç'} ({selectedProducts.length}/{filteredProducts.length})
+          </Label>
           {selectedProducts.length > 0 && (
             <>
               <div className="h-6 border-l border-gray-300 mx-2"></div>
-              <div className="text-sm text-gray-500">
+              <div className="text-base font-semibold text-gray-700">
                 {selectedProducts.length} ürün seçildi
               </div>
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={handleBulkDelete}
-                className="ml-auto"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Seçilenleri Sil
-              </Button>
+              {/* Kırmızı Seçilenleri Sil butonu kaldırıldı */}
+              <div className="flex items-center gap-2 ml-2">
+                <Select value={''} onValueChange={(val) => {/* toplu işlem state */}}>
+                  <SelectTrigger className="rounded-lg border border-gray-200 bg-gray-50 text-sm min-w-[140px]">
+                    <SelectValue placeholder="Toplu İşlem" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-lg shadow-lg">
+                    <SelectItem value="activate">Aktif Yap</SelectItem>
+                    <SelectItem value="deactivate">Pasif Yap</SelectItem>
+                    <SelectItem value="draft">Taslağa Al</SelectItem>
+                    <SelectItem value="copy">Kopyala</SelectItem>
+                    <SelectItem value="delete">Sil</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" className="rounded-lg bg-primary text-white px-5 py-2 font-semibold shadow hover:bg-primary/90 transition-colors">
+                  Uygula
+                </Button>
+              </div>
             </>
           )}
-        </div>
-        
-        <div className="flex gap-2 items-center">
-          <Button
-            size="sm"
-            onClick={handleOpenCreateModal}
-            className="bg-black hover:bg-gray-800 text-white"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Yeni Ürün
-          </Button>
+          <div className="flex gap-2 items-center ml-auto">
+            <Button
+              size="sm"
+              onClick={handleOpenCreateModal}
+              className="bg-black hover:bg-gray-800 text-white rounded-lg px-5 py-2 font-semibold shadow"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Yeni Ürün
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1314,9 +1489,17 @@ export default function ProductsClient() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div
+            className={
+              gridType === 'list'
+                ? 'flex flex-col gap-6'
+                : gridType === 'grid5'
+                  ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6'
+                  : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+            }
+          >
             {filteredProducts.map((product) => (
-              <ProductCard key={product.listing_id} product={product} />
+              <ProductCard key={product.listing_id} product={product} listView={gridType === 'list'} />
             ))}
           </div>
           

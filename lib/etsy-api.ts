@@ -1050,25 +1050,69 @@ export async function getEtsyListings(
       }
       
       // Resim verilerini doğru formatta olduğundan emin olalım
-      const processedResults = data.results ? data.results.map((listing: any) => {
-        // Resim verilerini kontrol et ve düzelt
-        if (listing.images && Array.isArray(listing.images)) {
-          listing.images = listing.images.map((image: any) => ({
-            ...image,
-            url_570xN: image.url_570xN || `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${listing.listing_id}`,
-            url_fullxfull: image.url_fullxfull || image.url_570xN || null,
-            alt_text: image.alt_text || listing.title || 'Product image'
-          }));
+      const processedResults = data.results ? await Promise.all(data.results.map(async (listing: any) => {
+        // Eğer images alanı yoksa veya boşsa, ilgili listing_id için ayrıca fetch yap
+        if (!listing.images || !Array.isArray(listing.images) || listing.images.length === 0) {
+          try {
+            const imageRes = await fetch(`${ETSY_API_BASE}/application/listings/${listing.listing_id}/images`, {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "x-api-key": ETSY_CLIENT_ID,
+              }
+            });
+            if (imageRes.ok) {
+              const imageData = await imageRes.json();
+              // Sadece bu ürüne ait resimleri ekle (listing_id eşleşmeli)
+              if (imageData.results && imageData.results.length > 0) {
+                listing.images = imageData.results
+                  .filter((img: any) => img.listing_id === listing.listing_id)
+                  .map((img: any) => ({
+                    listing_id: img.listing_id,
+                    listing_image_id: img.listing_image_id,
+                    url_570xN: img.url_570xN,
+                    url_fullxfull: img.url_fullxfull,
+                    alt_text: img.alt_text || listing.title || 'Product image'
+                  }));
+              } else {
+                listing.images = [{
+                  listing_id: listing.listing_id,
+                  listing_image_id: 0,
+                  url_570xN: `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${listing.listing_id}`,
+                  url_fullxfull: null,
+                  alt_text: listing.title || 'Product image'
+                }];
+              }
+            } else {
+              listing.images = [{
+                listing_id: listing.listing_id,
+                listing_image_id: 0,
+                url_570xN: `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${listing.listing_id}`,
+                url_fullxfull: null,
+                alt_text: listing.title || 'Product image'
+              }];
+            }
+          } catch (err) {
+            listing.images = [{
+              listing_id: listing.listing_id,
+              listing_image_id: 0,
+              url_570xN: `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${listing.listing_id}`,
+              url_fullxfull: null,
+              alt_text: listing.title || 'Product image'
+            }];
+          }
         } else {
-          // Resim verisi yoksa varsayılan oluştur
-          listing.images = [{
-            url_570xN: `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${listing.listing_id}`,
-            url_fullxfull: null,
-            alt_text: listing.title || 'Product image'
-          }];
+          // images alanı varsa, sadece bu ürüne ait olanları filtrele
+          listing.images = listing.images
+            .filter((img: any) => img.listing_id === listing.listing_id)
+            .map((image: any) => ({
+              ...image,
+              url_570xN: image.url_570xN || `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${listing.listing_id}`,
+              url_fullxfull: image.url_fullxfull || image.url_570xN || null,
+              alt_text: image.alt_text || listing.title || 'Product image'
+            }));
         }
         return listing;
-      }) : [];
+      })) : [];
       
       const result = {
         listings: processedResults,

@@ -151,6 +151,7 @@ export default function ProductsClient() {
   const [selectAllChecked, setSelectAllChecked] = useState(false)
   const [currentStore, setCurrentStore] = useState<{ shop_name: string; shop_id: number } | null>(null);
   const [reconnectRequired, setReconnectRequired] = useState(false);
+  const [showReconnectBanner, setShowReconnectBanner] = useState(true);
 
   // getProductImage fonksiyonunu sadeleştiriyorum:
   const getProductImage = (product: Product): string | null => {
@@ -309,11 +310,19 @@ export default function ProductsClient() {
     setLoading(true)
     try {
       // Kullanıcı ve mağaza id'sini çek
-      const storesRes = await fetch('/api/etsy/stores')
+      let storesRes, storesData;
+      try {
+        storesRes = await fetch('/api/etsy/stores')
+        storesData = await storesRes.json()
+      } catch (err) {
+        setReconnectRequired(true);
+        setProducts([])
+        setFilteredProducts([])
+        setLoading(false)
+        return;
+      }
       let shopId: number | null = null;
-      
       if (storesRes.ok) {
-        const storesData = await storesRes.json()
         if (storesData.error === 'RECONNECT_REQUIRED') {
           setReconnectRequired(true);
           setProducts([])
@@ -325,33 +334,49 @@ export default function ProductsClient() {
           shopId = storesData.stores[0].shop_id as number;
           setCurrentStore(storesData.stores[0]);
           // İlgili mağazadan ürünleri çek
-          const listingsRes = await fetch(`/api/etsy/listings?shop_id=${shopId}`)
+          let listingsRes, listingsData;
+          try {
+            listingsRes = await fetch(`/api/etsy/listings?shop_id=${shopId}`)
+            listingsData = await listingsRes.json()
+          } catch (err) {
+            setReconnectRequired(true);
+            setProducts([])
+            setFilteredProducts([])
+            setLoading(false)
+            return;
+          }
           if (listingsRes.ok) {
-            const listingsData = await listingsRes.json()
+            if (listingsData.error === 'RECONNECT_REQUIRED') {
+              setReconnectRequired(true);
+              setProducts([])
+              setFilteredProducts([])
+              setLoading(false)
+              return;
+            }
             const listings = listingsData.listings || []
             setProducts(listings)
             setFilteredProducts(listings)
             return
+          } else {
+            setReconnectRequired(true);
+            setProducts([])
+            setFilteredProducts([])
+            setLoading(false)
+            return;
           }
         }
       } else {
-        // Eğer hata RECONNECT_REQUIRED ise
-        const errorData = await storesRes.json().catch(() => ({}));
-        if (errorData.error === 'RECONNECT_REQUIRED') {
-          setReconnectRequired(true);
-          setProducts([])
-          setFilteredProducts([])
-          setLoading(false)
-          return;
-        }
+        setReconnectRequired(true);
+        setProducts([])
+        setFilteredProducts([])
+        setLoading(false)
+        return;
       }
       // API yanıt vermezse veya hata olursa boş ürün listesi göster
       setProducts([])
       setFilteredProducts([])
     } catch (error) {
-      if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
-        setReconnectRequired(true);
-      }
+      setReconnectRequired(true);
       setProducts([])
       setFilteredProducts([])
     } finally {
@@ -934,16 +959,28 @@ export default function ProductsClient() {
     }
   };
 
-  if (reconnectRequired) {
+  // Uyarı balonunu ürünler yoksa ve reconnectRequired true ise de göster
+  if ((reconnectRequired && showReconnectBanner) || (products.length === 0 && reconnectRequired && showReconnectBanner)) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-8 text-center max-w-md">
-          <AlertTriangle className="w-10 h-10 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">Etsy hesabınızın bağlantısı koptu</h2>
-          <p className="mb-4">Ürünlerinizi görebilmek için Etsy hesabınızı tekrar bağlamanız gerekiyor.</p>
-          <Button className="bg-black text-white px-6 py-3 text-lg" onClick={handleReconnectEtsy}>
-            Etsy Hesabını Tekrar Bağla
-          </Button>
+      <div>
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md">
+          <div className="flex items-center bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-lg px-4 py-3 shadow-md">
+            <AlertTriangle className="w-5 h-5 mr-2" />
+            <span className="flex-1">Etsy bağlantınızda sorun var, lütfen hesabınızı tekrar bağlayın.</span>
+            <Button size="sm" className="bg-black text-white ml-2" onClick={handleReconnectEtsy}>
+              Bağlantıyı Yenile
+            </Button>
+            <button className="ml-2 text-yellow-800 hover:text-yellow-900" onClick={() => setShowReconnectBanner(false)}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        {/* Sayfanın geri kalanı gri arka planla kapalı */}
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center opacity-60 pointer-events-none select-none">
+          <div className="text-center">
+            <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-400">Ürünler yüklenemedi.</p>
+          </div>
         </div>
       </div>
     );
@@ -987,18 +1024,6 @@ export default function ProductsClient() {
             <AlertTriangle className="w-4 h-4 mr-2" />
           )}
           <span>{refreshStatus.message}</span>
-        </div>
-      )}
-      
-      {/* Son yenileme bilgisi */}
-      {lastRefresh && (
-        <div className="text-xs text-gray-500 mb-4 flex items-center">
-          <Clock className="w-3 h-3 mr-1" />
-          Son yenileme: {lastRefresh.toLocaleString()}
-          <span className="mx-2">•</span>
-          <span>Otomatik yenileme: 3 saatte bir</span>
-          <span className="mx-2">•</span>
-          <span>Daha hızlı yenileme için <span className="text-blue-600 font-medium">Dashboard</span> sayfasını kullanabilirsiniz</span>
         </div>
       )}
       
@@ -1083,20 +1108,6 @@ export default function ProductsClient() {
         </div>
         
         <div className="flex gap-2 items-center">
-          <Button
-            size="sm"
-            onClick={() => refreshProducts()}
-            disabled={refreshing}
-            className="bg-black hover:bg-gray-800 text-white"
-          >
-            {refreshing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            {refreshing ? 'Yenileniyor...' : 'Verileri Güncelle'}
-          </Button>
-          
           <Button
             size="sm"
             onClick={handleOpenCreateModal}

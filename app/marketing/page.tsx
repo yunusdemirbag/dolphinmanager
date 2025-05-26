@@ -1,299 +1,201 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
-import {
-  Megaphone,
-  Target,
-  DollarSign,
-  TrendingUp,
-  MousePointerClickIcon as Click,
-  Calendar,
-  Gift,
-  Share2,
-  BarChart3,
-  Zap,
-} from "lucide-react"
+import { ArrowUp, Eye, ShoppingCart, DollarSign, TrendingUp } from "lucide-react";
 
 export default function MarketingPage() {
-  const [campaignName, setCampaignName] = useState("")
-  const [campaignBudget, setCampaignBudget] = useState("")
-  const [couponCode, setCouponCode] = useState("")
-  const [etsyAdsData, setEtsyAdsData] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadMarketingData()
-  }, [])
-
-  const loadMarketingData = async () => {
-    try {
-      // Gerçek marketing verilerini API'den çek
-      const response = await fetch('/api/etsy/marketing')
-      
-      if (response.ok) {
-        const data = await response.json()
-        setEtsyAdsData(data)
-      } else {
-        // API hatası - boş veri göster
-        setEtsyAdsData(null)
-      }
-    } catch (error) {
-      console.error("Marketing API error:", error)
-      // Hata durumunda boş veri göster
-      setEtsyAdsData(null)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Demo veriler kaldırıldı - gerçek veriler API'den gelecek
-  const campaigns: any[] = []
-  const coupons: any[] = []
-  const socialMediaStats = {
-    instagram_followers: 0,
-    instagram_engagement: 0,
-    pinterest_followers: 0,
-    pinterest_monthly_views: 0,
-    facebook_followers: 0,
-    facebook_reach: 0,
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "paused":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "ended":
-        return "bg-gray-100 text-gray-800 border-gray-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "active":
-        return "Aktif"
-      case "paused":
-        return "Duraklatıldı"
-      case "ended":
-        return "Sona Erdi"
-      default:
-        return "Bilinmiyor"
-    }
-  }
-
-  const getCouponTypeText = (type: string) => {
-    switch (type) {
-      case "percentage":
-        return "Yüzde İndirim"
-      case "fixed":
-        return "Sabit İndirim"
-      case "free_shipping":
-        return "Ücretsiz Kargo"
-      default:
-        return "Diğer"
-    }
-  }
-
   return (
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col space-y-8">
-        {/* Campaign Creation */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Yeni Kampanya Oluştur</CardTitle>
-            <CardDescription>Etsy mağazanız için yeni bir pazarlama kampanyası başlatın</CardDescription>
-                  </CardHeader>
-          <CardContent>
+    <div className="container p-6 mx-auto max-w-7xl">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold">Marketing Dashboard</h1>
+        <button className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+          Senkronize Et
+        </button>
+      </div>
+      
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <div className="flex justify-between">
+            <div>
+              <div className="text-gray-500 text-sm font-medium mb-1">Görüntülenme</div>
+              <div className="text-2xl font-bold">59.400</div>
+            </div>
+            <div className="bg-blue-50 h-10 w-10 flex items-center justify-center rounded-full">
+              <Eye className="h-5 w-5 text-blue-500" />
+            </div>
+          </div>
+          <div className="flex items-center mt-3 text-sm">
+            <span className="flex items-center text-green-500 mr-1">
+              <ArrowUp className="h-3 w-3 mr-0.5" />
+              13.2%
+            </span>
+            <span className="text-gray-500">geçen aya göre</span>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <div className="flex justify-between">
+            <div>
+              <div className="text-gray-500 text-sm font-medium mb-1">Satışlar</div>
+              <div className="text-2xl font-bold">438</div>
+            </div>
+            <div className="bg-green-50 h-10 w-10 flex items-center justify-center rounded-full">
+              <ShoppingCart className="h-5 w-5 text-green-500" />
+            </div>
+          </div>
+          <div className="flex items-center mt-3 text-sm">
+            <span className="flex items-center text-green-500 mr-1">
+              <ArrowUp className="h-3 w-3 mr-0.5" />
+              11.8%
+            </span>
+            <span className="text-gray-500">geçen aya göre</span>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <div className="flex justify-between">
+            <div>
+              <div className="text-gray-500 text-sm font-medium mb-1">Gelir</div>
+              <div className="text-2xl font-bold">₺2,702.96</div>
+            </div>
+            <div className="bg-purple-50 h-10 w-10 flex items-center justify-center rounded-full">
+              <DollarSign className="h-5 w-5 text-purple-500" />
+            </div>
+          </div>
+          <div className="flex items-center mt-3 text-sm">
+            <span className="flex items-center text-green-500 mr-1">
+              <ArrowUp className="h-3 w-3 mr-0.5" />
+              11.4%
+            </span>
+            <span className="text-gray-500">geçen aya göre</span>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <div className="flex justify-between">
+            <div>
+              <div className="text-gray-500 text-sm font-medium mb-1">Dönüşüm Oranı</div>
+              <div className="text-2xl font-bold">%0.2</div>
+            </div>
+            <div className="bg-orange-50 h-10 w-10 flex items-center justify-center rounded-full">
+              <TrendingUp className="h-5 w-5 text-orange-500" />
+            </div>
+          </div>
+          <div className="text-gray-500 text-sm mt-3">
+            Ortalama Sipariş: ₺25.99
+          </div>
+        </div>
+      </div>
+      
+      {/* Products Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
+        <div className="p-5 border-b border-gray-100">
+          <h2 className="text-lg font-semibold">Ürün Performansı</h2>
+          <p className="text-sm text-gray-500 mt-1">Son 30 günde en çok satan ürünler</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-sm text-gray-500 border-b">
+                <th className="text-left p-4 font-medium">Ürün</th>
+                <th className="text-center p-4 font-medium">Fiyat</th>
+                <th className="text-center p-4 font-medium">Görüntülenme</th>
+                <th className="text-center p-4 font-medium">Satış</th>
+                <th className="text-center p-4 font-medium">Dönüşüm</th>
+                <th className="text-center p-4 font-medium">Durum</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b hover:bg-gray-50 transition-colors">
+                <td className="p-4">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg mr-3 flex items-center justify-center text-gray-400">
+                      <span className="text-xs">Ürün</span>
+                    </div>
                     <div>
-                      <label className="text-sm font-medium">Kampanya Adı</label>
-                      <Input
-                        value={campaignName}
-                        onChange={(e) => setCampaignName(e.target.value)}
-                        placeholder="Kampanya adını girin"
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">Günlük Bütçe (₺)</label>
-                      <Input
-                        value={campaignBudget}
-                        onChange={(e) => setCampaignBudget(e.target.value)}
-                        placeholder="0.00"
-                        type="number"
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">Hedef Kitle</label>
-                      <select className="w-full mt-1 border border-gray-300 rounded-md px-3 py-2 text-sm">
-                        <option value="">Hedef kitle seçin</option>
-                        <option value="jewelry_lovers">Mücevher Severler</option>
-                        <option value="home_decor">Ev Dekorasyonu</option>
-                        <option value="vintage_collectors">Vintage Koleksiyoncuları</option>
-                        <option value="handmade_enthusiasts">El Yapımı Ürün Severler</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">Kampanya Türü</label>
-                      <select className="w-full mt-1 border border-gray-300 rounded-md px-3 py-2 text-sm">
-                        <option value="search">Arama Reklamları</option>
-                        <option value="browse">Kategori Reklamları</option>
-                        <option value="offsite">Offsite Ads</option>
-                      </select>
-                    </div>
-
-                    <Button className="w-full bg-orange-600 hover:bg-orange-700">
-                      <Zap className="w-4 h-4 mr-2" />
-                      Kampanyayı Başlat
-                    </Button>
-
-                    <div className="border-t pt-4">
-                      <h4 className="font-medium mb-2">💡 Kampanya İpuçları</h4>
-                      <ul className="text-sm text-gray-600 space-y-1">
-                        <li>• Günlük bütçenizi küçük başlatın</li>
-                        <li>• Yüksek kaliteli fotoğraflar kullanın</li>
-                        <li>• Anahtar kelimeleri optimize edin</li>
-                        <li>• Performansı düzenli takip edin</li>
-                      </ul>
-                    </div>
-                  </CardContent>
-                </Card>
-
-        {/* Active Campaigns */}
-                <Card>
-                  <CardHeader>
-            <CardTitle>Aktif Kampanyalar</CardTitle>
-            <CardDescription>Şu anda yürütülen kampanyalarınız</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-              {campaigns.map((campaign) => (
-                <div key={campaign.id} className="p-4 border border-gray-200 rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                      <h4 className="font-semibold">{campaign.name}</h4>
-                      <p className="text-sm text-gray-600">{campaign.type}</p>
-                              </div>
-                    <Badge className={getStatusColor(campaign.status)}>{getStatusText(campaign.status)}</Badge>
-                          </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-                    <div className="text-center p-2 bg-gray-50 rounded">
-                      <p className="text-sm text-gray-600">Harcanan</p>
-                      <p className="font-semibold">₺{campaign.spent}</p>
-                    </div>
-                            <div className="text-center p-2 bg-gray-50 rounded">
-                      <p className="text-sm text-gray-600">Tıklama</p>
-                      <p className="font-semibold">{campaign.clicks}</p>
-                            </div>
-                            <div className="text-center p-2 bg-gray-50 rounded">
-                      <p className="text-sm text-gray-600">Dönüşüm</p>
-                      <p className="font-semibold">{campaign.conversions}</p>
-                            </div>
-                            <div className="text-center p-2 bg-gray-50 rounded">
-                      <p className="text-sm text-gray-600">Gelir</p>
-                      <p className="font-semibold text-green-600">₺{campaign.revenue}</p>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                      <span>Bütçe Kullanımı:</span>
-                      <span>{Math.round((campaign.spent / campaign.budget) * 100)}%</span>
-                            </div>
-                    <Progress value={(campaign.spent / campaign.budget) * 100} className="h-2" />
-                          </div>
-
-                          <div className="flex items-center justify-between mt-3">
-                            <div className="text-sm text-gray-600">
-                      ROAS: {(campaign.revenue / campaign.spent).toFixed(1)}x
-                            </div>
-                            <div className="flex space-x-2">
-                              <Button size="sm" variant="outline">
-                                Düzenle
-                              </Button>
-                              <Button size="sm" variant="outline">
-                        {campaign.status === "active" ? "Duraklat" : "Başlat"}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-        {/* Campaign Analytics */}
-                <Card>
-                  <CardHeader>
-            <CardTitle>Kampanya Analizleri</CardTitle>
-            <CardDescription>Kampanyalarınızın performans metrikleri</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium text-green-900">Etsy Ads ROI</h4>
-                          <p className="text-sm text-green-700">Son 30 gün</p>
-                        </div>
-                        <div className="text-right">
-                    <p className="text-2xl font-bold text-green-600">{etsyAdsData?.return_on_ad_spend}x</p>
-                          <p className="text-sm text-green-600">ROAS</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium text-blue-900">Kupon Kullanımı</h4>
-                          <p className="text-sm text-blue-700">Aktif kuponlar</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-blue-600">
-                            {coupons.reduce((sum, c) => sum + c.usage_count, 0)}
-                          </p>
-                          <p className="text-sm text-blue-600">Toplam kullanım</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium text-purple-900">Sosyal Medya Erişimi</h4>
-                          <p className="text-sm text-purple-700">Tüm platformlar</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-purple-600">
-                            {(
-                              (socialMediaStats.pinterest_monthly_views + socialMediaStats.facebook_reach) /
-                              1000
-                            ).toFixed(0)}
-                            k
-                          </p>
-                          <p className="text-sm text-purple-600">Aylık erişim</p>
-                        </div>
-                      </div>
+                      <div className="font-medium">Örnek Ürün 1</div>
+                      <div className="text-xs text-gray-500">SKU: PRD-001</div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-      </main>
-  )
-}
+                </td>
+                <td className="text-center p-4 font-medium">₺25.00</td>
+                <td className="text-center p-4">240</td>
+                <td className="text-center p-4">12</td>
+                <td className="text-center p-4">5.0%</td>
+                <td className="text-center p-4">
+                  <span className="bg-green-50 text-green-700 px-2 py-1 rounded-full text-xs font-medium">Aktif</span>
+                </td>
+              </tr>
+              <tr className="border-b hover:bg-gray-50 transition-colors">
+                <td className="p-4">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg mr-3 flex items-center justify-center text-gray-400">
+                      <span className="text-xs">Ürün</span>
+                    </div>
+                    <div>
+                      <div className="font-medium">Örnek Ürün 2</div>
+                      <div className="text-xs text-gray-500">SKU: PRD-002</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="text-center p-4 font-medium">₺19.99</td>
+                <td className="text-center p-4">180</td>
+                <td className="text-center p-4">8</td>
+                <td className="text-center p-4">4.4%</td>
+                <td className="text-center p-4">
+                  <span className="bg-green-50 text-green-700 px-2 py-1 rounded-full text-xs font-medium">Aktif</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="p-4 text-center border-t border-gray-100">
+          <button className="text-primary text-sm font-medium hover:underline">
+            Tüm Ürünleri Görüntüle
+          </button>
+        </div>
+      </div>
+      
+      {/* Marketing Tips */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div className="p-5 border-b border-gray-100">
+          <h2 className="text-lg font-semibold">Marketing İpuçları</h2>
+          <p className="text-sm text-gray-500 mt-1">Satışlarınızı artırmak için öneriler</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5">
+          <div className="bg-blue-50 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-900 mb-2">SEO Optimizasyonu</h3>
+            <p className="text-sm text-blue-700">
+              Anahtar kelimelerinizi gözden geçirin ve başlıklarda kullanın. 
+              Özellikle "canvas" ve "duvar dekorasyonu" gibi popüler aramaları içeren ürünlere odaklanın.
+            </p>
+          </div>
+          
+          <div className="bg-green-50 rounded-lg p-4">
+            <h3 className="font-semibold text-green-900 mb-2">Fiyatlandırma Stratejisi</h3>
+            <p className="text-sm text-green-700">
+              En çok görüntülenen ama az satılan ürünleriniz için fiyat indirimi deneyebilirsiniz.
+              Yüksek dönüşüm oranına sahip ürünlerinizin fiyatını artırabilirsiniz.
+            </p>
+          </div>
+          
+          <div className="bg-purple-50 rounded-lg p-4">
+            <h3 className="font-semibold text-purple-900 mb-2">Sosyal Medya Tanıtımı</h3>
+            <p className="text-sm text-purple-700">
+              En popüler ürünlerinizi Pinterest ve Instagram'da tanıtın.
+              Görseller ve kullanıcı yorumlarıyla sosyal kanıt oluşturun.
+            </p>
+          </div>
+          
+          <div className="bg-orange-50 rounded-lg p-4">
+            <h3 className="font-semibold text-orange-900 mb-2">Sezonsal Kampanyalar</h3>
+            <p className="text-sm text-orange-700">
+              Yaklaşan özel günler ve tatiller için özel kampanyalar planlayın.
+              Sınırlı süreli indirimlerle satışlarınızı artırın.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+} 

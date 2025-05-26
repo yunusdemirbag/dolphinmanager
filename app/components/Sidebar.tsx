@@ -48,6 +48,7 @@ export function Sidebar() {
         { icon: BarChart3, label: "Dashboard", path: "/dashboard" },
         { icon: Store, label: "Mağazalar", path: "/stores" },
         { icon: ShoppingBag, label: "Ürünler", path: "/products" },
+        { icon: Package, label: "Siparişler", path: "/orders" },
         { icon: Sparkles, label: "Dolphin AI", path: "/dolphin-ai" },
         { icon: DollarSign, label: "Maliyetler", path: "/costs" },
         { icon: CreditCard, label: "Finans", path: "/finance" },

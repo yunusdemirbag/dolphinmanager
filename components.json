@@ -17,5 +17,18 @@
     "lib": "@/lib",
     "hooks": "@/hooks"
   },
-  "iconLibrary": "lucide"
+  "iconLibrary": "lucide",
+  "menu": [
+    { "label": "Dashboard", "icon": "bar-chart", "route": "/dashboard" },
+    { "label": "Mağazalar", "icon": "store", "route": "/stores" },
+    { "label": "Ürünler", "icon": "box", "route": "/products" },
+    { "label": "Siparişler", "icon": "shopping-cart", "route": "/orders" },
+    { "label": "Dolphin AI", "icon": "bot", "route": "/ai" },
+    { "label": "Maliyetler", "icon": "calculator", "route": "/costs" },
+    { "label": "Finans", "icon": "credit-card", "route": "/finance" },
+    { "label": "Müşteri Yönetimi", "icon": "users", "route": "/customers" },
+    { "label": "Marketing", "icon": "activity", "route": "/marketing" },
+    { "label": "SEO Optimizer", "icon": "search", "route": "/seo" },
+    { "label": "Ayarlar", "icon": "settings", "route": "/settings" }
+  ]
 }

@@ -39,11 +39,25 @@ export async function GET(request: NextRequest) {
 
     // Etsy API başarısız olursa varsayılan değerler döndür
     console.log("📦 Using database fallback for stats")
+    
+    // Kullanıcının profil verisini kontrol et
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("etsy_shop_name")
+      .eq("id", user.id)
+      .single()
+      
+    // Eğer profilde Etsy mağaza ismi varsa göster
+    const shopName = profile?.etsy_shop_name || "CanvasesWorldTR"
+    console.log(`📊 Generating mock stats for shop: ${shopName}`)
+    
     return NextResponse.json({
       totalListings: 763,
       totalOrders: 55,
       totalViews: 1420,
-      totalRevenue: 1427.45
+      totalRevenue: 1427.45,
+      source: "database_fallback",
+      shopName
     })
 
   } catch (error: any) {

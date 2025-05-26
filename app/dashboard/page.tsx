@@ -132,10 +132,16 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Etsy verileriniz yükleniyor...</p>
-          <p className="text-sm text-gray-500 mt-2">Veritabanından veriler çekiliyor</p>
+        <div className="text-center bg-white p-8 rounded-lg shadow-sm max-w-md mx-auto">
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-200 rounded-full"></div>
+            <Loader2 className="h-16 w-16 animate-spin text-blue-600 absolute top-0 left-0" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Etsy Verileri Yükleniyor</h2>
+          <p className="text-gray-600 mb-4">Mağaza performans verileri hazırlanıyor...</p>
+          <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-600 rounded-full animate-pulse" style={{ width: '75%' }}></div>
+          </div>
         </div>
       </div>
     )

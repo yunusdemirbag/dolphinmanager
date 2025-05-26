@@ -1,21 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { useRouter } from "next/navigation"
 import {
   Sparkles,
   Calendar,
   TrendingUp,
   Target,
   Lightbulb,
-  Heart,
-  Gift,
-  Snowflake,
-  Sun,
-  Leaf,
-  Flower,
+  BarChart3,
+  Search,
+  ArrowRight,
   RefreshCw,
   Bot,
   Clock
@@ -43,11 +41,63 @@ interface CalendarEvent {
 }
 
 export default function DolphinAIPage() {
+  const router = useRouter()
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([])
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [aiSource, setAiSource] = useState<"openai" | "fallback" | null>(null)
+
+  const aiTools = [
+    {
+      id: "market-advisor",
+      title: "Pazar Danışmanı",
+      description: "Trendleri, fırsatları ve ürün performansını tek bir gösterge panelinde analiz edin.",
+      icon: BarChart3,
+      color: "from-blue-400 to-indigo-500",
+      path: "/dolphin-ai/market-advisor"
+    },
+    {
+      id: "trend-predictor",
+      title: "Trend Tahmini",
+      description: "Yapay zeka ile gelecek trendleri önceden tahmin edin ve fırsatları yakalayın.",
+      icon: TrendingUp,
+      color: "from-purple-400 to-pink-500",
+      path: "/dolphin-ai/trend-predictor"
+    },
+    {
+      id: "opportunity-finder",
+      title: "Pazar Fırsatı Bulucu",
+      description: "Yüksek potansiyelli niche pazar fırsatlarını keşfedin ve rekabette öne çıkın.",
+      icon: Lightbulb,
+      color: "from-green-400 to-cyan-500",
+      path: "/dolphin-ai/opportunity-finder"
+    },
+    {
+      id: "product-analyzer",
+      title: "Ürün Analizi",
+      description: "Ürünlerinizin performansını analiz edin ve optimize etmek için öneriler alın.",
+      icon: Target,
+      color: "from-orange-400 to-red-500",
+      path: "/dolphin-ai/product-analyzer"
+    },
+    {
+      id: "seo-optimizer",
+      title: "SEO Optimizer",
+      description: "Ürün başlıklarınızı ve açıklamalarınızı AI ile optimize edin, arama sıralamalarını yükseltin.",
+      icon: Search,
+      color: "from-yellow-400 to-amber-500",
+      path: "/seo-optimizer"
+    },
+    {
+      id: "seasonal-planner",
+      title: "Mevsimsel Planlayıcı",
+      description: "Özel günler ve mevsimsel fırsatlar için önceden hazırlıklı olun.",
+      icon: Calendar,
+      color: "from-teal-400 to-emerald-500",
+      path: "/seasonal-planner"
+    }
+  ]
 
   useEffect(() => {
     // Sayfa yüklendiğinde localStorage'dan verileri yükle
@@ -206,182 +256,61 @@ export default function DolphinAIPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Dolphin AI</h1>
-              <p className="text-gray-600">Fiziksel Canvas Wall Art Print işletmeniz için AI destekli öneriler ve takvim planlaması</p>
-              {lastUpdate && (
-                <p className="text-sm text-gray-500 mt-2">
-                  Son güncelleme: {lastUpdate.toLocaleString('tr-TR')}
-                  {aiSource && (
-                    <span className="ml-2">
-                      <Badge variant={aiSource === "openai" ? "default" : "secondary"}>
-                        {aiSource === "openai" ? "OpenAI" : "Fallback"}
-                      </Badge>
-                    </span>
-                  )}
-                </p>
-              )}
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Dolphin AI Araçları</h1>
+              <p className="text-gray-600">Yapay zeka destekli araçlarla işletmenizi büyütün ve rekabette öne geçin</p>
             </div>
-            <Button 
-              onClick={generateAIRecommendations} 
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Güncelleniyor...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Yeni Öneriler Al
-                </>
-              )}
-            </Button>
+            <Badge variant="outline" className="bg-blue-50 text-blue-800 flex items-center gap-1 py-1.5">
+              <Bot className="h-3 w-3" />
+              Claude 3.7 Sonnet ile güçlendirilmiştir
+            </Badge>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* AI Önerileri - Sol taraf (2/3) */}
-          <div className="lg:col-span-2">
-            {recommendations.length > 0 ? (
-              <div className="space-y-4">
-                {recommendations.map((recommendation) => (
-                  <Card key={recommendation.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          {getTypeIcon(recommendation.type)}
-                          <CardTitle className="text-lg">{recommendation.title}</CardTitle>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge className={getPriorityColor(recommendation.priority)}>
-                            {recommendation.priority === "high" ? "Yüksek" : 
-                             recommendation.priority === "medium" ? "Orta" : "Düşük"}
-                          </Badge>
-                          <Badge variant="outline">
-                            %{recommendation.confidence} güven
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-gray-700">{recommendation.description}</p>
-                      {recommendation.data && (
-                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                          <p className="text-sm font-medium text-gray-900 mb-1">Detaylar:</p>
-                          <div className="text-sm text-gray-600">
-                            {Object.entries(recommendation.data).map(([key, value]) => (
-                              <div key={key} className="flex justify-between">
-                                <span className="capitalize">{key}:</span>
-                                <span className="font-medium">
-                                  {Array.isArray(value) ? value.join(", ") : String(value)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card className="text-center py-12">
-                <CardContent>
-                  <Bot className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Henüz öneri yok</h3>
-                  <p className="text-gray-600">
-                    AI destekli öneriler almak için sağ üstteki "Yeni Öneriler Al" butonuna tıklayın
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Yaklaşan Özel Günler - Sağ taraf (1/3) */}
-          <div className="lg:col-span-1">
-            <Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {aiTools.map(tool => (
+            <Card key={tool.id} className="overflow-hidden hover:shadow-md transition-all">
+              <div className={`h-2 bg-gradient-to-r ${tool.color}`}></div>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  Yaklaşan Özel Günler
-                </CardTitle>
-                <CardDescription>
-                  Canvas Wall Art Print satışları için önemli tarihler
-                </CardDescription>
+                <div className="flex justify-between items-start">
+                  <div className={`p-2 rounded-lg bg-gradient-to-br ${tool.color}`}>
+                    <tool.icon className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+                <CardTitle className="mt-4">{tool.title}</CardTitle>
+                <CardDescription>{tool.description}</CardDescription>
               </CardHeader>
-              <CardContent>
-                {calendarEvents.length > 0 ? (
-                  <div className="space-y-4">
-                    {calendarEvents.slice(0, 5).map((event, index) => {
-                      const IconComponent = getCalendarIcon(event.name)
-                      return (
-                        <div key={index} className={`border-l-4 pl-4 py-3 rounded-r-lg ${
-                          event.priority === 'high' ? 'border-orange-400 bg-orange-50' :
-                          event.priority === 'medium' ? 'border-blue-400 bg-blue-50' :
-                          'border-green-400 bg-green-50'
-                        }`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center">
-                              <IconComponent className={`h-5 w-5 mr-2 ${
-                                event.priority === 'high' ? 'text-orange-600' :
-                                event.priority === 'medium' ? 'text-blue-600' :
-                                'text-green-600'
-                              }`} />
-                              <h4 className="font-semibold text-gray-900">{event.name}</h4>
-                            </div>
-                            <div className={`flex items-center text-sm font-bold ${
-                              event.priority === 'high' ? 'text-orange-600' :
-                              event.priority === 'medium' ? 'text-blue-600' :
-                              'text-green-600'
-                            }`}>
-                              <Clock className="h-3 w-3 mr-1" />
-                              {event.daysUntil} gün
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-700 mb-2">{event.description}</p>
-                          <p className="text-xs text-gray-600 mb-2 font-medium">İş Etkisi: {event.businessImpact}</p>
-                          
-                          {event.themes && event.themes.length > 0 && (
-                            <div className="mb-2">
-                              <p className="text-xs font-medium text-gray-700 mb-1">Önerilen Temalar:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {event.themes.slice(0, 3).map((theme, themeIndex) => (
-                                  <Badge key={themeIndex} variant="secondary" className="text-xs">
-                                    {theme}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {event.colors && event.colors.length > 0 && (
-                            <div>
-                              <p className="text-xs font-medium text-gray-700 mb-1">Önerilen Renkler:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {event.colors.slice(0, 3).map((color, colorIndex) => (
-                                  <Badge key={colorIndex} variant="outline" className="text-xs">
-                                    {color}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Calendar className="h-8 w-8 mx-auto mb-3 text-gray-400" />
-                    <p className="text-gray-600 text-sm">
-                      Henüz özel gün bilgisi yok
-                    </p>
-                  </div>
-                )}
-              </CardContent>
+              <CardFooter>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-between text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                  onClick={() => router.push(tool.path)}
+                >
+                  <span>Keşfet</span>
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </CardFooter>
             </Card>
+          ))}
+        </div>
+
+        <div className="mt-12 bg-blue-50 rounded-lg p-6 border border-blue-100">
+          <div className="flex items-start">
+            <div className="mr-4 bg-blue-500 rounded-full p-3">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Yapay Zeka ile İşletmenizi Büyütün</h3>
+              <p className="text-gray-700 mb-4">
+                Dolphin AI araçları, gelişmiş yapay zeka teknolojisini kullanarak Etsy işletmeniz için veri odaklı kararlar almanıza yardımcı olur. Trendleri önceden tahmin edin, pazar fırsatlarını keşfedin ve ürün performansınızı optimize edin.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Badge className="bg-blue-100 text-blue-800 border-blue-200">Trend Analizi</Badge>
+                <Badge className="bg-green-100 text-green-800 border-green-200">Pazar Fırsatları</Badge>
+                <Badge className="bg-purple-100 text-purple-800 border-purple-200">Ürün Optimizasyonu</Badge>
+                <Badge className="bg-amber-100 text-amber-800 border-amber-200">SEO İyileştirme</Badge>
+                <Badge className="bg-red-100 text-red-800 border-red-200">Rekabet Avantajı</Badge>
+              </div>
+            </div>
           </div>
         </div>
       </main>

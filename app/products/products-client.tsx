@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -44,7 +45,11 @@ import {
   X,
   Image as ImageIcon,
   ExternalLink,
-  Info
+  Info,
+  RefreshCw,
+  Clock,
+  Check,
+  MoreHorizontal
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
 
@@ -130,6 +135,15 @@ export default function ProductsClient() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isDemoData, setIsDemoData] = useState(false);
   const [demoMessage, setDemoMessage] = useState("");
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [refreshStatus, setRefreshStatus] = useState<{
+    success?: boolean;
+    message?: string;
+  }>({})
+  const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [selectedProducts, setSelectedProducts] = useState<number[]>([])
+  const [selectAllChecked, setSelectAllChecked] = useState(false)
 
   // getProductImage fonksiyonunu sadeleştiriyorum:
   const getProductImage = (product: Product): string | null => {
@@ -161,6 +175,19 @@ export default function ProductsClient() {
     loadProducts()
     loadTaxonomy()
     loadShippingProfiles()
+    
+    // İlk sayfa yüklendiğinde son yenileme zamanını ayarla
+    setLastRefresh(new Date())
+    
+    // Otomatik yenileme için 3 saatlik timer başlat
+    startAutoRefreshTimer()
+    
+    // Component unmount olduğunda timer'ı temizle
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearTimeout(autoRefreshTimerRef.current)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -181,106 +208,129 @@ export default function ProductsClient() {
     if (products.length > 0) loadAnalytics();
   }, [products]);
 
-  const loadProducts = async () => {
-    setLoading(true)
-    setIsDemoData(false)
-    setDemoMessage("")
-
-    try {
-      // Gerçek Etsy ürünlerini çekmeye çalış
-      const response = await fetch('/api/etsy/products')
-      
-      if (response.ok) {
-        const data = await response.json()
-        console.log("Products API response:", data)
-        
-        if (data.products && data.products.length > 0) {
-          // Demo veri mi kontrol et
-          if (data.source === "demo") {
-            setIsDemoData(true)
-            setDemoMessage(data.message || "Etsy API'ye erişilemedi, demo ürünler gösteriliyor")
-          }
-          
-          // Normalize product data to ensure consistent format
-          const normalizedProducts = data.products.map((product: any) => {
-            // Handle price field which could be a string or an object
-            let price = product.price;
-            if (typeof price === 'string') {
-              price = {
-                amount: parseFloat(price) * 100,
-                divisor: 100,
-                currency_code: product.currency_code || 'USD'
-              };
-            } else if (!price || typeof price !== 'object') {
-              price = {
-                amount: 0,
-                divisor: 1,
-                currency_code: product.currency_code || 'USD'
-              };
-            }
-            
-            // Handle missing timestamps
-            const now = Date.now() / 1000;
-            
-            // Handle missing or malformed images with more robust approach
-            let images = product.images || [];
-            if (!Array.isArray(images)) {
-              images = [];
-            }
-            
-            // Orijinal Etsy resim URL'sini koruyalım, proxy'de kullanacağız
-            if (images.length > 0) {
-              images = images.map((img: any) => {
-                if (img && img.url_570xN) {
-                  return {
-                    ...img,
-                    url_570xN: img.url_570xN // Orijinal URL'yi koru
-                  };
-                }
-                return img;
-              });
-            }
-            
-            return {
-              ...product,
-              price,
-              tags: product.tags || [],
-              state: product.state || 'active',
-              views: product.views || 0,
-              created_timestamp: product.creation_timestamp || product.created_timestamp || now,
-              last_modified_timestamp: product.last_modified_timestamp || now,
-              images: images,
-              url: product.url || `https://www.etsy.com/listing/${product.listing_id}`,
-              metrics: product.metrics || { views: 0, favorites: 0, sold: 0 }
-            };
-          });
-          
-          setProducts(normalizedProducts);
-          
-          // Log success message with source information
-          if (data.source === "etsy_api") {
-            console.log(`✅ Loaded ${normalizedProducts.length} products from Etsy API (${data.total || "unknown"} total)`);
-          } else if (data.source === "database") {
-            console.log(`✅ Loaded ${normalizedProducts.length} products from database`);
-          } else {
-            console.log(`✅ Loaded ${normalizedProducts.length} demo products`);
-          }
-        } else {
-          console.log("No products found");
-          setProducts([]);
-        }
-      } else {
-        console.error("Products API error:", response.status, response.statusText);
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Error details:", errorData);
-        setProducts([]);
-      }
-    } catch (apiError) {
-      console.error("API error:", apiError);
-      setProducts([]);
+  // Otomatik yenileme timer'ını başlat
+  const startAutoRefreshTimer = useCallback(() => {
+    // Önceki timer varsa temizle
+    if (autoRefreshTimerRef.current) {
+      clearTimeout(autoRefreshTimerRef.current)
     }
     
-    setLoading(false);
+    // 3 saatlik timer ayarla (3 * 60 * 60 * 1000 = 10800000 ms)
+    autoRefreshTimerRef.current = setTimeout(() => {
+      console.log("Otomatik yenileme zamanı geldi")
+      refreshProducts(false) // Sessiz yenileme (bildirim gösterme)
+      // Timer'ı tekrar başlat
+      startAutoRefreshTimer()
+    }, 3 * 60 * 60 * 1000)
+    
+    console.log("Otomatik yenileme timer'ı başlatıldı - 3 saat sonra yenilenecek")
+  }, [])
+  
+  // Veri yenileme fonksiyonu
+  const refreshProducts = async (showNotification = true) => {
+    try {
+      if (refreshing) return // Zaten yenileme işlemi devam ediyorsa çık
+      
+      setRefreshing(true)
+      if (showNotification) {
+        setRefreshStatus({ message: "Ürün verileri yenileniyor..." })
+      }
+      
+      // API'ye istek gönder
+      const response = await fetch("/api/etsy/refresh", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          forceRefresh: true // Önbelleği temizle ve yeni veri çek
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Başarılı yenileme sonrası ürünleri yeniden yükle
+        await loadProducts()
+        setLastRefresh(new Date())
+        
+        if (showNotification) {
+          setRefreshStatus({
+            success: true,
+            message: "Ürünler başarıyla yenilendi"
+          })
+        }
+      } else {
+        if (showNotification) {
+          setRefreshStatus({
+            success: false,
+            message: `Yenileme hatası: ${result.message}`
+          })
+        }
+        console.error("Ürün yenileme hatası:", result.message)
+      }
+    } catch (error) {
+      if (showNotification) {
+        setRefreshStatus({
+          success: false,
+          message: "Ürün yenileme sırasında bir hata oluştu"
+        })
+      }
+      console.error("Ürün yenileme hatası:", error)
+    } finally {
+      setRefreshing(false)
+      
+      // 5 saniye sonra bildirim mesajını temizle (sadece bildirim gösteriliyorsa)
+      if (showNotification) {
+        setTimeout(() => {
+          setRefreshStatus({})
+        }, 5000)
+      }
+    }
+  }
+
+  const loadProducts = async () => {
+    setLoading(true)
+    try {
+      // Kullanıcı ve mağaza id'sini çek
+      const storesRes = await fetch('/api/etsy/stores')
+      let shopId = null
+      
+      if (storesRes.ok) {
+        const storesData = await storesRes.json()
+        if (storesData.stores && storesData.stores.length > 0) {
+          shopId = storesData.stores[0].shop_id
+          
+          // İlgili mağazadan ürünleri çek
+          const listingsRes = await fetch(`/api/etsy/listings?shop_id=${shopId}`)
+          
+          if (listingsRes.ok) {
+            const listingsData = await listingsRes.json()
+            const listings = listingsData.listings || []
+            
+            setProducts(listings)
+            setFilteredProducts(listings)
+            setIsDemoData(listingsData.isDemoData || false)
+            setDemoMessage(listingsData.message || "")
+            return
+          }
+        }
+      }
+      
+      // API yanıt vermezse veya hata olursa boş ürün listesi göster
+      setProducts([])
+      setFilteredProducts([])
+      setIsDemoData(true)
+      setDemoMessage("Etsy mağazanızdan ürünler yüklenemedi. Lütfen daha sonra tekrar deneyin.")
+    } catch (error) {
+      console.error("Error loading products:", error)
+      setProducts([])
+      setFilteredProducts([])
+      setIsDemoData(true)
+      setDemoMessage("Ürünler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   const loadTaxonomy = async () => {
@@ -614,11 +664,124 @@ export default function ProductsClient() {
     setShowCreateModal(true);
   };
 
+  // Ürün seçme/seçimi kaldırma fonksiyonu
+  const toggleProductSelection = (listingId: number) => {
+    setSelectedProducts(prev => {
+      if (prev.includes(listingId)) {
+        return prev.filter(id => id !== listingId);
+      } else {
+        return [...prev, listingId];
+      }
+    });
+  };
+
+  // Tüm ürünleri seçme/seçimi kaldırma fonksiyonu
+  const toggleSelectAll = () => {
+    if (selectedProducts.length === filteredProducts.length) {
+      // Tüm seçimleri kaldır
+      setSelectedProducts([]);
+      setSelectAllChecked(false);
+    } else {
+      // Tüm ürünleri seç
+      setSelectedProducts(filteredProducts.map(product => product.listing_id));
+      setSelectAllChecked(true);
+    }
+  };
+
+  // Toplu silme fonksiyonu
+  const handleBulkDelete = async () => {
+    if (selectedProducts.length === 0) {
+      return;
+    }
+
+    if (!confirm(`Seçilen ${selectedProducts.length} ürünü silmek istediğinizden emin misiniz?`)) {
+      return;
+    }
+
+    // Her bir seçili ürünü sırayla siliyoruz
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const listingId of selectedProducts) {
+        try {
+          const response = await fetch(`/api/etsy/listings/${listingId}`, {
+            method: 'DELETE'
+          });
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        } catch (error) {
+          console.error(`Error deleting product ${listingId}:`, error);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        alert(`✅ ${successCount} ürün başarıyla silindi. ${errorCount > 0 ? `\n❌ ${errorCount} ürün silinemedi.` : ''}`);
+        loadProducts(); // Ürün listesini yenile
+        setSelectedProducts([]); // Seçimleri temizle
+        setSelectAllChecked(false);
+      } else {
+        alert("❌ Ürünler silinirken hata oluştu!");
+      }
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      alert("❌ Toplu silme işlemi sırasında bir hata oluştu!");
+    }
+  };
+
+  // Filtered products değiştiğinde, select all checkbox durumunu güncelle
+  useEffect(() => {
+    setSelectAllChecked(
+      filteredProducts.length > 0 && 
+      selectedProducts.length === filteredProducts.length
+    );
+  }, [filteredProducts, selectedProducts]);
+
   const ProductCard = ({ product }: { product: Product }) => {
+    const isSelected = selectedProducts.includes(product.listing_id);
+
     return (
-      <div className="bg-white rounded-xl shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300">
+      <div 
+        className={`bg-white rounded-xl shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300 ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+        onClick={(e) => {
+          // Düğmelerin bulunduğu bölüme tıklandığında seçim yapmayı engelleme
+          if (
+            (e.target as HTMLElement).tagName === 'BUTTON' || 
+            (e.target as HTMLElement).closest('button') || 
+            (e.target as HTMLElement).tagName === 'A' || 
+            (e.target as HTMLElement).closest('a')
+          ) {
+            return;
+          }
+          
+          // Butona tıklanmadıysa ürünü seç/seçimi kaldır
+          toggleProductSelection(product.listing_id);
+        }}
+        style={{ cursor: 'pointer' }}
+      >
         <div className="relative aspect-square bg-gray-50">
-          <ProductImage product={product} />
+          <div className="absolute top-2 left-2 z-10">
+            <Checkbox 
+              checked={isSelected}
+              onCheckedChange={() => toggleProductSelection(product.listing_id)}
+              className="bg-white border-gray-300 rounded-sm"
+              onClick={(e) => e.stopPropagation()} // Checkbox'a tıklandığında event'in yayılmasını engelle
+            />
+          </div>
+          <div 
+            className="w-full h-full" 
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleProductSelection(product.listing_id);
+            }}
+          >
+            <ProductImage product={product} />
+          </div>
         </div>
         <div className="p-4 flex flex-col flex-1">
           <h3 className="text-base font-semibold text-gray-800 mb-1 line-clamp-2 min-h-[48px]">
@@ -653,7 +816,10 @@ export default function ProductsClient() {
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => window.open(product.url, '_blank')}
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(product.url, '_blank');
+              }}
             >
               <ExternalLink className="h-4 w-4 mr-2" /> Etsy'de Gör
             </Button>
@@ -661,18 +827,36 @@ export default function ProductsClient() {
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => handleCopyProduct(product)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCopyProduct(product);
+              }}
             >
               <Copy className="h-4 w-4 mr-2" /> Kopyala
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => setShowEditModal(product)}
-            >
-              <Edit className="h-4 w-4 mr-2" /> Düzenle
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowEditModal(product);
+                }}
+              >
+                <Edit className="h-4 w-4 mr-2" /> Düzenle
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteProduct(product.listing_id);
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" /> Sil
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -728,11 +912,45 @@ export default function ProductsClient() {
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Ürünler</h1>
-        <Button onClick={handleOpenCreateModal} className="bg-purple-600 hover:bg-purple-700">
-          <Plus className="w-4 h-4 mr-2" />
-          Ürün Ekle
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleOpenCreateModal} className="bg-purple-600 hover:bg-purple-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Ürün Ekle
+          </Button>
+        </div>
       </div>
+      
+      {/* Yenileme durumu bildirimi */}
+      {refreshStatus.message && (
+        <div className={`mb-4 p-3 rounded border flex items-center ${
+          refreshStatus.success === undefined
+            ? 'bg-blue-50 border-blue-200 text-blue-700'  // Bilgi
+            : refreshStatus.success
+              ? 'bg-green-50 border-green-200 text-green-700'  // Başarılı
+              : 'bg-red-50 border-red-200 text-red-700'  // Hata
+        }`}>
+          {refreshStatus.success === undefined ? (
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+          ) : refreshStatus.success ? (
+            <CheckCircle className="w-4 h-4 mr-2" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 mr-2" />
+          )}
+          <span>{refreshStatus.message}</span>
+        </div>
+      )}
+      
+      {/* Son yenileme bilgisi */}
+      {lastRefresh && (
+        <div className="text-xs text-gray-500 mb-4 flex items-center">
+          <Clock className="w-3 h-3 mr-1" />
+          Son yenileme: {lastRefresh.toLocaleString()}
+          <span className="mx-2">•</span>
+          <span>Otomatik yenileme: 3 saatte bir</span>
+          <span className="mx-2">•</span>
+          <span>Daha hızlı yenileme için <span className="text-blue-600 font-medium">Dashboard</span> sayfasını kullanabilirsiniz</span>
+        </div>
+      )}
       
       {isDemoData && (
         <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded">
@@ -789,6 +1007,41 @@ export default function ProductsClient() {
           </Button>
         </div>
       </div>
+
+      {/* Toplu İşlemler */}
+      {filteredProducts.length > 0 && (
+        <div className="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Checkbox 
+              id="select-all"
+              checked={selectAllChecked}
+              onCheckedChange={toggleSelectAll}
+              className="border-gray-300"
+            />
+            <Label htmlFor="select-all" className="cursor-pointer">
+              Tümünü Seç ({selectAllChecked ? filteredProducts.length : 0}/{filteredProducts.length})
+            </Label>
+          </div>
+          
+          {selectedProducts.length > 0 && (
+            <>
+              <div className="h-6 border-l border-gray-300 mx-2"></div>
+              <div className="text-sm text-gray-500">
+                {selectedProducts.length} ürün seçildi
+              </div>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={handleBulkDelete}
+                className="ml-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Seçilenleri Sil
+              </Button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Products Grid */}
       {filteredProducts.length === 0 ? (

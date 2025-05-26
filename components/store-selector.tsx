@@ -28,22 +28,21 @@ export default function StoreSelector({
 
   if (stores.length === 0) {
     return (
-      <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg">
-        <Store className="w-4 h-4 text-gray-400" />
-        <span className="text-sm text-gray-600">Mağaza bağlanmamış</span>
+      <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg text-sm">
+        <Store className="w-4 h-4 text-gray-500" />
+        <span className="text-gray-600">Mağaza bağlanmamış</span>
       </div>
     )
   }
 
   if (stores.length === 1) {
     return (
-      <div className="flex items-center space-x-3 px-3 py-2 bg-orange-50 rounded-lg border border-orange-200">
-        <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-          <Store className="w-5 h-5 text-orange-600" />
+      <div className="flex items-center space-x-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="w-6 h-6 bg-blue-100 rounded-md flex items-center justify-center">
+          <Store className="w-3.5 h-3.5 text-blue-600" />
         </div>
-        <div>
-          <p className="font-medium text-orange-900">{currentStore?.shop_name}</p>
-          <p className="text-xs text-orange-600">{currentStore?.listing_active_count} ürün</p>
+        <div className="truncate">
+          <p className="font-medium text-sm text-gray-800">{currentStore?.shop_name}</p>
         </div>
       </div>
     )
@@ -54,26 +53,20 @@ export default function StoreSelector({
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="flex items-center space-x-2 h-auto p-3 border-orange-200 hover:bg-orange-50"
+          className="flex items-center justify-between w-full p-2 border-blue-200 hover:bg-blue-50 h-auto text-sm"
         >
-          <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-            <Store className="w-5 h-5 text-orange-600" />
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-blue-100 rounded-md flex items-center justify-center">
+              <Store className="w-3.5 h-3.5 text-blue-600" />
+            </div>
+            <span className="font-medium truncate">{currentStore?.shop_name}</span>
           </div>
-          <div className="text-left">
-            <p className="font-medium text-sm">{currentStore?.shop_name}</p>
-            <p className="text-xs text-gray-600">{currentStore?.listing_active_count} ürün</p>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-0">
-              {stores.length}
-            </Badge>
-            <ChevronDown className="w-4 h-4" />
-          </div>
+          <ChevronDown className="w-4 h-4 ml-2" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-80">
+      <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Mağazalarınız ({stores.length}/5)</span>
+          <span>Mağazalarınız</span>
           {showAddStore && (
             <Button size="sm" variant="ghost" className="h-6 px-2">
               <Plus className="w-3 h-3" />
@@ -85,44 +78,28 @@ export default function StoreSelector({
           <DropdownMenuItem
             key={store.id}
             onClick={() => onStoreChange(store.id)}
-            className="flex items-center justify-between p-3 cursor-pointer"
+            className="flex items-center justify-between p-2 cursor-pointer"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                <Store className="w-6 h-6 text-orange-600" />
+            <div className="flex items-center space-x-2">
+              <div className="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center">
+                <Store className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <p className="font-medium">{store.shop_name}</p>
-                <div className="flex items-center space-x-2 text-xs text-gray-600">
-                  <span>{store.listing_active_count} ürün</span>
-                  <span>•</span>
-                  <span>{store.num_favorers} takipçi</span>
-                  {index === 0 && (
-                    <>
-                      <span>•</span>
-                      <Badge variant="outline" className="text-xs px-1 py-0">
-                        Ana
-                      </Badge>
-                    </>
-                  )}
-                </div>
+                <p className="font-medium text-sm">{store.shop_name}</p>
+                {index === 0 && (
+                  <Badge variant="outline" className="text-xs px-1 py-0 mt-0.5">
+                    Ana
+                  </Badge>
+                )}
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              {store.id === selectedStore && <CheckCircle className="w-4 h-4 text-green-600" />}
-              <Badge
-                variant="secondary"
-                className={`text-xs ${store.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
-              >
-                {store.is_active ? "Aktif" : "Pasif"}
-              </Badge>
-            </div>
+            {store.id === selectedStore && <CheckCircle className="w-4 h-4 text-green-600" />}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => (window.location.href = "/stores")} className="text-orange-600">
+        <DropdownMenuItem onClick={() => (window.location.href = "/stores")} className="text-blue-600">
           <Settings className="w-4 h-4 mr-2" />
-          Mağazaları Yönet
+          Mağaza Ayarları
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -62,9 +62,9 @@ export async function middleware(req: NextRequest) {
     }
     
     // Korumalı sayfalar - oturum yoksa login'e yönlendir
-    const protectedPages = ["/dashboard", "/stores", "/products"]
+    const protectedPages = ["/dashboard", "/stores", "/products", "/finance", "/orders", "/customer-management", "/marketing"]
     if (protectedPages.some(page => req.nextUrl.pathname.startsWith(page)) && !session) {
-      return NextResponse.redirect(new URL("/auth/login", req.url))
+      return NextResponse.redirect(new URL("/auth/login?redirect=" + encodeURIComponent(req.nextUrl.pathname), req.url))
     }
     
     return res

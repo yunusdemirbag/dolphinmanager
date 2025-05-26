@@ -3,22 +3,33 @@ import { cookies } from 'next/headers'
 import { Database } from '@/types/database.types'
 
 export async function createClient() {
-  try {
-    // Next.js 15 ile uyumlu, cookie tabanlı Supabase client
-    return createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          async get(name: string) {
-            const cookieStore = await cookies();
-            return cookieStore.get(name)?.value;
+  const cookieStore = cookies()
+  
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name) {
+          return cookieStore.get(name)?.value
+        },
+        set(name, value, options) {
+          try {
+            cookieStore.set({ name, value, ...options })
+          } catch (e) {
+            // Bu hata server component içinde olması beklenir
+            console.warn('Failed to set cookie in a Server Component')
           }
-        }
-      }
-    )
-  } catch (error) {
-    console.error("Error creating Supabase client:", error);
-    throw error;
-  }
+        },
+        remove(name, options) {
+          try {
+            cookieStore.set({ name, value: '', ...options })
+          } catch (e) {
+            // Bu hata server component içinde olması beklenir
+            console.warn('Failed to remove cookie in a Server Component')
+          }
+        },
+      },
+    }
+  )
 } 

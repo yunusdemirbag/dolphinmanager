@@ -259,7 +259,7 @@ export default function ProductsClient() {
 
   useEffect(() => {
     filterAndSortProducts()
-  }, [searchTerm, sortBy, filterStatus, sortOrder])
+  }, [searchTerm, sortBy, filterStatus, sortOrder, products])
 
   useEffect(() => {
     // Artık sahte analytics verisi yok, sadece gerçek Etsy verisi kullanılacak
@@ -317,7 +317,8 @@ export default function ProductsClient() {
       
       if (result.success) {
         // Başarılı yenileme sonrası ürünleri yeniden yükle
-        await loadProducts()
+        // Remove this call since we're updating local state properly now
+        // await loadProducts()
         setLastRefresh(new Date())
         
         if (showNotification) {
@@ -697,19 +698,25 @@ export default function ProductsClient() {
   const handleUpdateProduct = async (product: Product) => {
     setSubmitting(true);
     try {
-      console.log("Updating product:", product.listing_id, product);
+      // Ensure quantity is properly parsed as a number
+      const productToUpdate = {
+        ...product,
+        quantity: typeof product.quantity === 'string' ? parseInt(product.quantity) : product.quantity
+      };
       
-      const response = await fetch(`/api/etsy/listings/${product.listing_id}`, {
+      console.log("Updating product:", productToUpdate.listing_id, productToUpdate);
+      
+      const response = await fetch(`/api/etsy/listings/${productToUpdate.listing_id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: product.title,
-          description: product.description,
-          price: Math.round((product.price.amount / product.price.divisor) * 100),
-          quantity: product.quantity,
-          state: product.state
+          title: productToUpdate.title,
+          description: productToUpdate.description,
+          price: Math.round((productToUpdate.price.amount / productToUpdate.price.divisor) * 100),
+          quantity: productToUpdate.quantity,
+          state: productToUpdate.state
         })
       });
 
@@ -730,27 +737,28 @@ export default function ProductsClient() {
           variant: "default",
         });
         
+        // Use the returned data from API to update local state if available
+        const updatedProduct = result.listing || productToUpdate;
+        
         // Local state'i başarılı sonuçla güncelle
         setProducts(prevProducts => {
           const newProducts = [...prevProducts];
-          const index = newProducts.findIndex(p => p.listing_id === product.listing_id);
+          const index = newProducts.findIndex(p => p.listing_id === productToUpdate.listing_id);
           if (index !== -1) {
-            newProducts[index] = { ...newProducts[index], ...product };
+            newProducts[index] = { 
+              ...newProducts[index], 
+              ...updatedProduct,
+              // Make sure quantity is correctly set
+              quantity: typeof updatedProduct.quantity === 'string' ? 
+                parseInt(updatedProduct.quantity) : updatedProduct.quantity
+            };
           }
           return newProducts;
         });
         
-        // Filtrelenmiş listeyi de güncelle
-        setFilteredProducts(prevFiltered => {
-          const newFiltered = [...prevFiltered];
-          const index = newFiltered.findIndex(p => p.listing_id === product.listing_id);
-          if (index !== -1) {
-            newFiltered[index] = { ...newFiltered[index], ...product };
-          }
-          return newFiltered;
-        });
-        
         setShowEditModal(null);
+        
+        // Filter and sort products will be called automatically due to useEffect dependency on products
       } else {
         console.error("Error updating product:", result);
         toast({
@@ -1766,8 +1774,12 @@ export default function ProductsClient() {
                   <Input
                     id="edit-quantity"
                     type="number"
+                    min="0"
                     value={showEditModal.quantity}
-                    onChange={(e) => setShowEditModal(prev => prev ? { ...prev, quantity: parseInt(e.target.value) || 0 } : null)}
+                    onChange={(e) => setShowEditModal(prev => prev ? { 
+                      ...prev, 
+                      quantity: parseInt(e.target.value) || 0 
+                    } : null)}
                   />
                 </div>
               </div>

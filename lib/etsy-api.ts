@@ -1767,27 +1767,38 @@ export async function updateListing(
   listingId: number,
   updateData: UpdateListingData
 ): Promise<EtsyListing> {
-  const accessToken = await getValidAccessToken(userId)
+  console.log(`[updateListing] Starting update for listing ${listingId} with data:`, JSON.stringify(updateData, null, 2));
+  const accessToken = await getValidAccessToken(userId);
+  console.log(`[updateListing] Got valid access token for user ${userId}`);
 
-  const formData = new URLSearchParams()
+  const formData = new URLSearchParams();
   
-  if (updateData.title) formData.append('title', updateData.title)
-  if (updateData.description) formData.append('description', updateData.description)
-  if (updateData.price) formData.append('price', updateData.price.toString())
-  if (updateData.quantity) formData.append('quantity', updateData.quantity.toString())
-  if (updateData.state) formData.append('state', updateData.state)
-  if (updateData.shipping_profile_id) formData.append('shipping_profile_id', updateData.shipping_profile_id.toString())
-  if (updateData.processing_min) formData.append('processing_min', updateData.processing_min.toString())
-  if (updateData.processing_max) formData.append('processing_max', updateData.processing_max.toString())
+  if (updateData.title) formData.append('title', updateData.title);
+  if (updateData.description) formData.append('description', updateData.description);
+  if (updateData.price) formData.append('price', updateData.price.toString());
+  if (updateData.quantity) {
+    const quantityStr = updateData.quantity.toString();
+    formData.append('quantity', quantityStr);
+    console.log(`[updateListing] Setting quantity to ${quantityStr} (${typeof updateData.quantity})`);
+  }
+  if (updateData.state) formData.append('state', updateData.state);
+  if (updateData.shipping_profile_id) formData.append('shipping_profile_id', updateData.shipping_profile_id.toString());
+  if (updateData.processing_min) formData.append('processing_min', updateData.processing_min.toString());
+  if (updateData.processing_max) formData.append('processing_max', updateData.processing_max.toString());
   
   if (updateData.tags) {
-    updateData.tags.forEach(tag => formData.append('tags', tag))
+    updateData.tags.forEach(tag => formData.append('tags', tag));
   }
   if (updateData.materials) {
-    updateData.materials.forEach(material => formData.append('materials', material))
+    updateData.materials.forEach(material => formData.append('materials', material));
   }
 
-  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`, {
+  console.log(`[updateListing] Prepared form data:`, Array.from(formData.entries()));
+  
+  const url = `${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`;
+  console.log(`[updateListing] Sending PATCH request to: ${url}`);
+
+  const response = await fetch(url, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -1795,16 +1806,25 @@ export async function updateListing(
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: formData
-  })
+  });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    console.error("Update listing error:", errorData)
-    throw new Error(`Failed to update listing: ${errorData.error || response.statusText}`)
+    const errorData = await response.json().catch(() => ({}));
+    console.error("[updateListing] Update listing error:", errorData);
+    throw new Error(`Failed to update listing: ${errorData.error || response.statusText}`);
   }
 
-  const data = await response.json()
-  return data
+  const data = await response.json();
+  console.log(`[updateListing] Successfully updated listing ${listingId}. Response:`, JSON.stringify(data, null, 2));
+  
+  // Etsy API bazen gönderdiğimiz quantity değerini doğru uygulamayabiliyor
+  // Bu durumda bizim gönderdiğimiz değeri kullanacağız
+  if (updateData.quantity && data.quantity !== updateData.quantity) {
+    console.log(`[updateListing] Etsy API returned quantity=${data.quantity} but we sent quantity=${updateData.quantity}. Using our value.`);
+    data.quantity = updateData.quantity;
+  }
+  
+  return data;
 }
 
 // Listing sil

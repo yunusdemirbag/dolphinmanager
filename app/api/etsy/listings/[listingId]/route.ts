@@ -68,11 +68,23 @@ export async function PATCH(
     // Convert price object to number if it comes from the frontend
     if (body.price && typeof body.price === 'object' && body.price.amount !== undefined) {
       body.price = Math.round((body.price.amount / body.price.divisor) * 100);
+      console.log("Converted price object to cents:", body.price);
     }
+
+    // Create a clean update object with only the fields we want to update
+    const updateData = {
+      quantity: body.quantity,
+      price: body.price,
+      title: body.title,
+      description: body.description,
+      state: body.state
+    };
+    
+    console.log("Clean update data:", updateData);
     
     try {
       // Update the listing
-      const updatedListing = await updateListing(userId, shopId, listingId, body);
+      const updatedListing = await updateListing(userId, shopId, listingId, updateData);
       
       // Invalidate cache to ensure fresh data on the next fetch
       try {

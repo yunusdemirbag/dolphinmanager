@@ -1849,7 +1849,20 @@ export async function updateListing(
               }),
               offerings: product.offerings.map((offering: any) => {
                 const { offering_id, is_deleted, ...cleanOffering } = offering;
-                return cleanOffering;
+                
+                // Ensure price is properly formatted as a number instead of an object
+                if (offering.price && typeof offering.price === 'object' && offering.price.amount !== undefined) {
+                  return {
+                    ...cleanOffering,
+                    price: offering.price.amount / offering.price.divisor,
+                    quantity: requestedQuantity
+                  };
+                }
+                
+                return {
+                  ...cleanOffering,
+                  quantity: requestedQuantity
+                };
               })
             };
           }),

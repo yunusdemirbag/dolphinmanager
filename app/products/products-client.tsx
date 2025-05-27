@@ -267,6 +267,42 @@ export default function ProductsClient() {
   useEffect(() => {
     // Artık sahte analytics verisi yok, sadece gerçek Etsy verisi kullanılacak
   }, [products]);
+  
+  // Fetch store details for shop ID
+  const fetchStoreDetails = async (shopId: number) => {
+    try {
+      const response = await fetch('/api/etsy/stores', {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error("Error fetching store details:", response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.stores && Array.isArray(data.stores) && data.stores.length > 0) {
+        // Find the store with matching ID
+        const matchingStore = data.stores.find((store: any) => 
+          store.shop_id === shopId || parseInt(store.shop_id) === shopId
+        );
+        
+        if (matchingStore) {
+          setCurrentStore({
+            shop_id: matchingStore.shop_id,
+            shop_name: matchingStore.shop_name || `Mağaza #${matchingStore.shop_id}`
+          });
+          console.log("Store details updated:", matchingStore.shop_name);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch store details:", error);
+    }
+  };
 
   // Otomatik yenileme timer'ını başlat
   const startAutoRefreshTimer = useCallback(() => {
@@ -642,7 +678,7 @@ export default function ProductsClient() {
         ? parseInt(product.quantity, 10) 
         : product.quantity;
       
-      // Create a copy of the product with the parsed quantity
+      // Create a copy of the product with the parsed quantity and ensure price is properly formatted
       const productToUpdate = {
         ...product,
         quantity: quantityValue
@@ -674,7 +710,7 @@ export default function ProductsClient() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
         },
         body: JSON.stringify(productToUpdate)
       });
@@ -687,8 +723,6 @@ export default function ProductsClient() {
       const updatedProduct = await response.json();
       console.log("Product updated successfully:", updatedProduct);
       
-      // Close any open dialogs
-      
       // Show success message
       toast({
         title: "Ürün güncellendi",
@@ -696,8 +730,13 @@ export default function ProductsClient() {
         variant: "default",
       });
       
-      // Refresh product list to show updated data from the server
-      refreshProducts(false);
+      // Set submitting to false before showing any modal dialogs
+      setSubmitting(false);
+      
+      // Close any edit modals that might be open
+      if (showEditModal && showEditModal.listing_id === productToUpdate.listing_id) {
+        setShowEditModal(null);
+      }
       
     } catch (error) {
       console.error("Update product error:", error);
@@ -706,7 +745,6 @@ export default function ProductsClient() {
         description: error instanceof Error ? error.message : "Ürün güncellenirken bir hata oluştu",
         variant: "destructive",
       });
-    } finally {
       setSubmitting(false);
     }
   };
@@ -1345,41 +1383,7 @@ export default function ProductsClient() {
     )
   }
 
-  // Fetch store details for shop ID
-  const fetchStoreDetails = async (shopId: number) => {
-    try {
-      const response = await fetch('/api/etsy/stores', {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      if (!response.ok) {
-        console.error("Error fetching store details:", response.status);
-        return;
-      }
-      
-      const data = await response.json();
-      
-      if (data.stores && Array.isArray(data.stores) && data.stores.length > 0) {
-        // Find the store with matching ID
-        const matchingStore = data.stores.find((store: any) => 
-          store.shop_id === shopId || parseInt(store.shop_id) === shopId
-        );
-        
-        if (matchingStore) {
-          setCurrentStore({
-            shop_id: matchingStore.shop_id,
-            shop_name: matchingStore.shop_name || `Mağaza #${matchingStore.shop_id}`
-          });
-          console.log("Store details updated:", matchingStore.shop_name);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch store details:", error);
-    }
-  };
+
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -1692,7 +1696,7 @@ export default function ProductsClient() {
       {/* Edit Modal */}
       {showEditModal && (
         <Dialog open={!!showEditModal} onOpenChange={() => setShowEditModal(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-auto">
             <DialogHeader>
               <DialogTitle>Ürün Düzenle</DialogTitle>
               <DialogDescription>
@@ -1700,82 +1704,285 @@ export default function ProductsClient() {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="edit-title">Ürün Başlığı</Label>
-                <Input
-                  id="edit-title"
-                  value={showEditModal.title}
-                  onChange={(e) => setShowEditModal(prev => prev ? { ...prev, title: e.target.value } : null)}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="edit-description">Açıklama</Label>
-                <Textarea
-                  id="edit-description"
-                  value={showEditModal.description}
-                  onChange={(e) => setShowEditModal(prev => prev ? { ...prev, description: e.target.value } : null)}
-                  rows={4}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Sol Kolon - Ana Bilgiler */}
+              <div className="space-y-4">
                 <div>
-                  <Label htmlFor="edit-price">Fiyat (USD)</Label>
+                  <Label htmlFor="edit-title">Ürün Başlığı</Label>
                   <Input
-                    id="edit-price"
-                    type="number"
-                    step="0.01"
-                    value={showEditModal.price.amount / showEditModal.price.divisor}
-                    onChange={(e) => setShowEditModal(prev => prev ? {
-                      ...prev,
-                      price: {
-                        ...prev.price,
-                        amount: Math.round(parseFloat(e.target.value) * prev.price.divisor)
-                      }
-                    } : null)}
+                    id="edit-title"
+                    value={showEditModal.title}
+                    onChange={(e) => setShowEditModal(prev => prev ? { ...prev, title: e.target.value } : null)}
                   />
                 </div>
+
                 <div>
-                  <Label htmlFor="edit-quantity">Stok</Label>
-                  <Input
-                    id="edit-quantity"
-                    type="number"
-                    min="0"
-                    value={showEditModal.quantity}
-                    onChange={(e) => setShowEditModal(prev => prev ? { 
-                      ...prev, 
-                      quantity: parseInt(e.target.value) || 0 
-                    } : null)}
+                  <Label htmlFor="edit-description">Açıklama</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={showEditModal.description}
+                    onChange={(e) => setShowEditModal(prev => prev ? { ...prev, description: e.target.value } : null)}
+                    rows={8}
                   />
                 </div>
-              </div>
 
-              <div>
-                <Label htmlFor="edit-state">Durum</Label>
-                <Select 
-                  value={showEditModal.state} 
-                  onValueChange={(value: any) => setShowEditModal(prev => prev ? { ...prev, state: value } : null)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Aktif</SelectItem>
-                    <SelectItem value="inactive">Pasif</SelectItem>
-                    <SelectItem value="draft">Taslak</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-price">Fiyat (USD)</Label>
+                    <Input
+                      id="edit-price"
+                      type="number"
+                      step="0.01"
+                      value={showEditModal.price.amount / showEditModal.price.divisor}
+                      onChange={(e) => setShowEditModal(prev => prev ? {
+                        ...prev,
+                        price: {
+                          ...prev.price,
+                          amount: Math.round(parseFloat(e.target.value) * prev.price.divisor)
+                        }
+                      } : null)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-quantity">Stok</Label>
+                    <Input
+                      id="edit-quantity"
+                      type="number"
+                      min="0"
+                      value={showEditModal.quantity}
+                      onChange={(e) => setShowEditModal(prev => prev ? { 
+                        ...prev, 
+                        quantity: parseInt(e.target.value) || 0 
+                      } : null)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-state">Durum</Label>
+                  <Select 
+                    value={showEditModal.state} 
+                    onValueChange={(value: any) => setShowEditModal(prev => prev ? { ...prev, state: value } : null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Aktif</SelectItem>
+                      <SelectItem value="inactive">Pasif</SelectItem>
+                      <SelectItem value="draft">Taslak</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Etiketler düzenleme */}
+                <div className="mt-4">
+                  <Label className="block mb-2">Etiketler</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {showEditModal.tags?.map((tag, index) => (
+                      <Badge key={index} className="flex items-center gap-1 px-3 py-1">
+                        {tag}
+                        <Button 
+                          type="button" 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-4 w-4"
+                          onClick={() => {
+                            setShowEditModal(prev => {
+                              if (!prev) return null;
+                              const newTags = [...prev.tags];
+                              newTags.splice(index, 1);
+                              return { ...prev, tags: newTags };
+                            });
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                    <div className="flex gap-2 min-w-[300px] mt-2">
+                      <Input
+                        placeholder="Yeni etiket ekle..."
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && tagInput.trim()) {
+                            e.preventDefault();
+                            setShowEditModal(prev => {
+                              if (!prev) return null;
+                              const newTags = [...prev.tags];
+                              if (!newTags.includes(tagInput.trim())) {
+                                newTags.push(tagInput.trim());
+                              }
+                              return { ...prev, tags: newTags };
+                            });
+                            setTagInput('');
+                          }
+                        }}
+                      />
+                      <Button 
+                        type="button" 
+                        onClick={() => {
+                          if (tagInput.trim()) {
+                            setShowEditModal(prev => {
+                              if (!prev) return null;
+                              const newTags = [...prev.tags];
+                              if (!newTags.includes(tagInput.trim())) {
+                                newTags.push(tagInput.trim());
+                              }
+                              return { ...prev, tags: newTags };
+                            });
+                            setTagInput('');
+                          }
+                        }}
+                      >
+                        Ekle
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Sağ Kolon - Resimler ve Diğer Özellikler */}
+              <div className="space-y-4">
+                <div>
+                  <Label className="block mb-2">Ürün Resimleri</Label>
+                  {showEditModal.images && showEditModal.images.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      {showEditModal.images.map((image, index) => (
+                        <div key={index} className="relative group rounded-md overflow-hidden border border-gray-200">
+                          <img 
+                            src={image.url_570xN} 
+                            alt={image.alt_text || `Ürün resmi ${index + 1}`} 
+                            className="w-full h-40 object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              variant="destructive" 
+                              size="sm" 
+                              className="bg-red-600 hover:bg-red-700"
+                              title="Resmi kaldır"
+                              onClick={() => {
+                                setShowEditModal(prev => {
+                                  if (!prev) return null;
+                                  const newImages = [...prev.images];
+                                  newImages.splice(index, 1);
+                                  return { ...prev, images: newImages };
+                                });
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="p-2 bg-gray-50 text-xs truncate">
+                            <Input 
+                              value={image.alt_text || ''} 
+                              placeholder="Resim açıklaması"
+                              onChange={(e) => {
+                                setShowEditModal(prev => {
+                                  if (!prev) return null;
+                                  const newImages = [...prev.images];
+                                  newImages[index] = { ...newImages[index], alt_text: e.target.value };
+                                  return { ...prev, images: newImages };
+                                });
+                              }}
+                              className="mt-1 text-xs p-1 h-6"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-center h-40 border-2 border-dashed border-gray-300 rounded-md">
+                        <Label htmlFor="edit-add-image" className="cursor-pointer flex flex-col items-center p-4">
+                          <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                          <span className="text-sm text-gray-500">Yeni Resim Ekle</span>
+                          <Input 
+                            id="edit-add-image" 
+                            type="file" 
+                            accept="image/*"
+                            className="hidden" 
+                            onChange={(e) => {
+                              // Resim ekleme işlemi
+                              // Gerçek bir uygulamada burası API'ye yükleme yapacaktır
+                              alert("Resim yükleme özelliği yapım aşamasındadır");
+                            }}
+                          />
+                        </Label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-40 border-2 border-dashed border-gray-300 rounded-md">
+                      <Label htmlFor="edit-add-image" className="cursor-pointer flex flex-col items-center p-4">
+                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-500">Henüz Resim Yok</span>
+                        <span className="text-xs text-gray-400 mt-1">Resim eklemek için tıklayın</span>
+                        <Input 
+                          id="edit-add-image" 
+                          type="file" 
+                          accept="image/*"
+                          className="hidden" 
+                          onChange={(e) => {
+                            // Resim ekleme işlemi
+                            alert("Resim yükleme özelliği yapım aşamasındadır");
+                          }}
+                        />
+                      </Label>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-4">
+                  <Label className="block mb-2">Harici Bağlantılar</Label>
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-md">
+                    <ExternalLink className="h-5 w-5 text-gray-500" />
+                    <a 
+                      href={showEditModal.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm truncate"
+                    >
+                      Etsy'de Görüntüle
+                    </a>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <div className="text-sm text-gray-600 mb-2">Ürün Bilgileri</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-500">Ürün ID:</span> 
+                      <span className="font-medium ml-1">{showEditModal.listing_id}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Mağaza ID:</span> 
+                      <span className="font-medium ml-1">{showEditModal.shop_id}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Oluşturulma:</span> 
+                      <span className="font-medium ml-1">{formatDate(showEditModal.created_timestamp)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Son Güncelleme:</span> 
+                      <span className="font-medium ml-1">{formatDate(showEditModal.last_modified_timestamp)}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500">Görüntülenme:</span> 
+                      <span className="font-medium ml-1">{showEditModal.metrics?.views || 0}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500">Satış:</span> 
+                      <span className="font-medium ml-1">{showEditModal.metrics?.sold || 0}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="mt-6">
               <Button variant="outline" onClick={() => setShowEditModal(null)}>
                 İptal
               </Button>
               <Button onClick={() => showEditModal && handleUpdateProduct(showEditModal)} disabled={submitting}>
-                {submitting ? "Güncelleniyor..." : "Güncelle"}
+                {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Güncelleniyor...</> : "Güncelle"}
               </Button>
             </DialogFooter>
           </DialogContent>

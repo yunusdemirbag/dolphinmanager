@@ -111,17 +111,17 @@ export async function POST(request: NextRequest) {
     }
     
     console.log("Token refreshed successfully");
+    
     return NextResponse.json({ 
       success: true, 
-      message: "Token başarıyla yenilendi",
-      expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString()
+      message: "Token başarıyla yenilendi" 
     });
-    
   } catch (error) {
-    console.error("Error in refresh-token endpoint:", error);
+    console.error("Token refresh error:", error);
+    
     return NextResponse.json({ 
-      error: "SERVER_ERROR", 
-      message: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu" 
+      error: "INTERNAL_ERROR", 
+      message: `Token yenileme hatası: ${error instanceof Error ? error.message : String(error)}` 
     }, { status: 500 });
   }
 } 

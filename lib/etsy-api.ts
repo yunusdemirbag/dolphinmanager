@@ -588,7 +588,7 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
 }
 
 // Veritabanı yedekleme fonksiyonu
-async function getStoresFromDatabase(userId: string): Promise<EtsyStore[]> {
+export async function getStoresFromDatabase(userId: string): Promise<EtsyStore[]> {
   console.log(`DEBUG: getStoresFromDatabase called for userId: ${userId}`);
   try {
     // 1. Öncelikle etsy_stores tablosunu kontrol et (daha güvenilir veri olabilir)

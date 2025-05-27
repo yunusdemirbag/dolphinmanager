@@ -139,6 +139,7 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
 
   const loadStores = async () => {
     setLoading(true)
+    setConnectionError(null) // Reset any previous connection errors
     try {
       // Gerçek Etsy mağaza verilerini çekmeye çalış
       const response = await fetch('/api/etsy/stores', { credentials: 'include' })
@@ -152,6 +153,14 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
       if (response.ok) {
         const data = await response.json()
         console.log("Stores API response:", data);
+        
+        // Check for connection errors
+        if (data.error === "RECONNECT_REQUIRED") {
+          setConnectionError("Etsy bağlantınız geçersiz olmuş. Lütfen yeniden bağlanın.")
+          setStores([])
+          setEtsyConnected(false)
+          return
+        }
         
         if (data.stores && data.stores.length > 0) {
           // Add connection_status property if not exists
@@ -176,15 +185,23 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
           // Gerçek mağaza yok - boş liste göster
           setStores([]);
           setEtsyConnected(false);
+          
+          // Check if this is due to connection issues
+          if (data.message) {
+            setConnectionError(data.message);
+          }
         }
       } else {
         // API hatası - boş liste göster
         console.error("API error:", response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        setConnectionError(errorData.message || "Etsy API bağlantı hatası oluştu.");
         setStores([]);
         setEtsyConnected(false);
       }
     } catch (error) {
       console.error('Error loading stores:', error);
+      setConnectionError("Etsy bağlantısı sırasında bir hata oluştu. Lütfen tekrar deneyin.");
       setStores([]);
       setEtsyConnected(false);
     } finally {
@@ -207,6 +224,37 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
     } catch (error) {
       console.error("Etsy auth error:", error)
       alert("Etsy bağlantısı sırasında bir hata oluştu. Lütfen tekrar deneyin.")
+    }
+  };
+
+  // Handle reconnecting to Etsy if the connection was lost
+  const handleReconnectEtsy = async () => {
+    setReconnecting(true)
+    try {
+      // First try to reset the existing connection
+      await fetch('/api/etsy/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      // Then initialize a new connection
+      const response = await fetch("/api/etsy/auth")
+      const data = await response.json()
+
+      if (data.authUrl) {
+        // Navigate to the Etsy auth URL
+        window.location.href = data.authUrl
+      } else {
+        alert("Etsy bağlantı URL'i oluşturulamadı. Lütfen tekrar deneyin.")
+      }
+    } catch (error) {
+      console.error("Etsy reconnect error:", error)
+      alert("Etsy yeniden bağlantısı sırasında bir hata oluştu. Lütfen tekrar deneyin.")
+    } finally {
+      setReconnecting(false)
     }
   };
 
@@ -558,20 +606,47 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
           </CardContent>
         </Card>
       ) : stores.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-            <Store className="h-14 w-14 text-gray-300 mb-4" />
-            <h3 className="text-2xl font-semibold mb-2">Henüz bir Etsy mağazanız bağlı değil</h3>
-            <p className="text-gray-500 mb-6 max-w-md">
-              Etsy mağazanızı bağlayarak ürünlerinizi, siparişlerinizi ve istatistiklerinizi tek bir yerden yönetebilirsiniz.
-            </p>
-            <Button onClick={handleConnectEtsy} size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-              <Store className="w-5 h-5 mr-2" />
-              Etsy Mağazası Bağla
-            </Button>
-            <p className="text-xs text-gray-400 mt-4">
-              Sadece bir kez giriş yapmanız gerekir. Verileriniz güvende tutulur.
-            </p>
+        <Card className="bg-slate-50 border-2 border-dashed border-slate-200">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+              <Store className="h-12 w-12 text-slate-400" />
+              <div>
+                <h3 className="text-lg font-medium">Henüz Etsy Mağazanız Bağlı Değil</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Etsy hesabınızı bağlayarak mağazalarınızı ve ürünlerinizi yönetin.
+                </p>
+              </div>
+              {connectionError ? (
+                <Alert variant="destructive" className="mt-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Bağlantı Hatası</AlertTitle>
+                  <AlertDescription>{connectionError}</AlertDescription>
+                  <Button 
+                    variant="outline" 
+                    className="mt-2" 
+                    onClick={handleReconnectEtsy}
+                    disabled={reconnecting}
+                  >
+                    {reconnecting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Yeniden Bağlanılıyor...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Yeniden Bağlan
+                      </>
+                    )}
+                  </Button>
+                </Alert>
+              ) : (
+                <Button onClick={handleConnectEtsy} className="mt-2">
+                  <Link className="mr-2 h-4 w-4" />
+                  Etsy Hesabını Bağla
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       ) : (

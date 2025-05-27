@@ -536,6 +536,15 @@ async function refreshEtsyToken(userId: string): Promise<string> {
     }
 
     console.log("Token refreshed successfully");
+    
+    // After a successful refresh, invalidate all caches to ensure fresh data
+    try {
+      invalidateUserCache(userId);
+      console.log("Invalidated all caches after token refresh");
+    } catch (cacheError) {
+      console.warn("Error invalidating cache after token refresh:", cacheError);
+    }
+    
     return newTokens.access_token;
   } catch (error) {
     console.error("Token refresh error:", error);
@@ -572,12 +581,31 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
     });
 
     // Token'ın geçerliliğini kontrol et
+    // Add a 15-minute buffer to refresh tokens before they actually expire
     const expiresAt = new Date(latestToken.expires_at).getTime();
+    const bufferTime = 15 * 60 * 1000; // 15 minutes in milliseconds
     const now = Date.now();
 
-    if (now >= expiresAt) {
-      console.log("Token expired, refreshing...");
-      return refreshEtsyToken(userId);
+    // Refresh the token if it's expiring within the buffer time
+    if (now >= (expiresAt - bufferTime)) {
+      console.log(`Token expires soon (in ${Math.floor((expiresAt - now) / 1000 / 60)} minutes), refreshing early...`);
+      try {
+        return await refreshEtsyToken(userId);
+      } catch (refreshError) {
+        if (refreshError instanceof Error && refreshError.message === 'RECONNECT_REQUIRED') {
+          console.error("Token refresh failed, reconnection required");
+          return null;
+        }
+        
+        // If refresh failed but token is still valid, use existing token
+        if (now < expiresAt) {
+          console.warn("Token refresh failed, but existing token is still valid. Using existing token.");
+          return latestToken.access_token;
+        }
+        
+        console.error("Token refresh failed and token expired:", refreshError);
+        return null;
+      }
     }
 
     return latestToken.access_token;
@@ -1793,15 +1821,39 @@ export async function updateListing(
         console.log(`[updateListing] Got inventory data for forceful quantity update:`, JSON.stringify(inventoryData, null, 2));
         
         // Create an updated inventory payload based on existing data
+        // Handle variations by updating only specific required fields
         const updatePayload = {
           products: inventoryData.products.map((product: any) => ({
-            ...product,
+            product_id: product.product_id, // Keep this for reference only
+            sku: product.sku || "",
+            property_values: product.property_values || [],
             offerings: product.offerings.map((offering: any) => ({
-              ...offering,
-              quantity: requestedQuantity
+              offering_id: offering.offering_id, // Keep this for reference only
+              quantity: requestedQuantity,
+              is_enabled: true,
+              price: offering.price
             }))
           }))
         };
+        
+        // Remove fields that Etsy API doesn't accept in the PUT request
+        const cleanPayload = {
+          products: updatePayload.products.map((product: any) => {
+            const { product_id, is_deleted, ...cleanProduct } = product;
+            return {
+              ...cleanProduct,
+              offerings: product.offerings.map((offering: any) => {
+                const { offering_id, is_deleted, ...cleanOffering } = offering;
+                return cleanOffering;
+              })
+            };
+          }),
+          price_on_property: inventoryData.price_on_property,
+          quantity_on_property: inventoryData.quantity_on_property,
+          sku_on_property: inventoryData.sku_on_property
+        };
+        
+        console.log(`[updateListing] Prepared clean inventory payload:`, JSON.stringify(cleanPayload, null, 2));
         
         // Update inventory with correct quantity
         const updateResponse = await fetch(inventoryUrl, {
@@ -1811,19 +1863,28 @@ export async function updateListing(
             'Content-Type': 'application/json',
             'x-api-key': ETSY_CLIENT_ID
           },
-          body: JSON.stringify(updatePayload)
+          body: JSON.stringify(cleanPayload)
         });
         
         if (updateResponse.ok) {
           console.log(`[updateListing] Force-updated quantity to ${requestedQuantity}`);
           updatedListing.quantity = requestedQuantity;
         } else {
-          console.error(`[updateListing] Failed to force-update quantity:`, await updateResponse.json());
+          const errorResponse = await updateResponse.json();
+          console.error(`[updateListing] Failed to force-update quantity:`, errorResponse);
         }
       }
     } catch (forceUpdateError) {
       console.error(`[updateListing] Error in force-update of quantity:`, forceUpdateError);
     }
+  }
+  
+  // Invalidate the cache for this listing's shop
+  try {
+    invalidateShopCache(userId, shopId);
+    console.log(`[updateListing] Invalidated cache for shop ${shopId}`);
+  } catch (cacheError) {
+    console.error(`[updateListing] Error invalidating cache:`, cacheError);
   }
   
   return updatedListing;

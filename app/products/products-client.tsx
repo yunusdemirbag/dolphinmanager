@@ -72,6 +72,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Skeleton } from "@/components/ui/skeleton"
+import { ToastAction } from "@/components/ui/toast"
 
 interface Product {
   listing_id: number
@@ -177,6 +179,7 @@ export default function ProductsClient() {
   const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<number | null>(null);
+  const [etsyConnected, setEtsyConnected] = useState(true); // Track Etsy connection status
 
   // ProductImage bileşenini daha güvenli hale getiriyorum:
   const ProductImage = ({ product }: { product: Product }) => {
@@ -286,256 +289,192 @@ export default function ProductsClient() {
   // Veri yenileme fonksiyonu
   const refreshProducts = async (showNotification = true) => {
     try {
-      if (refreshing) return // Zaten yenileme işlemi devam ediyorsa çık
+      setLoading(true);
       
-      // Son yenilemeden bu yana 5 dakika geçmediyse kullanıcıya sor
-      if (lastRefresh && (Date.now() - lastRefresh.getTime() < 5 * 60 * 1000)) {
-        const confirmRefresh = confirm(
-          "Son yenilemeden henüz 5 dakika geçmedi. API çağrı limitlerini aşmamak için gereksiz yenilemeler yapmamaya özen gösterilmelidir. Yine de yenilemek istiyor musunuz?"
-        );
-        
-        if (!confirmRefresh) return;
-      }
-      
-      setRefreshing(true)
-      if (showNotification) {
-        setRefreshStatus({ message: "Ürün verileri yenileniyor..." })
-      }
-      
-      // API'ye istek gönder
-      const response = await fetch("/api/etsy/refresh", {
-        method: "POST",
+      // First refresh Etsy connection data
+      const refreshResponse = await fetch('/api/etsy/refresh', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json"
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          forceRefresh: true // Önbelleği temizle ve yeni veri çek
+          force_refresh: true
         })
-      })
+      });
       
-      const result = await response.json()
+      const refreshData = await refreshResponse.json();
       
-      if (result.success) {
-        // Başarılı yenileme sonrası ürünleri yeniden yükle
-        // Remove this call since we're updating local state properly now
-        // await loadProducts()
-        setLastRefresh(new Date())
+      // Check if reconnection is required
+      if (!refreshResponse.ok || (refreshData && refreshData.reconnect_required)) {
+        console.error("Etsy connection refresh failed or reconnection required:", refreshData);
         
-        if (showNotification) {
-          setRefreshStatus({
-            success: true,
-            message: "Ürünler başarıyla yenilendi"
-          })
+        if (refreshData.reconnect_required) {
+          toast({
+            title: "Etsy bağlantısı gerekiyor",
+            description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
+            variant: "destructive",
+            action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
+          });
+          setEtsyConnected(false);
+          setLoading(false);
+          return;
         }
+        
+        toast({
+          title: "Yenileme başarısız",
+          description: "Ürünler yenilenirken bir hata oluştu.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Now load the products
+      await loadProducts(1);
+      
+      if (showNotification) {
+        toast({
+          title: "Ürünler yenilendi",
+          description: "Ürün listesi başarıyla güncellendi."
+        });
+      }
+    } catch (error) {
+      console.error("Error refreshing products:", error);
+      
+      // Check if there's a connection issue
+      if (error instanceof Error && 
+          (error.message.includes("token") || 
+           error.message.includes("connection") || 
+           error.message.includes("unauthorized"))) {
+        toast({
+          title: "Etsy bağlantısı gerekiyor",
+          description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
+          variant: "destructive",
+          action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
+        });
+        setEtsyConnected(false);
       } else {
-        if (showNotification) {
-          setRefreshStatus({
-            success: false,
-            message: `Yenileme hatası: ${result.message}`
-          })
-        }
-        console.error("Ürün yenileme hatası:", result.message)
-      }
-    } catch (error) {
-      if (showNotification) {
-        setRefreshStatus({
-          success: false,
-          message: "Ürün yenileme sırasında bir hata oluştu"
-        })
-      }
-      console.error("Ürün yenileme hatası:", error)
-    } finally {
-      setRefreshing(false)
-      
-      // 5 saniye sonra bildirim mesajını temizle (sadece bildirim gösteriliyorsa)
-      if (showNotification) {
-        setTimeout(() => {
-          setRefreshStatus({})
-        }, 5000)
-      }
-    }
-  }
-
-  const loadProducts = async (page = currentPage) => {
-    setLoading(true);
-    setReconnectRequired(false); // Reset reconnect flag
-    setSessionExpired(false); // Reset session expired flag
-    setCurrentStore(null); // Reset current store
-    
-    // Debug log ekleyelim
-    console.log("Loading products - page:", page, "currentPage:", currentPage);
-    
-    // Sadece ilk sayfa yüklenirken tüm ürünleri temizle
-    if (page === 1) {
-      setProducts([]); // Clear products initially
-      setFilteredProducts([]);
-    }
-    
-    try {
-      // 1. Önce mağaza bilgisini al
-      console.log("Fetching Etsy stores...");
-      const storesRes = await fetch('/api/etsy/stores', {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'X-Skip-Cache': 'true' // Her zaman taze veri iste
-        }
-      });
-      
-      console.log("Etsy stores API response status:", storesRes.status);
-      
-      if (!storesRes.ok) {
-        console.error(`Stores API error: ${storesRes.status}`);
-        if (storesRes.status === 401) {
-          setSessionExpired(true);
-        } else {
-          setReconnectRequired(true);
-        }
-        setLoading(false);
-        return;
-      }
-      
-      const storesData = await storesRes.json();
-      console.log("Stores API response:", JSON.stringify(storesData, null, 2));
-      
-      // Etsy hesabına bağlı değilse veya Etsy'ye yeniden bağlanması gerekiyorsa
-      if (storesData.error === 'RECONNECT_REQUIRED') {
-        console.log("Store reconnection required");
-        setReconnectRequired(true);
-        setLoading(false);
-        return;
-      }
-      
-      if (!storesData.stores || storesData.stores.length === 0) {
-        console.log("No stores found in response:", storesData);
-        if (storesData.connected === false) {
-          setReconnectRequired(true);
-        } else {
-          toast({
-            title: "Mağaza bulunamadı",
-            description: "Etsy hesabınızda aktif bir mağaza bulunamadı. Lütfen Etsy'de bir mağaza oluşturun.",
-            variant: "destructive"
-          });
-        }
-        setLoading(false);
-        return;
-      }
-      
-      // 2. İlk mağazayı seç ve ürünleri çek
-      const firstStore = storesData.stores[0];
-      console.log("Selected store:", JSON.stringify(firstStore, null, 2));
-      setCurrentStore(firstStore);
-      
-      if (!firstStore.shop_id) {
-        console.error("No valid shop_id in store data:", firstStore);
         toast({
-          title: "Mağaza ID bulunamadı",
-          description: "Mağaza bilgisinde geçerli bir ID bulunamadı. Lütfen tekrar Etsy'ye bağlanın.",
-          variant: "destructive"
-        });
-        setLoading(false);
-        return;
-      }
-      
-      // 3. Ürünleri çek
-      console.log(`Fetching products for shop: ${firstStore.shop_id}, page: ${page}, limit: ${pageSize}`);
-      try {
-        const listingsRes = await fetch(`/api/etsy/listings?shop_id=${firstStore.shop_id}&page=${page}&limit=${pageSize}`);
-        
-        if (!listingsRes.ok) {
-          console.error(`Listings API error: ${listingsRes.status}`);
-          if (listingsRes.status === 401) {
-            setSessionExpired(true);
-          } else {
-            toast({
-              title: "Ürünler yüklenemedi",
-              description: `Hata kodu: ${listingsRes.status}. Lütfen tekrar deneyin.`,
-              variant: "destructive"
-            });
-          }
-          setLoading(false);
-          return;
-        }
-        
-        const listingsData = await listingsRes.json();
-        console.log("Listings API response:", listingsData);
-        
-        if (listingsData.error) {
-          console.error("Listings API returned error:", listingsData.error);
-          toast({
-            title: "Etsy API Hatası",
-            description: listingsData.message || listingsData.error,
-            variant: "destructive"
-          });
-          setLoading(false);
-          return;
-        }
-        
-        if (!listingsData.listings || !Array.isArray(listingsData.listings)) {
-          console.error("Invalid listings data format:", listingsData);
-          toast({
-            title: "Veri formatı hatası",
-            description: "Ürün verileri beklendiği formatta değil. Teknik destek ile iletişime geçin.",
-            variant: "destructive"
-          });
-          setLoading(false);
-          return;
-        }
-        
-        // 4. Ürünleri işle ve state'e ata
-        const productsData = listingsData.listings.map((listing: any) => ({
-          ...listing,
-          // Eksik alanları varsayılan değerlerle doldur
-          created_timestamp: listing.created_timestamp || Date.now() / 1000,
-          last_modified_timestamp: listing.last_modified_timestamp || Date.now() / 1000,
-          metrics: listing.metrics || { views: 0, favorites: 0, sold: 0 }
-        }));
-        
-        // Sayfalama bilgilerini güncelle
-        setCurrentPage(listingsData.page || page);
-        setTotalPages(listingsData.total_pages || 1);
-        setTotalCount(listingsData.count || 0);
-        
-        // İlk sayfa ise products state'ini sıfırla, değilse mevcut ürünlere ekle
-        if (page === 1) {
-          setProducts(productsData);
-          setFilteredProducts(productsData);
-        } else {
-          setProducts(prevProducts => [...prevProducts, ...productsData]);
-          setFilteredProducts(prevProducts => [...prevProducts, ...productsData]);
-        }
-        
-        if (page === 1 && productsData.length === 0) {
-          toast({
-            title: "Ürün bulunamadı",
-            description: "Etsy mağazanızda aktif ürün bulunamadı veya API erişim izni yok.",
-            variant: "default"
-          });
-        } else if (page === 1) {
-          toast({
-            title: "Ürünler yüklendi",
-            description: `${productsData.length} ürün başarıyla yüklendi. Toplam: ${listingsData.count || productsData.length}`,
-            variant: "default"
-          });
-        }
-        
-      } catch (listingsError) {
-        console.error("Listings API fetch error:", listingsError);
-        toast({
-          title: "Ürünler yüklenemedi",
-          description: "Etsy API ile iletişimde bir sorun oluştu. Bu genellikle yanlış shop_id kullanıldığında veya API izni olmadığında görülür.",
+          title: "Yenileme başarısız",
+          description: "Ürünler yenilenirken bir hata oluştu.",
           variant: "destructive"
         });
       }
-    } catch (error) {
-      console.error("Error loading products:", error);
-      toast({
-        title: "Ürünler yüklenirken hata",
-        description: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu.",
-        variant: "destructive"
-      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProducts = async (page = currentPage) => {
+    try {
+      setLoading(true)
+      setCurrentPage(page)
+      
+      // Set up request parameters
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: pageSize.toString(),
+        state: filterStatus === 'all' ? 'active' : filterStatus,
+        skip_cache: 'false', // Default to using cache
+      }).toString()
+      
+      // Make API request with proper error handling
+      const response = await fetch(`/api/etsy/listings?${params}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+      
+      // If the response indicates unauthorized/token issues
+      if (response.status === 401) {
+        console.error("Unauthorized or token expired")
+        setEtsyConnected(false)
+        setReconnectRequired(true)
+        
+        toast({
+          title: "Etsy bağlantısı gerekiyor",
+          description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
+          variant: "destructive",
+          action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
+        })
+        
+        setLoading(false)
+        return
+      }
+      
+      // For other API errors
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "API yanıtı okunamadı" }))
+        console.error("Product loading error:", errorData)
+        
+        toast({
+          title: "Ürünler yüklenemedi",
+          description: errorData.error || "Bilinmeyen bir hata oluştu",
+          variant: "destructive"
+        })
+        
+        setLoading(false)
+        return
+      }
+      
+      // Process successful response
+      const data = await response.json()
+      
+      if (data.listings && Array.isArray(data.listings)) {
+        // Update state with API data
+        setProducts(data.listings)
+        setTotalPages(data.total_pages || 1)
+        setTotalCount(data.count || 0)
+        
+        // Update store information if available
+        if (data.shop_id) {
+          setCurrentStore(prev => {
+            // If store name already exists, keep it
+            return {
+              shop_id: data.shop_id,
+              shop_name: prev?.shop_name || `Mağaza #${data.shop_id}`
+            }
+          })
+          
+          // Also fetch store details if we don't have them
+          if (!currentStore?.shop_name || currentStore.shop_name.includes('#')) {
+            fetchStoreDetails(data.shop_id)
+          }
+        }
+        
+        // Reset connection-related errors since we successfully got data
+        setReconnectRequired(false)
+        setEtsyConnected(true)
+        
+        console.log(`Loaded ${data.listings.length} products (page ${page}/${data.total_pages})`)
+      } else {
+        console.error("No listings data in API response:", data)
+        
+        // Check if reconnection error is indicated
+        if (data.error && typeof data.error === 'string' && 
+            (data.error.includes('token') || data.error.includes('auth') || data.error.includes('connect'))) {
+          setReconnectRequired(true)
+          setEtsyConnected(false)
+          
+          toast({
+            title: "Etsy bağlantısı gerekiyor",
+            description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
+            variant: "destructive",
+            action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error loading products:", error)
+      toast({
+        title: "Hata",
+        description: "Ürünler yüklenirken bir hata oluştu",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1405,6 +1344,42 @@ export default function ProductsClient() {
       </div>
     )
   }
+
+  // Fetch store details for shop ID
+  const fetchStoreDetails = async (shopId: number) => {
+    try {
+      const response = await fetch('/api/etsy/stores', {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error("Error fetching store details:", response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.stores && Array.isArray(data.stores) && data.stores.length > 0) {
+        // Find the store with matching ID
+        const matchingStore = data.stores.find((store: any) => 
+          store.shop_id === shopId || parseInt(store.shop_id) === shopId
+        );
+        
+        if (matchingStore) {
+          setCurrentStore({
+            shop_id: matchingStore.shop_id,
+            shop_name: matchingStore.shop_name || `Mağaza #${matchingStore.shop_id}`
+          });
+          console.log("Store details updated:", matchingStore.shop_name);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch store details:", error);
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">

@@ -42,13 +42,16 @@ export async function PATCH(
     const body = await request.json();
     
     // Get Etsy stores directly from the API to avoid database lookup issues
-    const stores = await getEtsyStores(userId);
+    // Set skipCache to true to always get the latest data
+    const stores = await getEtsyStores(userId, true);
     
     if (!stores || stores.length === 0) {
       return NextResponse.json({
         error: "No Etsy stores found",
-        success: false
-      }, { status: 404 });
+        success: false,
+        reconnect_required: true,
+        message: "Your Etsy connection needs to be refreshed. Please reconnect your store."
+      }, { status: 401 });
     }
     
     const shopId = stores[0].shop_id;
@@ -71,6 +74,16 @@ export async function PATCH(
       // Update the listing
       const updatedListing = await updateListing(userId, shopId, listingId, body);
       
+      // Invalidate cache to ensure fresh data on the next fetch
+      try {
+        // Import without breaking
+        const { invalidateShopCache } = require("@/lib/etsy-api");
+        invalidateShopCache(userId, shopId);
+        console.log("Cache invalidated for this shop after update");
+      } catch (cacheError) {
+        console.warn("Error invalidating cache:", cacheError);
+      }
+      
       // Add cache-control header to prevent browser caching
       const headers = new Headers();
       headers.append('Cache-Control', 'no-store, must-revalidate');
@@ -85,13 +98,34 @@ export async function PATCH(
     } catch (updateError: any) {
       console.error("Specific error updating listing:", updateError);
       
-      // Check if it's an API key error
-      if (updateError.message && typeof updateError.message === 'string' && updateError.message.includes("Invalid API key")) {
-        return NextResponse.json({
-          error: "Etsy API key error - token may need to be refreshed",
-          details: updateError.message,
-          success: false
-        }, { status: 401 });
+      // Check if it's an API key error or token error
+      const errorMessage = updateError.message || "";
+      const isAuthError = typeof errorMessage === 'string' && (
+        errorMessage.includes("Invalid API key") || 
+        errorMessage.includes("invalid_token") ||
+        errorMessage.includes("token") ||
+        errorMessage.includes("unauthorized") ||
+        errorMessage.includes("RECONNECT_REQUIRED")
+      );
+      
+      if (isAuthError) {
+        // Try refreshing the cache and retry
+        try {
+          // Import without breaking
+          const { invalidateUserCache } = require("@/lib/etsy-api");
+          invalidateUserCache(userId);
+          console.log("Invalidated all user cache due to token error");
+          
+          // Return proper error message for client to handle
+          return NextResponse.json({
+            error: "Etsy authorization error - reconnection required",
+            details: errorMessage,
+            reconnect_required: true,
+            success: false
+          }, { status: 401 });
+        } catch (cacheError) {
+          console.error("Error invalidating cache:", cacheError);
+        }
       }
       
       return NextResponse.json({

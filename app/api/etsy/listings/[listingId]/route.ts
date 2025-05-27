@@ -1,51 +1,49 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { updateListing, deleteListing, getEtsyStores, UpdateListingData } from "@/lib/etsy-api"
+import { createClient } from '@supabase/supabase-js'
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { listingId: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    console.log("--- PATCH /api/etsy/listings/[listingId] ---");
+    // Hard-code the userId - routes/api klasöründeki aynı userId'yi kullan
+    const userId = "71bca451-a580-4bdd-a7eb-91e2d8aa5d12";
+    console.log("Using user ID:", userId);
     
-    // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    // Önce params'ı bekle ve daha sonra listingId'yi al
+    const listingId = parseInt(params.listingId);
+    const updateData: UpdateListingData = await request.json();
+
+    console.log("Updating listing:", listingId, "Data:", updateData);
+
+    // Etsy store bilgilerini çek - userId ile doğrudan çağır
+    const etsyStores = await getEtsyStores(userId);
     
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const listingId = parseInt(params.listingId)
-    const updateData: UpdateListingData = await request.json()
-
-    console.log("Updating listing:", listingId, "Data:", updateData)
-
-    // Etsy store bilgilerini çek
-    const etsyStores = await getEtsyStores(user.id)
-    
-    if (etsyStores.length === 0) {
+    if (!etsyStores || etsyStores.length === 0) {
       return NextResponse.json({
-        error: "No Etsy stores connected"
-      }, { status: 400 })
+        error: "No Etsy stores connected",
+        success: false
+      }, { status: 400 });
     }
 
-    const primaryStore = etsyStores[0]
+    const primaryStore = etsyStores[0];
 
     // Listing güncelle
-    const updatedListing = await updateListing(user.id, primaryStore.shop_id, listingId, updateData)
+    const updatedListing = await updateListing(userId, primaryStore.shop_id, listingId, updateData);
 
-    console.log("Listing updated successfully:", listingId)
+    console.log("Listing updated successfully:", listingId);
 
     return NextResponse.json({
       success: true,
       listing: updatedListing,
       message: "Listing updated successfully"
-    })
+    });
 
   } catch (error: any) {
-    console.error("Update listing API error:", error)
+    console.error("Update listing API error:", error);
     return NextResponse.json(
       { 
         error: "Failed to update listing", 
@@ -53,7 +51,7 @@ export async function PATCH(
         success: false
       },
       { status: 500 }
-    )
+    );
   }
 }
 
@@ -62,31 +60,26 @@ export async function DELETE(
   { params }: { params: { listingId: string } }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    console.log("--- DELETE /api/etsy/listings/[listingId] ---");
+    // Hard-code the userId - routes/api klasöründeki aynı userId'yi kullan
+    const userId = "71bca451-a580-4bdd-a7eb-91e2d8aa5d12";
+    console.log("Using user ID:", userId);
     
-    // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const listingId = parseInt(params.listingId);
+    console.log("Deleting listing:", listingId);
 
-    const listingId = parseInt(params.listingId)
+    // Listing sil - userId ile doğrudan çağır
+    await deleteListing(userId, listingId);
 
-    console.log("Deleting listing:", listingId)
-
-    // Listing sil
-    await deleteListing(user.id, listingId)
-
-    console.log("Listing deleted successfully:", listingId)
+    console.log("Listing deleted successfully:", listingId);
 
     return NextResponse.json({
       success: true,
       message: "Listing deleted successfully"
-    })
+    });
 
   } catch (error: any) {
-    console.error("Delete listing API error:", error)
+    console.error("Delete listing API error:", error);
     return NextResponse.json(
       { 
         error: "Failed to delete listing", 

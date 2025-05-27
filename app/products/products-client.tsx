@@ -62,6 +62,16 @@ import {
 import { createClientSupabase } from "@/lib/supabase"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 import { toast } from "@/components/ui/use-toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Product {
   listing_id: number
@@ -164,6 +174,9 @@ export default function ProductsClient() {
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(100); // Varsayılan sayfa boyutu
   const [gridType, setGridType] = useState<'grid3' | 'grid5' | 'list'>('grid3');
+  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<number | null>(null);
 
   // ProductImage bileşenini daha güvenli hale getiriyorum:
   const ProductImage = ({ product }: { product: Product }) => {
@@ -684,6 +697,8 @@ export default function ProductsClient() {
   const handleUpdateProduct = async (product: Product) => {
     setSubmitting(true);
     try {
+      console.log("Updating product:", product.listing_id, product);
+      
       const response = await fetch(`/api/etsy/listings/${product.listing_id}`, {
         method: 'PATCH',
         headers: {
@@ -698,27 +713,35 @@ export default function ProductsClient() {
         })
       });
 
+      const result = await response.json();
+      console.log("Update response:", response.status, result);
+
       if (response.ok) {
         toast({
           title: "Başarılı",
           description: "Ürün başarıyla güncellendi",
           variant: "default",
         });
+        // Update the product in the list
+        const updatedProducts = products.map(p => 
+          p.listing_id === product.listing_id ? { ...p, ...product } : p
+        );
+        setProducts(updatedProducts);
+        filterAndSortProducts(); // Yeniden filtreleme ve sıralama uygula
         setShowEditModal(null);
-        await loadProducts();
       } else {
-        const errorData = await response.json();
+        console.error("Error updating product:", result);
         toast({
-          title: "Ürün güncellenemedi",
-          description: errorData.details || errorData.error || "Bilinmeyen bir hata oluştu",
+          title: "Hata",
+          description: `Güncelleme başarısız: ${result.error || result.details || 'Bilinmeyen hata'}`,
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Update product error:", error);
+      console.error("Exception updating product:", error);
       toast({
         title: "Hata",
-        description: "Ürün güncellenirken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.",
+        description: `İşlem sırasında bir hata oluştu: ${error}`,
         variant: "destructive",
       });
     } finally {
@@ -726,21 +749,25 @@ export default function ProductsClient() {
     }
   };
 
+  const confirmDelete = (listingId: number) => {
+    setConfirmDeleteProductId(listingId);
+  };
+  
+  const cancelDelete = () => {
+    setConfirmDeleteProductId(null);
+  };
+  
   const handleDeleteProduct = async (listingId: number) => {
-    if (!confirm("Bu ürünü silmek istediğinizden emin misiniz?")) {
-      return;
-    }
-
     try {
-      toast({
-        title: "İşlem sürüyor",
-        description: "Ürün siliniyor, lütfen bekleyin...",
-        variant: "default",
+      setDeletingProductId(listingId);
+      console.log("Deleting product:", listingId);
+      
+      const response = await fetch(`/api/etsy/listings/${listingId}`, {
+        method: 'DELETE',
       });
 
-      const response = await fetch(`/api/etsy/listings/${listingId}`, {
-        method: 'DELETE'
-      });
+      const result = await response.json();
+      console.log("Delete response:", response.status, result);
 
       if (response.ok) {
         toast({
@@ -748,22 +775,28 @@ export default function ProductsClient() {
           description: "Ürün başarıyla silindi",
           variant: "default",
         });
-        await loadProducts();
+        // Remove the product from the list
+        const updatedProducts = products.filter(p => p.listing_id !== listingId);
+        setProducts(updatedProducts);
+        setFilteredProducts(filteredProducts.filter(p => p.listing_id !== listingId));
+        setConfirmDeleteProductId(null);
       } else {
-        const errorData = await response.json();
+        console.error("Error deleting product:", result);
         toast({
-          title: "Ürün silinemedi",
-          description: errorData.details || errorData.error || "Bilinmeyen bir hata oluştu",
+          title: "Hata",
+          description: `Silme işlemi başarısız: ${result.error || result.details || 'Bilinmeyen hata'}`,
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Delete product error:", error);
+      console.error("Exception deleting product:", error);
       toast({
         title: "Hata",
-        description: "Ürün silinirken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.",
+        description: `İşlem sırasında bir hata oluştu: ${error}`,
         variant: "destructive",
       });
+    } finally {
+      setDeletingProductId(null);
     }
   };
 
@@ -1063,7 +1096,7 @@ export default function ProductsClient() {
                 title="Sil"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteProduct(product.listing_id);
+                  confirmDelete(product.listing_id);
                 }}
               >
                 <Trash2 className="h-4 w-4" />
@@ -1170,7 +1203,7 @@ export default function ProductsClient() {
               title="Sil"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDeleteProduct(product.listing_id);
+                confirmDelete(product.listing_id);
               }}
             >
               <Trash2 className="h-4 w-4" />
@@ -1938,6 +1971,36 @@ export default function ProductsClient() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+      
+      {confirmDeleteProductId && (
+        <AlertDialog open={true}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Ürünü Sil</AlertDialogTitle>
+              <AlertDialogDescription>
+                Bu ürünü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve Etsy'den de kaldırılacaktır.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={cancelDelete}>İptal</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => handleDeleteProduct(confirmDeleteProductId)}
+                disabled={deletingProductId === confirmDeleteProductId}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                {deletingProductId === confirmDeleteProductId ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Siliniyor...
+                  </>
+                ) : (
+                  "Evet, Sil"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   )

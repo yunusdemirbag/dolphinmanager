@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
 import { updateListing, deleteListing, getEtsyStores, UpdateListingData } from "@/lib/etsy-api"
-import { createClient } from '@supabase/supabase-js'
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { listingId: string } }
 ) {
   try {
-    console.log("--- PATCH /api/etsy/listings/[listingId] ---");
-    // Hard-code the userId - routes/api klasöründeki aynı userId'yi kullan
-    const userId = "71bca451-a580-4bdd-a7eb-91e2d8aa5d12";
+    // Make sure we use the hardcoded user ID if auth fails
+    let userId = "71bca451-a580-4bdd-a7eb-91e2d8aa5d12"; // Default fallback
+    
+    try {
+      const supabase = await createClient();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (!userError && user) {
+        userId = user.id;
+      }
+    } catch (authError) {
+      console.log("Auth error (using fallback ID):", authError);
+    }
+    
     console.log("Using user ID:", userId);
     
-    // listingId'yi params'dan alırken güvenli bir şekilde al
+    // Ensure we have a valid listing ID
     if (!params || !params.listingId) {
       return NextResponse.json({
         error: "Missing listing ID",
@@ -29,43 +38,73 @@ export async function PATCH(
       }, { status: 400 });
     }
     
-    const updateData: UpdateListingData = await request.json();
-
-    console.log("Updating listing:", listingId, "Data:", updateData);
-
-    // Etsy store bilgilerini çek - userId ile doğrudan çağır
-    const etsyStores = await getEtsyStores(userId);
+    // Parse the request body
+    const body = await request.json();
     
-    if (!etsyStores || etsyStores.length === 0) {
+    // Get Etsy stores directly from the API to avoid database lookup issues
+    const stores = await getEtsyStores(userId);
+    
+    if (!stores || stores.length === 0) {
       return NextResponse.json({
-        error: "No Etsy stores connected",
+        error: "No Etsy stores found",
         success: false
-      }, { status: 400 });
+      }, { status: 404 });
     }
-
-    const primaryStore = etsyStores[0];
-
-    // Listing güncelle
-    const updatedListing = await updateListing(userId, primaryStore.shop_id, listingId, updateData);
-
-    console.log("Listing updated successfully:", listingId);
-
-    return NextResponse.json({
-      success: true,
-      listing: updatedListing,
-      message: "Listing updated successfully"
-    });
-
-  } catch (error: any) {
-    console.error("Update listing API error:", error);
-    return NextResponse.json(
-      { 
-        error: "Failed to update listing", 
-        details: error.message,
+    
+    const shopId = stores[0].shop_id;
+    console.log("Using shop ID:", shopId);
+    
+    // Log the update data for debugging
+    console.log("Updating listing:", listingId, "Data:", body);
+    
+    // Force the quantity to be a number for proper handling
+    if (body.quantity !== undefined) {
+      body.quantity = Number(body.quantity);
+    }
+    
+    // Convert price object to number if it comes from the frontend
+    if (body.price && typeof body.price === 'object' && body.price.amount !== undefined) {
+      body.price = Math.round((body.price.amount / body.price.divisor) * 100);
+    }
+    
+    try {
+      // Update the listing
+      const updatedListing = await updateListing(userId, shopId, listingId, body);
+      
+      // Add cache-control header to prevent browser caching
+      const headers = new Headers();
+      headers.append('Cache-Control', 'no-store, must-revalidate');
+      headers.append('Pragma', 'no-cache');
+      headers.append('Expires', '0');
+      
+      return NextResponse.json({
+        success: true,
+        message: "Listing updated successfully: " + listingId,
+        listing: updatedListing
+      }, { headers });
+    } catch (updateError: any) {
+      console.error("Specific error updating listing:", updateError);
+      
+      // Check if it's an API key error
+      if (updateError.message && typeof updateError.message === 'string' && updateError.message.includes("Invalid API key")) {
+        return NextResponse.json({
+          error: "Etsy API key error - token may need to be refreshed",
+          details: updateError.message,
+          success: false
+        }, { status: 401 });
+      }
+      
+      return NextResponse.json({
+        error: updateError instanceof Error ? updateError.message : "Unknown error during update",
         success: false
-      },
-      { status: 500 }
-    );
+      }, { status: 500 });
+    }
+  } catch (error) {
+    console.error("Error updating listing:", error);
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : "Unknown error",
+      success: false
+    }, { status: 500 });
   }
 }
 
@@ -79,15 +118,18 @@ export async function DELETE(
     const userId = "71bca451-a580-4bdd-a7eb-91e2d8aa5d12";
     console.log("Using user ID:", userId);
     
-    // listingId'yi params'dan alırken güvenli bir şekilde al
-    if (!params || !params.listingId) {
+    // Get listing ID from the URL path params
+    const listingIdParam = params.listingId;
+    
+    // Ensure we have a valid listing ID
+    if (!listingIdParam) {
       return NextResponse.json({
         error: "Missing listing ID",
         success: false
       }, { status: 400 });
     }
     
-    const listingId = parseInt(params.listingId);
+    const listingId = parseInt(listingIdParam);
     if (isNaN(listingId)) {
       return NextResponse.json({
         error: "Invalid listing ID",
@@ -116,6 +158,6 @@ export async function DELETE(
         success: false
       },
       { status: 500 }
-    )
+    );
   }
 } 

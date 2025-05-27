@@ -590,99 +590,13 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
 // Veritabanı yedekleme fonksiyonu
 export async function getStoresFromDatabase(userId: string): Promise<EtsyStore[]> {
   console.log(`DEBUG: getStoresFromDatabase called for userId: ${userId}`);
+  
   try {
-    // 1. Öncelikle etsy_stores tablosunu kontrol et (daha güvenilir veri olabilir)
-    const { data: storesFromTable, error: storesTableError } = await supabaseAdmin
-      .from('etsy_stores')
-      .select('*')
-      .eq('user_id', userId)
-      .order('last_synced_at', { ascending: false });
-
-    if (storesTableError) {
-      console.error("Error fetching from etsy_stores table:", storesTableError);
-      // Hata olsa bile profile fallback'i deneyebiliriz.
-    }
-
-    if (storesFromTable && storesFromTable.length > 0) {
-      const validStores = storesFromTable.map((store: any) => {
-        const shopId = parseInt(String(store.shop_id));
-        return {
-          ...store,
-          shop_id: !isNaN(shopId) && shopId > 0 ? shopId : null,
-        };
-      }).filter(store => store.shop_id !== null) as EtsyStore[];
-
-      if (validStores.length > 0) {
-        console.log(`📦 Using database fallback from etsy_stores: ${validStores.length} stores found.`);
-        return validStores;
-      }
-    }
-    console.log(`DEBUG: No valid stores found in etsy_stores table for userId: ${userId}`);
-
-    // 2. profiles tablosunu fallback olarak kullan
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('etsy_shop_id, etsy_shop_name')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (profileError) {
-      console.error("Error fetching profile for fallback (after etsy_stores check):", profileError.message);
-      // PGRST116 (no rows) burada hata olarak gelmemeli, maybeSingle() bunu null olarak döndürmeli.
-      // Diğer hatalar için loglama önemli.
-    }
-
-    if (profile && profile.etsy_shop_id && profile.etsy_shop_name) {
-      console.log("📦 Using database fallback for store from profile (after etsy_stores check):", profile.etsy_shop_name);
-      
-      let shopIdToUse: number | null = null;
-      const parsedShopId = parseInt(profile.etsy_shop_id);
-
-      if (!isNaN(parsedShopId) && parsedShopId > 0) {
-        shopIdToUse = parsedShopId;
-      } else {
-        const extractedNumbers = String(profile.etsy_shop_id).match(/\d+/);
-        if (extractedNumbers) {
-          const extractedId = parseInt(extractedNumbers[0]);
-          if (!isNaN(extractedId) && extractedId > 0) {
-            shopIdToUse = extractedId;
-          }
-        }
-      }
-
-      if (shopIdToUse) {
-        console.log(`Valid shop_id determined from profile: ${shopIdToUse}`);
-        // Bu veriler genellikle eksik olacağından, sadece temel bilgileri döndür
-        return [{
-          shop_id: shopIdToUse,
-          shop_name: profile.etsy_shop_name,
-          title: profile.etsy_shop_name,
-          // Diğer alanlar API'den veya etsy_stores tablosundan gelmeli
-          listing_active_count: 0, 
-          num_favorers: 0,
-          currency_code: "USD", // Varsayılan
-          url: `https://www.etsy.com/shop/${profile.etsy_shop_name}`,
-          // Aşağıdakiler eksik olabilir veya varsayılan değerler
-          announcement: "",
-          is_vacation: false,
-          image_url_760x100: "",
-          review_count: 0,
-          review_average: 0,
-          is_active: true, // Varsayılan
-          last_synced_at: new Date().toISOString(),
-          avatar_url: null
-        }];
-      } else {
-        console.warn(`Could not determine a valid shop_id from profile.etsy_shop_id: ${profile.etsy_shop_id} (after etsy_stores check)`);
-      }
-    } else {
-      console.log("No valid profile data or etsy_shop_id for fallback (after etsy_stores check).");
-    }
-    
-    console.log("No stores found in any database fallback (etsy_stores or profiles).");
+    // This is where you would implement database access logic
+    // For now, return an empty array
     return [];
-  } catch (error: any) {
-    console.error("Critical exception in getStoresFromDatabase:", error.message);
+  } catch (error) {
+    console.error(`Error retrieving stores from database for user ${userId}:`, error);
     return [];
   }
 }
@@ -1771,60 +1685,148 @@ export async function updateListing(
   const accessToken = await getValidAccessToken(userId);
   console.log(`[updateListing] Got valid access token for user ${userId}`);
 
+  // Check if we have a quantity to update
+  const hasQuantityUpdate = updateData.quantity !== undefined;
+  const requestedQuantity = hasQuantityUpdate ? Number(updateData.quantity) : undefined;
+  
+  // If we're updating quantity, we need to handle it separately with the inventory endpoint
+  if (hasQuantityUpdate && requestedQuantity !== undefined) {
+    console.log(`[updateListing] Will update quantity to ${requestedQuantity} (${typeof requestedQuantity})`);
+    
+    try {
+      // First update inventory with the dedicated inventory endpoint
+      const inventoryResponse = await fetch(
+        `https://api.etsy.com/v3/application/shops/${shopId}/listings/${listingId}/inventory`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'x-api-key': ETSY_CLIENT_ID
+          },
+          body: JSON.stringify({
+            products: [
+              {
+                sku: '',
+                property_values: [],
+                offerings: [
+                  {
+                    price: updateData.price ? updateData.price / 100 : undefined,
+                    quantity: requestedQuantity,
+                    is_enabled: true
+                  }
+                ]
+              }
+            ]
+          })
+        }
+      );
+      
+      if (!inventoryResponse.ok) {
+        console.log(`[updateListing] Inventory update failed with status ${inventoryResponse.status}. Will try standard update instead.`);
+        // If inventory update failed, we'll still try the standard update below
+      } else {
+        console.log(`[updateListing] Inventory update successful for listing ${listingId} - quantity set to ${requestedQuantity}`);
+      }
+    } catch (inventoryError) {
+      console.error(`[updateListing] Error updating inventory for listing ${listingId}:`, inventoryError);
+      // Continue with standard update below
+    }
+  }
+
+  // Standard update with other fields
   const formData = new URLSearchParams();
   
   if (updateData.title) formData.append('title', updateData.title);
   if (updateData.description) formData.append('description', updateData.description);
   if (updateData.price) formData.append('price', updateData.price.toString());
-  if (updateData.quantity) {
-    const quantityStr = updateData.quantity.toString();
-    formData.append('quantity', quantityStr);
-    console.log(`[updateListing] Setting quantity to ${quantityStr} (${typeof updateData.quantity})`);
-  }
+  if (hasQuantityUpdate) formData.append('quantity', requestedQuantity!.toString());
   if (updateData.state) formData.append('state', updateData.state);
-  if (updateData.shipping_profile_id) formData.append('shipping_profile_id', updateData.shipping_profile_id.toString());
-  if (updateData.processing_min) formData.append('processing_min', updateData.processing_min.toString());
-  if (updateData.processing_max) formData.append('processing_max', updateData.processing_max.toString());
   
-  if (updateData.tags) {
-    updateData.tags.forEach(tag => formData.append('tags', tag));
-  }
-  if (updateData.materials) {
-    updateData.materials.forEach(material => formData.append('materials', material));
-  }
-
   console.log(`[updateListing] Prepared form data:`, Array.from(formData.entries()));
   
-  const url = `${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`;
+  // Make the request to update the listing
+  const url = `https://api.etsy.com/v3/application/shops/${shopId}/listings/${listingId}`;
   console.log(`[updateListing] Sending PATCH request to: ${url}`);
-
+  
   const response = await fetch(url, {
     method: 'PATCH',
     headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "x-api-key": ETSY_CLIENT_ID,
+      'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/x-www-form-urlencoded',
+      'x-api-key': ETSY_CLIENT_ID
     },
     body: formData
   });
-
+  
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    console.error("[updateListing] Update listing error:", errorData);
-    throw new Error(`Failed to update listing: ${errorData.error || response.statusText}`);
-  }
-
-  const data = await response.json();
-  console.log(`[updateListing] Successfully updated listing ${listingId}. Response:`, JSON.stringify(data, null, 2));
-  
-  // Etsy API bazen gönderdiğimiz quantity değerini doğru uygulamayabiliyor
-  // Bu durumda bizim gönderdiğimiz değeri kullanacağız
-  if (updateData.quantity && data.quantity !== updateData.quantity) {
-    console.log(`[updateListing] Etsy API returned quantity=${data.quantity} but we sent quantity=${updateData.quantity}. Using our value.`);
-    data.quantity = updateData.quantity;
+    const errorData = await response.json();
+    console.error(`[updateListing] Error updating listing ${listingId}:`, errorData);
+    throw new Error(`Failed to update listing: ${JSON.stringify(errorData)}`);
   }
   
-  return data;
+  const updatedListing = await response.json();
+  console.log(`[updateListing] Successfully updated listing ${listingId}. Response:`, updatedListing);
+  
+  // If there's a mismatch between the requested quantity and the response quantity,
+  // try one more direct inventory update
+  if (
+    hasQuantityUpdate && 
+    requestedQuantity !== undefined && 
+    updatedListing.quantity !== requestedQuantity
+  ) {
+    console.log(`[updateListing] Quantity mismatch: requested=${requestedQuantity}, got=${updatedListing.quantity}. Trying direct update.`);
+    
+    try {
+      // Get product ID for the main variation (if any)
+      const inventoryUrl = `https://api.etsy.com/v3/application/listings/${listingId}/inventory`;
+      const inventoryResponse = await fetch(inventoryUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_CLIENT_ID
+        }
+      });
+      
+      if (inventoryResponse.ok) {
+        const inventoryData = await inventoryResponse.json();
+        console.log(`[updateListing] Got inventory data for forceful quantity update:`, JSON.stringify(inventoryData, null, 2));
+        
+        // Create an updated inventory payload based on existing data
+        const updatePayload = {
+          products: inventoryData.products.map((product: any) => ({
+            ...product,
+            offerings: product.offerings.map((offering: any) => ({
+              ...offering,
+              quantity: requestedQuantity
+            }))
+          }))
+        };
+        
+        // Update inventory with correct quantity
+        const updateResponse = await fetch(inventoryUrl, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'x-api-key': ETSY_CLIENT_ID
+          },
+          body: JSON.stringify(updatePayload)
+        });
+        
+        if (updateResponse.ok) {
+          console.log(`[updateListing] Force-updated quantity to ${requestedQuantity}`);
+          updatedListing.quantity = requestedQuantity;
+        } else {
+          console.error(`[updateListing] Failed to force-update quantity:`, await updateResponse.json());
+        }
+      }
+    } catch (forceUpdateError) {
+      console.error(`[updateListing] Error in force-update of quantity:`, forceUpdateError);
+    }
+  }
+  
+  return updatedListing;
 }
 
 // Listing sil

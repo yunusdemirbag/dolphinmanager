@@ -699,79 +699,72 @@ export default function ProductsClient() {
     setSubmitting(true);
     try {
       // Ensure quantity is properly parsed as a number
+      const quantityValue = typeof product.quantity === 'string' 
+        ? parseInt(product.quantity, 10) 
+        : product.quantity;
+      
+      // Create a copy of the product with the parsed quantity
       const productToUpdate = {
         ...product,
-        quantity: typeof product.quantity === 'string' ? parseInt(product.quantity) : product.quantity
+        quantity: quantityValue
       };
       
-      console.log("Updating product:", productToUpdate.listing_id, productToUpdate);
+      console.log("Updating product:", productToUpdate.listing_id, "Quantity:", quantityValue, "Type:", typeof quantityValue);
       
+      // Update the product in our local state first for immediate UI feedback
+      setProducts(prevProducts => {
+        return prevProducts.map(p => {
+          if (p.listing_id === productToUpdate.listing_id) {
+            return { ...p, quantity: quantityValue };
+          }
+          return p;
+        });
+      });
+      
+      setFilteredProducts(prevProducts => {
+        return prevProducts.map(p => {
+          if (p.listing_id === productToUpdate.listing_id) {
+            return { ...p, quantity: quantityValue };
+          }
+          return p;
+        });
+      });
+      
+      // Send the update to the API
       const response = await fetch(`/api/etsy/listings/${productToUpdate.listing_id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
         },
-        body: JSON.stringify({
-          title: productToUpdate.title,
-          description: productToUpdate.description,
-          price: Math.round((productToUpdate.price.amount / productToUpdate.price.divisor) * 100),
-          quantity: productToUpdate.quantity,
-          state: productToUpdate.state
-        })
+        body: JSON.stringify(productToUpdate)
       });
-
-      let result;
-      try {
-        result = await response.json();
-      } catch (err) {
-        console.error("Error parsing response:", err);
-        result = { error: "Invalid response format" };
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `API error: ${response.status}`);
       }
       
-      console.log("Update response:", response.status, result);
-
-      if (response.ok && result.success) {
-        toast({
-          title: "Başarılı",
-          description: "Ürün başarıyla güncellendi",
-          variant: "default",
-        });
-        
-        // Use the returned data from API to update local state if available
-        const updatedProduct = result.listing || productToUpdate;
-        
-        // Local state'i başarılı sonuçla güncelle
-        setProducts(prevProducts => {
-          const newProducts = [...prevProducts];
-          const index = newProducts.findIndex(p => p.listing_id === productToUpdate.listing_id);
-          if (index !== -1) {
-            newProducts[index] = { 
-              ...newProducts[index], 
-              ...updatedProduct,
-              // Make sure quantity is correctly set
-              quantity: typeof updatedProduct.quantity === 'string' ? 
-                parseInt(updatedProduct.quantity) : updatedProduct.quantity
-            };
-          }
-          return newProducts;
-        });
-        
-        setShowEditModal(null);
-        
-        // Filter and sort products will be called automatically due to useEffect dependency on products
-      } else {
-        console.error("Error updating product:", result);
-        toast({
-          title: "Güncelleme Başarısız",
-          description: result.details || result.error || "Bilinmeyen bir hata oluştu.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Exception updating product:", error);
+      const updatedProduct = await response.json();
+      console.log("Product updated successfully:", updatedProduct);
+      
+      // Close any open dialogs
+      
+      // Show success message
       toast({
-        title: "Hata",
-        description: `İşlem sırasında bir hata oluştu: ${error}`,
+        title: "Ürün güncellendi",
+        description: "Ürün başarıyla güncellendi",
+        variant: "default",
+      });
+      
+      // Refresh product list to show updated data from the server
+      refreshProducts(false);
+      
+    } catch (error) {
+      console.error("Update product error:", error);
+      toast({
+        title: "Ürün güncelleme hatası",
+        description: error instanceof Error ? error.message : "Ürün güncellenirken bir hata oluştu",
         variant: "destructive",
       });
     } finally {

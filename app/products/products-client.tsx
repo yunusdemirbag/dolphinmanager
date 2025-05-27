@@ -58,6 +58,7 @@ import {
   Store,
   ArrowDown,
   ArrowUp,
+  Video, // Video ikonu için
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
@@ -180,61 +181,77 @@ export default function ProductsClient() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<number | null>(null);
   const [etsyConnected, setEtsyConnected] = useState(true); // Track Etsy connection status
+  // Add this state to track if image order has changed
+  const [imagesReordered, setImagesReordered] = useState(false);
+  // Add a new state for "No stores found" error
+  const [noStoresFound, setNoStoresFound] = useState(false);
 
   // ProductImage bileşenini daha güvenli hale getiriyorum:
   const ProductImage = ({ product }: { product: Product }) => {
-    const [imageSrc, setImageSrc] = useState<string>("");
     const [isLoading, setIsLoading] = useState(true);
-    const [hasError, setHasError] = useState(false);
-    
-    // Client-side'da resim URL'sini ayarlıyoruz (SSR/client hydration uyumsuzluğunu önlemek için)
+    const [error, setError] = useState<string | null>(null);
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStartIndex, setDragStartIndex] = useState<number | null>(null);
+    const [dragEndIndex, setDragEndIndex] = useState<number | null>(null);
+    const [imagesReordered, setImagesReordered] = useState(false);
+    const [newImages, setNewImages] = useState<any[]>([]);
+
     useEffect(() => {
-      if (Array.isArray(product.images) && product.images.length > 0 && product.images[0].url_570xN) {
-        // API'den gelen resim URL'sini kullan
-        setImageSrc(product.images[0].url_570xN);
-      } else if (product.listing_id) {
-        // Etsy'nin standart listing ID formatını kullan
-        setImageSrc(`https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${product.listing_id}`);
-      } else {
-        // Varsayılan placeholder
-        setImageSrc("https://via.placeholder.com/570x570.png?text=No+Image");
+      if (product.images && product.images.length > 0) {
+        setNewImages(product.images);
       }
-    }, [product]);
-    
+    }, [product.images]);
+
+    const handleDragStart = (index: number) => {
+      setIsDragging(true);
+      setDragStartIndex(index);
+    };
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+      e.preventDefault();
+      if (dragStartIndex === null) return;
+      setDragEndIndex(index);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      if (dragStartIndex === null || dragEndIndex === null) return;
+      const images = [...newImages];
+      const draggedImage = images[dragStartIndex];
+      images.splice(dragStartIndex, 1);
+      images.splice(dragEndIndex, 0, draggedImage);
+      setNewImages(images);
+      setImagesReordered(true);
+      setDragStartIndex(null);
+      setDragEndIndex(null);
+    };
+
     return (
-      <div className="relative w-full h-full">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <div className="relative">
+        {product.images && product.images.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2">
+            {newImages.map((image, index) => (
+              <div
+                key={index}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={handleDrop}
+                className={`relative ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+              >
+                <img
+                  src={image.url_570xN}
+                  alt={image.alt_text || 'Product image'}
+                  className="w-full h-32 object-cover rounded"
+                />
+              </div>
+            ))}
           </div>
-        )}
-        
-        {imageSrc && (
-          <img 
-            src={imageSrc}
-            alt={product.title}
-            className={`w-full h-full object-cover transform hover:scale-105 transition-transform duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-            loading="lazy"
-            onLoad={() => setIsLoading(false)}
-            onError={(e) => {
-              setHasError(true);
-              setIsLoading(false);
-              const target = e.target as HTMLImageElement;
-              target.onerror = null; // Sonsuz döngüyü engelle
-              
-              // Alternatif resim dene
-              if (target.src !== `https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${product.listing_id}`) {
-                setImageSrc(`https://i.etsystatic.com/isla/etc/placeholder.jpg?listing_id=${product.listing_id}`);
-              } else {
-                setImageSrc("https://via.placeholder.com/570x570.png?text=No+Image");
-              }
-            }}
-          />
-        )}
-        
-        {hasError && process.env.NODE_ENV === 'development' && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs p-1 truncate">
-            ID: {product.listing_id}
+        ) : (
+          <div className="w-full h-32 bg-gray-200 rounded flex items-center justify-center">
+            <span className="text-gray-500">No image available</span>
           </div>
         )}
       </div>
@@ -338,61 +355,131 @@ export default function ProductsClient() {
         })
       });
       
-      const refreshData = await refreshResponse.json();
-      
-      // Check if reconnection is required
-      if (!refreshResponse.ok || (refreshData && refreshData.reconnect_required)) {
-        console.error("Etsy connection refresh failed or reconnection required:", refreshData);
+      // Yanıt durum kodunu kontrol et
+      if (!refreshResponse.ok) {
+        // HTTP yanıt kodu hatalıysa
+        console.error("Etsy refresh API error:", refreshResponse.status, refreshResponse.statusText);
         
-        if (refreshData.reconnect_required) {
+        // 401 veya 403 gibi yetkilendirme hatası ise
+        if (refreshResponse.status === 401 || refreshResponse.status === 403) {
+          setEtsyConnected(false);
+          setReconnectRequired(true);
+          
           toast({
             title: "Etsy bağlantısı gerekiyor",
             description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
             variant: "destructive",
             action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
           });
-          setEtsyConnected(false);
+          
           setLoading(false);
           return;
         }
         
+        // Diğer API hataları için
         toast({
           title: "Yenileme başarısız",
-          description: "Ürünler yenilenirken bir hata oluştu.",
+          description: `API hatası: ${refreshResponse.status} ${refreshResponse.statusText}`,
           variant: "destructive"
         });
+        
         setLoading(false);
         return;
       }
       
-      // Now load the products
-      await loadProducts(1);
-      
-      if (showNotification) {
-        toast({
-          title: "Ürünler yenilendi",
-          description: "Ürün listesi başarıyla güncellendi."
-        });
+      // Yanıtı metin olarak al ve JSON'a çevirmeye çalış
+      let refreshData;
+      try {
+        const textResponse = await refreshResponse.text();
+        
+        // Boş yanıt mı kontrol et
+        if (!textResponse || textResponse.trim() === '') {
+          console.log("Etsy API boş yanıt döndürdü, işleme devam ediliyor");
+          refreshData = {}; // Boş nesne ile devam et
+        } else {
+          try {
+            // JSON'a çevirmeyi dene
+            refreshData = JSON.parse(textResponse);
+          } catch (parseError) {
+            console.error("JSON ayrıştırma hatası:", parseError);
+            // JSON ayrıştırılamazsa metin olarak kullan
+            refreshData = { error: textResponse };
+          }
+        }
+      } catch (textError) {
+        console.error("Yanıt metni okuma hatası:", textError);
+        refreshData = { error: "Yanıt metni okunamadı" };
       }
-    } catch (error) {
-      console.error("Error refreshing products:", error);
       
-      // Check if there's a connection issue
-      if (error instanceof Error && 
-          (error.message.includes("token") || 
-           error.message.includes("connection") || 
-           error.message.includes("unauthorized"))) {
+      // refreshData değerini kontrol et
+      if (refreshData && refreshData.reconnect_required) {
+        console.error("Etsy bağlantısı yenileme başarısız, yeniden bağlantı gerekiyor:", refreshData);
+        
+        setReconnectRequired(true);
+        setEtsyConnected(false);
+        
         toast({
           title: "Etsy bağlantısı gerekiyor",
           description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
           variant: "destructive",
           action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
         });
+        
+        setLoading(false);
+        return;
+      }
+      
+      // Buraya kadar geldiyse, bağlantı yenilemesi başarılı oldu demektir
+      console.log("Etsy bağlantısı başarıyla yenilendi, ürünler yükleniyor");
+      
+      try {
+        // Ürünleri yükle
+        await loadProducts(1);
+        
+        if (showNotification) {
+          toast({
+            title: "Ürünler yenilendi",
+            description: "Ürün listesi başarıyla güncellendi."
+          });
+        }
+        
+        // Bağlantı durumunu güncelle
+        setEtsyConnected(true);
+        setReconnectRequired(false);
+      } catch (loadError) {
+        console.error("Ürünleri yükleme hatası:", loadError);
+        
+        toast({
+          title: "Ürünler yüklenemedi",
+          description: "Bağlantı yenilendi ancak ürünler yüklenirken hata oluştu.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Yenileme işlemi sırasında beklenmeyen hata:", error);
+      
+      // Bağlantı sorunu olup olmadığını kontrol et
+      const errorMessage = error instanceof Error ? error.message : "Bilinmeyen hata";
+      
+      if (errorMessage.toLowerCase().includes("token") || 
+          errorMessage.toLowerCase().includes("connection") || 
+          errorMessage.toLowerCase().includes("unauthorized") ||
+          errorMessage.toLowerCase().includes("yetki") ||
+          errorMessage.toLowerCase().includes("bağlantı")) {
+        
+        toast({
+          title: "Etsy bağlantısı gerekiyor",
+          description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
+          variant: "destructive",
+          action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
+        });
+        
         setEtsyConnected(false);
+        setReconnectRequired(true);
       } else {
         toast({
           title: "Yenileme başarısız",
-          description: "Ürünler yenilenirken bir hata oluştu.",
+          description: "Ürünler yenilenirken bir hata oluştu: " + errorMessage,
           variant: "destructive"
         });
       }
@@ -405,13 +492,14 @@ export default function ProductsClient() {
     try {
       setLoading(true)
       setCurrentPage(page)
+      setNoStoresFound(false) // Reset the no stores error state
       
       // Set up request parameters
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pageSize.toString(),
         state: filterStatus === 'all' ? 'active' : filterStatus,
-        skip_cache: 'false', // Default to using cache
+        skip_cache: 'true', // Always skip cache to ensure fresh data
       }).toString()
       
       // Make API request with proper error handling
@@ -428,28 +516,66 @@ export default function ProductsClient() {
         console.error("Unauthorized or token expired")
         setEtsyConnected(false)
         setReconnectRequired(true)
-        
         toast({
           title: "Etsy bağlantısı gerekiyor",
-          description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
+          description: "Oturum süresi dolmuş. Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
           variant: "destructive",
           action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
         })
-        
         setLoading(false)
         return
       }
       
       // For other API errors
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "API yanıtı okunamadı" }))
-        console.error("Product loading error:", errorData)
+        let errorMessage = "Bilinmeyen bir hata oluştu"
+        try {
+          const textResponse = await response.text()
+          try {
+            const errorData = JSON.parse(textResponse)
+            errorMessage = errorData.error || errorData.details || textResponse
+          } catch {
+            errorMessage = textResponse || `API error: ${response.status} ${response.statusText}`
+          }
+        } catch (e) {
+          errorMessage = `API error: ${response.status} ${response.statusText}`
+        }
         
-        toast({
-          title: "Ürünler yüklenemedi",
-          description: errorData.error || "Bilinmeyen bir hata oluştu",
-          variant: "destructive"
-        })
+        console.error("Product loading error:", errorMessage)
+        
+        // Special handling for "No stores found" error
+        if (errorMessage === "No stores found") {
+          setNoStoresFound(true)
+          setEtsyConnected(false)
+          toast({
+            title: "Etsy mağazası bulunamadı",
+            description: "Henüz Etsy mağazanızı bağlamamışsınız veya bağlantı kopmuş.",
+            variant: "destructive",
+            action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
+          })
+          setLoading(false)
+          return
+        }
+        
+        // Check if it's a connection issue
+        if (errorMessage.toLowerCase().includes('token') || 
+            errorMessage.toLowerCase().includes('connect') || 
+            errorMessage.toLowerCase().includes('auth')) {
+          setReconnectRequired(true)
+          setEtsyConnected(false)
+          toast({
+            title: "Etsy bağlantısı gerekiyor",
+            description: "Bağlantı süresi dolmuş. Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
+            variant: "destructive",
+            action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
+          })
+        } else {
+          toast({
+            title: "Ürünler yüklenemedi",
+            description: errorMessage,
+            variant: "destructive"
+          })
+        }
         
         setLoading(false)
         return
@@ -459,28 +585,21 @@ export default function ProductsClient() {
       const data = await response.json()
       
       if (data.listings && Array.isArray(data.listings)) {
-        // Update state with API data
         setProducts(data.listings)
         setTotalPages(data.total_pages || 1)
         setTotalCount(data.count || 0)
         
-        // Update store information if available
         if (data.shop_id) {
-          setCurrentStore(prev => {
-            // If store name already exists, keep it
-            return {
-              shop_id: data.shop_id,
-              shop_name: prev?.shop_name || `Mağaza #${data.shop_id}`
-            }
-          })
+          setCurrentStore(prev => ({
+            shop_id: data.shop_id,
+            shop_name: prev?.shop_name || `Mağaza #${data.shop_id}`
+          }))
           
-          // Also fetch store details if we don't have them
           if (!currentStore?.shop_name || currentStore.shop_name.includes('#')) {
             fetchStoreDetails(data.shop_id)
           }
         }
         
-        // Reset connection-related errors since we successfully got data
         setReconnectRequired(false)
         setEtsyConnected(true)
         
@@ -488,17 +607,23 @@ export default function ProductsClient() {
       } else {
         console.error("No listings data in API response:", data)
         
-        // Check if reconnection error is indicated
         if (data.error && typeof data.error === 'string' && 
-            (data.error.includes('token') || data.error.includes('auth') || data.error.includes('connect'))) {
+            (data.error.toLowerCase().includes('token') || 
+             data.error.toLowerCase().includes('auth') || 
+             data.error.toLowerCase().includes('connect'))) {
           setReconnectRequired(true)
           setEtsyConnected(false)
-          
           toast({
             title: "Etsy bağlantısı gerekiyor",
             description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
             variant: "destructive",
             action: <ToastAction altText="Bağlan" onClick={handleReconnectEtsy}>Bağlan</ToastAction>
+          })
+        } else {
+          toast({
+            title: "Ürün bulunamadı",
+            description: "Mağazanızda hiç ürün bulunamadı veya veri alınamadı.",
+            variant: "destructive"
           })
         }
       }
@@ -623,6 +748,87 @@ export default function ProductsClient() {
     setFilteredProducts(filtered)
   }
 
+  // Etsy yeniden bağlantı fonksiyonu
+  const handleReconnectEtsy = async () => {
+    try {
+      setRefreshing(true);
+      
+      // First try to refresh the token automatically
+      const refreshRes = await fetch('/api/etsy/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          force_refresh: true
+        })
+      }).catch(e => null);
+      
+      if (refreshRes && refreshRes.ok) {
+        let refreshData: { reconnect_required?: boolean } = {};
+        try {
+          const textResponse = await refreshRes.text();
+          try {
+            refreshData = JSON.parse(textResponse);
+          } catch (parseError) {
+            console.error("Failed to parse refresh response", parseError);
+            refreshData = { reconnect_required: true };
+          }
+        } catch (e) {
+          console.error("Failed to read refresh response", e);
+          refreshData = { reconnect_required: true };
+        }
+        
+        if (!refreshData.reconnect_required) {
+          // Token refreshed successfully, reload products
+          toast({
+            title: "Bağlantı yenilendi",
+            description: "Etsy bağlantısı başarıyla yenilendi. Ürünler yükleniyor...",
+            variant: "default",
+          });
+          
+          await loadProducts();
+          setRefreshing(false);
+          return;
+        }
+      }
+      
+      // If automatic refresh failed, get the Etsy OAuth URL for manual reconnection
+      const res = await fetch('/api/etsy/auth-url');
+      
+      if (!res.ok) {
+        throw new Error(`Bağlantı URL'si alınamadı: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      if (data.url) {
+        toast({
+          title: "Etsy bağlantısı yenileniyor",
+          description: "Etsy sayfasına yönlendiriliyorsunuz. Lütfen Etsy hesabınıza izin verin.",
+          variant: "default",
+        });
+        
+        // Kısa bir süre bekleyip yönlendir
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 1500);
+      } else {
+        throw new Error(data.error || "Bağlantı URL'si alınamadı");
+      }
+    } catch (error) {
+      console.error("Auth URL error:", error);
+      
+      toast({
+        title: "Bağlantı Hatası",
+        description: error instanceof Error ? error.message : "Bağlantı başlatılırken bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleCreateProduct = async () => {
     if (!createForm.title || !createForm.description || createForm.price <= 0) {
       alert("Lütfen tüm gerekli alanları doldurun!")
@@ -673,6 +879,11 @@ export default function ProductsClient() {
   const handleUpdateProduct = async (product: Product) => {
     setSubmitting(true);
     try {
+      // Eğer resimlerin sırası değiştiyse önce sıralamayı güncelle
+      if (imagesReordered && showEditModal) {
+        setImagesReordered(false);
+      }
+      // Sonra diğer güncellemeleri yap
       // Ensure quantity is properly parsed as a number
       const quantityValue = typeof product.quantity === 'string' 
         ? parseInt(product.quantity, 10) 
@@ -1045,9 +1256,19 @@ export default function ProductsClient() {
             toggleProductSelection(product.listing_id);
           }}
         >
-          {/* Görsel */}
+          {/* Sadece ana görsel */}
           <div className="relative w-[140px] h-[140px] bg-gray-50 flex-shrink-0 flex items-center justify-center overflow-hidden">
-            <ProductImage product={product} />
+            {product.images && product.images.length > 0 ? (
+              <img
+                src={product.images[0].url_570xN}
+                alt={product.images[0].alt_text || 'Product image'}
+                className="w-full h-full object-cover rounded"
+              />
+            ) : (
+              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                <span className="text-gray-500">No image available</span>
+              </div>
+            )}
             <div className="absolute top-2 left-2 z-30">
               <Checkbox
                 checked={isSelected}
@@ -1057,7 +1278,7 @@ export default function ProductsClient() {
               />
             </div>
           </div>
-          {/* Bilgi alanı */}
+          {/* Bilgi alanı ve butonlar ... (değişmeden kalacak) */}
           <div className="flex-1 flex flex-col justify-between px-6 py-4 min-w-0">
             <div className="flex flex-col gap-1 min-w-0">
               <h3 className="text-lg font-bold text-gray-900 truncate mb-1">{product.title}</h3>
@@ -1137,7 +1358,7 @@ export default function ProductsClient() {
     // Grid (3'lü, 5'li) görünüm
     return (
       <div
-        className={`bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col relative hover:shadow-lg transition-shadow duration-300 border border-gray-100 ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+        className={`bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col relative hover:shadow-lg transition-shadow duration-300 border border-gray-100 group ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}`}
         style={{ cursor: 'pointer', minHeight: 340 }}
         onClick={(e) => {
           if (
@@ -1151,6 +1372,19 @@ export default function ProductsClient() {
           toggleProductSelection(product.listing_id);
         }}
       >
+        {/* Sağ üstte Etsy'de Göster butonu */}
+        <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200">
+          <a
+            href={product.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white shadow px-3 py-1 rounded-full text-xs font-medium text-primary hover:bg-primary hover:text-white border border-primary hover:border-primary-dark transition-colors duration-200"
+            title="Etsy'de Göster"
+            onClick={e => e.stopPropagation()}
+          >
+            Etsy'de Göster
+          </a>
+        </div>
         {/* Checkbox ve durum etiketi */}
         <div className="absolute top-2 left-2 z-30">
           <Checkbox
@@ -1160,14 +1394,21 @@ export default function ProductsClient() {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
-        {/* <div className="absolute top-2 right-2 z-30">
-          <ProductStatus status={product.state} grid />
-        </div> */}
-        {/* Ürün görseli */}
-        <div className="w-full aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
-          <ProductImage product={product} />
+        {/* Ürün görseli: sadece ana resim */}
+        <div className="w-full aspect-square bg-gray-50 flex items-center justify-center overflow-hidden relative">
+          {product.images && product.images.length > 0 ? (
+            <img
+              src={product.images[0].url_570xN}
+              alt={product.images[0].alt_text || 'Product image'}
+              className="w-full h-full object-cover rounded"
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+              <span className="text-gray-500">No image available</span>
+            </div>
+          )}
         </div>
-        {/* Bilgi alanı */}
+        {/* Bilgi alanı ve butonlar ... (değişmeden kalacak) */}
         <div className="flex-1 flex flex-col justify-between px-4 py-3">
           <h3 className="text-base font-bold text-gray-900 truncate mb-1">{product.title}</h3>
           <div className="text-gray-500 text-xs truncate mb-2">{product.description?.slice(0, 60)}{product.description && product.description.length > 60 ? '...' : ''}</div>
@@ -1292,402 +1533,328 @@ export default function ProductsClient() {
     );
   };
 
-  // Etsy yeniden bağlantı fonksiyonu
-  const handleReconnectEtsy = async () => {
-    try {
-      setRefreshing(true);
-      // Etsy OAuth bağlantı URL'sini al
-      const res = await fetch('/api/etsy/auth-url');
-      const data = await res.json();
-      if (data.url) {
-        toast({
-          title: "Etsy bağlantısı yenileniyor",
-          description: "Etsy sayfasına yönlendiriliyorsunuz. Lütfen Etsy hesabınıza izin verin.",
-          variant: "default",
-        });
-        // Kısa bir süre bekleyip yönlendir
-        setTimeout(() => {
-          window.location.href = data.url;
-        }, 1500);
-      } else {
-        toast({
-          title: "Hata",
-          description: "Bağlantı URL'si alınamadı: " + (data.error || "Bilinmeyen hata"),
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Auth URL error:", error);
-      toast({
-        title: "Hata",
-        description: "Bağlantı başlatılırken bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
-        variant: "destructive",
-      });
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // Uyarı balonunu ürünler yoksa ve reconnectRequired true ise de göster
-  if ((reconnectRequired && showReconnectBanner) || (products.length === 0 && reconnectRequired && showReconnectBanner)) {
-    return (
-      <div>
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md">
-          <div className="flex items-center bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-lg px-4 py-3 shadow-md">
-            <AlertTriangle className="w-5 h-5 mr-2" />
-            <span className="flex-1">Etsy bağlantınızda sorun var, lütfen hesabınızı tekrar bağlayın.</span>
-            <Button size="sm" className="bg-black text-white ml-2" onClick={handleReconnectEtsy} disabled={refreshing}>
-              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Bağlantıyı Yenile"}
-            </Button>
-            <button className="ml-2 text-yellow-800 hover:text-yellow-900" onClick={() => setShowReconnectBanner(false)}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        {/* Sayfanın geri kalanı gri arka planla kapalı */}
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center opacity-60 pointer-events-none select-none">
-          <div className="text-center">
-            <Store className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-600 mb-2">Etsy Bağlantısı Gerekli</h2>
-            <p className="text-gray-500 max-w-md">Ürünleri görüntülemek ve yönetmek için Etsy hesabınıza yeniden bağlanmanız gerekiyor.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Oturum süresi dolduysa uyarı göster
-  if (sessionExpired) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-8 text-center max-w-md">
-          <AlertTriangle className="w-10 h-10 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">Oturumunuz sona erdi</h2>
-          <p className="mb-4">Devam edebilmek için tekrar giriş yapmanız gerekiyor.</p>
-          <Button className="bg-black text-white px-6 py-3 text-lg" onClick={() => window.location.href = '/auth/login'}>
-            Giriş Yap
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Package className="h-12 w-12 animate-pulse text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Ürünler yükleniyor...</p>
-        </div>
-      </div>
-    )
-  }
-
-
-
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="w-full px-8 py-8">
-        <div className="flex flex-col items-start mb-6">
-          <h1 className="text-2xl font-bold">Ürünler</h1>
-          <div className="flex items-center gap-2 mt-2">
-            <CurrentStoreNameBadge shopName={currentStore?.shop_name} />
-          </div>
-          <div className="text-gray-500 text-base mt-2 mb-2">Etsy Mağazanızdaki Tüm Ürünleri Buradan Yönetin.</div>
-        </div>
-      </div>
-      
-      {/* Yenileme durumu bildirimi */}
-      {refreshStatus.message && (
-        <div className={`mb-4 p-3 rounded border flex items-center ${
-          refreshStatus.success === undefined
-            ? 'bg-blue-50 border-blue-200 text-blue-700'  // Bilgi
-            : refreshStatus.success
-              ? 'bg-green-50 border-green-200 text-green-700'  // Başarılı
-              : 'bg-red-50 border-red-200 text-red-700'  // Hata
-        }`}>
-          {refreshStatus.success === undefined ? (
-            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-          ) : refreshStatus.success ? (
-            <CheckCircle className="w-4 h-4 mr-2" />
-          ) : (
-            <AlertTriangle className="w-4 h-4 mr-2" />
-          )}
-          <span>{refreshStatus.message}</span>
-        </div>
-      )}
-      
-      {taxonomyError && (
-        <div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-6 rounded">
-          <p>{taxonomyError}</p>
-        </div>
-      )}
-
-      <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-2 w-full">
-          {/* Arama kutusu */}
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
-            <Input
-              placeholder="Ürün adı, etiket veya açıklama ara..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 rounded-full border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all bg-gray-50 text-sm shadow-none"
-            />
-          </div>
-          {/* Sıralama dropdown + artan/azalan toggle */}
-          <div className="flex items-center gap-2 min-w-[180px]">
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="rounded-full border border-gray-200 bg-gray-50 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
-                <SelectValue placeholder="Sırala" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl shadow-lg">
-                <SelectItem value="created_timestamp">
-                  <Clock className="inline w-4 h-4 mr-2 text-gray-400" /> Yeni Eklenen
-                </SelectItem>
-                <SelectItem value="title">
-                  <ArrowDownUp className="inline w-4 h-4 mr-2 text-gray-400" /> Başlık
-                </SelectItem>
-                <SelectItem value="price">
-                  <BarChart3 className="inline w-4 h-4 mr-2 text-gray-400" /> Fiyat
-                </SelectItem>
-                <SelectItem value="quantity">
-                  <Package className="inline w-4 h-4 mr-2 text-gray-400" /> Stok
-                </SelectItem>
-                <SelectItem value="views">
-                  <Eye className="inline w-4 h-4 mr-2 text-gray-400" /> Görüntüleme
-                </SelectItem>
-                <SelectItem value="sold">
-                  <ShoppingCart className="inline w-4 h-4 mr-2 text-gray-400" /> Satış
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <button
-              type="button"
-              className={`ml-1 rounded-full border border-gray-200 bg-gray-50 p-2 hover:bg-primary/10 transition-colors ${sortOrder === 'asc' ? 'text-primary' : 'text-gray-500'}`}
-              onClick={() => setSortOrder((prev) => prev === 'asc' ? 'desc' : 'asc')}
-              title={sortOrder === 'asc' ? 'Artan Sırala' : 'Azalan Sırala'}
-            >
-              {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
-            </button>
-          </div>
-          {/* Durum filtresi dropdown */}
-          <div className="min-w-[140px]">
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="rounded-full border border-gray-200 bg-gray-50 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
-                <SelectValue placeholder="Durum" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl shadow-lg">
-                <SelectItem value="all">
-                  <List className="inline w-4 h-4 mr-2 text-gray-400" /> Tüm Durumlar
-                </SelectItem>
-                <SelectItem value="active">
-                  <CheckCircle className="inline w-4 h-4 mr-2 text-green-500" /> Aktif
-                </SelectItem>
-                <SelectItem value="inactive">
-                  <X className="inline w-4 h-4 mr-2 text-red-500" /> Pasif
-                </SelectItem>
-                <SelectItem value="draft">
-                  <Clock className="inline w-4 h-4 mr-2 text-yellow-500" /> Taslak
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Yenile butonu */}
+    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Reconnect Banner */}
+      {reconnectRequired && showReconnectBanner && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-center justify-between">
           <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 text-amber-500 mr-3" />
+            <div>
+              <h3 className="font-medium text-amber-800">Etsy bağlantısı gerekiyor</h3>
+              <p className="text-sm text-amber-700">Etsy mağazanıza yeniden bağlanmanız gerekiyor.</p>
+            </div>
+          </div>
+          <div className="flex space-x-3">
             <Button
-              variant="ghost"
-              className="rounded-full p-2 hover:bg-primary/10 transition-colors"
-              onClick={() => loadProducts()}
-              title="Yenile"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowReconnectBanner(false)}
+              className="border-amber-300 text-amber-600 hover:bg-amber-50"
             >
-              {loading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              Sonra
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleReconnectEtsy}
+              className="bg-amber-500 hover:bg-amber-600"
+              disabled={refreshing}
+            >
+              {refreshing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Bağlanıyor...
+                </>
               ) : (
-                <RefreshCw className="h-5 w-5 text-gray-500" />
+                'Etsy\'ye Bağlan'
               )}
             </Button>
           </div>
-          {/* Görünüm seçici */}
-          <div className="flex items-center gap-1 ml-auto">
-            <button
-              type="button"
-              className={`rounded-full p-2 border ${gridType === 'grid3' ? 'bg-primary/10 border-primary text-primary' : 'bg-gray-50 border-gray-200 text-gray-500'} hover:bg-primary/10 transition-colors`}
-              onClick={() => setGridType('grid3')}
-              title="3'lü Izgara"
+        </div>
+      )}
+      
+      {/* No Stores Found Banner */}
+      {noStoresFound && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 p-4 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Store className="h-5 w-5 text-blue-500 mr-3" />
+              <div>
+                <h3 className="font-medium text-blue-800">Etsy mağazası bulunamadı</h3>
+                <p className="text-sm text-blue-700">Ürünleri görüntülemek için Etsy mağazanızı bağlamanız gerekiyor.</p>
+              </div>
+            </div>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleReconnectEtsy}
+              className="bg-blue-500 hover:bg-blue-600"
+              disabled={refreshing}
             >
-              {/* 3'lü grid için tek satırda 3 kare ikon */}
-              <span className="inline-flex items-center h-5">
-                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1.5px]" />
-                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1.5px]" />
-                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1.5px]" />
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`rounded-full p-2 border ${gridType === 'grid5' ? 'bg-primary/10 border-primary text-primary' : 'bg-gray-50 border-gray-200 text-gray-500'} hover:bg-primary/10 transition-colors`}
-              onClick={() => setGridType('grid5')}
-              title="5'li Izgara"
-            >
-              {/* 5'li grid için tek satırda 5 kare ikon */}
-              <span className="inline-flex items-center h-5">
-                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
-                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
-                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
-                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
-                <span className="bg-current rounded-sm w-1.5 h-1.5 mx-[1px]" />
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`rounded-full p-2 border ${gridType === 'list' ? 'bg-primary/10 border-primary text-primary' : 'bg-gray-50 border-gray-200 text-gray-500'} hover:bg-primary/10 transition-colors`}
-              onClick={() => setGridType('list')}
-              title="Liste Görünümü"
-            >
-              <List className="w-5 h-5" />
-            </button>
+              {refreshing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Bağlanıyor...
+                </>
+              ) : (
+                'Etsy\'ye Bağlan'
+              )}
+            </Button>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Üst Filtreleme ve İşlem Butonları */}
-      <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-        <div className="flex flex-wrap gap-2 items-center w-full">
-          <Checkbox 
-            id="select-all"
-            checked={selectAllChecked}
-            onCheckedChange={toggleSelectAll}
-            className="border-gray-300"
-          />
-          <Label htmlFor="select-all" className="cursor-pointer">
-            {selectAllChecked ? 'Seçimi Kaldır' : 'Tümünü Seç'} ({selectedProducts.length}/{filteredProducts.length})
-          </Label>
-          {selectedProducts.length > 0 && (
-            <>
-              <div className="h-6 border-l border-gray-300 mx-2"></div>
-              <div className="text-base font-semibold text-gray-700">
-                {selectedProducts.length} ürün seçildi
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">Ürünler</h1>
+          <div className="flex items-center text-sm text-gray-500">
+            {currentStore ? (
+              <div className="flex items-center">
+                <Store className="h-4 w-4 mr-1" />
+                <span className="font-medium text-primary">{currentStore.shop_name}</span>
+                <span className="mx-2 text-gray-400">•</span>
+                <span>{totalCount} ürün</span>
               </div>
-              {/* Kırmızı Seçilenleri Sil butonu kaldırıldı */}
-              <div className="flex items-center gap-2 ml-2">
-                <Select value={''} onValueChange={(val) => {/* toplu işlem state */}}>
-                  <SelectTrigger className="rounded-lg border border-gray-200 bg-gray-50 text-sm min-w-[140px]">
-                    <SelectValue placeholder="Toplu İşlem" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg">
-                    <SelectItem value="activate">Aktif Yap</SelectItem>
-                    <SelectItem value="deactivate">Pasif Yap</SelectItem>
-                    <SelectItem value="draft">Taslağa Al</SelectItem>
-                    <SelectItem value="copy">Kopyala</SelectItem>
-                    <SelectItem value="delete">Sil</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button size="sm" className="rounded-lg bg-primary text-white px-5 py-2 font-semibold shadow hover:bg-primary/90 transition-colors">
-                  Uygula
+            ) : (
+              <div className="flex items-center">
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                <span>Mağaza bilgisi yükleniyor...</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            onClick={handleOpenCreateModal}
+            size="sm"
+            className="whitespace-nowrap"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Yeni Ürün Ekle
+          </Button>
+          
+          {selectedProducts.length > 0 && (
+            <Button 
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              className="whitespace-nowrap"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {selectedProducts.length} Ürünü Sil
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      <Card className="mb-6">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Ürün ara..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              <Select
+                value={filterStatus}
+                onValueChange={setFilterStatus}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Durum" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tümü</SelectItem>
+                  <SelectItem value="active">Aktif</SelectItem>
+                  <SelectItem value="inactive">Pasif</SelectItem>
+                  <SelectItem value="draft">Taslak</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select
+                value={sortBy}
+                onValueChange={setSortBy}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <ArrowDownUp className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Sıralama" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_timestamp">Eklenme Tarihi</SelectItem>
+                  <SelectItem value="title">İsim</SelectItem>
+                  <SelectItem value="price">Fiyat</SelectItem>
+                  <SelectItem value="quantity">Stok</SelectItem>
+                  <SelectItem value="views">Görüntülenme</SelectItem>
+                  <SelectItem value="sold">Satış</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="h-10 w-10"
+              >
+                {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+              </Button>
+              
+              <div className="flex rounded-md border">
+                <Button
+                  variant={gridType === 'grid3' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  onClick={() => setGridType('grid3')}
+                  className="h-10 w-10 rounded-none rounded-l-md"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={gridType === 'grid5' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  onClick={() => setGridType('grid5')}
+                  className="h-10 w-10 rounded-none"
+                >
+                  <div className="grid grid-cols-2 gap-px w-4 h-4">
+                    <div className="bg-current rounded-sm" />
+                    <div className="bg-current rounded-sm" />
+                    <div className="bg-current rounded-sm" />
+                    <div className="bg-current rounded-sm" />
+                  </div>
+                </Button>
+                <Button
+                  variant={gridType === 'list' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  onClick={() => setGridType('list')}
+                  className="h-10 w-10 rounded-none rounded-r-md"
+                >
+                  <List className="h-4 w-4" />
                 </Button>
               </div>
-            </>
-          )}
-          <div className="flex gap-2 items-center ml-auto">
-            <Button
-              size="sm"
-              onClick={handleOpenCreateModal}
-              className="bg-black hover:bg-gray-800 text-white rounded-lg px-5 py-2 font-semibold shadow"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Yeni Ürün
-            </Button>
+            </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
+
+      {/* All Selected Checkbox */}
+      <div className="flex items-center mb-4">
+        <Checkbox
+          id="selectAll"
+          checked={selectAllChecked}
+          onCheckedChange={toggleSelectAll}
+          className="mr-2"
+        />
+        <label
+          htmlFor="selectAll"
+          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+        >
+          {filteredProducts.length > 0
+            ? `${selectedProducts.length === filteredProducts.length
+                ? 'Tümü seçili'
+                : selectedProducts.length > 0
+                  ? `${selectedProducts.length} ürün seçili`
+                  : 'Tümünü seç'}`
+            : 'Ürün bulunamadı'}
+        </label>
       </div>
 
-      {/* Products Grid */}
-      {filteredProducts.length === 0 ? (
-        <div className="text-center py-16 border border-dashed rounded-lg bg-gray-50">
-          <Package className="mx-auto h-14 w-14 text-blue-400 mb-4" />
-          <h3 className="mt-2 text-lg font-semibold text-gray-800">Henüz ürününüz yok</h3>
-          <p className="mt-1 text-base text-gray-500 max-w-xl mx-auto">Etsy mağazanızda hiç ürün bulunamadı. Hemen ilk ürününüzü ekleyin!</p>
-          <div className="mt-6">
-            <Button size="lg" className="bg-black hover:bg-gray-800 text-white px-8 py-3 text-lg" onClick={handleOpenCreateModal}>
-              <Plus className="h-5 w-5 mr-2" /> Ürün Ekle
-            </Button>
-          </div>
+      {/* Loading Skeleton */}
+      {loading && (
+        <div className={gridType === 'list' ? 'space-y-4' : `grid grid-cols-1 md:grid-cols-${gridType === 'grid3' ? '3' : '5'} gap-4`}>
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className={`bg-white rounded-xl shadow-sm overflow-hidden ${gridType === 'list' ? 'flex' : ''}`}>
+              <div className={`${gridType === 'list' ? 'w-[140px] h-[140px]' : 'w-full aspect-square'} bg-gray-100`}>
+                <Skeleton className="h-full w-full" />
+              </div>
+              <div className="p-4 space-y-2 flex-1">
+                <Skeleton className="h-6 w-4/5" />
+                <Skeleton className="h-4 w-3/5" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          ))}
         </div>
-      ) : (
+      )}
+
+      {/* Products Grid/List */}
+      {!loading && (
         <>
-          <div
-            className={
-              gridType === 'list'
-                ? 'flex flex-col gap-6'
-                : gridType === 'grid5'
-                  ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-6'
-                  : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-            }
-          >
-            {filteredProducts.map((product) => (
-              <ProductCard key={product.listing_id} product={product} listView={gridType === 'list'} />
-            ))}
-          </div>
-          
-          {/* Sayfalama Kontrolleri */}
-          {totalPages > 1 && (
-            <div className="flex justify-between items-center mt-8 border-t pt-6">
-              <div className="text-sm text-gray-500">
-                {searchTerm || filterStatus !== "all" ? (
-                  <>Filtrelenmiş sonuçlar: {filteredProducts.length} ürün</>
-                ) : (
-                  <>Toplam {totalCount} ürün • Sayfa {currentPage} / {totalPages}</>
-                )}
+          {filteredProducts.length === 0 ? (
+            <div className="bg-white p-8 rounded-xl shadow-sm text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                <Package className="h-6 w-6 text-gray-400" />
               </div>
-              <div className="flex gap-2">
-                {!(searchTerm || filterStatus !== "all") && (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      disabled={currentPage <= 1}
-                      onClick={() => loadProducts(currentPage - 1)}
-                    >
-                      Önceki Sayfa
-                    </Button>
-                    {currentPage < totalPages && (
-                      <Button 
-                        variant="outline"
-                        onClick={() => loadProducts(currentPage + 1)}
-                      >
-                        Sonraki Sayfa
-                      </Button>
-                    )}
-                    {currentPage < totalPages && (
-                      <Button 
-                        variant="default"
-                        className="bg-black text-white hover:bg-gray-800"
-                        onClick={() => {
-                          const confirmed = confirm(`Bu işlem tüm sayfaları yükleyecek. Toplam ${totalCount} ürün için ${totalPages - currentPage} sayfa daha yüklenecek. Devam etmek istiyor musunuz?`);
-                          if (confirmed) {
-                            toast({
-                              title: "Tüm ürünler yükleniyor",
-                              description: "Bu işlem biraz zaman alabilir...",
-                            });
-                            // Tüm sayfaları yükle
-                            const loadAllPages = async () => {
-                              for (let p = currentPage + 1; p <= totalPages; p++) {
-                                await loadProducts(p);
-                              }
-                              toast({
-                                title: "Tüm ürünler yüklendi",
-                                description: `${totalCount} ürün başarıyla yüklendi.`,
-                              });
-                            };
-                            loadAllPages();
-                          }
-                        }}
-                      >
-                        Tüm Ürünleri Yükle
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-1">Ürün Bulunamadı</h3>
+              <p className="text-gray-500 mb-4">
+                {searchTerm
+                  ? `"${searchTerm}" araması için sonuç bulunamadı.`
+                  : filterStatus !== "all"
+                  ? `${filterStatus === "active" ? "Aktif" : filterStatus === "inactive" ? "Pasif" : "Taslak"} durumda ürün bulunamadı.`
+                  : "Henüz hiç ürün eklenmemiş."}
+              </p>
+              <Button onClick={handleOpenCreateModal}>
+                <Plus className="mr-2 h-4 w-4" />
+                Yeni Ürün Ekle
+              </Button>
+            </div>
+          ) : (
+            <div className={gridType === 'list' ? 'space-y-4' : `grid grid-cols-1 sm:grid-cols-2 md:grid-cols-${gridType === 'grid3' ? '3' : '5'} gap-4`}>
+              {filteredProducts.map((product) => (
+                <ProductCard 
+                  key={product.listing_id} 
+                  product={product}
+                  listView={gridType === 'list'}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && !searchTerm && filterStatus === 'all' && (
+            <div className="mt-6 flex items-center justify-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadProducts(1)}
+                disabled={currentPage === 1 || loading}
+              >
+                İlk
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadProducts(currentPage - 1)}
+                disabled={currentPage === 1 || loading}
+              >
+                Önceki
+              </Button>
+              
+              <span className="text-sm text-gray-500 mx-2">
+                Sayfa {currentPage} / {totalPages}
+              </span>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadProducts(currentPage + 1)}
+                disabled={currentPage === totalPages || loading}
+              >
+                Sonraki
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadProducts(totalPages)}
+                disabled={currentPage === totalPages || loading}
+              >
+                Son
+              </Button>
             </div>
           )}
         </>
@@ -1846,88 +2013,41 @@ export default function ProductsClient() {
               {/* Sağ Kolon - Resimler ve Diğer Özellikler */}
               <div className="space-y-4">
                 <div>
-                  <Label className="block mb-2">Ürün Resimleri</Label>
+                  <Label className="block mb-2 flex items-center justify-between">
+                    <span>Ürün Resimleri ve Videolar</span>
+                    <span className="text-xs text-gray-500">Sürükleyerek sıralayabilirsiniz</span>
+                  </Label>
                   {showEditModal.images && showEditModal.images.length > 0 ? (
                     <div className="grid grid-cols-2 gap-4">
                       {showEditModal.images.map((image, index) => (
-                        <div key={index} className="relative group rounded-md overflow-hidden border border-gray-200">
-                          <img 
-                            src={image.url_570xN} 
-                            alt={image.alt_text || `Ürün resmi ${index + 1}`} 
+                        <div key={index} className="relative rounded-md overflow-hidden border border-gray-200 group">
+                          <img
+                            src={image.url_570xN}
+                            alt={image.alt_text || `Resim ${index + 1}`}
                             className="w-full h-40 object-cover"
                           />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button 
-                              variant="destructive" 
-                              size="sm" 
-                              className="bg-red-600 hover:bg-red-700"
-                              title="Resmi kaldır"
-                              onClick={() => {
-                                setShowEditModal(prev => {
-                                  if (!prev) return null;
-                                  const newImages = [...prev.images];
-                                  newImages.splice(index, 1);
-                                  return { ...prev, images: newImages };
-                                });
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <div className="p-2 bg-gray-50 text-xs truncate">
-                            <Input 
-                              value={image.alt_text || ''} 
-                              placeholder="Resim açıklaması"
-                              onChange={(e) => {
-                                setShowEditModal(prev => {
-                                  if (!prev) return null;
-                                  const newImages = [...prev.images];
-                                  newImages[index] = { ...newImages[index], alt_text: e.target.value };
-                                  return { ...prev, images: newImages };
-                                });
-                              }}
-                              className="mt-1 text-xs p-1 h-6"
-                            />
-                          </div>
+                          {/* Hover'da sil butonu */}
+                          <button
+                            type="button"
+                            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 z-10"
+                            title="Resmi Sil"
+                            onClick={() => {
+                              setShowEditModal(prev => {
+                                if (!prev) return null;
+                                const newImages = [...prev.images];
+                                newImages.splice(index, 1);
+                                return { ...prev, images: newImages };
+                              });
+                            }}
+                          >
+                            <span className="bg-white shadow-lg hover:bg-red-600 hover:text-white text-red-600 rounded-full flex items-center justify-center h-14 w-14 border border-gray-200 hover:border-red-600">
+                              <Trash2 className="h-7 w-7" />
+                            </span>
+                          </button>
                         </div>
                       ))}
-                      <div className="flex items-center justify-center h-40 border-2 border-dashed border-gray-300 rounded-md">
-                        <Label htmlFor="edit-add-image" className="cursor-pointer flex flex-col items-center p-4">
-                          <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                          <span className="text-sm text-gray-500">Yeni Resim Ekle</span>
-                          <Input 
-                            id="edit-add-image" 
-                            type="file" 
-                            accept="image/*"
-                            className="hidden" 
-                            onChange={(e) => {
-                              // Resim ekleme işlemi
-                              // Gerçek bir uygulamada burası API'ye yükleme yapacaktır
-                              alert("Resim yükleme özelliği yapım aşamasındadır");
-                            }}
-                          />
-                        </Label>
-                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-40 border-2 border-dashed border-gray-300 rounded-md">
-                      <Label htmlFor="edit-add-image" className="cursor-pointer flex flex-col items-center p-4">
-                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                        <span className="text-sm text-gray-500">Henüz Resim Yok</span>
-                        <span className="text-xs text-gray-400 mt-1">Resim eklemek için tıklayın</span>
-                        <Input 
-                          id="edit-add-image" 
-                          type="file" 
-                          accept="image/*"
-                          className="hidden" 
-                          onChange={(e) => {
-                            // Resim ekleme işlemi
-                            alert("Resim yükleme özelliği yapım aşamasındadır");
-                          }}
-                        />
-                      </Label>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
                 
                 <div className="mt-4">
@@ -1977,13 +2097,31 @@ export default function ProductsClient() {
               </div>
             </div>
 
-            <DialogFooter className="mt-6">
-              <Button variant="outline" onClick={() => setShowEditModal(null)}>
-                İptal
-              </Button>
-              <Button onClick={() => showEditModal && handleUpdateProduct(showEditModal)} disabled={submitting}>
-                {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Güncelleniyor...</> : "Güncelle"}
-              </Button>
+            <DialogFooter className="mt-6 flex justify-between">
+              <div>
+                {imagesReordered && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      if (showEditModal) {
+                        setImagesReordered(false);
+                      }
+                    }}
+                    className="mr-2"
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    Görsel Sıralamasını Kaydet
+                  </Button>
+                )}
+              </div>
+              <div>
+                <Button variant="outline" onClick={() => setShowEditModal(null)} className="mr-2">
+                  İptal
+                </Button>
+                <Button onClick={() => showEditModal && handleUpdateProduct(showEditModal)} disabled={submitting}>
+                  {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Güncelleniyor...</> : "Güncelle"}
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2219,5 +2357,5 @@ export default function ProductsClient() {
         </AlertDialog>
       )}
     </div>
-  )
+  );
 } 

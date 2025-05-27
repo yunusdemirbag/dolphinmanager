@@ -1641,6 +1641,7 @@ export interface UpdateListingData {
   shipping_profile_id?: number
   processing_min?: number
   processing_max?: number
+  images_order?: number[] // Add this field to hold image ordering
 }
 
 // Yeni listing oluştur (draft olarak)
@@ -2503,5 +2504,86 @@ export async function getEtsyStats(
       totalViews: 0,
       totalRevenue: 0
     };
+  }
+}
+
+// New function to reorder listing images
+export async function reorderListingImages(
+  userId: string,
+  shopId: number, // bu parametre kullanılmayacak
+  listingId: number,
+  imageIds: number[]
+): Promise<boolean> {
+  try {
+    console.log(`[reorderListingImages] Starting reordering of images for listing ${listingId}`);
+    
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      console.error("[reorderListingImages] No valid access token for reordering images");
+      return false;
+    }
+
+    // Filter out any invalid IDs
+    const validImageIds = imageIds.filter(id => typeof id === 'number' && !isNaN(id) && id > 0);
+    if (validImageIds.length === 0) {
+      console.error("[reorderListingImages] No valid image IDs after filtering:", imageIds);
+      return false;
+    }
+    
+    // Doğru Etsy API endpointi
+    const url = `https://api.etsy.com/v3/application/listings/${listingId}/images`;
+    const requestBody = {
+      image_ids: validImageIds
+    };
+    
+    console.log(`[reorderListingImages] Sending PUT request to: ${url}`);
+    console.log(`[reorderListingImages] Request body:`, JSON.stringify(requestBody));
+    
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'x-api-key': ETSY_CLIENT_ID,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+      
+      const responseStatus = response.status;
+      let responseText = '';
+      try {
+        responseText = await response.text();
+        console.log(`[reorderListingImages] Response text: ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
+      } catch (textError) {
+        console.error(`[reorderListingImages] Error getting response text:`, textError);
+      }
+      
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = responseText ? JSON.parse(responseText) : { error: `HTTP error: ${responseStatus}` };
+        } catch (e) {
+          errorData = { error: responseText || `HTTP error: ${responseStatus}` };
+        }
+        console.error(`[reorderListingImages] Error reordering images for listing ${listingId}:`, errorData);
+        return false;
+      }
+      
+      try {
+        const responseData = responseText ? JSON.parse(responseText) : {};
+        console.log(`[reorderListingImages] API response:`, responseData);
+      } catch (e) {}
+      
+      console.log(`[reorderListingImages] Successfully reordered images for listing ${listingId}`);
+      return true;
+    } catch (fetchError) {
+      console.error(`[reorderListingImages] Fetch error while reordering:`, fetchError);
+      return false;
+    }
+  } catch (error) {
+    console.error(`[reorderListingImages] Exception reordering images for listing ${listingId}:`, error);
+    return false;
   }
 }

@@ -66,19 +66,26 @@ export async function PATCH(
     }
     
     // Convert price object to number if it comes from the frontend
-    if (body.price && typeof body.price === 'object' && body.price.amount !== undefined) {
-      body.price = Math.round((body.price.amount / body.price.divisor) * 100);
-      console.log("Converted price object to cents:", body.price);
+    if (body.price && typeof body.price === 'object') {
+      if (body.price.amount !== undefined) {
+        body.price = Math.round((body.price.amount / body.price.divisor) * 100);
+        console.log("Converted price object to cents:", body.price);
+      } else {
+        // In case there's another price object format, ensure we don't send the object directly
+        delete body.price;
+        console.log("Removed invalid price object from update data");
+      }
     }
 
     // Create a clean update object with only the fields we want to update
-    const updateData = {
-      quantity: body.quantity,
-      price: body.price,
-      title: body.title,
-      description: body.description,
-      state: body.state
-    };
+    const updateData: UpdateListingData = {};
+    
+    // Only include defined fields to avoid sending undefined values
+    if (body.quantity !== undefined) updateData.quantity = body.quantity;
+    if (body.price !== undefined) updateData.price = body.price;
+    if (body.title) updateData.title = body.title;
+    if (body.description) updateData.description = body.description;
+    if (body.state) updateData.state = body.state;
     
     console.log("Clean update data:", updateData);
     

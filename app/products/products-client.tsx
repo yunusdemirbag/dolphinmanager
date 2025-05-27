@@ -713,27 +713,49 @@ export default function ProductsClient() {
         })
       });
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (err) {
+        console.error("Error parsing response:", err);
+        result = { error: "Invalid response format" };
+      }
+      
       console.log("Update response:", response.status, result);
 
-      if (response.ok) {
+      if (response.ok && result.success) {
         toast({
           title: "Başarılı",
           description: "Ürün başarıyla güncellendi",
           variant: "default",
         });
-        // Update the product in the list
-        const updatedProducts = products.map(p => 
-          p.listing_id === product.listing_id ? { ...p, ...product } : p
-        );
-        setProducts(updatedProducts);
-        filterAndSortProducts(); // Yeniden filtreleme ve sıralama uygula
+        
+        // Local state'i başarılı sonuçla güncelle
+        setProducts(prevProducts => {
+          const newProducts = [...prevProducts];
+          const index = newProducts.findIndex(p => p.listing_id === product.listing_id);
+          if (index !== -1) {
+            newProducts[index] = { ...newProducts[index], ...product };
+          }
+          return newProducts;
+        });
+        
+        // Filtrelenmiş listeyi de güncelle
+        setFilteredProducts(prevFiltered => {
+          const newFiltered = [...prevFiltered];
+          const index = newFiltered.findIndex(p => p.listing_id === product.listing_id);
+          if (index !== -1) {
+            newFiltered[index] = { ...newFiltered[index], ...product };
+          }
+          return newFiltered;
+        });
+        
         setShowEditModal(null);
       } else {
         console.error("Error updating product:", result);
         toast({
-          title: "Hata",
-          description: `Güncelleme başarısız: ${result.error || result.details || 'Bilinmeyen hata'}`,
+          title: "Güncelleme Başarısız",
+          description: result.details || result.error || "Bilinmeyen bir hata oluştu.",
           variant: "destructive",
         });
       }
@@ -766,25 +788,32 @@ export default function ProductsClient() {
         method: 'DELETE',
       });
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (err) {
+        console.error("Error parsing response:", err);
+        result = { error: "Invalid response format" };
+      }
+      
       console.log("Delete response:", response.status, result);
 
-      if (response.ok) {
+      if (response.ok && result.success) {
         toast({
           title: "Başarılı",
           description: "Ürün başarıyla silindi",
           variant: "default",
         });
-        // Remove the product from the list
-        const updatedProducts = products.filter(p => p.listing_id !== listingId);
-        setProducts(updatedProducts);
-        setFilteredProducts(filteredProducts.filter(p => p.listing_id !== listingId));
+        
+        // Local state'i güncelle
+        setProducts(prevProducts => prevProducts.filter(p => p.listing_id !== listingId));
+        setFilteredProducts(prevFiltered => prevFiltered.filter(p => p.listing_id !== listingId));
         setConfirmDeleteProductId(null);
       } else {
         console.error("Error deleting product:", result);
         toast({
-          title: "Hata",
-          description: `Silme işlemi başarısız: ${result.error || result.details || 'Bilinmeyen hata'}`,
+          title: "Silme Başarısız",
+          description: result.details || result.error || "Bilinmeyen bir hata oluştu.",
           variant: "destructive",
         });
       }

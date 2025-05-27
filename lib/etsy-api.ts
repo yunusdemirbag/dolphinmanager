@@ -1842,6 +1842,11 @@ export async function updateListing(
             const { product_id, is_deleted, ...cleanProduct } = product;
             return {
               ...cleanProduct,
+              property_values: product.property_values.map((propValue: any) => {
+                // Remove scale_name field if it exists to avoid API error
+                const { scale_name, ...cleanPropValue } = propValue;
+                return cleanPropValue;
+              }),
               offerings: product.offerings.map((offering: any) => {
                 const { offering_id, is_deleted, ...cleanOffering } = offering;
                 return cleanOffering;

@@ -13,8 +13,22 @@ export async function PATCH(
     const userId = "71bca451-a580-4bdd-a7eb-91e2d8aa5d12";
     console.log("Using user ID:", userId);
     
-    // Önce params'ı bekle ve daha sonra listingId'yi al
+    // listingId'yi params'dan alırken güvenli bir şekilde al
+    if (!params || !params.listingId) {
+      return NextResponse.json({
+        error: "Missing listing ID",
+        success: false
+      }, { status: 400 });
+    }
+    
     const listingId = parseInt(params.listingId);
+    if (isNaN(listingId)) {
+      return NextResponse.json({
+        error: "Invalid listing ID",
+        success: false
+      }, { status: 400 });
+    }
+    
     const updateData: UpdateListingData = await request.json();
 
     console.log("Updating listing:", listingId, "Data:", updateData);
@@ -65,7 +79,22 @@ export async function DELETE(
     const userId = "71bca451-a580-4bdd-a7eb-91e2d8aa5d12";
     console.log("Using user ID:", userId);
     
+    // listingId'yi params'dan alırken güvenli bir şekilde al
+    if (!params || !params.listingId) {
+      return NextResponse.json({
+        error: "Missing listing ID",
+        success: false
+      }, { status: 400 });
+    }
+    
     const listingId = parseInt(params.listingId);
+    if (isNaN(listingId)) {
+      return NextResponse.json({
+        error: "Invalid listing ID",
+        success: false
+      }, { status: 400 });
+    }
+    
     console.log("Deleting listing:", listingId);
 
     // Listing sil - userId ile doğrudan çağır

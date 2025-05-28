@@ -3,6 +3,8 @@ import qs from "querystring"
 import { supabaseAdmin } from "./supabase"
 import { cacheManager } from "./cache"
 import { fetchWithCache } from "./api-utils"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/types/database.types";
 // Mock data importları geçici olarak kaldırıldı
 // Gerekirse burada yeniden implement edilebilir
 
@@ -471,146 +473,163 @@ async function rateLimitedFetch<T>(
 // refreshEtsyToken fonksiyonunu güncelle
 async function refreshEtsyToken(userId: string): Promise<string> {
   try {
-    // Önce en son token'ı bul
-    const { data: tokenData, error: tokenError } = await supabaseAdmin
-      .from("etsy_tokens")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1);
+    console.log("Refreshing Etsy token for user:", userId);
+    
+    const supabase = createClientSupabase();
+    const { data: tokens, error } = await supabase
+      .from('etsy_tokens')
+      .select('refresh_token, expires_at, access_token')
+      .eq('user_id', userId)
+      .single();
 
-    if (tokenError) {
-      console.error("Token query error:", tokenError);
-      throw new Error(`Token query failed: ${tokenError.message}`);
+    if (error) {
+      console.error("Error fetching Etsy refresh token:", error);
+      throw new Error('RECONNECT_REQUIRED');
     }
 
-    if (!tokenData || tokenData.length === 0) {
-      throw new Error("No token found for user");
+    if (!tokens || !tokens.refresh_token) {
+      console.error("No refresh token found for user:", userId);
+      throw new Error('RECONNECT_REQUIRED');
     }
 
-    // En son oluşturulan token'ı kullan
-    const latestToken = tokenData[0];
-    console.log(`Using latest token created at: ${latestToken.created_at}`);
+    // Token hala geçerli mi kontrol et - 5 dakikalık bir tampon bırak
+    if (tokens.expires_at && new Date(tokens.expires_at) > new Date(Date.now() + 5 * 60 * 1000)) {
+      console.log("Token still valid, no need to refresh. Expires at:", tokens.expires_at);
+      return tokens.access_token;
+    }
 
-    // Token yenileme isteği
-    const response = await fetch(`${ETSY_OAUTH_BASE}/token`, {
-      method: "POST",
+    console.log("Token needs refresh. Current expiry:", tokens.expires_at);
+    
+    // Etsy API'ye token yenileme isteği gönder
+    const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "x-api-key": ETSY_CLIENT_ID,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        grant_type: "refresh_token",
+        grant_type: 'refresh_token',
         client_id: ETSY_CLIENT_ID,
-        refresh_token: latestToken.refresh_token,
+        refresh_token: tokens.refresh_token,
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      // Eğer refresh token hatası varsa Supabase'dan tokenı sil
-      if (response.status === 400 && errorText.includes('invalid_grant')) {
-        // Tokenı sil
-        await supabaseAdmin.from('etsy_tokens').delete().eq('user_id', userId);
+      let errorText = '';
+      try {
+        const errorJson = await response.json();
+        errorText = JSON.stringify(errorJson);
+      } catch (e) {
+        errorText = await response.text().catch(() => response.statusText);
+      }
+
+      console.error(`Token refresh failed: ${response.status} - ${errorText}`);
+
+      // 400 ve 401 hata kodları için token yenileme gerektiğini belirt
+      if (response.status === 400 || response.status === 401) {
+        console.log("Invalid refresh token, user needs to reconnect");
         throw new Error('RECONNECT_REQUIRED');
       }
+
+      // Diğer API hataları - yeniden bağlantı gerekiyorsa RECONNECT_REQUIRED mesajı döndürür
+      if (errorText.includes('invalid_grant') || 
+          errorText.includes('expired') || 
+          errorText.includes('revoked')) {
+        console.log("Token refresh failed with OAuth error, user needs to reconnect");
+        throw new Error('RECONNECT_REQUIRED');
+      }
+
+      console.error("Token refresh failed, but existing token is still valid. Using existing token.");
+      // Mevcut token'ı döndürerek bir şans daha ver
+      if (tokens.access_token) {
+        return tokens.access_token;
+      }
+      
       throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
     }
 
     const newTokens = await response.json();
+    console.log("Token refreshed successfully. New expiry in", newTokens.expires_in, "seconds");
 
-    // Yeni token'ı veritabanına kaydet
-    const { error: updateError } = await supabaseAdmin
-      .from("etsy_tokens")
-      .upsert({
-        user_id: userId,
+    // Yeni expire time hesapla (şu an + expires_in saniye)
+    const expiresAt = new Date(Date.now() + newTokens.expires_in * 1000).toISOString();
+
+    // Token'ları veritabanına kaydet
+    const { error: updateError } = await supabase
+      .from('etsy_tokens')
+      .update({
         access_token: newTokens.access_token,
         refresh_token: newTokens.refresh_token,
-        expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+        expires_at: expiresAt,
+        created_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId);
 
     if (updateError) {
-      console.error("Token update error:", updateError);
-      throw new Error(`Failed to update token: ${updateError.message}`);
+      console.error("Error updating tokens in database:", updateError);
+      // Kaydetme hatası olsa bile yeni token'ı döndür
     }
 
-    console.log("Token refreshed successfully");
-    
-    // After a successful refresh, invalidate all caches to ensure fresh data
-    try {
-      invalidateUserCache(userId);
-      console.log("Invalidated all caches after token refresh");
-    } catch (cacheError) {
-      console.warn("Error invalidating cache after token refresh:", cacheError);
-    }
-    
     return newTokens.access_token;
   } catch (error) {
-    console.error("Token refresh error:", error);
-    throw error;
+    console.error("refreshEtsyToken error:", error);
+    
+    // RECONNECT_REQUIRED hatası veya diğer hataları yeniden fırlat
+    if (error instanceof Error) {
+      if (error.message === 'RECONNECT_REQUIRED') {
+        throw error;
+      }
+      throw new Error(`Token refresh failed: ${error.message}`);
+    }
+    
+    throw new Error('Unknown error refreshing token');
   }
 }
 
 async function getValidAccessToken(userId: string): Promise<string | null> {
   try {
-    // En son token'ı bul
-    const { data: tokenData, error: tokenError } = await supabaseAdmin
-      .from("etsy_tokens")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1);
+    console.log("Getting valid access token for user:", userId);
+    
+    const supabase = createClientSupabase();
+    const { data: tokens, error } = await supabase
+      .from('etsy_tokens')
+      .select('access_token, refresh_token, expires_at, created_at')
+      .eq('user_id', userId)
+      .single();
 
-    if (tokenError) {
-      console.error("Token query error:", tokenError);
+    if (error) {
+      console.error("Error fetching Etsy tokens:", error);
       return null;
     }
 
-    if (!tokenData || tokenData.length === 0) {
-      console.log("No token found for user");
+    if (!tokens || !tokens.access_token) {
+      console.error("No access token found for user:", userId);
       return null;
     }
 
-    // En son token'ı kullan
-    const latestToken = tokenData[0];
+    // Debug için token bilgilerini yazdır
     console.log("Token found:", {
-      expires_at: latestToken.expires_at,
-      created_at: latestToken.created_at,
-      access_token_length: latestToken.access_token.length
+      expires_at: tokens.expires_at,
+      created_at: tokens.created_at,
+      access_token_length: tokens.access_token.length
     });
 
-    // Token'ın geçerliliğini kontrol et
-    // Add a 15-minute buffer to refresh tokens before they actually expire
-    const expiresAt = new Date(latestToken.expires_at).getTime();
-    const bufferTime = 15 * 60 * 1000; // 15 minutes in milliseconds
-    const now = Date.now();
-
-    // Refresh the token if it's expiring within the buffer time
-    if (now >= (expiresAt - bufferTime)) {
-      console.log(`Token expires soon (in ${Math.floor((expiresAt - now) / 1000 / 60)} minutes), refreshing early...`);
-      try {
-        return await refreshEtsyToken(userId);
-      } catch (refreshError) {
-        if (refreshError instanceof Error && refreshError.message === 'RECONNECT_REQUIRED') {
-          console.error("Token refresh failed, reconnection required");
-          return null;
-        }
-        
-        // If refresh failed but token is still valid, use existing token
-        if (now < expiresAt) {
-          console.warn("Token refresh failed, but existing token is still valid. Using existing token.");
-          return latestToken.access_token;
-        }
-        
-        console.error("Token refresh failed and token expired:", refreshError);
-        return null;
-      }
+    // Token hala geçerli mi kontrol et - 5 dakikalık bir tampon bırak
+    if (tokens.expires_at && new Date(tokens.expires_at) > new Date(Date.now() + 5 * 60 * 1000)) {
+      console.log("Token still valid. Using existing token.");
+      return tokens.access_token;
     }
 
-    return latestToken.access_token;
+    // Token süresi dolmuş, yenile
+    console.log("Token expired or close to expiry. Refreshing...");
+    return await refreshEtsyToken(userId);
   } catch (error) {
-    console.error("Error getting valid access token:", error);
+    // Yeniden bağlantı gereken hata
+    if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
+      console.error("No valid access token for getEtsyStores - user needs to connect Etsy account");
+      return null;
+    }
+    
+    console.error("getValidAccessToken error:", error);
     return null;
   }
 }
@@ -712,171 +731,208 @@ export function toggleCachedDataOnlyMode(useOnlyCachedData: boolean): void {
 // getEtsyStores fonksiyonunu güncelle
 export async function getEtsyStores(userId: string, skipCache = false): Promise<EtsyStore[]> {
   try {
-    console.log(`=== getEtsyStores called for userId: ${userId} ===`);
+    console.log("=== getEtsyStores called for userId:", userId, "===");
     
-    // Token kontrolü - kullanıcının Etsy ile bağlı olup olmadığını anlamak için
+    // Mevcut token'ı kontrol et
     const accessToken = await getValidAccessToken(userId);
     if (!accessToken) {
-      console.log("No valid access token for getEtsyStores - user needs to connect Etsy account");
-      return []; // Token yoksa bağlantı yok demektir, boş dizi döndür
+      console.error("No valid access token for getEtsyStores - user needs to connect Etsy account");
+      return [];
     }
-    
-    // Token'dan Etsy kullanıcı ID'sini çıkar
-    const etsyApiUserId = accessToken.split('.')[0];
-    console.log(`Extracted Etsy User ID from token: ${etsyApiUserId}`);
-    
+
     try {
-      console.log(`Fetching shops for Etsy User ID: ${etsyApiUserId}`);
+      // Etsy User ID'yi token'dan çıkar (sub claim'inden)
+      const tokenPayload = parseJwt(accessToken);
+      const etsyUserId = tokenPayload.sub;
       
-      // Etsy API'ye istek gönder
-      const response = await fetch(`${ETSY_API_BASE}/application/users/${etsyApiUserId}/shops`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "x-api-key": ETSY_CLIENT_ID,
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      if (!etsyUserId) {
+        console.error("Could not extract Etsy User ID from token");
+        return [];
       }
       
-      // API yanıtını işle
-      const data = await response.json();
-      console.log(`Raw API response from shops endpoint (first 300 chars):`, JSON.stringify(data).substring(0, 300) + "...");
-      
-      // Burada doğrudan mağaza nesnesi geliyor, bunu işleyelim
-      if (data && data.shop_id && data.shop_name) {
-        console.log(`Found direct shop object with ID: ${data.shop_id}`);
+      console.log("Extracted Etsy User ID from token:", etsyUserId);
+      console.log("Fetching shops for Etsy User ID:", etsyUserId);
+
+      // Etsy API'ye istek gönder
+      const response = await fetch(`${ETSY_API_BASE}/application/users/${etsyUserId}/shops`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_CLIENT_ID
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => response.statusText);
+        console.error(`Error fetching Etsy shops: ${response.status} - ${errorText}`);
         
-        // Mağaza verilerini işle
-        const validShop: EtsyStore = {
-          shop_id: data.shop_id,
-          shop_name: data.shop_name,
-          title: data.title || data.shop_name,
-          announcement: data.announcement || "",
-          currency_code: data.currency_code || "USD",
-          is_vacation: data.is_vacation || false,
-          listing_active_count: data.listing_active_count || 0,
-          num_favorers: data.num_favorers || 0,
-          url: data.url || `https://www.etsy.com/shop/${data.shop_name}`,
-          image_url_760x100: data.image_url_760x100 || "",
-          review_count: data.review_count || 0,
-          review_average: data.review_average || 0,
-          is_active: true,
-          last_synced_at: new Date().toISOString(),
-          avatar_url: (data as any).icon_url_fullxfull || null
-        };
-        
-        console.log(`Successfully processed shop: ${validShop.shop_id} - ${validShop.shop_name}`);
-        
-        // Mağaza bilgilerini veritabanına kaydet
-        try {
-          // 1. Önce profiles tablosunu güncelle
-          const { error: profileError } = await supabaseAdmin
-            .from("profiles")
-            .update({
-              etsy_shop_id: validShop.shop_id.toString(),
-              etsy_shop_name: validShop.shop_name,
-              last_synced_at: validShop.last_synced_at
-            })
-            .eq("id", userId);
-            
-          if (profileError) {
-            console.error("Error updating profile with Etsy shop data:", profileError);
-          } else {
-            console.log("✅ Profile updated with Etsy shop data");
-          }
-          
-          // 2. etsy_stores tablosuna ekle/güncelle
-          const { error: storesError } = await supabaseAdmin
-            .from("etsy_stores")
-            .upsert({
-              user_id: userId,
-              shop_id: validShop.shop_id,
-              shop_name: validShop.shop_name,
-              title: validShop.title,
-              announcement: validShop.announcement,
-              currency_code: validShop.currency_code,
-              is_vacation: validShop.is_vacation,
-              listing_active_count: validShop.listing_active_count,
-              num_favorers: validShop.num_favorers,
-              url: validShop.url,
-              image_url_760x100: validShop.image_url_760x100,
-              review_count: validShop.review_count,
-              review_average: validShop.review_average,
-              is_active: validShop.is_active,
-              last_synced_at: validShop.last_synced_at,
-              avatar_url: validShop.avatar_url
-            }, {
-              onConflict: 'user_id,shop_id'
-            });
-            
-          if (storesError) {
-            console.error("Error storing Etsy shop data:", storesError);
-          } else {
-            console.log("✅ Etsy shop data stored in database");
-          }
-        } catch (dbError) {
-          console.error("Database error while storing shop data:", dbError);
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('RECONNECT_REQUIRED');
         }
         
-        return [validShop];
-      } else if (data && Array.isArray(data.results) && data.results.length > 0) {
-        // Bir dizi içinde mağazalar döndü
-        console.log(`Found ${data.results.length} shops in results array`);
-        
-        // Mağaza verilerini işle
-        const validShops = data.results.map((shop: any) => ({
+        return [];
+      }
+
+      // API yanıtını al
+      const responseText = await response.text();
+      console.log("Raw API response from shops endpoint (first 300 chars):", responseText.substring(0, 300) + "...");
+      
+      // API yanıtını parse et
+      let shopObj: any;
+      try {
+        shopObj = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Error parsing Etsy shops response:", e);
+        return [];
+      }
+
+      // API yanıtı yapısını kontrol et
+      let shops: EtsyStore[] = [];
+      
+      if (Array.isArray(shopObj)) {
+        // Dizi formatında geliyor
+        shops = shopObj;
+        console.log(`Found ${shops.length} shops for user`);
+      } else if (shopObj.shop_id) {
+        // Tek mağaza, nesne formatında geliyor
+        console.log("Found direct shop object with ID:", shopObj.shop_id);
+        shops = [shopObj];
+      } else if (shopObj.count && Array.isArray(shopObj.results)) {
+        // Pagination formatında geliyor
+        shops = shopObj.results;
+        console.log(`Found ${shops.length} shops out of ${shopObj.count} total`);
+      } else {
+        console.error("Unknown response format from Etsy shops API:", Object.keys(shopObj));
+        return [];
+      }
+
+      // Mağaza verilerini işle
+      const processedShops = shops.map(shop => {
+        // Mağaza verilerini özelleştir
+        const processedShop: EtsyStore = {
           shop_id: shop.shop_id,
           shop_name: shop.shop_name,
           title: shop.title || shop.shop_name,
           announcement: shop.announcement || "",
-          currency_code: shop.currency_code || "USD",
-          is_vacation: shop.is_vacation || false,
+          currency_code: shop.currency_code,
+          is_vacation: Boolean(shop.is_vacation),
           listing_active_count: shop.listing_active_count || 0,
           num_favorers: shop.num_favorers || 0,
           url: shop.url || `https://www.etsy.com/shop/${shop.shop_name}`,
           image_url_760x100: shop.image_url_760x100 || "",
           review_count: shop.review_count || 0,
           review_average: shop.review_average || 0,
+          avatar_url: (shop as any).icon_url_fullxfull || (shop as any).avatar_url || null,
           is_active: true,
-          last_synced_at: new Date().toISOString(),
-          avatar_url: shop.icon_url_fullxfull || null
-        }));
+          last_synced_at: new Date().toISOString()
+        };
         
-        console.log(`Successfully processed ${validShops.length} shops`);
+        console.log(`Successfully processed shop: ${processedShop.shop_id} - ${processedShop.shop_name}`);
         
-        // İlk mağazayı veritabanına kaydet
-        if (validShops.length > 0) {
-          const firstShop = validShops[0];
-          try {
-            await supabaseAdmin
-              .from("profiles")
-              .update({
-                etsy_shop_id: firstShop.shop_id.toString(),
-                etsy_shop_name: firstShop.shop_name,
-                last_synced_at: firstShop.last_synced_at
-              })
-              .eq("id", userId);
-              
-            console.log("✅ Profile updated with first Etsy shop data");
-          } catch (dbError) {
-            console.error("Database error while storing first shop data:", dbError);
-          }
+        // İlk mağaza bulundu bilgisi yazdır
+        if (shops.indexOf(shop) === 0) {
+          console.log("Found user's first store:", processedShop.shop_id);
         }
         
-        return validShops;
+        return processedShop;
+      });
+
+      if (processedShops.length > 0) {
+        try {
+          // Profil tablosunu güncelle
+          const supabase = createClientSupabase();
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({
+              etsy_shop_id: processedShops[0].shop_id,
+              etsy_shop_name: processedShops[0].shop_name,
+              last_synced_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+            
+          if (profileError) {
+            console.error("Error updating profile with Etsy shop data:", profileError);
+          }
+          
+          // Mağaza verilerini veritabanına kaydet
+          for (const shop of processedShops) {
+            try {
+              const { error: storeError } = await supabase
+                .from('etsy_stores')
+                .upsert({
+                  user_id: userId,
+                  shop_id: shop.shop_id,
+                  shop_name: shop.shop_name,
+                  title: shop.title,
+                  currency_code: shop.currency_code,
+                  is_vacation: shop.is_vacation,
+                  listing_active_count: shop.listing_active_count,
+                  num_favorers: shop.num_favorers,
+                  url: shop.url,
+                  image_url_760x100: shop.image_url_760x100,
+                  review_count: shop.review_count,
+                  review_average: shop.review_average,
+                  is_active: true,
+                  avatar_url: shop.avatar_url,
+                  last_synced_at: new Date().toISOString()
+                }, { onConflict: 'shop_id' });
+                
+              if (storeError) {
+                console.error("Error storing Etsy shop data:", storeError);
+              }
+            } catch (storeError) {
+              console.error("Exception storing Etsy shop data:", storeError);
+            }
+          }
+        } catch (dbError) {
+          console.error("Database error when storing shop data:", dbError);
+          // Veritabanı hatası olsa bile mağaza verilerini döndür
+        }
+      }
+      
+      if (processedShops.length > 0) {
+        console.log("getEtsyStores returned", processedShops.length, "stores");
+        console.log("First store raw data:", JSON.stringify(processedShops[0], null, 2));
+        console.log("✅ Etsy stores found:", processedShops.length, "stores");
+        console.log("First store details:", {
+          shop_id: processedShops[0].shop_id,
+          shop_name: processedShops[0].shop_name,
+          type_shop_id: typeof processedShops[0].shop_id
+        });
       } else {
-        console.log("No valid shop data found in API response");
+        console.log("❌ No Etsy stores found for user:", userId);
+      }
+
+      return processedShops;
+    } catch (error) {
+      if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
+        console.error("Etsy reconnection required for user:", userId);
         return [];
       }
-    } catch (error: any) {
-      console.error(`Error fetching Etsy shops: ${error.message}`);
+      
+      console.error("Error in getEtsyStores:", error);
       return [];
     }
-  } catch (error: any) {
-    console.error(`Critical error in getEtsyStores: ${error.message}`);
+  } catch (error) {
+    console.error("Unexpected error in getEtsyStores:", error);
     return [];
+  }
+}
+
+// JWT token parser helper
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("Error parsing JWT token:", e);
+    return { sub: null };
   }
 }
 
@@ -2586,4 +2642,9 @@ export async function reorderListingImages(
     console.error(`[reorderListingImages] Exception reordering images for listing ${listingId}:`, error);
     return false;
   }
+}
+
+// Supabase client
+function createClientSupabase() {
+  return createClientComponentClient<Database>();
 }

@@ -75,6 +75,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ToastAction } from "@/components/ui/toast"
+import { useRouter } from "next/navigation"
 
 interface Product {
   listing_id: number
@@ -119,8 +120,48 @@ interface CreateProductForm {
   when_made: string
   taxonomy_id: number
   shipping_profile_id?: number
+  processing_profile_id?: number
+  processing_min?: number
+  processing_max?: number
+  processing_time_unit?: string
   state?: "active" | "draft"
-  image_ids?: number[] // Kopyalanan resim ID'leri için
+  image_ids?: number[]
+  // Varyasyonlar ve diğer detaylar
+  variations?: Array<{
+    property_values: Array<{
+      scale_id: number
+      value_ids: number[]
+      values: string[]
+    }>
+  }>
+  style?: string
+  non_taxable?: boolean
+  language?: string
+  featured_rank?: number
+  taxonomy_path?: string[]
+  used_manufacturer?: boolean
+  is_supply?: boolean
+  is_customizable?: boolean
+  is_digital?: boolean
+  file_data?: string
+  has_variations?: boolean
+  production_partners?: string[]
+  section_id?: number
+  shop_section_id?: number
+  inventory?: {
+    products: Array<{
+      property_values: Array<{
+        scale_id: number
+        value_ids: number[]
+        values: string[]
+      }>
+    }>
+  }
+  should_auto_renew?: boolean;
+  is_personalizable?: boolean;
+  personalization_is_required?: boolean;
+  personalization_instructions?: string;
+  personalization_char_count_max?: number;
 }
 
 interface TaxonomyNode {
@@ -151,7 +192,10 @@ export default function ProductsClient() {
     materials: [],
     who_made: "i_did",
     when_made: "made_to_order",
-    taxonomy_id: 1
+    taxonomy_id: 1,
+    processing_min: undefined,
+    processing_max: undefined,
+    processing_time_unit: "business_days" // Default to business days
   })
   const [tagInput, setTagInput] = useState("")
   const [materialInput, setMaterialInput] = useState("")
@@ -159,7 +203,10 @@ export default function ProductsClient() {
   const [cachingImages, setCachingImages] = useState(false)
   const [cachingAllImages, setCachingAllImages] = useState(false)
   const [analytics, setAnalytics] = useState<Record<number, { view: number; sale: number; revenue: number }>>({});
-  const [shippingProfiles, setShippingProfiles] = useState<{ shipping_profile_id: number; title: string }[]>([]);
+  const [shippingProfiles, setShippingProfiles] = useState<{ shipping_profile_id: number; title: string; min_processing_time: number; max_processing_time: number; processing_time_unit: string; }[]>([]);
+  const [loadingShippingProfiles, setLoadingShippingProfiles] = useState(false);
+  const [processingProfiles, setProcessingProfiles] = useState<{ readiness_state_id: number; readiness_state: string; min_processing_time: number; max_processing_time: number; processing_time_unit: string; }[]>([]);
+  const [loadingProcessingProfiles, setLoadingProcessingProfiles] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [refreshing, setRefreshing] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
@@ -200,6 +247,12 @@ export default function ProductsClient() {
   const [isCopyMode, setIsCopyMode] = useState(false)
   const [lastScrollY, setLastScrollY] = useState(0)
   const scrollYRef = useRef(0)
+  // Ekle: Kopyalanan ürünü saklamak için yeni state
+  const [productToCopy, setProductToCopy] = useState<Product | null>(null);
+
+  // Add state for active tab in modals
+  const [activeCreateTab, setActiveCreateTab] = useState('basic_info');
+  const [activeEditTab, setActiveEditTab] = useState('basic_info');
 
   // ProductImage bileşenini daha güvenli hale getiriyorum:
   const ProductImage = ({ product }: { product: Product }) => {
@@ -212,7 +265,7 @@ export default function ProductsClient() {
     const [imagesReordered, setImagesReordered] = useState(false);
     const [newImages, setNewImages] = useState<any[]>([]);
 
-    useEffect(() => {
+  useEffect(() => {
       if (product.images && product.images.length > 0) {
         setNewImages(product.images);
       }
@@ -272,7 +325,7 @@ export default function ProductsClient() {
       </div>
     );
   };
-
+  
   useEffect(() => {
     loadProducts()
     loadTaxonomy()
@@ -317,6 +370,46 @@ export default function ProductsClient() {
       
       const data = await response.json();
       
+            // Yeni eklenen kısım: Resim yükleme
+            if (imageFiles.length > 0 && data.listing_id) {
+              alert("✅ Ürün başarıyla oluşturuldu! Resimler yükleniyor..."); // Kullanıcıya bilgi ver
+              for (const file of imageFiles) {
+                const formData = new FormData();
+                formData.append('image', file); // 'image' anahtarının backend ile uyumlu olduğundan emin olun
+    
+                try {
+                  // Resim yükleme API çağrısı
+                  const uploadResponse = await fetch(`/api/etsy/listings/${data.listing_id}/images`, {
+                    method: 'POST',
+                    body: formData
+                  });
+    
+                  if (!uploadResponse.ok) {
+                    // Resim yükleme hatası durumunda loglama
+                    const uploadErrorData = await uploadResponse.json().catch(() => ({ error: 'Unknown upload error' }));
+                    console.error(`Resim yükleme hatası (${file.name}):`, uploadResponse.status, uploadErrorData);
+                    // İsteğe bağlı: Kullanıcıya hangi resmin yüklenemediği hakkında bilgi verebilirsiniz
+                  } else {
+                    console.log(`Resim başarıyla yüklendi: ${file.name}`);
+                  }
+                } catch (uploadError) {
+                  // Fetch sırasında bir hata oluşursa
+                  console.error(`Resim yüklenirken beklenmeyen hata oluştu (${file.name}):`, uploadError);
+                }
+              }
+              // Tüm resimler için yükleme denemeleri tamamlandıktan sonra
+               // Resim yükleme tamamlandı mesajı (opsiyonel, toast kullanıldı)
+               // Bu alert mesajını yukarıdaki alert ile birleştirdik.
+              // toast({
+              //   title: "Resimler Yüklendi",
+              //   description: "Ürün resimleri başarıyla yüklendi.",
+              // });
+            } else {
+               // Resim yoksa sadece ürünün başarıyla oluşturulduğunu belirt
+               alert("✅ Ürün başarıyla oluşturuldu!")
+            }
+            // Resim yükleme bitişi
+
       if (data.stores && Array.isArray(data.stores) && data.stores.length > 0) {
         // Find the store with matching ID
         const matchingStore = data.stores.find((store: any) => 
@@ -357,7 +450,7 @@ export default function ProductsClient() {
   // Veri yenileme fonksiyonu - skipReconnect parametresi ekleyerek iyileştirildi
   const refreshProducts = async (showNotification = true) => {
     try {
-      setLoading(true);
+    setLoading(true);
       
       // First refresh Etsy connection data
       const refreshResponse = await fetch('/api/etsy/refresh', {
@@ -457,11 +550,11 @@ export default function ProductsClient() {
             setEtsyConnected(false);
             setRefreshing(false);
             setReconnectErrorCount(prev => prev + 1);
-            setLoading(false);
-            return;
+        setLoading(false);
+        return;
           }
-        }
-        
+      }
+
         setReconnectRequired(true);
         setEtsyConnected(false);
         setReconnectErrorCount(prev => prev + 1);
@@ -489,7 +582,7 @@ export default function ProductsClient() {
         // Ürünleri yükle
         await loadProducts(1);
         
-        if (showNotification) {
+      if (showNotification) {
           toast({
             title: "Ürünler yenilendi",
             description: "Ürün listesi başarıyla güncellendi."
@@ -562,12 +655,17 @@ export default function ProductsClient() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pageSize.toString(),
-        state: filterStatus === 'all' ? 'active' : filterStatus,
         skip_cache: 'true', // Always skip cache to ensure fresh data
-      }).toString()
+      });
+
+      if (filterStatus !== 'all') {
+        params.append('state', filterStatus);
+      }
+      
+      const paramsString = params.toString();
       
       // Make API request with proper error handling
-      const response = await fetch(`/api/etsy/listings?${params}`, {
+      const response = await fetch(`/api/etsy/listings?${paramsString}`, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
@@ -723,8 +821,8 @@ export default function ProductsClient() {
           setTaxonomyError('Kategori verileri uygun formatta değil, ancak ürün görüntüleme etkilenmeyecek.')
           // Use default taxonomy ID
           setCreateForm(prev => ({ ...prev, taxonomy_id: 1 }))
-        }
-      } else {
+          }
+        } else {
         console.log("Taxonomy API error:", response.status, response.statusText)
         setTaxonomyError('Kategori verileri yüklenemedi, ancak ürün görüntüleme etkilenmeyecek.')
         // Use default taxonomy ID
@@ -738,23 +836,98 @@ export default function ProductsClient() {
     }
   }
 
+  // ... existing code ...
   const loadShippingProfiles = async () => {
+    let shopId = null;
     try {
-      // Kullanıcı ve mağaza id'sini çek
+      // Kullanıcı ve mağaza id'sini çek - Bu adım her iki API için de gerekli
       const storesRes = await fetch('/api/etsy/stores');
-      if (storesRes.ok) {
-        const storesData = await storesRes.json();
-        if (storesData.stores && storesData.stores.length > 0) {
-          const shopId = storesData.stores[0].shop_id;
-          const profilesRes = await fetch(`/api/etsy/shipping-profiles?shop_id=${shopId}`);
-          if (profilesRes.ok) {
-            const profilesData = await profilesRes.json();
-            setShippingProfiles(profilesData.shipping_profiles || []);
-          }
-        }
+      if (!storesRes.ok) {
+        throw new Error('Mağaza bilgileri alınamadı');
+      }
+
+      const storesData = await storesRes.json();
+      if (!storesData.stores || storesData.stores.length === 0) {
+        // Mağaza bulunamadı durumunu yönet
+        setNoStoresFound(true);
+        setEtsyConnected(false);
+        throw new Error('Mağaza bulunamadı');
+      }
+
+      shopId = storesData.stores[0].shop_id;
+
+    } catch (err) {
+       console.error("Mağaza bilgileri yüklenirken hata:", err);
+       // Mağaza bilgisi alınamazsa her iki profil listesini de boşalt
+       setShippingProfiles([]);
+       setProcessingProfiles([]);
+       setLoadingShippingProfiles(false);
+       setLoadingProcessingProfiles(false);
+       toast({
+         title: "Hata",
+         description: "Mağaza bilgileri yüklenemedi. Ürün oluşturma/düzenleme etkilenebilir.",
+         variant: "destructive",
+       });
+       return; // Mağaza ID'si yoksa devam etme
+    }
+
+    // Kargo Profillerini Çek - Ayrı try-catch bloğu
+    try {
+      setLoadingShippingProfiles(true);
+      const shippingProfilesRes = await fetch(`/api/etsy/shipping-profiles?shop_id=${shopId}`);
+
+      if (!shippingProfilesRes.ok) {
+        throw new Error('Kargo profilleri alınamadı');
+      }
+
+      const shippingProfilesData = await shippingProfilesRes.json();
+      const profiles = shippingProfilesData.shipping_profiles || [];
+      setShippingProfiles(profiles);
+      console.log("Shipping profiles loaded successfully. Count:", profiles.length);
+
+      if (profiles.length === 0) {
+        toast({
+          title: "Uyarı",
+          description: "Kargo profili bulunamadı. Lütfen Etsy hesabınızda kargo profili oluşturun.",
+          variant: "destructive",
+        });
       }
     } catch (err) {
+      console.error("Kargo profilleri yüklenirken hata:", err);
       setShippingProfiles([]);
+      toast({
+        title: "Uyarı",
+        description: "Kargo profilleri yüklenemedi.",
+        variant: "default",
+      });
+    } finally {
+      setLoadingShippingProfiles(false);
+    }
+
+    // Hazırlık Süresi Profillerini Çek - Ayrı try-catch bloğu
+    try {
+      setLoadingProcessingProfiles(true);
+      const processingProfilesRes = await fetch(`/api/etsy/processing-profiles?shop_id=${shopId}`);
+
+      if (!processingProfilesRes.ok) {
+        throw new Error('Processing profilleri alınamadı');
+      }
+
+      const processingProfilesData = await processingProfilesRes.json();
+      const processingProfilesList = processingProfilesData.readiness_state_definitions || [];
+      setProcessingProfiles(processingProfilesList);
+      console.log("Processing profiles loaded successfully. Count:", processingProfilesList.length);
+    } catch (err) {
+      console.error("Hazırlık profilleri yüklenirken hata:", err);
+      setProcessingProfiles([]);
+      // Hazırlık profili hatası için farklı bir uyarı gösterebilirsiniz
+       toast({
+         title: "Uyarı",
+         description: "Hazırlık profilleri yüklenemedi.",
+         variant: "default",
+       });
+    } finally {
+      setLoadingProcessingProfiles(false);
     }
   };
 
@@ -782,8 +955,8 @@ export default function ProductsClient() {
           : b.title.localeCompare(a.title);
       }
       if (sortBy === "price") {
-        const aPrice = a.price.amount / a.price.divisor;
-        const bPrice = b.price.amount / b.price.divisor;
+          const aPrice = a.price.amount / a.price.divisor;
+          const bPrice = b.price.amount / b.price.divisor;
         return sortOrder === 'asc' ? aPrice - bPrice : bPrice - aPrice;
       }
       if (sortBy === "quantity") {
@@ -815,8 +988,8 @@ export default function ProductsClient() {
   // handleReconnectEtsy fonksiyonunu tamamen yeniden düzenleyelim
   const handleReconnectEtsy = async () => {
     try {
-      setRefreshing(true);
-      setLastReconnectAttempt(new Date());
+    setRefreshing(true); 
+    setLastReconnectAttempt(new Date());
       
       // Kullanıcı manuel bağlanma istedi - bu sefer force_refresh ve manual_reconnect parametreleri ile istek yap
       const refreshRes = await fetch('/api/etsy/refresh', {
@@ -919,55 +1092,188 @@ export default function ProductsClient() {
   };
 
   const handleCreateProduct = async () => {
-    if (!createForm.title || !createForm.description || createForm.price <= 0) {
-      alert("Lütfen tüm gerekli alanları doldurun!")
-      return
-    }
-
-    setSubmitting(true)
     try {
-      const response = await fetch('/api/etsy/listings/create', {
-        method: 'POST',
+      setSubmitting(true);
+      console.log("Starting product creation...");
+
+      // Validate required fields
+      if (!createForm.title || !createForm.description || !createForm.price || !createForm.taxonomy_id) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate image files
+      if (imageFiles.length === 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please select at least one image",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (imageFiles.length > 10) {
+        toast({
+          title: "Validation Error",
+          description: "Maximum 10 images allowed",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate shipping profile
+      if (!createForm.shipping_profile_id) {
+        toast({
+          title: "Validation Error",
+          description: "Please select a shipping profile.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("Creating product with form data:", createForm);
+      console.log("Number of images to upload:", imageFiles.length);
+
+      const response = await fetch("/api/etsy/listings/create", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ...createForm,
-          price: Math.round(createForm.price * 100), // USD cents'e çevir
-          image_ids: createForm.image_ids || [], // Resim ID'lerini gönder
-        })
-      })
+          price: Math.round(createForm.price * 100), // Convert to USD cents
+        }),
+      });
 
-      if (response.ok) {
-        const data = await response.json()
-        alert("✅ Ürün başarıyla oluşturuldu!")
-        setShowCreateModal(false)
-        setCreateForm({
-          title: "",
-          description: "",
-          price: 0,
-          quantity: 1,
-          tags: [],
-          materials: [],
-          who_made: "i_did",
-          when_made: "made_to_order",
-          taxonomy_id: 1,
-          image_ids: [] // Formu sıfırla
-        })
-        loadProducts() // Listeyi yenile
-      } else {
-        const errorData = await response.json()
-        alert(`❌ Hata: ${errorData.details || errorData.error}`)
+      console.log("Product creation response status:", response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          console.error("Parsed error response data:", errorData);
+        } catch (e) {
+          console.error("Failed to parse error response as JSON:", e);
+        }
+        throw new Error(errorText || "Failed to create product");
       }
-    } catch (error) {
-      console.error("Create product error:", error)
-      alert("❌ Ürün oluşturulurken hata oluştu!")
-    } finally {
-      setSubmitting(false)
-    }
-  }
 
-  // handleCopyProduct fonksiyonunu güncelle - TÜM alanları kopyala
+      const data = await response.json();
+      console.log("Product creation response data:", data);
+
+      // Image upload logic - moved inside the success block
+      console.log("Checking image files before upload loop. imageFiles count:", imageFiles.length, "Listing ID:", data.listing?.listing_id);
+      if (imageFiles.length > 0 && data.listing && data.listing.listing_id) {
+        console.log("Starting image uploads for listing:", data.listing.listing_id);
+        let successCount = 0;
+        let failureCount = 0;
+        let errorMessages: string[] = [];
+
+        for (let index = 0; index < imageFiles.length; index++) {
+          const file = imageFiles[index];
+          try {
+            console.log(`Uploading image: ${file.name} (Sıra: ${index + 1})`);
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('rank', (index + 1).toString());
+
+            const uploadResponse = await fetch(`/api/etsy/listings/${data.listing.listing_id}/images`, {
+              method: "POST",
+              body: formData,
+            });
+
+            const responseText = await uploadResponse.text();
+            console.log("Image upload response text:", responseText);
+
+            let uploadResponseData;
+            try {
+              uploadResponseData = JSON.parse(responseText);
+            } catch (e) {
+              console.error("Failed to parse response as JSON:", e);
+              uploadResponseData = { error: responseText };
+            }
+
+            if (!uploadResponse.ok) {
+              console.error("Image upload failed:", uploadResponseData);
+              errorMessages.push(`Failed to upload ${file.name}: ${uploadResponseData.error || responseText}`);
+              failureCount++;
+              continue;
+            }
+
+            console.log("Image upload response:", uploadResponseData);
+            successCount++;
+          } catch (error) {
+            console.error("Error uploading image:", error);
+            errorMessages.push(`Error uploading ${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`);
+            failureCount++;
+          }
+        }
+
+        // Show summary toast
+        if (successCount > 0 || failureCount > 0) {
+          toast({
+            title: "Image Upload Summary",
+            description: (
+              <div>
+                <p>Successfully uploaded {successCount} image(s).</p>
+                {failureCount > 0 && (
+                  <div>
+                    <p>Failed to upload {failureCount} image(s):</p>
+                    <ul>
+                      {errorMessages.map((msg, i) => (
+                        <li key={i}>{msg}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ),
+            variant: failureCount > 0 ? "destructive" : "default",
+            duration: 10000,
+          });
+        }
+      }
+
+      toast({
+        title: "Success",
+        description: "Product created successfully",
+      });
+
+      setShowCreateModal(false);
+      setCreateForm({
+        title: "",
+        description: "",
+        price: 0,
+        quantity: 1,
+        tags: [],
+        materials: [],
+        who_made: "i_did",
+        when_made: "made_to_order",
+        taxonomy_id: 1,
+        processing_min: undefined,
+        processing_max: undefined,
+        processing_time_unit: "business_days" // Default to business days
+      });
+      setImageFiles([]);
+      await loadProducts(1);
+    } catch (error) {
+      console.error("Error creating product:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create product",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // handleCopyProduct fonksiyonunu güncelle - Kopyalanan ürünü state'e kaydet
   const handleCopyProduct = (product: Product) => {
     scrollYRef.current = window.scrollY;
     // Etsy başlık sınırı 140 karakter
@@ -988,23 +1294,76 @@ export default function ProductsClient() {
 
     console.log(`Kopyalanan ürün resim ID'leri: ${imageIds.join(', ')}`);
     
+    // Tüm ürün detaylarını kopyala
     setCreateForm({
       title: newTitle,
       description: product.description,
       price: product.price.amount / product.price.divisor,
       quantity: product.quantity,
       tags: product.tags,
-      materials: [], // Etsy'de product.materials yok, boş başlatıyoruz
+      materials: (product as any)?.materials || [],
       who_made: (product as any)?.who_made || "i_did",
       when_made: (product as any)?.when_made || "made_to_order",
       taxonomy_id: (product as any)?.taxonomy_id || 1,
       shipping_profile_id: (product as any)?.shipping_profile_id,
-      state: product.state === "active" ? "active" : "draft",
-      image_ids: imageIds.length > 0 ? imageIds : undefined
+      processing_profile_id: (product as any)?.processing_profile_id,
+      processing_min: (product as any)?.processing_min,
+      processing_max: (product as any)?.processing_max,
+      processing_time_unit: (product as any)?.processing_time_unit || "business_days",
+      state: "draft", // Her zaman draft olarak başlat
+      image_ids: imageIds.length > 0 ? imageIds : undefined,
+      // Varyasyonları ve diğer metadata'ları kopyala
+      variations: (product as any)?.variations?.map((variation: any) => ({
+        ...variation,
+        property_values: variation.property_values?.map((pv: any) => ({
+          ...pv,
+          scale_id: pv.scale_id,
+          value_ids: pv.value_ids,
+          values: pv.values
+        }))
+      })) || [],
+      style: (product as any)?.style,
+      non_taxable: (product as any)?.non_taxable,
+      language: (product as any)?.language || "en-US",
+      featured_rank: (product as any)?.featured_rank,
+      taxonomy_path: (product as any)?.taxonomy_path,
+      used_manufacturer: (product as any)?.used_manufacturer,
+      is_supply: (product as any)?.is_supply,
+      is_customizable: (product as any)?.is_customizable,
+      is_digital: (product as any)?.is_digital,
+      file_data: (product as any)?.file_data,
+      has_variations: (product as any)?.has_variations,
+      production_partners: (product as any)?.production_partners,
+      section_id: (product as any)?.section_id,
+      shop_section_id: (product as any)?.shop_section_id,
+      // Envanter detaylarını kopyala
+      inventory: (product as any)?.inventory ? {
+        ...(product as any).inventory,
+        products: (product as any).inventory.products?.map((p: any) => ({
+          ...p,
+          property_values: p.property_values?.map((pv: any) => ({
+            ...pv,
+            scale_id: pv.scale_id,
+            value_ids: pv.value_ids,
+            values: pv.values
+          }))
+        }))
+      } : undefined,
+      should_auto_renew: (product as any)?.should_auto_renew,
+      is_personalizable: (product as any)?.is_personalizable,
+      personalization_is_required: (product as any)?.personalization_is_required,
+      personalization_instructions: (product as any)?.personalization_instructions,
+      personalization_char_count_max: (product as any)?.personalization_char_count_max,
     });
-    
-    setImageFile(null); // Yeni dosya yüklemeyi sıfırla
-    setImageFiles([]); // Yeni dosya yüklemeyi sıfırla
+
+    // Kopyalanan ürünü state'e kaydet
+    setProductToCopy(product);
+
+    // Yeni dosya yüklemeyi ve resim dosyası state'ini sıfırla
+    setImageFile(null);
+    setImageFiles([]);
+
+    // Kopya modunu etkinleştir ve modalı aç
     setIsCopyMode(true);
     setShowCreateModal(true);
   };
@@ -1037,8 +1396,8 @@ export default function ProductsClient() {
         file => file.type.startsWith('image/')
       );
       
-      if (filesArray.length > 0) {
-        setImageFiles(prev => [...prev, ...filesArray]);
+      if (filesArray.length > 0) { 
+        setImageFiles(prev => [...prev, ...filesArray]); 
       }
     }
   };
@@ -1048,12 +1407,12 @@ export default function ProductsClient() {
     if (startIndex === endIndex) return;
     
     // Seçilen görsel için
-    if (imageFiles.length > 0) {
+    if (imageFiles.length > 0) { 
       const result = Array.from(imageFiles);
       const [removed] = result.splice(startIndex, 1);
       result.splice(endIndex, 0, removed);
       setImageFiles(result);
-    }
+    } 
     
     // Edit modal içindeki görsel sıralaması için
     if (showEditModal && showEditModal.images && showEditModal.images.length > 0) {
@@ -1061,27 +1420,33 @@ export default function ProductsClient() {
       const [removed] = newImages.splice(startIndex, 1);
       newImages.splice(endIndex, 0, removed);
       setShowEditModal(prev => prev ? {...prev, images: newImages} : null);
-      setImagesReordered(true);
+      setImagesReordered(true); 
     }
   };
 
   // Resim kaldırma fonksiyonu
   const removeImage = (index: number) => {
-    setImageFiles(prev => prev.filter((_, i) => i !== index));
+      setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   // Ürün güncelleme fonksiyonunu genişletelim - resim yükleme destekli
   const handleUpdateProduct = async (product: Product) => {
     setSubmitting(true);
+    let success = true; // Başarı durumunu takip etmek için
+    let errorMessage = ""; // Hata mesajını toplamak için
+    let errorMessages: string[] = []; // Detaylı hata mesajları için
+
     try {
       // Ürün güncelleme
       const productToUpdate = {
         ...product,
-        quantity: typeof product.quantity === 'string' 
-          ? parseInt(product.quantity, 10) 
+        quantity: typeof product.quantity === 'string'
+          ? parseInt(product.quantity, 10)
           : product.quantity
       };
-      
+
+      console.log("Ürün bilgileri güncelleniyor:", productToUpdate);
+
       // Ürünü güncelle
       const response = await fetch(`/api/etsy/listings/${productToUpdate.listing_id}`, {
         method: 'PATCH',
@@ -1091,82 +1456,175 @@ export default function ProductsClient() {
         },
         body: JSON.stringify(productToUpdate)
       });
-      
+
       if (!response.ok) {
+        success = false;
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `API error: ${response.status}`);
+        errorMessage += `Ürün güncelleme hatası (${response.status}): ${errorData.error || JSON.stringify(errorData)}. `;
+        console.error("Ürün güncelleme hatası:", response.status, errorData);
+      } else {
+        console.log("Ürün bilgileri başarıyla güncellendi (API tarafında).");
       }
-      
+
       // Yeni resimler varsa, bunları ekle
       if (imageFiles.length > 0) {
-        for (const file of imageFiles) {
+        console.log(`Yüklemek için ${imageFiles.length} resim bulundu.`);
+        let successCount = 0;
+        let failureCount = 0;
+
+        for (let index = 0; index < imageFiles.length; index++) {
+          const file = imageFiles[index];
+          console.log(`Resim yükleniyor: ${file.name} (Sıra: ${index + 1})`);
           const formData = new FormData();
           formData.append('image', file);
-          
-          const uploadResponse = await fetch(`/api/etsy/listings/${productToUpdate.listing_id}/images`, {
-            method: 'POST',
-            body: formData
-          });
-          
-          if (!uploadResponse.ok) {
-            console.error(`Resim yükleme hatası: ${uploadResponse.status}`);
+          // Add the rank parameter based on the file's position in the array
+          formData.append('rank', (index + 1).toString());
+
+          try {
+            const uploadResponse = await fetch(`/api/etsy/listings/${productToUpdate.listing_id}/images`, {
+              method: 'POST',
+              body: formData
+            });
+
+            const responseText = await uploadResponse.text();
+            console.log("Image upload response text:", responseText);
+
+            let uploadResponseData;
+            try {
+              uploadResponseData = JSON.parse(responseText);
+            } catch (e) {
+              console.error("Failed to parse response as JSON:", e);
+              uploadResponseData = { error: responseText };
+            }
+
+            if (!uploadResponse.ok) {
+              success = false;
+              const errorDetail = uploadResponseData.error || uploadResponseData.message || responseText;
+              errorMessages.push(`Failed to upload ${file.name}: ${errorDetail}`);
+              console.error(`Resim yükleme hatası (${file.name}):`, uploadResponse.status, uploadResponseData);
+              failureCount++;
+            } else {
+              console.log(`Resim başarıyla yüklendi: ${file.name}`, uploadResponseData);
+              successCount++;
+            }
+          } catch (uploadError) {
+            success = false;
+            errorMessages.push(`Error uploading ${file.name}: ${uploadError instanceof Error ? uploadError.message : "Unknown error"}`);
+            console.error(`Resim yükleme sırasında beklenmeyen hata (${file.name}):`, uploadError);
+            failureCount++;
           }
         }
+
+        // Show summary toast for image uploads
+        if (successCount > 0 || failureCount > 0) {
+          toast({
+            title: "Image Upload Summary",
+            description: (
+              <div>
+                <p>Successfully uploaded {successCount} image(s).</p>
+                {failureCount > 0 && (
+                  <div>
+                    <p>Failed to upload {failureCount} image(s):</p>
+                    <ul>
+                      {errorMessages.map((msg, i) => (
+                        <li key={i}>{msg}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ),
+            variant: failureCount > 0 ? "destructive" : "default",
+            duration: 10000,
+          });
+        }
       }
-      
+
       // Resim sıralaması değiştiyse ve resimler varsa sıralamayı güncelle
-      if (imagesReordered && product.images && product.images.length > 1) {
-        // Etsy API resim sıralama desteği burada eklenir
+      if (imagesReordered && showEditModal?.images && showEditModal.images.length > 1) {
         console.log("Resim sıralaması güncelleniyor...");
         try {
-          // API'nin resim sıralama desteği varsa burada implemente edilir
-          // Tip hatasını gidermek için any kullanıyoruz - gerçek uygulamada
-          // Image tipini düzgün tanımlamak daha doğru olur
-          const imageIds = product.images.map((img: any) => img.listing_image_id || img.image_id).filter(Boolean);
-          
-          if (imageIds.length > 0) {
-            // Resim sıralama isteği
-            await fetch(`/api/etsy/listings/${productToUpdate.listing_id}/images/reorder`, {
-              method: 'POST',
+          const orderedImageIds = showEditModal.images
+            .map(img => (img as any).listing_image_id || (img as any).image_id)
+            .filter(Boolean);
+
+          if (orderedImageIds.length > 0) {
+            console.log("Resim sıralama isteği gönderiliyor:", orderedImageIds);
+            const reorderResponse = await fetch(`/api/etsy/listings/${productToUpdate.listing_id}/images`, {
+              method: 'PUT',
               headers: {
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ image_ids: imageIds })
+              body: JSON.stringify({ image_ids: orderedImageIds })
             });
+
+            const reorderResponseData = await reorderResponse.json().catch(() => ({}));
+
+            if (!reorderResponse.ok) {
+              success = false;
+              const errorDetail = reorderResponseData.error || reorderResponseData.message || JSON.stringify(reorderResponseData);
+              errorMessages.push(`Failed to reorder images: ${errorDetail}`);
+              console.error("Resim sıralama hatası:", reorderResponse.status, reorderResponseData);
+            } else {
+              console.log("Resim sıralaması başarıyla güncellendi.");
+            }
           }
         } catch (reorderError) {
-          console.error("Resim sıralama hatası:", reorderError);
+          success = false;
+          errorMessages.push(`Error reordering images: ${reorderError instanceof Error ? reorderError.message : "Unknown error"}`);
+          console.error("Resim sıralama sırasında beklenmeyen hata:", reorderError);
         }
-        
+
         setImagesReordered(false);
       }
-      
+
       // UI güncelle
-      toast({
-        title: "Ürün güncellendi",
-        description: "Ürün başarıyla güncellendi",
-        variant: "default",
-      });
-      
-      // Temizle
-      setSubmitting(false);
-      setImageFiles([]);
-      
-      // Modalı kapat
-      if (showEditModal && showEditModal.listing_id === productToUpdate.listing_id) {
-        setShowEditModal(null);
+      if (success) {
+        toast({
+          title: "Başarılı",
+          description: "Ürün ve resimler başarıyla güncellendi.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Güncelleme Tamamlandı, Ancak Hatalar Oluştu:",
+          description: (
+            <div>
+              <p>{errorMessage}</p>
+              {errorMessages.length > 0 && (
+                <div>
+                  <p>Detailed errors:</p>
+                  <ul>
+                    {errorMessages.map((msg, i) => (
+                      <li key={i}>{msg}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ),
+          variant: "destructive",
+          duration: 10000,
+        });
       }
-      
-      // Ürün listesini yenile
-      loadProducts();
-      
+
+      // Başarılı güncelleme sonrası state'i temizle
+      setImageFiles([]);
+      setShowEditModal(null);
+      await loadProducts(1);
+
     } catch (error) {
-      console.error("Update product error:", error);
+      success = false;
+      errorMessage = `Genel güncelleme hatası: ${error instanceof Error ? error.message : "Bilinmeyen hata"}. `;
+      console.error("Update product process error:", error);
+      
       toast({
-        title: "Ürün güncelleme hatası",
-        description: error instanceof Error ? error.message : "Ürün güncellenirken bir hata oluştu",
+        title: "Error",
+        description: errorMessage,
         variant: "destructive",
+        duration: 10000,
       });
+    } finally {
       setSubmitting(false);
     }
   };
@@ -1338,8 +1796,9 @@ export default function ProductsClient() {
     }
   };
 
-  const handleOpenCreateModal = () => {
-    scrollYRef.current = window.scrollY;
+  // Ürün oluşturma modalını açma fonksiyonu - kargo profillerini yüklemeyi ekledik
+  const handleOpenCreateModal = async () => {
+    scrollYRef.current = window.scrollY; // Scroll pozisyonunu kaydet
     setCreateForm({
       title: "",
       description: "",
@@ -1349,11 +1808,16 @@ export default function ProductsClient() {
       materials: [],
       who_made: "i_did",
       when_made: "made_to_order",
-      taxonomy_id: 1
+      taxonomy_id: 1,
+      shipping_profile_id: undefined, // Yeni ürün oluştururken shipping_profile_id'yi undefined yap
+      image_ids: []
     });
-    setIsCopyMode(false);
+    setImageFile(null); // Yeni dosya yüklemeyi sıfırla
+    setImageFiles([]); // Yeni dosya yüklemeyi sıfırla
+    setIsCopyMode(false); // Kopya modu kapalı
+    await loadShippingProfiles(); // Kargo profillerini yükle
     setShowCreateModal(true);
-  };
+  }
 
   // Ürün seçme/seçimi kaldırma fonksiyonu
   const toggleProductSelection = (listingId: number) => {
@@ -2149,586 +2613,230 @@ export default function ProductsClient() {
       {/* Edit Modal */}
       {showEditModal && (
         <>
-          <Dialog
-            open={!!showEditModal}
+          <Dialog 
+            open={!!showEditModal} 
             onOpenChange={(open) => {
               if (!open) {
-                setPendingModalType('edit');
-                setShowCloseConfirm(true);
+                setShowEditModal(null);
               }
             }}
           >
-            <DialogContent className="max-w-5xl max-h-[90vh] overflow-auto">
+            <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Ürün Düzenle</DialogTitle>
+                <DialogTitle>Ürünü Düzenle: {showEditModal?.title}</DialogTitle>
                 <DialogDescription>
-                  {showEditModal.title} ürününü düzenleyin
+                  Bu ürünün detaylarını düzenleyin.
                 </DialogDescription>
               </DialogHeader>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Sol Kolon - Ana Bilgiler */}
-                <div className="space-y-4">
+
+              {/* Tek Parça Form İçeriği */}
+              <div className="py-4 space-y-6">
+                {/* Temel Bilgiler Bölümü */}
+                <section className="space-y-4 border-b pb-6">
+                  <h3 className="text-lg font-semibold">Temel Bilgiler</h3>
                   <div>
-                    <Label htmlFor="edit-title">Ürün Başlığı</Label>
+                    <Label htmlFor="edit-title">Başlık</Label>
                     <Input
                       id="edit-title"
-                      value={showEditModal.title}
-                      onChange={(e) => setShowEditModal(prev => prev ? { ...prev, title: e.target.value } : null)}
+                      value={showEditModal?.title}
+                      onChange={(e) => setShowEditModal({ ...showEditModal, title: e.target.value })}
+                      required
                     />
                   </div>
-
                   <div>
                     <Label htmlFor="edit-description">Açıklama</Label>
                     <Textarea
                       id="edit-description"
-                      value={showEditModal.description}
-                      onChange={(e) => setShowEditModal(prev => prev ? { ...prev, description: e.target.value } : null)}
-                      rows={8}
+                      value={showEditModal?.description}
+                      onChange={(e) => setShowEditModal({ ...showEditModal, description: e.target.value })}
+                      required
                     />
                   </div>
+                </section>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="edit-price">Fiyat (USD)</Label>
-                      <Input
-                        id="edit-price"
-                        type="number"
-                        step="0.01"
-                        value={showEditModal.price.amount / showEditModal.price.divisor}
-                        onChange={(e) => setShowEditModal(prev => prev ? {
-                          ...prev,
-                          price: {
-                            ...prev.price,
-                            amount: Math.round(parseFloat(e.target.value) * prev.price.divisor)
-                          }
-                        } : null)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-quantity">Stok</Label>
-                      <Input
-                        id="edit-quantity"
-                        type="number"
-                        min="0"
-                        value={showEditModal.quantity}
-                        onChange={(e) => setShowEditModal(prev => prev ? { 
-                          ...prev, 
-                          quantity: parseInt(e.target.value) || 0 
-                        } : null)}
-                      />
+                {/* Görseller & Video Bölümü */}
+                <section className="space-y-4 border-b pb-6">
+                  <h3 className="text-lg font-semibold">Görseller & Video</h3>
+                  <div>
+                    <Label>Görseller ({showEditModal?.images.length || 0}/10)</Label>
+                    <div className="mt-4 grid grid-cols-3 gap-4">
+                      {showEditModal?.images.map((image, index) => (
+                        <div
+                          key={image.listing_image_id}
+                          className="relative group"
+                        >
+                          <img src={image.url_570xN} alt={image.alt_text || `Görsel ${index + 1}`} className="w-full h-32 object-cover rounded" />
+                          {index === 0 && <Badge className="absolute top-2 left-2">Ana Görsel</Badge>}
+                        </div>
+                      ))}
                     </div>
                   </div>
+                </section>
 
+                {/* Fiyat & Envanter Bölümü */}
+                <section className="space-y-4 border-b pb-6">
+                  <h3 className="text-lg font-semibold">Fiyat & Envanter</h3>
                   <div>
-                    <Label htmlFor="edit-state">Durum</Label>
-                    <Select 
-                      value={showEditModal.state} 
-                      onValueChange={(value: any) => setShowEditModal(prev => prev ? { ...prev, state: value } : null)}
+                    <Label htmlFor="price">Fiyat (USD)</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      value={createForm.price}
+                      onChange={(e) => setCreateForm({ ...createForm, price: parseFloat(e.target.value) })}
+                      required
+                    />
+                  </div>
+                  {!createForm.has_variations && (
+                    <div>
+                      <Label htmlFor="quantity">Miktar</Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        step="1"
+                        value={createForm.quantity}
+                        onChange={(e) => setCreateForm({ ...createForm, quantity: parseInt(e.target.value) })}
+                        required
+                      />
+                    </div>
+                  )}
+                </section>
+
+                {/* Detaylar & Nitelikler Bölümü */}
+                <section className="space-y-4 border-b pb-6">
+                  <h3 className="text-lg font-semibold">Detaylar & Nitelikler</h3>
+                  <div>
+                    <Label htmlFor="taxonomy_id">Kategori</Label>
+                    <Select
+                      onValueChange={(value) => setCreateForm({ ...createForm, taxonomy_id: parseInt(value) })}
+                      value={createForm.taxonomy_id?.toString()}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Bir kategori seçin" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Aktif</SelectItem>
-                        <SelectItem value="inactive">Pasif</SelectItem>
-                        <SelectItem value="draft">Taslak</SelectItem>
+                        {taxonomyNodes.map(node => (
+                          <SelectItem key={node.id} value={node.id.toString()}>
+                            {node.path.join(' > ')}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {/* Etiketler düzenleme */}
-                  <div className="mt-4">
-                    <Label className="block mb-2">Etiketler</Label>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {showEditModal.tags?.map((tag, index) => (
-                        <Badge key={index} className="flex items-center gap-1 px-3 py-1">
-                          {tag}
-                          <Button 
-                            type="button" 
-                            size="icon" 
-                            variant="ghost" 
-                            className="h-4 w-4"
-                            onClick={() => {
-                              setShowEditModal(prev => {
-                                if (!prev) return null;
-                                const newTags = [...prev.tags];
-                                newTags.splice(index, 1);
-                                return { ...prev, tags: newTags };
-                              });
-                            }}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
+                  {/* Etiketler */}
+                  <div>
+                    <Label htmlFor="tags">Etiketler (Max 13)</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        id="tagInput"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        placeholder="Etiket ekle (örn: tablo, sanat)"
+                        onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                      />
+                      <Button type="button" onClick={addTag}>Ekle</Button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {createForm.tags.map(tag => (
+                        <Badge key={tag} variant="secondary">
+                          {tag} <button type="button" onClick={() => removeTag(tag)} className="ml-1 text-red-500"><X size={12} /></button>
                         </Badge>
                       ))}
-                      <div className="flex gap-2 min-w-[300px] mt-2">
-                        <Input
-                          placeholder="Yeni etiket ekle..."
-                          value={tagInput}
-                          onChange={(e) => setTagInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && tagInput.trim()) {
-                              e.preventDefault();
-                              setShowEditModal(prev => {
-                                if (!prev) return null;
-                                const newTags = [...prev.tags];
-                                if (!newTags.includes(tagInput.trim())) {
-                                  newTags.push(tagInput.trim());
-                                }
-                                return { ...prev, tags: newTags };
-                              });
-                              setTagInput('');
-                            }
-                          }}
-                        />
-                        <Button 
-                          type="button" 
-                          onClick={() => {
-                            if (tagInput.trim()) {
-                              setShowEditModal(prev => {
-                                if (!prev) return null;
-                                const newTags = [...prev.tags];
-                                if (!newTags.includes(tagInput.trim())) {
-                                  newTags.push(tagInput.trim());
-                                }
-                                return { ...prev, tags: newTags };
-                              });
-                              setTagInput('');
-                            }
-                          }}
-                        >
-                          Ekle
-                        </Button>
-                      </div>
                     </div>
                   </div>
-                </div>
-                
-                {/* Sağ Kolon - Resimler ve Diğer Özellikler */}
-                <div className="space-y-4">
-                  <div>
-                    <Label className="block mb-2 flex items-center justify-between">
-                      <span>Ürün Resimleri ve Videolar</span>
-                    </Label>
-                    {showEditModal.images && showEditModal.images.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-4">
-                        {showEditModal.images.map((image, index) => (
-                          <div 
-                            key={index} 
-                            className="relative rounded-md overflow-hidden border border-gray-200 group"
-                            draggable
-                            onDragStart={() => setDragImageIndex(index)}
-                            onDragOver={(e) => {
-                              e.preventDefault();
-                              setDropImageIndex(index);
-                            }}
-                            onDragEnd={() => {
-                              if (dragImageIndex !== null && dropImageIndex !== null) {
-                                reorderImages(dragImageIndex, dropImageIndex);
-                                setDragImageIndex(null);
-                                setDropImageIndex(null);
-                              }
-                            }}
-                          >
-                            <img
-                              src={image.url_570xN}
-                              alt={image.alt_text || `Resim ${index + 1}`}
-                              className="w-full h-40 object-cover"
-                            />
-                            {/* Hover'da sil butonu */}
-                            <button
-                              type="button"
-                              className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 z-10"
-                              title="Resmi Sil"
-                              onClick={() => {
-                                setShowEditModal(prev => {
-                                  if (!prev) return null;
-                                  const newImages = [...prev.images];
-                                  newImages.splice(index, 1);
-                                  return { ...prev, images: newImages };
-                                });
-                              }}
-                            >
-                              <span className="bg-white shadow-lg hover:bg-red-600 hover:text-white text-red-600 rounded-full flex items-center justify-center h-14 w-14 border border-gray-200 hover:border-red-600">
-                                <Trash2 className="h-7 w-7" />
-                              </span>
-                            </button>
-                            {index === 0 && (
-                              <span className="absolute top-2 left-2 bg-primary text-white text-xs px-2 py-1 rounded-md">
-                                Ana Görsel
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center border-2 border-dashed rounded-md">
-                        <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
-                        <p className="mt-2 text-sm text-gray-500">Henüz resim eklenmemiş</p>
-                      </div>
-                    )}
-                    
-                    {/* Yeni resim ekleme alanı */}
-                    <div className="mt-4">
-                      <Label htmlFor="edit-new-images">Yeni Görseller Ekle</Label>
-                      <div 
-                        className={`mt-2 p-4 border-2 border-dashed rounded-md transition-colors ${
-                          dragOver ? 'border-primary bg-primary/5' : 'border-gray-300'
-                        }`}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                      >
-                        <div className="text-center">
-                          <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                          <div className="mt-2">
-                            <p className="text-sm text-gray-500">
-                              Resimleri sürükleyip bırakın veya 
-                              <label htmlFor="edit-file-upload" className="relative cursor-pointer">
-                                <span className="text-primary font-medium"> dosya seçin</span>
-                                <input
-                                  id="edit-file-upload"
-                                  name="edit-file-upload"
-                                  type="file"
-                                  multiple
-                                  className="sr-only"
-                                  accept="image/*"
-                                  onChange={handleMultipleImageSelect}
-                                />
-                              </label>
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Eklenen yeni resimleri göster */}
-                      {imageFiles.length > 0 && (
-                        <div className="mt-4">
-                          <Label className="block mb-2">Eklenecek Yeni Görseller ({imageFiles.length})</Label>
-                          <div className="grid grid-cols-4 gap-3">
-                            {imageFiles.map((file, index) => (
-                              <div 
-                                key={index} 
-                                className="relative rounded overflow-hidden h-24 border border-gray-200 bg-gray-50 group"
-                              >
-                                <img 
-                                  src={URL.createObjectURL(file)} 
-                                  alt={`Preview ${index}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  type="button"
-                                  className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                                  onClick={() => removeImage(index)}
-                                >
-                                  <Trash2 className="h-6 w-6 text-white" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4">
-                    <Label className="block mb-2">Harici Bağlantılar</Label>
-                    <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-md">
-                      <ExternalLink className="h-5 w-5 text-gray-500" />
-                      <a 
-                        href={showEditModal.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline text-sm truncate"
-                      >
-                        Etsy'de Görüntüle
-                      </a>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-50 p-3 rounded-md">
-                    <div className="text-sm text-gray-600 mb-2">Ürün Bilgileri</div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-gray-500">Ürün ID:</span> 
-                        <span className="font-medium ml-1">{showEditModal.listing_id}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Mağaza ID:</span> 
-                        <span className="font-medium ml-1">{showEditModal.shop_id}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Oluşturulma:</span> 
-                        <span className="font-medium ml-1">{formatDate(showEditModal.created_timestamp)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Son Güncelleme:</span> 
-                        <span className="font-medium ml-1">{formatDate(showEditModal.last_modified_timestamp)}</span>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-gray-500">Görüntülenme:</span> 
-                        <span className="font-medium ml-1">{showEditModal.metrics?.views || 0}</span>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-gray-500">Satış:</span> 
-                        <span className="font-medium ml-1">{showEditModal.metrics?.sold || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              <DialogFooter className="mt-6 flex justify-between">
-                <div>
-                  {imagesReordered && (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        if (showEditModal) {
-                          setImagesReordered(false);
-                        }
-                      }}
-                      className="mr-2"
+                  {/* Malzemeler */}
+                  <div>
+                    <Label htmlFor="materials">Malzemeler (Max 13)</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        id="materialInput"
+                        value={materialInput}
+                        onChange={(e) => setMaterialInput(e.target.value)}
+                        placeholder="Malzeme ekle (örn: tuval, yağlı boya)"
+                        onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); addMaterial(); } }}
+                      />
+                      <Button type="button" onClick={addMaterial}>Ekle</Button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {createForm.materials.map(material => (
+                        <Badge key={material} variant="secondary">
+                          {material} <button type="button" onClick={() => removeMaterial(material)} className="ml-1 text-red-500"><X size={12} /></button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                {/* Kargo & Hazırlık Bölümü */}
+                <section className="space-y-4 border-b pb-6">
+                  <h3 className="text-lg font-semibold">Kargo & Hazırlık</h3>
+                  <div>
+                    <Label htmlFor="shipping_profile_id">Kargo Profili</Label>
+                    <Select
+                      onValueChange={(value) => setCreateForm({ ...createForm, shipping_profile_id: parseInt(value) })}
+                      value={createForm.shipping_profile_id?.toString()}
                     >
-                      <Save className="mr-2 h-4 w-4" />
-                      Görsel Sıralamasını Kaydet
-                    </Button>
-                  )}
-                </div>
-                <div>
-                  <Button variant="outline" onClick={() => setShowEditModal(null)} className="mr-2">
-                    İptal
-                  </Button>
-                  <Button onClick={() => showEditModal && handleUpdateProduct(showEditModal)} disabled={submitting}>
-                    {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Güncelleniyor...</> : "Güncelle"}
-                  </Button>
-                </div>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          {/* Kapatma onayı */}
-          <AlertDialog open={showCloseConfirm && pendingModalType === 'edit'} onOpenChange={setShowCloseConfirm}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Değişiklikler kaybolacak</AlertDialogTitle>
-                <AlertDialogDescription>Düzenlemeden çıkmak istediğinize emin misiniz?</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setShowCloseConfirm(false)}>Hayır</AlertDialogCancel>
-                <AlertDialogAction onClick={() => { setShowEditModal(null); setShowCloseConfirm(false); setPendingModalType(null); }}>Evet, Çık</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </>
-      )}
-
-      {/* Create Modal */}
-      {showCreateModal && (
-        <>
-          <Dialog
-            open={showCreateModal}
-            onOpenChange={(open) => {
-              if (!open) {
-                setPendingModalType('create');
-                setShowCloseConfirm(true);
-              }
-            }}
-          >
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
-              <DialogHeader>
-                <DialogTitle>Yeni Ürün Ekle</DialogTitle>
-                <DialogDescription>Yeni bir ürün oluşturun</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="create-title">Ürün Başlığı</Label>
-                  <Input
-                    id="create-title"
-                    value={createForm.title}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, title: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="create-description">Açıklama</Label>
-                  <Textarea
-                    id="create-description"
-                    value={createForm.description}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
-                    rows={4}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="create-price">Fiyat (USD)</Label>
-                    <Input
-                      id="create-price"
-                      type="number"
-                      step="0.01"
-                      value={createForm.price}
-                      onChange={(e) => setCreateForm(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="create-quantity">Stok</Label>
-                    <Input
-                      id="create-quantity"
-                      type="number"
-                      value={createForm.quantity}
-                      onChange={(e) => setCreateForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="create-state">Durum</Label>
-                  <Select
-                    value={createForm.state || "active"}
-                    onValueChange={(val) => setCreateForm(prev => ({ ...prev, state: val as any }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Durum seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Aktif</SelectItem>
-                      <SelectItem value="draft">Taslak</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="create-image">Görseller</Label>
-                  <div 
-                    className={`mt-2 p-4 border-2 border-dashed rounded-md transition-colors ${
-                      dragOver ? 'border-primary bg-primary/5' : 'border-gray-300'
-                    }`}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <div className="text-center">
-                      <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-500">
-                          Resimleri sürükleyip bırakın veya 
-                          <label htmlFor="file-upload" className="relative cursor-pointer">
-                            <span className="text-primary font-medium"> dosya seçin</span>
-                            <input
-                              id="file-upload"
-                              name="file-upload"
-                              type="file"
-                              multiple
-                              className="sr-only"
-                              accept="image/*"
-                              onChange={handleMultipleImageSelect}
-                            />
-                          </label>
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          PNG, JPG, GIF - En iyi sonuç için kare formatta, 1000x1000 piksel çözünürlükte resimler yükleyin
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Seçilen resimleri göster */}
-                  {imageFiles.length > 0 && (
-                    <div className="mt-4">
-                      <Label className="block mb-2">Seçilen Görseller ({imageFiles.length})</Label>
-                      <p className="text-xs text-gray-500 mb-2">Sürükleyerek sıralayabilirsiniz. İlk resim ana görsel olacaktır.</p>
-                      <div className="grid grid-cols-4 gap-3">
-                        {imageFiles.map((file, index) => (
-                          <div 
-                            key={index} 
-                            className="relative rounded overflow-hidden h-24 border border-gray-200 bg-gray-50 group"
-                            draggable
-                            onDragStart={() => setDragImageIndex(index)}
-                            onDragOver={(e) => {
-                              e.preventDefault();
-                              setDropImageIndex(index);
-                            }}
-                            onDragEnd={() => {
-                              if (dragImageIndex !== null && dropImageIndex !== null) {
-                                reorderImages(dragImageIndex, dropImageIndex);
-                                setDragImageIndex(null);
-                                setDropImageIndex(null);
-                              }
-                            }}
-                          >
-                            <img 
-                              src={URL.createObjectURL(file)} 
-                              alt={`Preview ${index}`}
-                              className="w-full h-full object-cover"
-                            />
-                            <button
-                              type="button"
-                              className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                              onClick={() => removeImage(index)}
-                            >
-                              <Trash2 className="h-6 w-6 text-white" />
-                            </button>
-                            {index === 0 && (
-                              <span className="absolute top-0 left-0 bg-primary text-white text-xs px-2 py-1">
-                                Ana Görsel
-                              </span>
-                            )}
-                          </div>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Bir kargo profili seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shippingProfiles.map(profile => (
+                          <SelectItem key={profile.shipping_profile_id} value={profile.shipping_profile_id.toString()}>
+                            {profile.title}
+                          </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </section>
+
+                {/* Kişiselleştirme Bölümü */}
+                <section className="space-y-4">
+                  <h3 className="text-lg font-semibold">Kişiselleştirme</h3>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="is_personalizable"
+                      checked={createForm.is_personalizable}
+                      onCheckedChange={(checked) => setCreateForm({ ...createForm, is_personalizable: checked as boolean })}
+                    />
+                    <Label htmlFor="is_personalizable">Kişiselleştirilebilir mi?</Label>
+                  </div>
+
+                  {createForm.is_personalizable && (
+                    <div className="space-y-4 pl-4 border-l">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="personalization_is_required"
+                          checked={createForm.personalization_is_required}
+                          onCheckedChange={(checked) => setCreateForm({ ...createForm, personalization_is_required: checked as boolean })}
+                        />
+                        <Label htmlFor="personalization_is_required">Alıcıdan kişiselleştirme bilgisini zorunlu kıl</Label>
+                      </div>
+                      <div>
+                        <Label htmlFor="personalization_instructions">Alıcıya Talimatlar</Label>
+                        <Textarea
+                          id="personalization_instructions"
+                          value={createForm.personalization_instructions || ''}
+                          onChange={(e) => setCreateForm({ ...createForm, personalization_instructions: e.target.value })}
+                          placeholder="Alıcıya kişiselleştirme için vermesi gereken bilgileri yazın"
+                        />
                       </div>
                     </div>
                   )}
-                </div>
-                <div>
-                  <Label htmlFor="create-tags">Etiketler</Label>
-                  <div className="flex gap-2 mb-2">
-                    <Input
-                      id="create-tags"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                      placeholder="Etiket ekle..."
-                    />
-                    <Button type="button" onClick={addTag}>Ekle</Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {createForm.tags.map((tag) => (
-                      <Badge key={tag} className="flex items-center gap-1">
-                        {tag}
-                        <Button type="button" size="icon" variant="ghost" onClick={() => removeTag(tag)}><X className="w-3 h-3" /></Button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="create-materials">Malzemeler</Label>
-                  <div className="flex gap-2 mb-2">
-                    <Input
-                      id="create-materials"
-                      value={materialInput}
-                      onChange={(e) => setMaterialInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addMaterial())}
-                      placeholder="Malzeme ekle..."
-                    />
-                    <Button type="button" onClick={addMaterial}>Ekle</Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {createForm.materials.map((mat) => (
-                      <Badge key={mat} className="flex items-center gap-1">
-                        {mat}
-                        <Button type="button" size="icon" variant="ghost" onClick={() => removeMaterial(mat)}><X className="w-3 h-3" /></Button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+                </section>
               </div>
+
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowCreateModal(false)}>
-                  İptal
-                </Button>
+                <Button variant="outline" onClick={() => setShowCreateModal(false)}>İptal</Button>
                 <Button onClick={handleCreateProduct} disabled={submitting}>
-                  {submitting ? (isCopyMode ? "Kopyalanıyor..." : "Ekleniyor...") : (isCopyMode ? "Kopyala ve Ürünü Ekle" : "Ekle")}
+                  {submitting ? ( <Loader2 className="mr-2 h-4 w-4 animate-spin" /> ) : (isCopyMode ? 'Kopyayı Oluştur' : 'Oluştur')}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
           {/* Kapatma onayı */}
           <AlertDialog open={showCloseConfirm && pendingModalType === 'create'} onOpenChange={setShowCloseConfirm}>
             <AlertDialogContent>

@@ -50,7 +50,6 @@ import {
 } from "@/components/ui/dialog"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 import { RateLimitIndicator } from "@/components/ui/rate-limit-indicator"
-import Image from "next/image"
 
 interface EtsyStore {
   shop_id: number
@@ -658,13 +657,15 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
               <Card key={store.shop_id} className="relative">
                 <CardContent className="flex items-center">
                   <div className="relative w-20 h-20 rounded-full overflow-hidden mr-4 bg-gray-200 flex items-center justify-center">
-                    {(store.avatar_url && typeof store.avatar_url === 'string') || (store.image_url_760x100 && typeof store.image_url_760x100 === 'string') ? (
-                      <Image
-                        src={(store.avatar_url || store.image_url_760x100) as string}
+                    {store.avatar_url || store.image_url_760x100 ? (
+                      <img
+                        src={store.avatar_url || store.image_url_760x100}
                         alt={`${store.shop_name} avatar`}
-                        fill
-                        style={{ objectFit: 'cover' }}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = `https://www.etsy.com/images/avatars/default_shop.png`; // Hata oluşursa default resim
+                        }}
                       />
                     ) : (
                       <Store className="w-10 h-10 text-gray-500" />

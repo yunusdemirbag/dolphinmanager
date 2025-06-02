@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1")
     const limit = parseInt(searchParams.get("limit") || "100") // Varsayılan limiti 100'e çıkardık
     const offset = (page - 1) * limit
-    const state = (searchParams.get("state") || "active") as "active" | "inactive" | "draft" | "expired" | "all"
+    const state = (searchParams.get("state") || "active") as "active" | "inactive" | "draft" | "expired" | "all" // Varsayılan olarak active
     const skipCache = searchParams.get("skip_cache") === "true"
     
     // Ekleme: Yeniden bağlanma isteğini sınırlamak için

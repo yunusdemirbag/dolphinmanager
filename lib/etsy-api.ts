@@ -2,7 +2,7 @@ import crypto from "crypto"
 import qs from "querystring"
 import { supabaseAdmin } from "./supabase"
 import { cacheManager } from "./cache"
-import { fetchWithCache } from "./api-utils"
+import { fetchWithCache, rateLimitedFetch } from "./api-utils"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Database } from "@/types/database.types";
 // Mock data importları geçici olarak kaldırıldı
@@ -139,14 +139,14 @@ function checkEtsyConfig() {
 export interface EtsyStore {
   shop_id: number
   shop_name: string
-  title: string
-  announcement: string
+  title: string | null
+  announcement: string | null
   currency_code: string
   is_vacation: boolean
   listing_active_count: number
   num_favorers: number
   url: string
-  image_url_760x100: string
+  image_url_760x100: string | null
   review_count: number
   review_average: number
   is_active?: boolean
@@ -160,7 +160,7 @@ export interface EtsyListing {
   shop_id: number
   title: string
   description: string
-  state: "active" | "inactive" | "draft"
+  state: "active" | "inactive" | "draft" | "expired" | "sold_out"
   quantity: number
   url: string
   views?: number
@@ -170,6 +170,7 @@ export interface EtsyListing {
     currency_code: string
   }
   tags: string[]
+  materials?: string[]
   images: Array<{
     listing_id: number
     listing_image_id: number
@@ -178,7 +179,26 @@ export interface EtsyListing {
     url_570xN: string
     url_fullxfull: string
     alt_text: string
-  }>
+    rank?: number
+  }> | null
+  created_timestamp: number
+  last_modified_timestamp: number
+  taxonomy_id?: number
+  metrics?: {
+    views: number
+    favorites: number
+    sold: number
+  } | null
+  has_variations?: boolean
+  inventory?: any
+  shipping_profile_id?: number
+  processing_min?: number
+  processing_max?: number
+  processing_time_unit?: string
+  is_personalizable?: boolean
+  personalization_is_required?: boolean
+  personalization_instructions?: string
+  personalization_char_count_max?: number
 }
 
 export interface EtsyTokens {
@@ -585,7 +605,7 @@ async function refreshEtsyToken(userId: string): Promise<string> {
   }
 }
 
-async function getValidAccessToken(userId: string): Promise<string | null> {
+export async function getValidAccessToken(userId: string): Promise<string | null> {
   try {
     console.log("Getting valid access token for user:", userId);
     
@@ -1656,6 +1676,7 @@ export interface CreateListingData {
   is_digital?: boolean
   processing_min?: number
   processing_max?: number
+  processing_time_unit?: string; // Add processing_time_unit
 }
 
 export interface UpdateListingData {
@@ -1709,6 +1730,9 @@ export async function createDraftListing(
   }
   if (listingData.processing_max) {
     formData.append('processing_max', listingData.processing_max.toString())
+  }
+  if (listingData.processing_time_unit) {
+    formData.append('processing_time_unit', listingData.processing_time_unit);
   }
 
   const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings`, {
@@ -2178,445 +2202,28 @@ export async function getShippingProfiles(
   userId: string,
   shopId: number
 ): Promise<ShippingProfile[]> {
-  const accessToken = await getValidAccessToken(userId)
-
-  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "x-api-key": ETSY_CLIENT_ID,
-    },
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    console.error("Get shipping profiles error:", errorData)
-    throw new Error(`Failed to get shipping profiles: ${errorData.error || response.statusText}`)
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) {
+    throw new Error('Etsy access token not found or expired.');
   }
 
-  const data = await response.json()
-  return data.results || []
-}
-
-// ===== TAXONOMY & PROPERTIES =====
-
-export interface TaxonomyNode {
-  id: number
-  level: number
-  name: string
-  parent_id?: number
-  path: string[]
-  children?: TaxonomyNode[]
-}
-
-export interface Property {
-  property_id: number
-  name: string
-  display_name: string
-  scales?: PropertyScale[]
-  possible_values?: PropertyValue[]
-}
-
-export interface PropertyScale {
-  scale_id: number
-  display_name: string
-  description: string
-}
-
-export interface PropertyValue {
-  value_id: number
-  name: string
-  scale_id?: number
-}
-
-// Seller taxonomy node'larını getir
-export async function getSellerTaxonomyNodes(): Promise<TaxonomyNode[]> {
-  const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes`, {
-    headers: {
-      "x-api-key": ETSY_CLIENT_ID,
-    },
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    console.error("Get taxonomy error:", errorData)
-    throw new Error(`Failed to get taxonomy: ${errorData.error || response.statusText}`)
-  }
-
-  const data = await response.json()
-  return data.results || []
-}
-
-// Taxonomy ID'ye göre property'leri getir
-export async function getPropertiesByTaxonomyId(taxonomyId: number): Promise<Property[]> {
-  const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes/${taxonomyId}/properties`, {
-    headers: {
-      "x-api-key": ETSY_CLIENT_ID,
-    },
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    console.error("Get properties error:", errorData)
-    throw new Error(`Failed to get properties: ${errorData.error || response.statusText}`)
-  }
-
-  const data = await response.json()
-  return data.results || []
-}
-
-/**
- * Invalidates all cached data for a specific user
- */
-export function invalidateUserCache(userId: string): void {
-  console.log(`Invalidating cache for user: ${userId}`);
-  cacheManager.invalidateByPrefix(`etsy_stores_${userId}`);
-  cacheManager.invalidateByPrefix(`etsy_listings_${userId}`);
-  cacheManager.invalidateByPrefix(`etsy_receipts_${userId}`);
-  cacheManager.invalidateByPrefix(`etsy_payments_${userId}`);
-  cacheManager.invalidateByPrefix(`etsy_financial_summary_${userId}`);
-  console.log(`Cache invalidated for user: ${userId}`);
-}
-
-/**
- * Invalidates cached data for a specific shop
- */
-export function invalidateShopCache(userId: string, shopId: number): void {
-  console.log(`Invalidating shop cache for user: ${userId}, shop: ${shopId}`);
-  cacheManager.invalidateByPrefix(`etsy_listings_${userId}_${shopId}`);
-  cacheManager.invalidateByPrefix(`etsy_receipts_${userId}_${shopId}`);
-  cacheManager.invalidateByPrefix(`etsy_payments_${userId}_${shopId}`);
-  cacheManager.invalidateByPrefix(`etsy_financial_summary_${userId}_${shopId}`);
-  console.log(`Shop cache invalidated for user: ${userId}, shop: ${shopId}`);
-}
-
-/**
- * Utility function to get fresh data or use cache based on preference
- */
-export async function getEtsyStoresWithCacheControl(
-  userId: string, 
-  { forceRefresh = false, cacheTime = 3 * 60 * 60 * 1000 } = {}
-): Promise<EtsyStore[]> {
-  const stores = await getEtsyStores(userId, forceRefresh);
-  
-  // If we forced a refresh, update the cache expiration
-  if (forceRefresh && stores.length > 0) {
-    const cacheKey = `etsy_stores_${userId}`;
-    cacheManager.set(cacheKey, stores, { ttl: cacheTime });
-    console.log(`Updated cache TTL for stores to ${cacheTime / (60 * 1000)} minutes`);
-  }
-  
-  return stores;
-}
-
-/**
- * Utility function to get fresh listings or use cache based on preference
- */
-export async function getEtsyListingsWithCacheControl(
-  userId: string,
-  shopId: number,
-  { 
-    limit = 25, 
-    offset = 0, 
-    state = 'active' as 'active' | 'inactive' | 'draft' | 'expired' | 'all',
-    forceRefresh = false,
-    cacheTime = 3 * 60 * 60 * 1000
-  } = {}
-): Promise<{
-  listings: EtsyListing[]
-  count: number
-}> {
-  const result = await getEtsyListings(userId, shopId, limit, offset, state, forceRefresh);
-  
-  // If we forced a refresh, update the cache expiration
-  if (forceRefresh && result.listings.length > 0) {
-    const cacheKey = `etsy_listings_${userId}_${shopId}_${limit}_${offset}_${state}`;
-    cacheManager.set(cacheKey, result, { ttl: cacheTime });
-    console.log(`Updated cache TTL for listings to ${cacheTime / (60 * 1000)} minutes`);
-  }
-  
-  return result;
-}
-
-/**
- * Get all Etsy data for a user with refresh control
- * This function is used to refresh all cached data for a user
- */
-export async function getEtsyDataWithRefreshControl(
-  userId: string,
-  shopId?: number,
-  forceRefresh: boolean = false
-): Promise<{
-  success: boolean;
-  message: string;
-  stores?: EtsyStore[];
-  timestamp: number;
-}> {
   try {
-    console.log(`Refreshing Etsy data for user: ${userId}, force: ${forceRefresh}`);
-    
-    // Mağaza belirtilmişse sadece o mağazaya ait verileri temizle
-    if (shopId) {
-      if (forceRefresh) {
-        invalidateShopCache(userId, shopId);
-      }
-      
-      // Mağaza verilerini çek
-      const storeData = await getEtsyListingsWithCacheControl(
-        userId, 
-        shopId, 
-        { forceRefresh, limit: 10 }
-      );
-      
-      return {
-        success: true,
-        message: `Mağaza verileri ${forceRefresh ? 'yenilendi' : 'önbellekten yüklendi'}`,
-        timestamp: Date.now()
-      };
-    }
-    
-    // Belirli bir mağaza belirtilmemişse tüm kullanıcı verilerini yenile
-    if (forceRefresh) {
-      invalidateUserCache(userId);
-    }
-    
-    // Mağazaları çek
-    const stores = await getEtsyStoresWithCacheControl(
-      userId, 
-      { forceRefresh }
-    );
-    
-    // Her mağazanın verilerini çek
-    if (stores && stores.length > 0) {
-      // Sadece ilk mağazanın verilerini çekelim (çok sayıda istek yapılmasını önlemek için)
-      const firstShopId = stores[0].shop_id;
-      
-      await Promise.all([
-        getEtsyListingsWithCacheControl(userId, firstShopId, { forceRefresh, limit: 5 }),
-        // Diğer API çağrıları da eklenebilir
-      ]);
-    }
-    
-    return {
-      success: true,
-      message: forceRefresh 
-        ? 'Tüm Etsy verileri başarıyla yenilendi' 
-        : 'Mevcut önbellek verileri kullanıldı',
-      stores,
-      timestamp: Date.now()
-    };
-  } catch (error) {
-    console.error('Error refreshing Etsy data:', error);
-    return {
-      success: false,
-      message: `Veri yenileme hatası: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`,
-      timestamp: Date.now()
-    };
+    // Construct the API URL
+    const url = `${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`;
+
+    // Make the API call using rateLimitedFetch
+    const response = await rateLimitedFetch<{results: ShippingProfile[]}>(url, {
+      method: 'GET',
+      headers: {
+        'x-api-key': ETSY_CLIENT_ID,
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json'
+      },
+    });
+
+    return response.results;
+  } catch (error: any) {
+    console.error('[ETSY-API] Error fetching shipping profiles:', error.message);
+    throw new Error(`Failed to fetch Etsy shipping profiles: ${error.message}`);
   }
-}
-
-// Veritabanı tablolarını oluştur
-export async function createEtsyDataTables(): Promise<void> {
-  try {
-    console.log("Creating Etsy data tables...");
-
-    // Mağaza verileri tablosu
-    const { error: storeError } = await supabaseAdmin.rpc('create_etsy_store_data_table');
-    if (storeError) {
-      console.error("Error creating store data table:", storeError);
-      throw storeError;
-    }
-
-    // Ürün listeleri tablosu
-    const { error: listingsError } = await supabaseAdmin.rpc('create_etsy_listings_data_table');
-    if (listingsError) {
-      console.error("Error creating listings data table:", listingsError);
-      throw listingsError;
-    }
-
-    // Mağaza istatistikleri tablosu
-    const { error: statsError } = await supabaseAdmin.rpc('create_etsy_stats_data_table');
-    if (statsError) {
-      console.error("Error creating stats data table:", statsError);
-      throw statsError;
-    }
-
-    // Siparişler tablosu
-    const { error: receiptsError } = await supabaseAdmin.rpc('create_etsy_receipts_data_table');
-    if (receiptsError) {
-      console.error("Error creating receipts data table:", receiptsError);
-      throw receiptsError;
-    }
-
-    // Ödemeler tablosu
-    const { error: paymentsError } = await supabaseAdmin.rpc('create_etsy_payments_data_table');
-    if (paymentsError) {
-      console.error("Error creating payments data table:", paymentsError);
-      throw paymentsError;
-    }
-
-    console.log("✅ All Etsy data tables created successfully");
-  } catch (error) {
-    console.error("Failed to create Etsy data tables:", error);
-    throw error;
-  }
-}
-
-// Etsy mağaza istatistiklerini getir
-export async function getEtsyStats(
-  userId: string,
-  shopId: number,
-  skipCache = false
-): Promise<{
-  totalListings: number;
-  totalOrders: number;
-  totalViews: number;
-  totalRevenue: number;
-}> {
-  const cacheKey = `etsy_stats_${userId}_${shopId}`;
-  
-  try {
-    // Önce önbellekten kontrol et
-    if (!skipCache) {
-      const cachedStats = cacheManager.get<{
-        totalListings: number;
-        totalOrders: number;
-        totalViews: number;
-        totalRevenue: number;
-      }>(cacheKey);
-      
-      if (cachedStats) {
-        console.log(`📦 Using cached stats data`);
-        return cachedStats;
-      }
-    }
-
-    // Etsy mağazalarını çek
-    const stores = await getEtsyStores(userId, skipCache);
-    
-    if (stores && stores.length > 0) {
-      // Eğer shopId belirtilmişse o mağazayı bul, değilse ilkini kullan
-      const store = shopId ? 
-        stores.find(s => s.shop_id === shopId) : 
-        stores[0];
-      
-      if (store) {
-        // İstatistikleri hesapla
-        const stats = {
-          totalListings: store.listing_active_count || 0,
-          totalOrders: store.review_count || 0, // Review count'u order sayısı olarak kullan
-          totalViews: store.num_favorers * 100 || 0, // Tahmini
-          totalRevenue: (store.review_count || 0) * 25.99, // Ortalama fiyat
-        };
-        
-        // Önbelleğe kaydet
-        cacheManager.set(cacheKey, stats, { ttl: 3 * 60 * 60 * 1000 }); // 3 saat
-        
-        return stats;
-      }
-    }
-    
-    // Veri yoksa boş değerler döndür
-    return {
-      totalListings: 0,
-      totalOrders: 0,
-      totalViews: 0,
-      totalRevenue: 0
-    };
-  } catch (error) {
-    console.error("getEtsyStats error:", error);
-    
-    // Hata durumunda varsayılan değerler
-    return {
-      totalListings: 0,
-      totalOrders: 0,
-      totalViews: 0,
-      totalRevenue: 0
-    };
-  }
-}
-
-// New function to reorder listing images
-export async function reorderListingImages(
-  userId: string,
-  shopId: number, // bu parametre kullanılmayacak
-  listingId: number,
-  imageIds: number[]
-): Promise<boolean> {
-  try {
-    console.log(`[reorderListingImages] Starting reordering of images for listing ${listingId}`);
-    
-    const accessToken = await getValidAccessToken(userId);
-    if (!accessToken) {
-      console.error("[reorderListingImages] No valid access token for reordering images");
-      return false;
-    }
-
-    // Filter out any invalid IDs
-    const validImageIds = imageIds.filter(id => typeof id === 'number' && !isNaN(id) && id > 0);
-    if (validImageIds.length === 0) {
-      console.error("[reorderListingImages] No valid image IDs after filtering:", imageIds);
-      return false;
-    }
-    
-    // Doğru Etsy API endpointi
-    const url = `https://api.etsy.com/v3/application/listings/${listingId}/images`;
-    const requestBody = {
-      image_ids: validImageIds
-    };
-    
-    console.log(`[reorderListingImages] Sending PUT request to: ${url}`);
-    console.log(`[reorderListingImages] Request body:`, JSON.stringify(requestBody));
-    
-    try {
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'x-api-key': ETSY_CLIENT_ID,
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
-      
-      const responseStatus = response.status;
-      let responseText = '';
-      try {
-        responseText = await response.text();
-        console.log(`[reorderListingImages] Response text: ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
-      } catch (textError) {
-        console.error(`[reorderListingImages] Error getting response text:`, textError);
-      }
-      
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = responseText ? JSON.parse(responseText) : { error: `HTTP error: ${responseStatus}` };
-        } catch (e) {
-          errorData = { error: responseText || `HTTP error: ${responseStatus}` };
-        }
-        console.error(`[reorderListingImages] Error reordering images for listing ${listingId}:`, errorData);
-        return false;
-      }
-      
-      try {
-        const responseData = responseText ? JSON.parse(responseText) : {};
-        console.log(`[reorderListingImages] API response:`, responseData);
-      } catch (e) {}
-      
-      console.log(`[reorderListingImages] Successfully reordered images for listing ${listingId}`);
-      return true;
-    } catch (fetchError) {
-      console.error(`[reorderListingImages] Fetch error while reordering:`, fetchError);
-      return false;
-    }
-  } catch (error) {
-    console.error(`[reorderListingImages] Exception reordering images for listing ${listingId}:`, error);
-    return false;
-  }
-}
-
-// Supabase client
-function createClientSupabase() {
-  return createClientComponentClient<Database>();
 }

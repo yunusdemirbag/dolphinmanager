@@ -23,7 +23,6 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { RateLimitIndicator } from "@/components/ui/rate-limit-indicator"
-import { shouldUseOnlyCachedData } from "@/lib/etsy-api"
 
 interface InventoryItem {
   id: number
@@ -213,18 +212,6 @@ export default function InventoryPage() {
           </div>
         </div>
       </header>
-
-      {/* Cached data notification */}
-      {shouldUseOnlyCachedData && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-          <Alert className="bg-blue-50 border-blue-200">
-            <Info className="w-4 h-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
-              Etsy API çağrı limitlerini korumak için veriler önbellekten yükleniyor. Güncel verileri görmek için "Verileri Güncelle" butonuna tıklayın.
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
 
       {/* Rate Limit Indicator */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">

@@ -454,7 +454,7 @@ const rateLimiter = {
 };
 
 // Rate limit kontrolü ile API çağrısı yapan yardımcı fonksiyon
-async function rateLimitedFetch<T>(
+export async function rateLimitedFetch<T>(
   url: string,
   options: RequestInit,
   cacheKey?: string,
@@ -491,7 +491,7 @@ async function rateLimitedFetch<T>(
 }
 
 // refreshEtsyToken fonksiyonunu güncelle
-async function refreshEtsyToken(userId: string): Promise<string> {
+export async function refreshEtsyToken(userId: string): Promise<string> {
   try {
     console.log("Refreshing Etsy token for user:", userId);
     

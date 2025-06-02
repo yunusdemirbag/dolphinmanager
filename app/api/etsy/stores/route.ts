@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
                 
                 try {
                   // Yenileme API'sini çağır
-                  const refreshResponse = await fetch('/api/etsy/refresh-token', {
+                  const refreshResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/etsy/refresh`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -131,22 +131,17 @@ export async function GET(request: NextRequest) {
                     body: JSON.stringify({ userId: user.id }),
                   });
                   
-                  if (refreshResponse.ok) {
-                    console.log("Token refreshed successfully");
-                    // Başarılı yenileme durumunda normal yanıt ver, yeniden bağlantı gerekmez
-                  } else {
-                    console.log("Token refresh failed, will notify client to reconnect");
-                    return NextResponse.json({
-                      error: "TOKEN_REFRESH_FAILED",
-                      stores: [],
-                      count: 0,
-                      connected: false,
-                      message: "Token yenilemesi başarısız oldu. Lütfen Etsy hesabınıza yeniden bağlanın.",
-                      source: "token_refresh_failed"
-                    });
+                  if (!refreshResponse.ok) {
+                    console.error('Token refresh failed:', await refreshResponse.text());
+                    return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 });
                   }
-                } catch (refreshError) {
-                  console.error("Error refreshing token:", refreshError);
+
+                  const newTokens = await refreshResponse.json();
+                  console.log("Token refreshed successfully");
+                  // Başarılı yenileme durumunda normal yanıt ver, yeniden bağlantı gerekmez
+                } catch (error) {
+                  console.error('Error refreshing token:', error);
+                  return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 });
                 }
               }
               
@@ -227,7 +222,7 @@ export async function GET(request: NextRequest) {
             
             try {
               // Yenileme API'sini çağır
-              const refreshResponse = await fetch('/api/etsy/refresh-token', {
+              const refreshResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/etsy/refresh`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -235,22 +230,17 @@ export async function GET(request: NextRequest) {
                 body: JSON.stringify({ userId: user.id }),
               });
               
-              if (refreshResponse.ok) {
-                console.log("Token refreshed successfully");
-                // Başarılı yenileme durumunda normal yanıt ver, yeniden bağlantı gerekmez
-              } else {
-                console.log("Token refresh failed, will notify client to reconnect");
-                return NextResponse.json({
-                  error: "TOKEN_REFRESH_FAILED",
-                  stores: [],
-                  count: 0,
-                  connected: false,
-                  message: "Token yenilemesi başarısız oldu. Lütfen Etsy hesabınıza yeniden bağlanın.",
-                  source: "token_refresh_failed"
-                });
+              if (!refreshResponse.ok) {
+                console.error('Token refresh failed:', await refreshResponse.text());
+                return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 });
               }
-            } catch (refreshError) {
-              console.error("Error refreshing token:", refreshError);
+
+              const newTokens = await refreshResponse.json();
+              console.log("Token refreshed successfully");
+              // Başarılı yenileme durumunda normal yanıt ver, yeniden bağlantı gerekmez
+            } catch (error) {
+              console.error('Error refreshing token:', error);
+              return NextResponse.json({ error: 'Token refresh failed' }, { status: 401 });
             }
           }
           

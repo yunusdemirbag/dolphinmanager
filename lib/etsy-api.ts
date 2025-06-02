@@ -732,7 +732,7 @@ export function toggleCachedDataOnlyMode(useOnlyCachedData: boolean): void {
 export async function getEtsyStores(userId: string, skipCache = false): Promise<EtsyStore[]> {
   try {
     console.log("=== getEtsyStores called for userId:", userId, "===");
-    
+
     // Mevcut token'ı kontrol et
     const accessToken = await getValidAccessToken(userId);
     if (!accessToken) {
@@ -741,19 +741,42 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
     }
 
     try {
-      // Etsy User ID'yi token'dan çıkar (sub claim'inden)
-      const tokenPayload = parseJwt(accessToken);
-      const etsyUserId = tokenPayload.sub;
-      
-      if (!etsyUserId) {
-        console.error("Could not extract Etsy User ID from token");
+      // Etsy API'ye istek göndererek kullanıcının Etsy User ID'sini al
+      // OAuth 2.0'da user ID token payload'ında genellikle bulunmaz,
+      // bunun yerine /users/me endpoint'i kullanılır.
+      console.log("Fetching Etsy User ID using access token...");
+      const userMeResponse = await fetch(`${ETSY_API_BASE}/application/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_CLIENT_ID
+        }
+      });
+
+      if (!userMeResponse.ok) {
+        const errorText = await userMeResponse.text().catch(() => userMeResponse.statusText);
+        console.error(`Error fetching Etsy user details (me endpoint): ${userMeResponse.status} - ${errorText}`);
+
+        if (userMeResponse.status === 401 || userMeResponse.status === 403) {
+          // Token geçersiz veya yetersiz izinler - yeniden bağlantı gerekli
+          throw new Error('RECONNECT_REQUIRED');
+        }
+
+        // Diğer hatalar
         return [];
       }
-      
-      console.log("Extracted Etsy User ID from token:", etsyUserId);
+
+      const userDetails: any = await userMeResponse.json();
+      const etsyUserId = userDetails?.user_id;
+
+      if (!etsyUserId) {
+        console.error("Could not fetch Etsy User ID from /users/me endpoint response:", userDetails);
+        return [];
+      }
+
+      console.log("Fetched Etsy User ID:", etsyUserId);
       console.log("Fetching shops for Etsy User ID:", etsyUserId);
 
-      // Etsy API'ye istek gönder
+      // Etsy API'ye istek gönder - kullanıcının mağazalarını al
       const response = await fetch(`${ETSY_API_BASE}/application/users/${etsyUserId}/shops`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -764,18 +787,20 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
       if (!response.ok) {
         const errorText = await response.text().catch(() => response.statusText);
         console.error(`Error fetching Etsy shops: ${response.status} - ${errorText}`);
-        
+
         if (response.status === 401 || response.status === 403) {
+          // Token geçersiz veya yetersiz izinler - yeniden bağlantı gerekli
           throw new Error('RECONNECT_REQUIRED');
         }
-        
+
+        // Diğer hatalar
         return [];
       }
 
       // API yanıtını al
       const responseText = await response.text();
       console.log("Raw API response from shops endpoint (first 300 chars):", responseText.substring(0, 300) + "...");
-      
+
       // API yanıtını parse et
       let shopObj: any;
       try {
@@ -785,135 +810,85 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
         return [];
       }
 
-      // API yanıtı yapısını kontrol et
+      // API yanıtı yapısını kontrol et ve mağazaları işle
       let shops: EtsyStore[] = [];
-      
-      if (Array.isArray(shopObj)) {
-        // Dizi formatında geliyor
-        shops = shopObj;
-        console.log(`Found ${shops.length} shops for user`);
-      } else if (shopObj.shop_id) {
-        // Tek mağaza, nesne formatında geliyor
-        console.log("Found direct shop object with ID:", shopObj.shop_id);
-        shops = [shopObj];
-      } else if (shopObj.count && Array.isArray(shopObj.results)) {
-        // Pagination formatında geliyor
-        shops = shopObj.results;
-        console.log(`Found ${shops.length} shops out of ${shopObj.count} total`);
+
+      // Etsy API v3 shops endpoint'i genellikle 'results' içinde bir dizi döndürür
+      if (shopObj && Array.isArray(shopObj.results)) {
+          shops = shopObj.results.map((shop: any) => ({
+              shop_id: shop.shop_id,
+              shop_name: shop.shop_name,
+              title: shop.title,
+              announcement: shop.announcement,
+              currency_code: shop.currency_code,
+              is_vacation: shop.is_vacation,
+              listing_active_count: shop.listing_active_count,
+              num_favorers: shop.num_favorers,
+              url: shop.url,
+              image_url_760x100: shop.image_url_760x100,
+              review_count: shop.review_count,
+              review_average: shop.review_average,
+              is_active: true, // API'den gelen mağaza aktif kabul edilebilir
+              last_synced_at: new Date().toISOString(),
+              avatar_url: shop.avatar_url || null
+          }));
+          console.log(`Found ${shops.length} shops in results array.`);
+
+      } else if (shopObj && shopObj.shop_id) {
+        // Nadiren, belki tek mağaza doğrudan nesne olarak dönebilir?
+        console.warn("Received single shop object instead of results array:", shopObj);
+         shops = [{
+              shop_id: shopObj.shop_id,
+              shop_name: shopObj.shop_name,
+              title: shopObj.title,
+              announcement: shopObj.announcement,
+              currency_code: shopObj.currency_code,
+              is_vacation: shopObj.is_vacation,
+              listing_active_count: shopObj.listing_active_count,
+              num_favorers: shopObj.num_favorers,
+              url: shopObj.url,
+              image_url_760x100: shopObj.image_url_760x100,
+              review_count: shopObj.review_count,
+              review_average: shopObj.review_average,
+              is_active: true,
+              last_synced_at: new Date().toISOString(),
+              avatar_url: shopObj.avatar_url || null
+         }];
+         console.log("Processed single shop object.");
+
       } else {
-        console.error("Unknown response format from Etsy shops API:", Object.keys(shopObj));
-        return [];
+        console.error("Unexpected API response structure for shops:", shopObj);
+        return []; // Beklenmedik yanıt formatı
       }
 
-      // Mağaza verilerini işle
-      const processedShops = shops.map(shop => {
-        // Mağaza verilerini özelleştir
-        const processedShop: EtsyStore = {
-          shop_id: shop.shop_id,
-          shop_name: shop.shop_name,
-          title: shop.title || shop.shop_name,
-          announcement: shop.announcement || "",
-          currency_code: shop.currency_code,
-          is_vacation: Boolean(shop.is_vacation),
-          listing_active_count: shop.listing_active_count || 0,
-          num_favorers: shop.num_favorers || 0,
-          url: shop.url || `https://www.etsy.com/shop/${shop.shop_name}`,
-          image_url_760x100: shop.image_url_760x100 || "",
-          review_count: shop.review_count || 0,
-          review_average: shop.review_average || 0,
-          avatar_url: (shop as any).icon_url_fullxfull || (shop as any).avatar_url || null,
-          is_active: true,
-          last_synced_at: new Date().toISOString()
-        };
-        
-        console.log(`Successfully processed shop: ${processedShop.shop_id} - ${processedShop.shop_name}`);
-        
-        // İlk mağaza bulundu bilgisi yazdır
-        if (shops.indexOf(shop) === 0) {
-          console.log("Found user's first store:", processedShop.shop_id);
-        }
-        
-        return processedShop;
-      });
+      console.log(`Successfully fetched ${shops.length} Etsy stores.`);
+      return shops;
 
-      if (processedShops.length > 0) {
-        try {
-          // Profil tablosunu güncelle
-          const supabase = createClientSupabase();
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .update({
-              etsy_shop_id: processedShops[0].shop_id,
-              etsy_shop_name: processedShops[0].shop_name,
-              last_synced_at: new Date().toISOString()
-            })
-            .eq('id', userId);
-            
-          if (profileError) {
-            console.error("Error updating profile with Etsy shop data:", profileError);
-          }
-          
-          // Mağaza verilerini veritabanına kaydet
-          for (const shop of processedShops) {
-            try {
-              const { error: storeError } = await supabase
-                .from('etsy_stores')
-                .upsert({
-                  user_id: userId,
-                  shop_id: shop.shop_id,
-                  shop_name: shop.shop_name,
-                  title: shop.title,
-                  currency_code: shop.currency_code,
-                  is_vacation: shop.is_vacation,
-                  listing_active_count: shop.listing_active_count,
-                  num_favorers: shop.num_favorers,
-                  url: shop.url,
-                  image_url_760x100: shop.image_url_760x100,
-                  review_count: shop.review_count,
-                  review_average: shop.review_average,
-                  is_active: true,
-                  avatar_url: shop.avatar_url,
-                  last_synced_at: new Date().toISOString()
-                }, { onConflict: 'shop_id' });
-                
-              if (storeError) {
-                console.error("Error storing Etsy shop data:", storeError);
-              }
-            } catch (storeError) {
-              console.error("Exception storing Etsy shop data:", storeError);
-            }
-          }
-        } catch (dbError) {
-          console.error("Database error when storing shop data:", dbError);
-          // Veritabanı hatası olsa bile mağaza verilerini döndür
-        }
-      }
-      
-      if (processedShops.length > 0) {
-        console.log("getEtsyStores returned", processedShops.length, "stores");
-        console.log("First store raw data:", JSON.stringify(processedShops[0], null, 2));
-        console.log("✅ Etsy stores found:", processedShops.length, "stores");
-        console.log("First store details:", {
-          shop_id: processedShops[0].shop_id,
-          shop_name: processedShops[0].shop_name,
-          type_shop_id: typeof processedShops[0].shop_id
-        });
-      } else {
-        console.log("❌ No Etsy stores found for user:", userId);
-      }
-
-      return processedShops;
     } catch (error) {
+      // RECONNECT_REQUIRED hatasını yeniden fırlat
       if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
-        console.error("Etsy reconnection required for user:", userId);
-        return [];
+        console.error("RECONNECT_REQUIRED error during getEtsyStores");
+        throw error; // Ana fonksiyona hatayı bildir
       }
-      
-      console.error("Error in getEtsyStores:", error);
+
+      console.error("Error in getEtsyStores API call:", error);
       return [];
     }
+
   } catch (error) {
-    console.error("Unexpected error in getEtsyStores:", error);
+    console.error("Top-level error in getEtsyStores:", error);
+
+     // RECONNECT_REQUIRED hatasını yakala ve işle
+    if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
+      console.warn("Etsy connection requires reconnection.");
+       // Burada kullanıcıyı yeniden bağlantı akışına yönlendirecek bir işaret veya hata döndürebilirsiniz.
+       // Örneğin, boş dizi döndürüp UI'da mesaj gösterebilirsiniz.
+       // Veya özel bir hata objesi fırlatabilirsiniz.
+       // Şu an için boş dizi döndürüyorum.
+       return [];
+    }
+
+    // Diğer hatalarda boş dizi döndür
     return [];
   }
 }
@@ -921,18 +896,15 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
 // JWT token parser helper
 function parseJwt(token: string) {
   try {
+    if (!token) return null;
     const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
+    const jsonPayload = atob(base64);
     return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error("Error parsing JWT token:", e);
-    return { sub: null };
+  } catch (error) {
+    console.error('Error parsing JWT token:', error);
+    return null;
   }
 }
 

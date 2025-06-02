@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/dialog"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 import { RateLimitIndicator } from "@/components/ui/rate-limit-indicator"
+import Image from "next/image"
 
 interface EtsyStore {
   shop_id: number
@@ -71,6 +72,7 @@ interface EtsyStore {
   trend?: 'up' | 'down' | 'stable'
   avatar_url?: string
   icon_url_fullxfull?: string
+  image_url_760x100?: string
 }
 
 interface StoresClientProps {
@@ -499,14 +501,11 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
               ? 'bg-green-50 border-green-200 text-green-700'  // Başarılı
               : 'bg-red-50 border-red-200 text-red-700'  // Hata
         }`}>
-          {refreshStatus.success === undefined ? (
-            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-          ) : refreshStatus.success ? (
-            <CheckCircle className="w-4 h-4 mr-2" />
-          ) : (
-            <AlertTriangle className="w-4 h-4 mr-2" />
-          )}
-          <span>{refreshStatus.message}</span>
+          {refreshStatus.success === undefined && <Activity className="h-5 w-5 mr-3" />}
+          {refreshStatus.success === true && <CheckCircle className="h-5 w-5 mr-3" />}
+          {refreshStatus.success === false && <XCircle className="h-5 w-5 mr-3" />}
+          <p className="text-sm font-medium flex-1">{refreshStatus.message}</p>
+          {refreshing && <Loader2 className="w-5 h-5 ml-3 animate-spin" />}
         </div>
       )}
       
@@ -533,10 +532,12 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
             )}
             {refreshing ? 'Yenileniyor...' : 'Verileri Güncelle'}
           </Button>
-          <Button onClick={handleConnectEtsy} className="bg-black hover:bg-gray-800 text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Mağaza Ekle
-          </Button>
+          {!etsyConnected && (
+            <Button onClick={handleConnectEtsy} className="bg-black hover:bg-gray-800 text-white">
+              <Link className="mr-2 h-4 w-4" />
+              Mağaza Ekle
+            </Button>
+          )}
         </div>
       </div>
 
@@ -652,134 +653,37 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
       ) : (
         <>
           {/* Mağaza Kartları */}
-          <div className="grid grid-cols-1 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {stores.map((store) => (
-              <Card key={store.shop_id} className="overflow-hidden border border-gray-200 hover:shadow-md transition-shadow duration-300">
-                <CardContent className="p-0">
-                  <div className="flex flex-col md:flex-row">
-                    {/* Mağaza Görsel Alanı */}
-                    <div className="w-full md:w-1/4 bg-gray-50 p-6 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-gray-200">
-                      <img 
-                        src={store.avatar_url || store.icon_url_fullxfull || `https://www.etsy.com/images/avatars/default_shop.png`} 
-                        alt={`${store.title} Logo`} 
-                        className="h-24 w-24 rounded-full border-4 border-white bg-white object-cover shadow-lg mb-4"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = `https://www.etsy.com/images/avatars/default_shop.png`;
-                        }}
+              <Card key={store.shop_id} className="relative">
+                <CardContent className="flex items-center">
+                  <div className="relative w-20 h-20 rounded-full overflow-hidden mr-4 bg-gray-200 flex items-center justify-center">
+                    {(store.avatar_url && typeof store.avatar_url === 'string') || (store.image_url_760x100 && typeof store.image_url_760x100 === 'string') ? (
+                      <Image
+                        src={(store.avatar_url || store.image_url_760x100) as string}
+                        alt={`${store.shop_name} avatar`}
+                        fill
+                        style={{ objectFit: 'cover' }}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       />
-                      <h3 className="text-lg font-bold text-center mb-1">{store.title}</h3>
-                      <div className="flex items-center gap-2 text-gray-500 mb-3">
-                        <a href={store.url} target="_blank" rel="noopener noreferrer" className="text-sm hover:text-indigo-600 flex items-center">
-                          Etsy'de Görüntüle
-                          <ExternalLink className="h-3 w-3 ml-1" />
-                        </a>
-                      </div>
-                      <div className="flex items-center gap-1 text-yellow-600 mb-2">
-                        <Star className="h-4 w-4" />
-                        <span className="font-medium">{store.review_average?.toFixed(2) || 0}</span>
-                        <span className="text-gray-500 text-sm">({store.review_count})</span>
-                      </div>
-                      {getConnectionStatusBadge(store.connection_status)}
+                    ) : (
+                      <Store className="w-10 h-10 text-gray-500" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-center mb-1">{store.title}</h3>
+                    <div className="flex items-center gap-2 text-gray-500 mb-3">
+                      <a href={store.url} target="_blank" rel="noopener noreferrer" className="text-sm hover:text-indigo-600 flex items-center">
+                        Etsy'de Görüntüle
+                        <ExternalLink className="h-3 w-3 ml-1" />
+                      </a>
                     </div>
-                    
-                    {/* Mağaza Detay Alanı */}
-                    <div className="w-full md:w-3/4 p-6">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Sol Kısım - Temel Bilgiler */}
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500 mb-2">Mağaza Bilgileri</h4>
-                            <div className="space-y-2">
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Mağaza Adı</span>
-                                <span className="font-medium">{store.shop_name}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Aktif Ürünler</span>
-                                <span className="font-medium">{store.listing_active_count}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Takipçi Sayısı</span>
-                                <span className="font-medium">{store.num_favorers}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Para Birimi</span>
-                                <span className="font-medium">{store.currency_code}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Aktif ürün barı */}
-                          <div>
-                            <div className="flex justify-between text-xs text-gray-500 mb-1">
-                              <span>Kapasite Kullanımı</span>
-                              <span>{store.listing_active_count}/100</span>
-                            </div>
-                            <Progress value={Math.min(100, (store.listing_active_count / 100) * 100)} className="h-2" />
-                          </div>
-                        </div>
-
-                        {/* Sağ Kısım - İstatistikler */}
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 mb-2">Performans İstatistikleri</h4>
-                          <div className="grid grid-cols-2 gap-3">
-                            <Card className="bg-gray-50 border-none">
-                              <CardContent className="p-3 text-center">
-                                <div className="text-xs text-gray-500 mb-1">Aylık Gelir</div>
-                                <div className="text-lg font-bold text-yellow-700 flex items-center justify-center gap-1">
-                                  <DollarSign className="h-4 w-4" />
-                                  {store.monthly_revenue?.toLocaleString() || '0'}
-                                </div>
-                              </CardContent>
-                            </Card>
-                            <Card className="bg-gray-50 border-none">
-                              <CardContent className="p-3 text-center">
-                                <div className="text-xs text-gray-500 mb-1">Siparişler</div>
-                                <div className="text-lg font-bold text-blue-700 flex items-center justify-center gap-1">
-                                  <ShoppingCart className="h-4 w-4" />
-                                  {store.monthly_orders || '0'}
-                                </div>
-                              </CardContent>
-                            </Card>
-                            <Card className="bg-gray-50 border-none">
-                              <CardContent className="p-3 text-center">
-                                <div className="text-xs text-gray-500 mb-1">Görüntülenme</div>
-                                <div className="text-lg font-bold text-green-700 flex items-center justify-center gap-1">
-                                  <Eye className="h-4 w-4" />
-                                  {store.monthly_views || '0'}
-                                </div>
-                              </CardContent>
-                            </Card>
-                            <Card className="bg-gray-50 border-none">
-                              <CardContent className="p-3 text-center">
-                                <div className="text-xs text-gray-500 mb-1">Dönüşüm Oranı</div>
-                                <div className="text-lg font-bold text-indigo-700 flex items-center justify-center gap-1">
-                                  {getTrendIcon(store.trend)}
-                                  {store.conversion_rate ? `${store.conversion_rate}%` : '0%'}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Actions */}
-                      <div className="flex gap-2 mt-6 justify-end">
-                        <Button size="sm" variant="outline" onClick={() => setDisconnectDialogOpen(true)} className="bg-black hover:bg-gray-800 text-white border-none">
-                          <Unlink className="h-4 w-4 mr-1" />
-                          Bağlantıyı Kes
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={handleResetEtsyConnection} className="bg-black hover:bg-gray-800 text-white border-none">
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Sıfırla
-                        </Button>
-                        <Button size="sm" className="bg-black hover:bg-gray-800 text-white">
-                          <ArrowRight className="h-4 w-4 mr-1" />
-                          Yönet
-                        </Button>
-                      </div>
+                    <div className="flex items-center gap-1 text-yellow-600 mb-2">
+                      <Star className="h-4 w-4" />
+                      <span className="font-medium">{store.review_average?.toFixed(2) || 0}</span>
+                      <span className="text-gray-500 text-sm">({store.review_count})</span>
                     </div>
+                    {getConnectionStatusBadge(store.connection_status)}
                   </div>
                 </CardContent>
               </Card>

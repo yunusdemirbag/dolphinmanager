@@ -1,9 +1,9 @@
 import crypto from "crypto"
 import qs from "querystring"
 import { supabaseAdmin } from "./supabase"
+import { createClient } from "@/lib/supabase/server"; // Import the server-side client
 import { cacheManager } from "./cache"
-import { fetchWithCache, rateLimitedFetch } from "./api-utils"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { fetchWithCache } from "./api-utils"
 import { Database } from "@/types/database.types";
 // Mock data importları geçici olarak kaldırıldı
 // Gerekirse burada yeniden implement edilebilir
@@ -495,7 +495,7 @@ async function refreshEtsyToken(userId: string): Promise<string> {
   try {
     console.log("Refreshing Etsy token for user:", userId);
     
-    const supabase = createClientSupabase();
+    const supabase = await createClient(); // Use the server-side client
     const { data: tokens, error } = await supabase
       .from('etsy_tokens')
       .select('refresh_token, expires_at, access_token')
@@ -609,7 +609,7 @@ export async function getValidAccessToken(userId: string): Promise<string | null
   try {
     console.log("Getting valid access token for user:", userId);
     
-    const supabase = createClientSupabase();
+    const supabase = await createClient(); // Use the server-side client
     const { data: tokens, error } = await supabase
       .from('etsy_tokens')
       .select('access_token, refresh_token, expires_at, created_at')
@@ -1153,15 +1153,33 @@ export async function syncEtsyDataToDatabase(userId: string): Promise<void> {
       
       console.log("Profile updated with real store data:", primaryStore.shop_name)
       
+      // Fetch listings data
+      const { listings } = await getEtsyListings(userId, primaryStore.shop_id, 100, 0, 'active', true);
+
+      // Calculate stats from listings data
+      const totalListings = listings.length;
+      const totalViews = listings.reduce((sum, listing) => sum + (listing.metrics?.views || 0), 0);
+      const totalOrders = listings.reduce((sum, listing) => sum + (listing.metrics?.sold || 0), 0);
+      const totalRevenue = listings.reduce((sum, listing) => {
+        const priceInDollars = (listing.price?.amount || 0) / (listing.price?.divisor || 1);
+        return sum + (priceInDollars * (listing.metrics?.sold || 0));
+      }, 0);
+
+      const stats = {
+        totalListings,
+        totalOrders,
+        totalViews,
+        totalRevenue: parseFloat(totalRevenue.toFixed(2)), // Format to 2 decimal places
+        source: "calculated_from_listings"
+      };
+
       // Tüm verileri paralel olarak çek ve kaydet
       await Promise.all([
         // Listings
-        getEtsyListings(userId, primaryStore.shop_id, 100, 0, 'active', true)
-          .then(({ listings }) => storeEtsyData(userId, primaryStore.shop_id, listings, 'listings')),
+        storeEtsyData(userId, primaryStore.shop_id, listings, 'listings'),
         
         // Stats
-        getEtsyStats(userId, primaryStore.shop_id, true)
-          .then(stats => storeEtsyData(userId, primaryStore.shop_id, stats, 'stats')),
+        storeEtsyData(userId, primaryStore.shop_id, stats, 'stats'),
         
         // Receipts
         getEtsyReceipts(userId, primaryStore.shop_id, 100, 0, true)
@@ -2211,8 +2229,8 @@ export async function getShippingProfiles(
     // Construct the API URL
     const url = `${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`;
 
-    // Make the API call using rateLimitedFetch
-    const response = await rateLimitedFetch<{results: ShippingProfile[]}>(url, {
+    // Make the API call using fetchWithCache
+    const response = await fetchWithCache<{results: ShippingProfile[]}>(url, {
       method: 'GET',
       headers: {
         'x-api-key': ETSY_CLIENT_ID,
@@ -2226,4 +2244,31 @@ export async function getShippingProfiles(
     console.error('[ETSY-API] Error fetching shipping profiles:', error.message);
     throw new Error(`Failed to fetch Etsy shipping profiles: ${error.message}`);
   }
+}
+
+// Cache invalidation functions
+export function invalidateUserCache(userId: string): void {
+  console.log(`Invalidating cache for user: ${userId}`);
+  // Invalidate caches based on user ID prefix
+  cacheManager.invalidateByPrefix(`etsy_store_${userId}`);
+  cacheManager.invalidateByPrefix(`etsy_listings_${userId}`);
+  cacheManager.invalidateByPrefix(`etsy_payments_${userId}`);
+  cacheManager.invalidateByPrefix(`etsy_receipts_${userId}`);
+  cacheManager.invalidateByPrefix(`etsy_ledger_${userId}`);
+  cacheManager.invalidateByPrefix(`etsy_financial_summary_${userId}`);
+  // Add other user-specific cache keys as needed
+}
+
+export function invalidateShopCache(userId: string, shopId: number): void {
+    console.log(`Invalidating cache for user ${userId}, shop: ${shopId}`);
+    // Invalidate caches based on user ID and shop ID prefix
+    cacheManager.invalidateByPrefix(`etsy_store_${userId}_${shopId}`); // Specific store cache
+    cacheManager.invalidateByPrefix(`etsy_listings_${userId}_${shopId}`);
+    cacheManager.invalidateByPrefix(`etsy_payments_${userId}_${shopId}`);
+    cacheManager.invalidateByPrefix(`etsy_receipts_${userId}_${shopId}`);
+    cacheManager.invalidateByPrefix(`etsy_ledger_${userId}_${shopId}`);
+    cacheManager.invalidateByPrefix(`etsy_financial_summary_${userId}_${shopId}`);
+    // Also invalidate the general user store list cache as shop data changed
+    cacheManager.invalidateByPrefix(`etsy_stores_${userId}`);
+    // Add other shop-specific cache keys as needed
 }

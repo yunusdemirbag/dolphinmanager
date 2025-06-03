@@ -8,13 +8,48 @@ export interface Product {
     currency_code: string
   }
   images: Array<{
-    listing_image_id?: number
+    listing_image_id: number
     url_570xN: string
     url_fullxfull?: string
     alt_text: string
     cache_key?: string
   }>
+  video?: {
+    video_id: number
+    url: string
+    thumbnail_url: string
+  }
   tags: string[]
+  materials: string[]
+  who_made: "i_did" | "someone_else" | "collective"
+  when_made: string
+  taxonomy_id: number
+  shipping_profile_id: number
+  is_personalizable: boolean
+  personalization_is_required: boolean
+  personalization_instructions: string
+  primary_color?: string
+  secondary_color?: string
+  width?: number
+  width_unit?: string
+  height?: number
+  height_unit?: string
+  min_processing_days?: number
+  max_processing_days?: number
+  style?: string[]
+  occasion?: string[]
+  holiday?: string
+  shop_section_id?: number
+  production_location?: string
+  care_instructions?: string
+  is_digital?: boolean
+  digital_files?: Array<{
+    file_id: number
+    name: string
+    size: number
+    type: string
+  }>
+  language?: string
   state: "active" | "inactive" | "draft"
   views?: number
   sold?: number
@@ -28,12 +63,6 @@ export interface Product {
     favorites: number
     sold: number
   }
-  taxonomy_id?: number
-  shipping_profile_id?: number
-  is_personalizable?: boolean
-  personalization_is_required?: boolean
-  personalization_instructions?: string
-  materials?: string[]
 }
 
 export interface CreateProductForm {
@@ -50,6 +79,27 @@ export interface CreateProductForm {
   is_personalizable: boolean
   personalization_is_required: boolean
   personalization_instructions: string
+  primary_color?: string
+  secondary_color?: string
+  width?: number
+  width_unit?: string
+  height?: number
+  height_unit?: string
+  min_processing_days?: number
+  max_processing_days?: number
+  style?: string[]
+  occasion?: string[]
+  holiday?: string
+  shop_section_id?: number
+  production_location?: string
+  care_instructions?: string
+  is_digital?: boolean
+  digital_files: File[]
+  images: File[]
+  video?: File | null
+  image_alt_texts: string[]
+  language?: string
+  state: "active" | "draft"
 }
 
 export interface TaxonomyNode {

@@ -1513,7 +1513,7 @@ export async function getEtsyReceipts(
 export async function getSellerTaxonomyNodes(): Promise<any[]> {
   try {
     const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes`, {
-      headers: {
+        headers: {
         'x-api-key': ETSY_CLIENT_ID,
       }
     });
@@ -1527,21 +1527,21 @@ export async function getSellerTaxonomyNodes(): Promise<any[]> {
   } catch (error) {
     console.error("Taxonomy node'ları alınırken hata oluştu:", error);
     return [];
-  }
-}
+      }
+    }
 
 export async function getPropertiesByTaxonomyId(taxonomyId: number): Promise<any[]> {
   try {
     const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes/${taxonomyId}/properties`, {
-      headers: {
+    headers: {
         'x-api-key': ETSY_CLIENT_ID,
       }
-    });
-
-    if (!response.ok) {
+  });
+  
+  if (!response.ok) {
       throw new Error(`Taxonomy özellikleri alınamadı: ${response.status} ${response.statusText}`);
-    }
-
+  }
+  
     const data = await response.json();
     return data.results || [];
   } catch (error) {
@@ -1600,15 +1600,15 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
     }
 
     const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`, {
-      headers: {
+    headers: {
         'Authorization': `Bearer ${accessToken}`,
         'x-api-key': ETSY_CLIENT_ID
       }
     });
 
-    if (!response.ok) {
+  if (!response.ok) {
       throw new Error(`Failed to fetch shipping profiles: ${response.status} ${response.statusText}`);
-    }
+  }
 
     const data = await response.json();
     return data.results || [];
@@ -1621,9 +1621,9 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
 // Get processing profiles for a shop
 export async function getProcessingProfiles(userId: string, shopId: number): Promise<any[]> {
   try {
-    const accessToken = await getValidAccessToken(userId);
+  const accessToken = await getValidAccessToken(userId);
     
-    if (!accessToken) {
+  if (!accessToken) {
       console.log(`No valid access token for user ${userId} - cannot fetch processing profiles`);
       return [];
     }

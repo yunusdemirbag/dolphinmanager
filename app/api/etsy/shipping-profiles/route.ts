@@ -1,42 +1,79 @@
 import { NextResponse } from 'next/server';
-import { getShippingProfiles } from '@/lib/etsy-api';
-import { createClient } from '@/lib/supabase/server';
+import { getEtsyClient } from '@/lib/etsy';
 
-export async function GET(request: Request) {
+// Kargo profillerini listele
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const shopId = searchParams.get('shop_id');
-
-    if (!shopId) {
-      return NextResponse.json({
-        success: false,
-        error: 'Shop ID is required'
-      }, { status: 400 });
+    console.log('API: Getting Etsy client...');
+    const etsy = await getEtsyClient();
+    
+    if (!etsy) {
+      console.error('API: Etsy client is null');
+      return NextResponse.json(
+        { error: 'Etsy client initialization failed' },
+        { status: 500 }
+      );
     }
 
-    // Get user ID from session
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({
-        success: false,
-        error: 'Unauthorized'
-      }, { status: 401 });
+    console.log('API: Fetching shipping profiles...');
+    const profiles = await etsy.getShippingProfiles();
+    
+    if (!profiles || !Array.isArray(profiles)) {
+      console.error('API: Invalid profiles response:', profiles);
+      return NextResponse.json(
+        { error: 'Invalid shipping profiles response' },
+        { status: 500 }
+      );
     }
 
-    const shippingProfiles = await getShippingProfiles(user.id, parseInt(shopId));
-
-    return NextResponse.json({
-      success: true,
-      data: shippingProfiles
+    console.log('API: Successfully fetched profiles:', profiles);
+    return NextResponse.json({ profiles });
+  } catch (error: any) {
+    // Detaylı hata loglaması
+    console.error('API: Detailed error in shipping profiles:', {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack,
+      cause: error?.cause
     });
 
+    // Özel hata mesajları
+    let errorMessage = 'Kargo profilleri yüklenirken bir hata oluştu';
+    let statusCode = 500;
+
+    if (error?.message?.includes('Unauthorized') || error?.message?.includes('401')) {
+      errorMessage = 'Etsy hesabınıza erişim yetkisi bulunamadı. Lütfen tekrar giriş yapın.';
+      statusCode = 401;
+    } else if (error?.message?.includes('not found') || error?.message?.includes('404')) {
+      errorMessage = 'Etsy mağaza bilgileriniz bulunamadı. Lütfen mağaza bağlantınızı kontrol edin.';
+      statusCode = 404;
+    } else if (error?.message?.includes('API error')) {
+      errorMessage = 'Etsy API hatası: ' + error.message;
+      statusCode = 502;
+    } else if (error?.message?.includes('rate limit') || error?.message?.includes('429')) {
+      errorMessage = 'Etsy API istek limiti aşıldı. Lütfen biraz bekleyip tekrar deneyin.';
+      statusCode = 429;
+    }
+
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: statusCode }
+    );
+  }
+}
+
+// Yeni kargo profili oluştur
+export async function POST(request: Request) {
+  try {
+    const etsy = await getEtsyClient();
+    const data = await request.json();
+    const profile = await etsy.createShippingProfile(data);
+    return NextResponse.json({ profile });
   } catch (error) {
-    console.error('Error fetching shipping profiles:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to fetch shipping profiles'
-    }, { status: 500 });
+    console.error('Error creating shipping profile:', error);
+    return NextResponse.json(
+      { error: 'Kargo profili oluşturulurken bir hata oluştu' },
+      { status: 500 }
+    );
   }
 } 

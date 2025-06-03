@@ -60,7 +60,28 @@ export default function ProductsPage() {
     shipping_profile_id: 0,
     is_personalizable: false,
     personalization_is_required: false,
-    personalization_instructions: ""
+    personalization_instructions: "",
+    primary_color: "",
+    secondary_color: "",
+    width: 0,
+    width_unit: "cm",
+    height: 0,
+    height_unit: "cm",
+    min_processing_days: 1,
+    max_processing_days: 3,
+    style: [],
+    occasion: [],
+    holiday: "",
+    shop_section_id: 0,
+    production_location: "",
+    care_instructions: "",
+    is_digital: false,
+    digital_files: [],
+    images: [],
+    video: null,
+    image_alt_texts: [],
+    language: "tr",
+    state: "draft"
   })
   const [tagInput, setTagInput] = useState("")
   const [materialInput, setMaterialInput] = useState("")
@@ -85,13 +106,35 @@ export default function ProductsPage() {
 
     const loadShippingProfiles = async () => {
       try {
-        const response = await fetch('/api/etsy/shipping-profiles')
-        if (response.ok) {
-          const data = await response.json()
-          setShippingProfiles(data.profiles || [])
+        console.log('Client: Loading shipping profiles...');
+        const response = await fetch('/api/etsy/shipping-profiles');
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Client: Error loading shipping profiles:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData.error
+          });
+
+          // Kullanıcıya gösterilecek hata mesajı
+          let errorMessage = errorData.error || 'Kargo profilleri yüklenirken bir hata oluştu';
+          
+          if (response.status === 401) {
+            // Yetkilendirme hatası - kullanıcıyı yeniden bağlanmaya yönlendir
+            setReconnectRequired(true);
+          }
+          
+          throw new Error(errorMessage);
         }
+
+        const data = await response.json();
+        console.log('Client: Successfully loaded shipping profiles:', data.profiles);
+        setShippingProfiles(data.profiles || []);
       } catch (error) {
-        console.error('Error loading shipping profiles:', error)
+        console.error('Client: Error in loadShippingProfiles:', error);
+        // Hata durumunda boş array set et
+        setShippingProfiles([]);
       }
     }
 
@@ -144,10 +187,10 @@ export default function ProductsPage() {
   }, [products, searchTerm, filterStatus, sortBy, sortOrder])
 
   // Handle Create Product
-  const onCreateProduct = async () => {
+  const onCreateProduct = async (state: "draft" | "active" = "active") => {
     try {
       setSubmitting(true)
-      await handleCreateProduct(createForm)
+      await handleCreateProduct({ ...createForm, state })
       setShowCreateModal(false)
       setCreateForm({
         title: "",
@@ -162,7 +205,28 @@ export default function ProductsPage() {
         shipping_profile_id: 0,
         is_personalizable: false,
         personalization_is_required: false,
-        personalization_instructions: ""
+        personalization_instructions: "",
+        primary_color: "",
+        secondary_color: "",
+        width: 0,
+        width_unit: "cm",
+        height: 0,
+        height_unit: "cm",
+        min_processing_days: 1,
+        max_processing_days: 3,
+        style: [],
+        occasion: [],
+        holiday: "",
+        shop_section_id: 0,
+        production_location: "",
+        care_instructions: "",
+        is_digital: false,
+        digital_files: [],
+        images: [],
+        video: null,
+        image_alt_texts: [],
+        language: "tr",
+        state: "draft"
       })
     } catch (error) {
       console.error('Error creating product:', error)
@@ -203,7 +267,7 @@ export default function ProductsPage() {
     grid5: "grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4",
     list: "flex flex-col gap-4"
   }
-
+  
   return (
     <div className="container mx-auto py-8 space-y-6">
       {/* Header */}

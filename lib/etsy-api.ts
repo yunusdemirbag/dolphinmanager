@@ -1527,8 +1527,8 @@ export async function getSellerTaxonomyNodes(): Promise<any[]> {
   } catch (error) {
     console.error("Taxonomy node'ları alınırken hata oluştu:", error);
     return [];
-      }
-    }
+  }
+}
 
 export async function getPropertiesByTaxonomyId(taxonomyId: number): Promise<any[]> {
   try {
@@ -1594,7 +1594,7 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
   try {
     console.log(`Fetching shipping profiles for user ${userId} and shop ${shopId}...`);
     
-    const accessToken = await getValidAccessToken(userId);
+  const accessToken = await getValidAccessToken(userId);
     
     if (!accessToken) {
       console.log(`No valid access token for user ${userId} - cannot fetch shipping profiles`);
@@ -1625,8 +1625,8 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
       }
       
       throw new Error(`Failed to fetch shipping profiles: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
+  }
+  
     const responseText = await response.text();
     console.log('Raw API response:', responseText);
 
@@ -1687,30 +1687,82 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
 }
 
 // Get processing profiles for a shop
-export async function getProcessingProfiles(userId: string, shopId: number): Promise<any[]> {
+export async function getProcessingProfiles(userId: string, shopId: number): Promise<EtsyProcessingProfile[]> {
   try {
-  const accessToken = await getValidAccessToken(userId);
+    console.log(`Fetching processing profiles for user ${userId} and shop ${shopId}...`);
     
-  if (!accessToken) {
+    const accessToken = await getValidAccessToken(userId);
+    
+    if (!accessToken) {
       console.log(`No valid access token for user ${userId} - cannot fetch processing profiles`);
-      return [];
+      throw new Error('RECONNECT_REQUIRED');
     }
 
+    console.log('Making request to Etsy API for processing profiles...');
+    // Etsy'nin API'si processing profile için production-partners endpoint'ini kullanıyor
     const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/production-partners`, {
-    headers: {
+      headers: {
         'Authorization': `Bearer ${accessToken}`,
         'x-api-key': ETSY_CLIENT_ID
       }
     });
 
-  if (!response.ok) {
-      throw new Error(`Failed to fetch processing profiles: ${response.status} ${response.statusText}`);
+    // Log the response status and headers for debugging
+    console.log('Processing profiles API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response from Etsy API:', errorText);
+      
+      if (response.status === 401) {
+        throw new Error('RECONNECT_REQUIRED');
+      }
+      
+      throw new Error(`Failed to fetch processing profiles: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const data = await response.json();
-    return data.results || [];
+    const responseText = await response.text();
+    console.log('Raw API response for processing profiles:', responseText);
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse JSON response:', e);
+      throw new Error('Invalid JSON response from Etsy API');
+    }
+
+    if (!data || !data.results || !Array.isArray(data.results)) {
+      console.error('Invalid API response format:', data);
+      throw new Error('Invalid API response format');
+    }
+
+    // Etsy API'sinden gelen sonucu EtsyProcessingProfile formatına dönüştür
+    const profiles = data.results.map((profile: any) => ({
+      processing_profile_id: profile.production_partner_id,
+      title: profile.partner_name,
+      user_id: profile.user_id || 0,
+      min_processing_days: 1, // Varsayılan değerler
+      max_processing_days: 3, // Varsayılan değerler
+      processing_days_display_label: '1-3 days', // Varsayılan değer
+      is_deleted: false
+    }));
+
+    console.log(`Successfully fetched ${profiles.length} processing profiles`);
+    return profiles;
   } catch (error) {
-    console.error("Error fetching processing profiles:", error);
+    console.error('Error in getProcessingProfiles:', error);
+    
+    // RECONNECT_REQUIRED hatasını yeniden fırlat
+    if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
+      throw error;
+    }
+    
+    // Boş dizi döndür
     return [];
   }
 }
@@ -1759,7 +1811,7 @@ export async function createShippingProfile(
 
   if (!response.ok) {
       throw new Error(`Failed to create shipping profile: ${response.status} ${response.statusText}`);
-    }
+  }
 
     const result = await response.json();
     return result.shipping_profile;
@@ -1791,7 +1843,7 @@ export async function updateShippingProfile(
     if (!accessToken) {
       console.log(`No valid access token for user ${userId} - cannot update shipping profile`);
       throw new Error('RECONNECT_REQUIRED');
-    }
+  }
 
     const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles/${profileId}`, {
       method: 'PUT',
@@ -1799,7 +1851,7 @@ export async function updateShippingProfile(
         'Authorization': `Bearer ${accessToken}`,
         'x-api-key': ETSY_CLIENT_ID,
         'Content-Type': 'application/x-www-form-urlencoded'
-      },
+    },
       body: new URLSearchParams(
         Object.entries(data).reduce((acc: Record<string, string>, [key, value]) => {
           if (value !== undefined) {
@@ -1812,7 +1864,7 @@ export async function updateShippingProfile(
 
   if (!response.ok) {
       throw new Error(`Failed to update shipping profile: ${response.status} ${response.statusText}`);
-    }
+  }
 
     const result = await response.json();
     return result.shipping_profile;

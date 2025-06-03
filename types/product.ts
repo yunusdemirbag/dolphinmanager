@@ -24,7 +24,7 @@ export interface Product {
   who_made: "i_did" | "someone_else" | "collective"
   when_made: string
   taxonomy_id: number
-  shipping_profile_id: number
+  shipping_profile_id?: number
   is_personalizable: boolean
   personalization_is_required: boolean
   personalization_instructions: string
@@ -63,6 +63,7 @@ export interface Product {
     favorites: number
     sold: number
   }
+  processing_profile_id?: number
 }
 
 export interface CreateProductForm {
@@ -114,4 +115,41 @@ export interface TaxonomyNode {
 export interface EtsyStore {
   shop_id: number
   shop_name: string
+}
+
+export interface ShippingProfile {
+  shipping_profile_id: number;
+  title: string;
+  user_id: number;
+  min_processing_days: number;
+  max_processing_days: number;
+  processing_days_display_label: string;
+  origin_country_iso: string;
+  is_deleted: boolean;
+  shipping_carrier_id: number;
+  mail_class: string;
+  min_delivery_days: number;
+  max_delivery_days: number;
+  destination_country_iso: string;
+  destination_region: string;
+  primary_cost: {
+    amount: number;
+    divisor: number;
+    currency_code: string;
+  };
+  secondary_cost: {
+    amount: number;
+    divisor: number;
+    currency_code: string;
+  };
+}
+
+export interface EtsyProcessingProfile {
+  processing_profile_id: number;
+  title: string;
+  user_id: number;
+  min_processing_days: number;
+  max_processing_days: number;
+  processing_days_display_label: string;
+  is_deleted: boolean;
 } 

@@ -4,10 +4,12 @@ import { useState, useEffect } from "react"
 import { useProducts } from "@/hooks/useProducts"
 import { ProductCard } from "@/components/product/ProductCard"
 import { ProductFilters } from "@/components/product/ProductFilters"
-import { ProductModals } from "@/components/product/ProductModals"
+import { ProductFormModal } from "@/components/product/ProductFormModal"
+import { ProductDeleteModal } from "@/components/product/ProductDeleteModal"
 import { Button } from "@/components/ui/button"
 import { Plus, Loader2 } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode } from "@/types/product"
+import { useProductsClient } from "./products-client"
 
 export default function ProductsPage() {
   const {
@@ -31,6 +33,15 @@ export default function ProductsPage() {
     handleDeleteProduct,
     setFilteredProducts
   } = useProducts()
+
+  const {
+    shippingProfiles,
+    loadingShippingProfiles,
+    processingProfiles,
+    loadingProcessingProfiles,
+    storeDetails,
+    fetchStoreDetailsAndProfiles
+  } = useProductsClient()
 
   // Filter & Sort States
   const [searchTerm, setSearchTerm] = useState("")
@@ -88,7 +99,6 @@ export default function ProductsPage() {
 
   // Taxonomy & Shipping Profile States
   const [taxonomyNodes, setTaxonomyNodes] = useState<TaxonomyNode[]>([])
-  const [shippingProfiles, setShippingProfiles] = useState<any[]>([])
 
   // Load taxonomy and shipping profiles
   useEffect(() => {
@@ -130,11 +140,11 @@ export default function ProductsPage() {
 
         const data = await response.json();
         console.log('Client: Successfully loaded shipping profiles:', data.profiles);
-        setShippingProfiles(data.profiles || []);
+        fetchStoreDetailsAndProfiles(data.profiles || []);
       } catch (error) {
         console.error('Client: Error in loadShippingProfiles:', error);
         // Hata durumunda boş array set et
-        setShippingProfiles([]);
+        fetchStoreDetailsAndProfiles([]);
       }
     }
 
@@ -187,47 +197,11 @@ export default function ProductsPage() {
   }, [products, searchTerm, filterStatus, sortBy, sortOrder])
 
   // Handle Create Product
-  const onCreateProduct = async (state: "draft" | "active" = "active") => {
+  const onCreateProduct = async (product: Partial<Product>, state: "draft" | "active" = "active") => {
     try {
       setSubmitting(true)
-      await handleCreateProduct({ ...createForm, state })
+      await handleCreateProduct(product)
       setShowCreateModal(false)
-      setCreateForm({
-        title: "",
-        description: "",
-        price: 0,
-        quantity: 1,
-        tags: [],
-        materials: [],
-        who_made: "i_did",
-        when_made: "made_to_order",
-        taxonomy_id: 0,
-        shipping_profile_id: 0,
-        is_personalizable: false,
-        personalization_is_required: false,
-        personalization_instructions: "",
-        primary_color: "",
-        secondary_color: "",
-        width: 0,
-        width_unit: "cm",
-        height: 0,
-        height_unit: "cm",
-        min_processing_days: 1,
-        max_processing_days: 3,
-        style: [],
-        occasion: [],
-        holiday: "",
-        shop_section_id: 0,
-        production_location: "",
-        care_instructions: "",
-        is_digital: false,
-        digital_files: [],
-        images: [],
-        video: null,
-        image_alt_texts: [],
-        language: "tr",
-        state: "draft"
-      })
     } catch (error) {
       console.error('Error creating product:', error)
     } finally {
@@ -335,7 +309,6 @@ export default function ProductsPage() {
               isSelected={false}
               onSelect={() => {}}
               onEdit={setShowEditModal}
-              onCopy={() => {}}
               onDelete={setConfirmDeleteProductId}
               onUpdateState={(product, newState) => {
                 handleUpdateProduct({ ...product, state: newState })
@@ -350,27 +323,38 @@ export default function ProductsPage() {
       )}
 
       {/* Modals */}
-      <ProductModals
-        showCreateModal={showCreateModal}
-        setShowCreateModal={setShowCreateModal}
-        showEditModal={showEditModal}
-        setShowEditModal={setShowEditModal}
-        confirmDeleteProductId={confirmDeleteProductId}
-        setConfirmDeleteProductId={setConfirmDeleteProductId}
-        createForm={createForm}
-        setCreateForm={setCreateForm}
-        tagInput={tagInput}
-        setTagInput={setTagInput}
-        materialInput={materialInput}
-        setMaterialInput={setMaterialInput}
-        taxonomyNodes={taxonomyNodes}
-        shippingProfiles={shippingProfiles}
+      <ProductFormModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={onCreateProduct}
         submitting={submitting}
-        onCreateProduct={onCreateProduct}
-        onUpdateProduct={onUpdateProduct}
-        onDeleteProduct={onDeleteProduct}
-        deletingProductId={deletingProductId}
+        shippingProfiles={shippingProfiles}
+        processingProfiles={processingProfiles}
+        loadingShippingProfiles={loadingShippingProfiles}
+        loadingProcessingProfiles={loadingProcessingProfiles}
       />
+
+      {showEditModal && (
+        <ProductFormModal
+          isOpen={true}
+          onClose={() => setShowEditModal(null)}
+          product={showEditModal}
+          onSubmit={(data) => onUpdateProduct({ ...showEditModal, ...data } as Product)}
+          submitting={submitting}
+          shippingProfiles={shippingProfiles}
+          processingProfiles={processingProfiles}
+          loadingShippingProfiles={loadingShippingProfiles}
+          loadingProcessingProfiles={loadingProcessingProfiles}
+        />
+      )}
+
+      {confirmDeleteProductId && (
+        <ProductDeleteModal
+          onClose={() => setConfirmDeleteProductId(null)}
+          onConfirm={() => onDeleteProduct(confirmDeleteProductId)}
+          deleting={deletingProductId === confirmDeleteProductId}
+        />
+      )}
     </div>
   )
 }

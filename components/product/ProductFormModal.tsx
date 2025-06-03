@@ -21,119 +21,203 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Loader2 } from "lucide-react"
-import { Product, CreateProductForm, TaxonomyNode } from "@/types/product"
+import { Product, CreateProductForm, TaxonomyNode, ShippingProfile, EtsyProcessingProfile } from "@/types/product"
 import { ProductFormSections } from "./ProductFormSections"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 interface ProductFormModalProps {
-  showModal: boolean
-  setShowModal: (show: boolean) => void
-  editProduct: Product | null
-  setEditProduct: (product: Product | null) => void
-  createForm: CreateProductForm
-  setCreateForm: (form: CreateProductForm) => void
-  tagInput: string
-  setTagInput: (value: string) => void
-  materialInput: string
-  setMaterialInput: (value: string) => void
-  taxonomyNodes: TaxonomyNode[]
-  shippingProfiles: any[]
+  isOpen: boolean
+  onClose: () => void
+  product?: Product
+  onSubmit: (product: Partial<Product>, state: "draft" | "active") => Promise<void>
   submitting: boolean
-  onCreateProduct: (state: "draft" | "active") => void
-  onUpdateProduct: (product: Product) => void
+  shippingProfiles: ShippingProfile[]
+  processingProfiles: EtsyProcessingProfile[]
+  loadingShippingProfiles: boolean
+  loadingProcessingProfiles: boolean
 }
 
 export function ProductFormModal({
-  showModal,
-  setShowModal,
-  editProduct,
-  setEditProduct,
-  createForm,
-  setCreateForm,
-  tagInput,
-  setTagInput,
-  materialInput,
-  setMaterialInput,
-  taxonomyNodes,
-  shippingProfiles,
+  isOpen,
+  onClose,
+  product,
+  onSubmit,
   submitting,
-  onCreateProduct,
-  onUpdateProduct,
+  shippingProfiles,
+  processingProfiles,
+  loadingShippingProfiles,
+  loadingProcessingProfiles
 }: ProductFormModalProps) {
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false)
-  const [pendingClose, setPendingClose] = useState(false)
+  const [title, setTitle] = useState(product?.title || "")
+  const [description, setDescription] = useState(product?.description || "")
+  const [price, setPrice] = useState(product?.price?.amount || 0)
+  const [quantity, setQuantity] = useState(product?.quantity || 1)
+  const [shippingProfileId, setShippingProfileId] = useState<string>(
+    product?.shipping_profile_id?.toString() || ""
+  )
+  const [processingProfileId, setProcessingProfileId] = useState<string>(
+    product?.processing_profile_id?.toString() || ""
+  )
 
-  // Formda değişiklik yapılıp yapılmadığını kontrol eden fonksiyon
+  // Form değişikliklerini kontrol et
   const hasUnsavedChanges = () => {
-    if (editProduct) {
-      return false // Düzenleme modalı için ayrıca kontrol eklenebilir
+    if (!product) {
+      return title !== "" || description !== "" || price !== 0 || quantity !== 1 || 
+             shippingProfileId !== "" || processingProfileId !== ""
     }
-    return createForm.title !== "" ||
-      createForm.description !== "" ||
-      createForm.price !== 0 ||
-      createForm.quantity !== 1 ||
-      createForm.tags.length > 0 ||
-      createForm.materials.length > 0 ||
-      createForm.taxonomy_id !== 0 ||
-      createForm.shipping_profile_id !== 0
+    return false
   }
 
   // Modal kapatma işlemi
   const handleCloseModal = () => {
     if (hasUnsavedChanges()) {
       setShowUnsavedChangesDialog(true)
-      setPendingClose(true)
     } else {
-      setShowModal(false)
-      setEditProduct(null)
+      onClose()
     }
   }
 
-  // Kapatma işlemini onayla
-  const confirmClose = () => {
-    setShowUnsavedChangesDialog(false)
-    setPendingClose(false)
-    setShowModal(false)
-    setEditProduct(null)
-  }
-
-  // Kapatma işlemini iptal et
-  const cancelClose = () => {
-    setShowUnsavedChangesDialog(false)
-    setPendingClose(false)
+  const handleSubmit = async (state: "draft" | "active") => {
+    await onSubmit({
+      title,
+      description,
+      price: {
+        amount: price,
+        divisor: 100,
+        currency_code: "USD"
+      },
+      quantity,
+      shipping_profile_id: parseInt(shippingProfileId),
+      processing_profile_id: parseInt(processingProfileId),
+      state
+    }, state)
   }
 
   return (
     <>
-      {/* Create/Edit Modal */}
-      <Dialog 
-        open={showModal} 
-        onOpenChange={(open) => {
-          if (!open) {
-            handleCloseModal()
-          }
-        }}
-      >
+      <Dialog open={isOpen} onOpenChange={handleCloseModal}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editProduct ? `Ürünü Düzenle: ${editProduct.title}` : "Yeni Ürün Ekle"}
+              {product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}
             </DialogTitle>
             <DialogDescription>
-              {editProduct ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."}
+              {product ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."}
             </DialogDescription>
           </DialogHeader>
 
-          <ProductFormSections
-            editProduct={editProduct}
-            createForm={createForm}
-            setCreateForm={setCreateForm}
-            tagInput={tagInput}
-            setTagInput={setTagInput}
-            materialInput={materialInput}
-            setMaterialInput={setMaterialInput}
-            taxonomyNodes={taxonomyNodes}
-            shippingProfiles={shippingProfiles}
-          />
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">
+                Başlık
+              </Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">
+                Açıklama
+              </Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="price" className="text-right">
+                Fiyat
+              </Label>
+              <Input
+                id="price"
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(parseFloat(e.target.value))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="quantity" className="text-right">
+                Adet
+              </Label>
+              <Input
+                id="quantity"
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value))}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="shipping" className="text-right">
+                Kargo Profili
+              </Label>
+              <Select
+                value={shippingProfileId}
+                onValueChange={setShippingProfileId}
+                disabled={loadingShippingProfiles || shippingProfiles.length === 0}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={
+                    loadingShippingProfiles
+                      ? "Kargo profilleri yükleniyor..."
+                      : shippingProfiles.length === 0
+                      ? "Kargo profili bulunamadı"
+                      : "Kargo profili seçin"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {shippingProfiles.map((profile) => (
+                    <SelectItem
+                      key={profile.shipping_profile_id}
+                      value={profile.shipping_profile_id.toString()}
+                    >
+                      {profile.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="processing" className="text-right">
+                İşlem Profili
+              </Label>
+              <Select
+                value={processingProfileId}
+                onValueChange={setProcessingProfileId}
+                disabled={loadingProcessingProfiles || processingProfiles.length === 0}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={
+                    loadingProcessingProfiles
+                      ? "İşlem profilleri yükleniyor..."
+                      : processingProfiles.length === 0
+                      ? "İşlem profili bulunamadı"
+                      : "İşlem profili seçin"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {processingProfiles.map((profile) => (
+                    <SelectItem
+                      key={profile.processing_profile_id}
+                      value={profile.processing_profile_id.toString()}
+                    >
+                      {profile.title} ({profile.min_processing_days}-{profile.max_processing_days} gün)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           <DialogFooter className="flex justify-between">
             <div>
@@ -142,16 +226,10 @@ export function ProductFormModal({
             <div className="flex gap-2">
               <Button 
                 variant="secondary" 
-                onClick={() => {
-                  if (editProduct) {
-                    onUpdateProduct({ ...editProduct, state: "draft" })
-                  } else {
-                    onCreateProduct("draft")
-                  }
-                }} 
+                onClick={() => handleSubmit("draft")} 
                 disabled={submitting}
               >
-                {submitting && createForm.state === "draft" ? (
+                {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Taslak Kaydediliyor...
@@ -161,22 +239,16 @@ export function ProductFormModal({
                 )}
               </Button>
               <Button 
-                onClick={() => {
-                  if (editProduct) {
-                    onUpdateProduct({ ...editProduct, state: "active" })
-                  } else {
-                    onCreateProduct("active")
-                  }
-                }} 
+                onClick={() => handleSubmit("active")} 
                 disabled={submitting}
               >
-                {submitting && createForm.state === "active" ? (
+                {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {editProduct ? 'Güncelleniyor...' : 'Oluşturuluyor...'}
+                    {product ? 'Güncelleniyor...' : 'Oluşturuluyor...'}
                   </>
                 ) : (
-                  editProduct ? 'Güncelle' : 'Ürünü Oluştur'
+                  product ? 'Güncelle' : 'Ürünü Oluştur'
                 )}
               </Button>
             </div>
@@ -184,7 +256,6 @@ export function ProductFormModal({
         </DialogContent>
       </Dialog>
 
-      {/* Unsaved Changes Dialog */}
       <AlertDialog open={showUnsavedChangesDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -194,8 +265,11 @@ export function ProductFormModal({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelClose}>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmClose}>Tamam</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setShowUnsavedChangesDialog(false)}>İptal</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setShowUnsavedChangesDialog(false)
+              onClose()
+            }}>Tamam</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 // import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // Supabase şimdilik kaldırıldı
 // import { cookies } from 'next/headers'; // Supabase şimdilik kaldırıldı
 import { getProcessingProfiles } from '@/lib/etsy-api';
@@ -25,9 +25,6 @@ export async function GET(request: Request) {
       }, { status: 400 });
     }
 
-    console.log('[PROCESSING-PROFILES-ROUTE] GET request received.');
-    console.log('[PROCESSING-PROFILES-ROUTE] Fetching processing profiles for shop ID:', shopId);
-
     // Get user ID from session
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -40,7 +37,6 @@ export async function GET(request: Request) {
     }
 
     const processingProfiles = await getProcessingProfiles(user.id, parseInt(shopId));
-    console.log('[PROCESSING-PROFILES-ROUTE] Fetched', processingProfiles.length, 'processing profiles.');
 
     return NextResponse.json({
       success: true,
@@ -48,7 +44,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error) {
-    console.error('[PROCESSING-PROFILES-ROUTE] Error:', error);
+    console.error('Error fetching processing profiles:', error);
     return NextResponse.json({
       success: false,
       error: 'Failed to fetch processing profiles'

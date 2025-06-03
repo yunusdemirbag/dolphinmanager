@@ -1545,7 +1545,7 @@ export async function getPropertiesByTaxonomyId(taxonomyId: number): Promise<any
     const data = await response.json();
     return data.results || [];
   } catch (error) {
-    console.error(`${taxonomyId} ID'li taxonomy için özellikler alınırken hata oluştu:`, error);
+    console.error("Taxonomy özellikleri alınırken hata oluştu:", error);
     return [];
   }
 }
@@ -1613,13 +1613,13 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
     const data = await response.json();
     return data.results || [];
   } catch (error) {
-    console.error('Error fetching shipping profiles:', error);
+    console.error("Error fetching shipping profiles:", error);
     return [];
   }
 }
 
 // Get processing profiles for a shop
-export async function getProcessingProfiles(userId: string, shopId: number): Promise<EtsyProcessingProfile[]> {
+export async function getProcessingProfiles(userId: string, shopId: number): Promise<any[]> {
   try {
     const accessToken = await getValidAccessToken(userId);
     
@@ -1628,7 +1628,7 @@ export async function getProcessingProfiles(userId: string, shopId: number): Pro
       return [];
     }
 
-    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/processing-profiles`, {
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/production-partners`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'x-api-key': ETSY_CLIENT_ID
@@ -1642,7 +1642,7 @@ export async function getProcessingProfiles(userId: string, shopId: number): Pro
     const data = await response.json();
     return data.results || [];
   } catch (error) {
-    console.error('Error fetching processing profiles:', error);
+    console.error("Error fetching processing profiles:", error);
     return [];
   }
 }

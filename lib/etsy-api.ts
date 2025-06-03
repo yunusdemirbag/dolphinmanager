@@ -1509,7 +1509,7 @@ export async function getEtsyReceipts(
   }
 }
 
-// Taxonomy node'larını getir
+// Taxonomy fonksiyonları
 export async function getSellerTaxonomyNodes(): Promise<any[]> {
   try {
     const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes`, {
@@ -1519,18 +1519,17 @@ export async function getSellerTaxonomyNodes(): Promise<any[]> {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch taxonomy nodes: ${response.status} ${response.statusText}`);
+      throw new Error(`Taxonomy node'ları alınamadı: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     return data.results || [];
   } catch (error) {
-    console.error("Error fetching taxonomy nodes:", error);
+    console.error("Taxonomy node'ları alınırken hata oluştu:", error);
     return [];
   }
 }
 
-// Belirli bir taxonomy ID için özellikleri getir
 export async function getPropertiesByTaxonomyId(taxonomyId: number): Promise<any[]> {
   try {
     const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes/${taxonomyId}/properties`, {
@@ -1540,13 +1539,110 @@ export async function getPropertiesByTaxonomyId(taxonomyId: number): Promise<any
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch taxonomy properties: ${response.status} ${response.statusText}`);
+      throw new Error(`Taxonomy özellikleri alınamadı: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     return data.results || [];
   } catch (error) {
-    console.error(`Error fetching properties for taxonomy ID ${taxonomyId}:`, error);
+    console.error(`${taxonomyId} ID'li taxonomy için özellikler alınırken hata oluştu:`, error);
+    return [];
+  }
+}
+
+// Shipping profile interface
+export interface EtsyShippingProfile {
+  shipping_profile_id: number;
+  title: string;
+  user_id: number;
+  min_processing_days: number;
+  max_processing_days: number;
+  processing_days_display_label: string;
+  origin_country_iso: string;
+  is_deleted: boolean;
+  shipping_carrier_id: number;
+  mail_class: string;
+  min_delivery_days: number;
+  max_delivery_days: number;
+  destination_country_iso: string;
+  destination_region: string;
+  primary_cost: {
+    amount: number;
+    divisor: number;
+    currency_code: string;
+  };
+  secondary_cost: {
+    amount: number;
+    divisor: number;
+    currency_code: string;
+  };
+}
+
+// Processing profile interface
+export interface EtsyProcessingProfile {
+  processing_profile_id: number;
+  title: string;
+  user_id: number;
+  min_processing_days: number;
+  max_processing_days: number;
+  processing_days_display_label: string;
+  is_deleted: boolean;
+}
+
+// Get shipping profiles for a shop
+export async function getShippingProfiles(userId: string, shopId: number): Promise<EtsyShippingProfile[]> {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    
+    if (!accessToken) {
+      console.log(`No valid access token for user ${userId} - cannot fetch shipping profiles`);
+      return [];
+    }
+
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch shipping profiles: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error('Error fetching shipping profiles:', error);
+    return [];
+  }
+}
+
+// Get processing profiles for a shop
+export async function getProcessingProfiles(userId: string, shopId: number): Promise<EtsyProcessingProfile[]> {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    
+    if (!accessToken) {
+      console.log(`No valid access token for user ${userId} - cannot fetch processing profiles`);
+      return [];
+    }
+
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/processing-profiles`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch processing profiles: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error('Error fetching processing profiles:', error);
     return [];
   }
 }

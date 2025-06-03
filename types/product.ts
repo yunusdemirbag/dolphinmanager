@@ -77,6 +77,7 @@ export interface CreateProductForm {
   when_made: string
   taxonomy_id: number
   shipping_profile_id: number
+  processing_profile_id: number
   is_personalizable: boolean
   personalization_is_required: boolean
   personalization_instructions: string

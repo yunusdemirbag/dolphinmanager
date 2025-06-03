@@ -1592,29 +1592,97 @@ export interface EtsyProcessingProfile {
 // Get shipping profiles for a shop
 export async function getShippingProfiles(userId: string, shopId: number): Promise<EtsyShippingProfile[]> {
   try {
+    console.log(`Fetching shipping profiles for user ${userId} and shop ${shopId}...`);
+    
     const accessToken = await getValidAccessToken(userId);
     
     if (!accessToken) {
       console.log(`No valid access token for user ${userId} - cannot fetch shipping profiles`);
-      return [];
+      throw new Error('RECONNECT_REQUIRED');
     }
 
+    console.log('Making request to Etsy API for shipping profiles...');
     const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`, {
-    headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': ETSY_CLIENT_ID
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'x-api-key': ETSY_CLIENT_ID
       }
     });
 
+    // Log the response status and headers for debugging
+    console.log('Shipping profiles API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+  });
+  
   if (!response.ok) {
-      throw new Error(`Failed to fetch shipping profiles: ${response.status} ${response.statusText}`);
-  }
+      const errorText = await response.text();
+      console.error('Error response from Etsy API:', errorText);
+      
+      if (response.status === 401) {
+        throw new Error('RECONNECT_REQUIRED');
+      }
+      
+      throw new Error(`Failed to fetch shipping profiles: ${response.status} ${response.statusText} - ${errorText}`);
+    }
 
-    const data = await response.json();
-    return data.results || [];
+    const responseText = await response.text();
+    console.log('Raw API response:', responseText);
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse JSON response:', e);
+      throw new Error('Invalid JSON response from Etsy API');
+    }
+
+    if (!data || !data.results || !Array.isArray(data.results)) {
+      console.error('Invalid API response format:', data);
+      throw new Error('Invalid API response format');
+    }
+
+    // Transform the response to match our interface
+    const profiles = data.results.map((profile: any) => ({
+      shipping_profile_id: profile.shipping_profile_id,
+      title: profile.title,
+      user_id: profile.user_id,
+      min_processing_days: profile.min_processing_days,
+      max_processing_days: profile.max_processing_days,
+      processing_days_display_label: profile.processing_days_display_label,
+      origin_country_iso: profile.origin_country_iso,
+      is_deleted: profile.is_deleted || false,
+      shipping_carrier_id: profile.shipping_carrier_id,
+      mail_class: profile.mail_class,
+      min_delivery_days: profile.min_delivery_days,
+      max_delivery_days: profile.max_delivery_days,
+      destination_country_iso: profile.destination_country_iso,
+      destination_region: profile.destination_region,
+      primary_cost: {
+        amount: profile.primary_cost?.amount || 0,
+        divisor: profile.primary_cost?.divisor || 100,
+        currency_code: profile.primary_cost?.currency_code || 'USD'
+      },
+      secondary_cost: {
+        amount: profile.secondary_cost?.amount || 0,
+        divisor: profile.secondary_cost?.divisor || 100,
+        currency_code: profile.secondary_cost?.currency_code || 'USD'
+      }
+    }));
+
+    console.log(`Successfully fetched ${profiles.length} shipping profiles`);
+    return profiles;
   } catch (error) {
-    console.error("Error fetching shipping profiles:", error);
-    return [];
+    console.error('Error in getShippingProfiles:', error);
+    
+    // RECONNECT_REQUIRED hatasını yeniden fırlat
+    if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
+      throw error;
+    }
+    
+    // Diğer hataları yeniden fırlat
+    throw error;
   }
 }
 
@@ -1629,13 +1697,13 @@ export async function getProcessingProfiles(userId: string, shopId: number): Pro
     }
 
     const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/production-partners`, {
-      headers: {
+    headers: {
         'Authorization': `Bearer ${accessToken}`,
         'x-api-key': ETSY_CLIENT_ID
       }
     });
 
-    if (!response.ok) {
+  if (!response.ok) {
       throw new Error(`Failed to fetch processing profiles: ${response.status} ${response.statusText}`);
     }
 
@@ -1644,5 +1712,143 @@ export async function getProcessingProfiles(userId: string, shopId: number): Pro
   } catch (error) {
     console.error("Error fetching processing profiles:", error);
     return [];
+  }
+}
+
+// Create a shipping profile for a shop
+export async function createShippingProfile(
+  userId: string,
+  shopId: number,
+  data: {
+    title: string;
+    origin_country_iso: string;
+    primary_cost: number;
+    secondary_cost: number;
+    min_processing_days: number;
+    max_processing_days: number;
+    destination_country_iso?: string;
+    destination_region?: string;
+  }
+): Promise<EtsyShippingProfile> {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    
+    if (!accessToken) {
+      console.log(`No valid access token for user ${userId} - cannot create shipping profile`);
+      throw new Error('RECONNECT_REQUIRED');
+    }
+
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`, {
+      method: 'POST',
+    headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        title: data.title,
+        origin_country_iso: data.origin_country_iso,
+        primary_cost: data.primary_cost.toString(),
+        secondary_cost: data.secondary_cost.toString(),
+        min_processing_days: data.min_processing_days.toString(),
+        max_processing_days: data.max_processing_days.toString(),
+        ...(data.destination_country_iso ? { destination_country_iso: data.destination_country_iso } : {}),
+        ...(data.destination_region ? { destination_region: data.destination_region } : {})
+      })
+    });
+
+  if (!response.ok) {
+      throw new Error(`Failed to create shipping profile: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result.shipping_profile;
+  } catch (error) {
+    console.error("Error creating shipping profile:", error);
+    throw error;
+  }
+}
+
+// Update a shipping profile
+export async function updateShippingProfile(
+  userId: string,
+  shopId: number,
+  profileId: number,
+  data: {
+    title?: string;
+    origin_country_iso?: string;
+    primary_cost?: number;
+    secondary_cost?: number;
+    min_processing_days?: number;
+    max_processing_days?: number;
+    destination_country_iso?: string;
+    destination_region?: string;
+  }
+): Promise<EtsyShippingProfile> {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    
+    if (!accessToken) {
+      console.log(`No valid access token for user ${userId} - cannot update shipping profile`);
+      throw new Error('RECONNECT_REQUIRED');
+    }
+
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles/${profileId}`, {
+      method: 'PUT',
+    headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams(
+        Object.entries(data).reduce((acc: Record<string, string>, [key, value]) => {
+          if (value !== undefined) {
+            acc[key] = value.toString();
+          }
+          return acc;
+        }, {})
+      )
+    });
+
+  if (!response.ok) {
+      throw new Error(`Failed to update shipping profile: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result.shipping_profile;
+  } catch (error) {
+    console.error("Error updating shipping profile:", error);
+    throw error;
+  }
+}
+
+// Delete a shipping profile
+export async function deleteShippingProfile(
+  userId: string,
+  shopId: number,
+  profileId: number
+): Promise<void> {
+  try {
+  const accessToken = await getValidAccessToken(userId);
+    
+  if (!accessToken) {
+      console.log(`No valid access token for user ${userId} - cannot delete shipping profile`);
+      throw new Error('RECONNECT_REQUIRED');
+    }
+
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles/${profileId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete shipping profile: ${response.status} ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error("Error deleting shipping profile:", error);
+    throw error;
   }
 }

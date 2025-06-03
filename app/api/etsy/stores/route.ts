@@ -74,6 +74,60 @@ export async function GET(request: NextRequest) {
               type_shop_id: typeof etsyStores[0].shop_id
             });
             
+            // Mağaza bilgilerini etsy_auth tablosuna kaydet
+            try {
+              const primaryStore = etsyStores[0]; // İlk mağazayı ana mağaza olarak kullan
+              
+              // Önce mevcut kaydı kontrol et
+              const { data: existingAuth, error: checkError } = await supabase
+                .from('etsy_auth')
+                .select('*')
+                .eq('user_id', user.id);
+              
+              if (checkError) {
+                console.error("Error checking etsy_auth:", checkError);
+              } else {
+                // Mevcut kayıt yoksa oluştur, varsa güncelle
+                if (!existingAuth || existingAuth.length === 0) {
+                  console.log("Creating new etsy_auth record with shop_id:", primaryStore.shop_id);
+                  const { error: insertError } = await supabase
+                    .from('etsy_auth')
+                    .insert({
+                      user_id: user.id,
+                      shop_id: primaryStore.shop_id.toString(),
+                      shop_name: primaryStore.shop_name,
+                      last_updated: new Date().toISOString(),
+                      access_token: tokenData[0].access_token
+                    });
+                  
+                  if (insertError) {
+                    console.error("Error inserting etsy_auth:", insertError);
+                  } else {
+                    console.log("Successfully created etsy_auth record");
+                  }
+                } else {
+                  console.log("Updating existing etsy_auth record with shop_id:", primaryStore.shop_id);
+                  const { error: updateError } = await supabase
+                    .from('etsy_auth')
+                    .update({
+                      shop_id: primaryStore.shop_id.toString(),
+                      shop_name: primaryStore.shop_name,
+                      last_updated: new Date().toISOString(),
+                      access_token: tokenData[0].access_token
+                    })
+                    .eq('user_id', user.id);
+                  
+                  if (updateError) {
+                    console.error("Error updating etsy_auth:", updateError);
+                  } else {
+                    console.log("Successfully updated etsy_auth record");
+                  }
+                }
+              }
+            } catch (authError) {
+              console.error("Error updating etsy_auth:", authError);
+            }
+            
             // Mağaza verilerini düzenle ve döndür
             const storeData = etsyStores.map(store => ({
               shop_id: store.shop_id,

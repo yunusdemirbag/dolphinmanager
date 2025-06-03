@@ -2272,3 +2272,45 @@ export function invalidateShopCache(userId: string, shopId: number): void {
     cacheManager.invalidateByPrefix(`etsy_stores_${userId}`);
     // Add other shop-specific cache keys as needed
 }
+
+// Taxonomy node'larını getir
+export async function getSellerTaxonomyNodes(): Promise<any[]> {
+  try {
+    const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes`, {
+      headers: {
+        'x-api-key': ETSY_CLIENT_ID,
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch taxonomy nodes: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error("Error fetching taxonomy nodes:", error);
+    return [];
+  }
+}
+
+// Belirli bir taxonomy ID için özellikleri getir
+export async function getPropertiesByTaxonomyId(taxonomyId: number): Promise<any[]> {
+  try {
+    const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes/${taxonomyId}/properties`, {
+      headers: {
+        'x-api-key': ETSY_CLIENT_ID,
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch taxonomy properties: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error(`Error fetching properties for taxonomy ID ${taxonomyId}:`, error);
+    return [];
+  }
+}

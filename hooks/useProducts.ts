@@ -227,7 +227,11 @@ export function useProducts() {
         },
         body: JSON.stringify({
           ...form,
-          price: Math.round(form.price * 100),
+          price: form.price && {
+            amount: Math.round((form.price as number) * 100),
+            divisor: 100,
+            currency_code: "USD"
+          }
         }),
       })
 
@@ -238,8 +242,8 @@ export function useProducts() {
       const data = await response.json()
       
       toast({
-        title: "Success",
-        description: "Product created successfully",
+        title: "Başarılı!",
+        description: "Ürün başarıyla oluşturuldu",
       })
 
       await loadProducts(1)
@@ -247,8 +251,8 @@ export function useProducts() {
     } catch (error) {
       console.error("Error creating product:", error)
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create product",
+        title: "Hata",
+        description: error instanceof Error ? error.message : "Ürün oluşturulamadı",
         variant: "destructive",
       })
       throw error

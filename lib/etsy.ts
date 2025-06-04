@@ -165,44 +165,38 @@ class EtsyClient {
         throw new Error('Shop ID is missing');
       }
 
-      // Önce mağaza bilgilerini kontrol et
-      const shopEndpoint = `/application/shops/${this.shopId}`;
-      console.log('Checking shop status...');
-      const shopResponse = await this.request(shopEndpoint);
-      console.log('Shop response:', shopResponse);
-
-      const endpoint = `/application/shops/${this.shopId}/shipping-profiles/entries`;
+      const endpoint = `/application/shops/${this.shopId}/shipping-profiles`;
       console.log('Making request to endpoint:', endpoint);
       
       const response = await this.request(endpoint);
       console.log('Raw API Response:', response);
       
       // Etsy API'den gelen yanıtı kontrol et
-      if (!response || !response.entries) {
+      if (!response || !response.results) {
         console.error('Invalid API response format:', response);
         throw new Error('Invalid API response format');
       }
 
       // Shipping profiles'ı doğru formata dönüştür
-      const profiles = response.entries.map((entry: any) => ({
-        shipping_profile_id: entry.shipping_profile_id,
-        title: entry.shipping_profile.title,
-        min_processing_days: entry.shipping_profile.min_processing_days,
-        max_processing_days: entry.shipping_profile.max_processing_days,
-        origin_country_iso: entry.shipping_profile.origin_country_iso,
+      const profiles = response.results.map((profile: any) => ({
+        shipping_profile_id: profile.shipping_profile_id,
+        title: profile.title,
+        min_processing_days: profile.min_processing_days,
+        max_processing_days: profile.max_processing_days,
+        origin_country_iso: profile.origin_country_iso,
         primary_cost: {
-          amount: entry.price.amount,
-          divisor: entry.price.divisor,
-          currency_code: entry.price.currency_code
+          amount: profile.primary_cost?.amount || 0,
+          divisor: profile.primary_cost?.divisor || 100,
+          currency_code: profile.primary_cost?.currency_code || 'USD'
         },
         secondary_cost: {
-          amount: entry.secondary_price?.amount || 0,
-          divisor: entry.secondary_price?.divisor || 100,
-          currency_code: entry.secondary_price?.currency_code || 'USD'
+          amount: profile.secondary_cost?.amount || 0,
+          divisor: profile.secondary_cost?.divisor || 100,
+          currency_code: profile.secondary_cost?.currency_code || 'USD'
         },
-        destination_country_iso: entry.destination?.region?.iso_country_code,
-        min_delivery_days: entry.min_delivery_days,
-        max_delivery_days: entry.max_delivery_days
+        destination_country_iso: profile.destination_country_iso,
+        min_delivery_days: profile.min_delivery_days || 1,
+        max_delivery_days: profile.max_delivery_days || 7
       }));
 
       console.log('Transformed shipping profiles:', profiles);

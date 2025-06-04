@@ -1573,7 +1573,7 @@ export interface EtsyShippingProfile {
   };
   secondary_cost: {
     amount: number;
-    divisor: number;
+    divisor: number
     currency_code: string;
   };
 }
@@ -1901,6 +1901,252 @@ export async function deleteShippingProfile(
     }
   } catch (error) {
     console.error("Error deleting shipping profile:", error);
+    throw error;
+  }
+}
+
+// CreateListingData interface for creating a new listing
+export interface CreateListingData {
+  title: string;
+  description: string;
+  price: {
+    amount: number;
+    divisor: number;
+    currency_code: string;
+  };
+  quantity: number;
+  shipping_profile_id: number;
+  processing_profile_id: number;
+  tags: string[];
+  materials: string[];
+  is_personalizable?: boolean;
+  personalization_is_required?: boolean;
+  personalization_instructions?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  width?: number;
+  width_unit?: string;
+  height?: number;
+  height_unit?: string;
+  taxonomy_id?: number;
+  state: "active" | "draft";
+  image_ids?: number[];
+  who_made?: "i_did" | "someone_else" | "collective";
+  when_made?: string;
+}
+
+// Function to invalidate shop cache to ensure fresh data on next fetch
+export async function invalidateShopCache(userId: string, shopId: number): Promise<void> {
+  try {
+    console.log(`Invalidating cache for user: ${userId}, shop: ${shopId}`);
+    // This could involve Redis, local storage, or database caching
+    // For now, just log it since we don't have explicit caching yet
+  } catch (error) {
+    console.error("Error invalidating shop cache:", error);
+  }
+}
+
+// Function to reorder listing images
+export async function reorderListingImages(
+  userId: string, 
+  shopId: number, 
+  listingId: number, 
+  imageIds: number[]
+): Promise<boolean> {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      throw new Error("No valid access token found");
+    }
+
+    console.log(`Reordering images for listing: ${listingId}, Shop: ${shopId}, Image IDs:`, imageIds);
+
+    const response = await fetch(
+      `${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images/reorder`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_CLIENT_ID,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ listing_image_ids: imageIds })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response from Etsy API (reorder images):', errorText);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in reorderListingImages:', error);
+    return false;
+  }
+}
+
+// Create a draft listing on Etsy
+export async function createDraftListing(
+  userId: string,
+  shopId: number,
+  listingData: CreateListingData
+): Promise<EtsyListing> {
+  try {
+    console.log('[ETSY_API] Creating draft listing with data:', {
+      title: listingData.title,
+      shop_id: shopId,
+      has_price: !!listingData.price,
+      price_amount: listingData.price?.amount,
+      shipping_profile_id: listingData.shipping_profile_id,
+      processing_profile_id: listingData.processing_profile_id,
+      state: listingData.state
+    });
+
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      throw new Error("No valid access token found");
+    }
+
+    // Validate and ensure price has a valid value
+    if (!listingData.price || !listingData.price.amount) {
+      console.log('[ETSY_API] Price is missing or invalid, setting default price of 1 USD');
+      listingData.price = {
+        amount: 100, // 1 USD in cents
+        divisor: 100,
+        currency_code: "USD"
+      };
+    }
+
+    // Prepare listing data for API request
+    const requestBody = new URLSearchParams({
+      title: listingData.title,
+      description: listingData.description,
+      price: (listingData.price.amount / listingData.price.divisor).toString(),
+      quantity: listingData.quantity.toString(),
+      who_made: listingData.who_made || 'i_did',
+      when_made: listingData.when_made || 'made_to_order',
+      shipping_profile_id: listingData.shipping_profile_id.toString(),
+      state: listingData.state,
+      taxonomy_id: (listingData.taxonomy_id || 1).toString()
+    });
+
+    // Add optional fields if they exist
+    if (listingData.materials && listingData.materials.length > 0) {
+      listingData.materials.forEach(material => {
+        requestBody.append('materials', material);
+      });
+    }
+
+    if (listingData.tags && listingData.tags.length > 0) {
+      listingData.tags.forEach(tag => {
+        requestBody.append('tags', tag);
+      });
+    }
+
+    if (listingData.is_personalizable !== undefined) {
+      requestBody.append('is_personalizable', listingData.is_personalizable.toString());
+    }
+
+    if (listingData.personalization_is_required !== undefined) {
+      requestBody.append('personalization_is_required', listingData.personalization_is_required.toString());
+    }
+
+    if (listingData.personalization_instructions) {
+      requestBody.append('personalization_instructions', listingData.personalization_instructions);
+    }
+
+    // Enhanced processing profile handling with better validation
+    const processingProfileId = typeof listingData.processing_profile_id === 'string' 
+      ? parseInt(listingData.processing_profile_id) 
+      : listingData.processing_profile_id;
+    
+    console.log('[ETSY_API] Processing profile check:', {
+      raw: listingData.processing_profile_id,
+      type: typeof listingData.processing_profile_id,
+      parsedId: processingProfileId,
+      isValidNumber: !isNaN(processingProfileId) && processingProfileId > 0
+    });
+
+    if (!isNaN(processingProfileId) && processingProfileId > 0) {
+      requestBody.append('processing_profile_id', processingProfileId.toString());
+      console.log('[ETSY_API] Setting processing_profile_id:', processingProfileId);
+    } else {
+      console.log('[ETSY_API] No valid processing_profile_id found, skipping this field');
+    }
+
+    if (listingData.primary_color) {
+      requestBody.append('primary_color', listingData.primary_color);
+    }
+
+    if (listingData.secondary_color) {
+      requestBody.append('secondary_color', listingData.secondary_color);
+    }
+
+    if (listingData.width) {
+      requestBody.append('width', listingData.width.toString());
+      requestBody.append('width_unit', listingData.width_unit || 'cm');
+    }
+
+    if (listingData.height) {
+      requestBody.append('height', listingData.height.toString());
+      requestBody.append('height_unit', listingData.height_unit || 'cm');
+    }
+
+    // Log the complete request body for debugging
+    console.log('[ETSY_API] Listing creation - Request body:', Object.fromEntries(requestBody.entries()));
+    console.log('[ETSY_API] Making request to Etsy API to create listing...');
+    
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: requestBody
+    });
+
+    // Log the response status and headers for debugging
+    console.log('[ETSY_API] Create listing API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+  
+    // Get response text for proper error handling
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      console.error('[ETSY_API] Error response from Etsy API:', responseText);
+      
+      if (response.status === 401) {
+        throw new Error('RECONNECT_REQUIRED');
+      }
+      
+      throw new Error(`Failed to create listing: ${response.status} ${response.statusText} - ${responseText}`);
+    }
+
+    // Parse the successful response
+    let data;
+    try {
+      data = JSON.parse(responseText);
+      console.log('[ETSY_API] Successfully created draft listing:', data.listing_id);
+    } catch (parseError) {
+      console.error('[ETSY_API] Error parsing response JSON:', parseError);
+      throw new Error(`Failed to parse Etsy API response: ${responseText}`);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('[ETSY_API] Error in createDraftListing:', error);
+    
+    // RECONNECT_REQUIRED hatasını yeniden fırlat
+    if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
+      throw error;
+    }
+    
     throw error;
   }
 }

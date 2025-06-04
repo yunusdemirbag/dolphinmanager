@@ -24,6 +24,16 @@ export async function POST(request: NextRequest) {
       console.log("Başlık Etsy limiti olan 140 karaktere kısaltıldı:", listingData.title);
     }
 
+    // Fiyat kontrolü - fiyat yoksa veya hatalıysa varsayılan değer ata
+    if (!listingData.price || !listingData.price.amount) {
+      listingData.price = {
+        amount: 100, // 1 USD varsayılan değer
+        divisor: 100,
+        currency_code: "USD"
+      };
+      console.log("Fiyat belirtilmediği veya geçersiz olduğu için varsayılan fiyat ayarlandı: 1 USD");
+    }
+
     console.log("Creating listing for user:", user.id, "Data:", JSON.stringify(listingData))
 
     // Etsy store bilgilerini çek

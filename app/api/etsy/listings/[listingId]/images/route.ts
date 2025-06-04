@@ -246,6 +246,13 @@ export async function POST(
       etsyFormData.append('rank', rank.toString());
     }
 
+    // Log headers for debugging CORS issues
+    console.log("[IMAGE_UPLOAD_API] Request headers to Etsy:", {
+      'Content-Type': 'multipart/form-data',
+      'Authorization': `Bearer ${accessToken}`,
+      'x-api-key': process.env.ETSY_CLIENT_ID as string,
+    });
+
     // Upload image to Etsy
     console.log("[IMAGE_UPLOAD_API] Uploading image to Etsy...");
     const etsyResponse = await fetch(

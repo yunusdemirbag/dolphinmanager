@@ -64,6 +64,9 @@ export interface Product {
     sold: number
   }
   processing_profile_id?: number
+  has_variations?: boolean
+  variations?: ProductVariation[]
+  inventory?: ProductInventory
 }
 
 export interface CreateProductForm {
@@ -102,7 +105,82 @@ export interface CreateProductForm {
   image_alt_texts: string[]
   language?: string
   state: "active" | "draft"
+  has_variations?: boolean
+  variations?: ProductVariation[]
+  inventory?: ProductInventory
 }
+
+// Varyasyon tipleri
+export interface ProductVariation {
+  property_id: number
+  property_name: string
+  values: string[]
+  options: {
+    value: string
+    disabled?: boolean
+  }[]
+}
+
+export interface ProductVariationOption {
+  value: string
+}
+
+export interface ProductInventory {
+  products: ProductInventoryItem[]
+  price_varies: boolean
+  quantity_varies: boolean
+}
+
+export interface ProductInventoryItem {
+  property_values: {
+    property_id: number
+    property_name: string
+    value: string
+  }[]
+  price: {
+    amount: number
+    divisor: number
+    currency_code: string
+  }
+  quantity: number
+  is_enabled: boolean
+}
+
+export interface ProductInventoryPropertyValue {
+  property_id: number
+  property_name: string
+  value_id?: number
+  value: string
+}
+
+// Etsy API'sine gönderilecek inventory payload tipi
+export interface EtsyInventoryPayload {
+  products: EtsyInventoryProduct[]
+  price_on_property: number[]
+  quantity_on_property: number[]
+  sku_on_property: number[]
+}
+
+// Standart varyasyon seçenekleri
+export const DEFAULT_SIZE_OPTIONS = [
+  "8\"x12\" - 20x30 cm",
+  "14\"x20\" - 35x50cm",
+  "16\"x24\" - 40x60cm",
+  "20\"x28\" - 50x70cm",
+  "24\"x36\" - 60x90cm",
+  "28\"x40\" - 70x100cm",
+  "32\"x48\" - 80x120cm",
+  "36\"x51\" - 90x130cm"
+];
+
+export const DEFAULT_FRAME_OPTIONS = [
+  "Roll",
+  "Standard Canvas",
+  "White Frame",
+  "Gold Frame",
+  "Silver Frame",
+  "Black Frame"
+];
 
 export interface TaxonomyNode {
   id: number
@@ -153,4 +231,40 @@ export interface EtsyProcessingProfile {
   max_processing_days: number;
   processing_days_display_label: string;
   is_deleted: boolean;
+}
+
+export interface EtsyInventoryPropertyValue {
+  property_id: number;
+  property_name: string;
+  values: string[];
+}
+
+export interface EtsyInventoryProduct {
+  sku: string;
+  property_values: EtsyInventoryPropertyValue[];
+  offerings: {
+    price: number;
+    quantity: number;
+    is_enabled: boolean;
+  }[];
+}
+
+export interface CreateListingResponse {
+  success: boolean;
+  message?: string;
+  listing_id?: number;
+  listing?: {
+    listing_id: number;
+    title: string;
+    description: string;
+    state: string;
+    url: string;
+    price: {
+      amount: number;
+      divisor: number;
+      currency_code: string;
+    };
+  };
+  error?: string;
+  details?: string;
 } 

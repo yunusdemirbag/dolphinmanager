@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Plus, Loader2 } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode } from "@/types/product"
 import { useProductsClient } from "./products-client"
+import { toast } from "@/components/ui/use-toast"
 
 interface CreateListingResponse {
   success: boolean;
@@ -19,6 +20,8 @@ interface CreateListingResponse {
     [key: string]: any;
   };
   message: string;
+  error?: string;
+  details?: string;
 }
 
 export default function ProductsPage() {
@@ -207,68 +210,374 @@ export default function ProductsPage() {
     setFilteredProducts(filtered)
   }, [products, searchTerm, filterStatus, sortBy, sortOrder])
 
-  // Handle Create Product
+  // Handle Create Product - ProductFormModal tarafından kullanılan, formdan veri alan ve Etsy'ye gönderen fonksiyon
   const onCreateProduct = async (productData: Partial<Product>, state: "draft" | "active" = "active"): Promise<CreateListingResponse> => {
     try {
-      setSubmitting(true)
+      setSubmitting(true);
       
-      // Make the API call and return the response
+      // Önce ürünü oluştur
       const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(productData)
+        body: JSON.stringify({
+          ...productData,
+          state: state
+        })
       });
 
-      const data = await response.json();
-      
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create listing');
+        const errorData = await response.json();
+        console.error("[PRODUCT_FORM] Create listing error:", errorData);
+        return {
+          success: false,
+          message: 'Ürün oluşturulurken hata oluştu',
+          error: errorData.error,
+          details: errorData.details
+        };
       }
 
-      setShowCreateModal(false);
-      return data;
+      const result: CreateListingResponse = await response.json();
+      console.log("[PRODUCT_FORM] Create listing result:", result);
       
+      // Eğer varyasyonlar varsa, inventory API'sini kullanarak varyasyonları ekle
+      if (result.listing_id && productData.has_variations && productData.variations && productData.inventory) {
+        try {
+          // Varyasyon verilerini Etsy formatına dönüştür
+          const inventoryPayload = {
+            products: productData.inventory.products.map((item) => ({
+              property_values: item.property_values.map(pv => ({
+                property_id: pv.property_id,
+                property_name: pv.property_name,
+                values: [pv.value]
+              })),
+              offerings: [{
+                price: Number((item.price?.amount ?? 100) / 100).toFixed(2),
+                quantity: item.quantity || 1,
+                is_enabled: item.is_enabled ?? true
+              }]
+            })),
+            price_on_property: productData.variations.map(v => v.property_id),
+            quantity_on_property: []
+          };
+
+          console.log("[PRODUCT_FORM] Sending inventory update:", {
+            listingId: result.listing_id,
+            payload: JSON.stringify(inventoryPayload, null, 2)
+          });
+
+          // Inventory API'sini çağır
+          const inventoryResponse = await fetch(`/api/etsy/listings/${result.listing_id}/inventory`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(inventoryPayload)
+          });
+
+          if (!inventoryResponse.ok) {
+            const errorData = await inventoryResponse.json();
+            console.error("[PRODUCT_FORM] Inventory API error:", {
+              status: inventoryResponse.status,
+              statusText: inventoryResponse.statusText,
+              error: errorData
+            });
+            return {
+              success: false,
+              message: 'Varyasyonlar eklenirken hata oluştu',
+              error: errorData.error,
+              details: errorData.details,
+              listing_id: result.listing_id
+            };
+          }
+
+          const inventoryResult = await inventoryResponse.json();
+          console.log("[PRODUCT_FORM] Inventory update result:", inventoryResult);
+          
+          return {
+            ...result,
+            message: "Ürün ve varyasyonlar başarıyla oluşturuldu"
+          };
+        } catch (error) {
+          console.error('[PRODUCT_FORM] Varyasyon ekleme hatası:', error);
+          return {
+            success: false,
+            message: 'Varyasyon eklenirken hata oluştu',
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata',
+            listing_id: result.listing_id
+          };
+        }
+      }
+
+      return {
+        ...result,
+        message: "Ürün başarıyla oluşturuldu"
+      };
     } catch (error) {
-      console.error('Error creating product:', error);
-      throw error;
+      console.error('[PRODUCT_FORM] Ürün oluşturma hatası:', error);
+      return {
+        success: false,
+        message: 'Ürün oluşturulurken hata oluştu',
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      };
     } finally {
       setSubmitting(false);
     }
-  }
+  };
 
-  // Handle Copy Product
-  const onCopyProduct = (product: Product) => {
-    console.log("Copying product:", product.title)
-    // Implementation for copying product
-  }
+  // Handle Copy Product - Mevcut bir ürünü kopyalayarak yeni bir ürün oluştur
+  const onCopyProduct = async (product: Product): Promise<CreateListingResponse> => {
+    try {
+      console.log("Copying product:", product.title);
+      setSubmitting(true);
+      
+      // Ürün verilerini kopyala ama listing_id ve image_ids gibi özgün alanları temizle
+      const copiedProductData: Partial<Product> = {
+        title: `${product.title} - Kopya`,
+        description: product.description,
+        price: product.price,
+        quantity: product.quantity,
+        tags: product.tags,
+        materials: product.materials,
+        who_made: product.who_made || "i_did",
+        when_made: product.when_made || "made_to_order",
+        taxonomy_id: product.taxonomy_id,
+        shipping_profile_id: product.shipping_profile_id,
+        processing_profile_id: product.processing_profile_id,
+        is_personalizable: product.is_personalizable,
+        personalization_is_required: product.personalization_is_required,
+        personalization_instructions: product.personalization_instructions,
+        primary_color: product.primary_color,
+        secondary_color: product.secondary_color,
+        width: product.width,
+        width_unit: product.width_unit,
+        height: product.height,
+        height_unit: product.height_unit,
+        // Varyasyonları kopyala
+        has_variations: product.has_variations,
+        variations: product.variations,
+        inventory: product.inventory,
+        state: "draft" // Her zaman taslak olarak oluştur
+      };
+      
+      // Önce yeni ürünü oluştur - onCreateProduct kullanarak
+      const createResponse = await onCreateProduct(copiedProductData, "draft");
+      
+      if (!createResponse.success || !createResponse.listing_id) {
+        return {
+          success: false,
+          message: "Ürün kopyalanırken hata oluştu",
+          error: createResponse.error,
+          details: createResponse.details
+        };
+      }
+      
+      // Orijinal ürünün fotoğraflarını varsa kopyala
+      if (product.images && product.images.length > 0) {
+        try {
+          // Her bir fotoğrafı sırayla kopyala
+          for (const image of product.images) {
+            // Fotoğrafı indir
+            const imageResponse = await fetch(image.url_fullxfull || image.url_570xN);
+            const imageBlob = await imageResponse.blob();
+            
+            // FormData oluştur
+            const formData = new FormData();
+            formData.append('image', imageBlob, 'product-image.jpg');
+            
+            // Fotoğrafı yükle
+            const uploadResponse = await fetch(`/api/etsy/listings/${createResponse.listing_id}/images`, {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (!uploadResponse.ok) {
+              console.error("[PRODUCT_FORM] Image upload error:", await uploadResponse.text());
+            }
+          }
+          
+          return {
+            ...createResponse,
+            message: "Ürün ve fotoğraflar başarıyla kopyalandı"
+          };
+        } catch (error) {
+          console.error("[PRODUCT_FORM] Error copying images:", error);
+          return {
+            ...createResponse,
+            message: "Ürün kopyalandı fakat fotoğraflar kopyalanırken hata oluştu"
+          };
+        }
+      }
+      
+      return {
+        ...createResponse,
+        message: "Ürün başarıyla kopyalandı"
+      };
+    } catch (error) {
+      console.error("[PRODUCT_FORM] Error copying product:", error);
+      return {
+        success: false,
+        message: "Ürün kopyalanırken hata oluştu",
+        error: error instanceof Error ? error.message : "Bilinmeyen hata"
+      };
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // Handle Update Product
-  const onUpdateProduct = async (product: Product) => {
+  const onUpdateProduct = async (product: Product): Promise<CreateListingResponse> => {
     try {
-      setSubmitting(true)
-      await handleUpdateProduct(product)
-      setShowEditModal(null)
+      setSubmitting(true);
+      
+      // Önce ürünü güncelle
+      const response = await fetch(`/api/etsy/listings/${product.listing_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(product)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("[PRODUCT_FORM] Update listing error:", errorData);
+        return {
+          success: false,
+          message: 'Ürün güncellenirken hata oluştu',
+          error: errorData.error,
+          details: errorData.details
+        };
+      }
+
+      const result = await response.json();
+      console.log("[PRODUCT_FORM] Update listing result:", result);
+      
+      // Eğer varyasyonlar varsa, inventory API'sini kullanarak varyasyonları güncelle
+      if (product.has_variations && product.variations && product.inventory) {
+        try {
+          // Varyasyon verilerini Etsy formatına dönüştür
+          const inventoryPayload = {
+            products: product.inventory.products.map((item) => ({
+              property_values: item.property_values.map(pv => ({
+                property_id: pv.property_id,
+                property_name: pv.property_name,
+                values: [pv.value]
+              })),
+              offerings: [{
+                price: Number((item.price?.amount ?? 100) / 100).toFixed(2),
+                quantity: item.quantity || 1,
+                is_enabled: item.is_enabled ?? true
+              }]
+            })),
+            price_on_property: product.variations.map(v => v.property_id),
+            quantity_on_property: []
+          };
+
+          console.log("[PRODUCT_FORM] Sending inventory update:", {
+            listingId: product.listing_id,
+            payload: JSON.stringify(inventoryPayload, null, 2)
+          });
+
+          // Inventory API'sini çağır
+          const inventoryResponse = await fetch(`/api/etsy/listings/${product.listing_id}/inventory`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(inventoryPayload)
+          });
+
+          if (!inventoryResponse.ok) {
+            const errorData = await inventoryResponse.json();
+            console.error("[PRODUCT_FORM] Inventory API error:", {
+              status: inventoryResponse.status,
+              statusText: inventoryResponse.statusText,
+              error: errorData
+            });
+            return {
+              success: false,
+              message: 'Varyasyonlar güncellenirken hata oluştu',
+              error: errorData.error,
+              details: errorData.details,
+              listing_id: product.listing_id
+            };
+          }
+
+          const inventoryResult = await inventoryResponse.json();
+          console.log("[PRODUCT_FORM] Inventory update result:", inventoryResult);
+          
+          return {
+            ...result,
+            message: "Ürün ve varyasyonlar başarıyla güncellendi"
+          };
+        } catch (error) {
+          console.error('[PRODUCT_FORM] Varyasyon güncelleme hatası:', error);
+          return {
+            success: false,
+            message: 'Varyasyon güncellenirken hata oluştu',
+            error: error instanceof Error ? error.message : 'Bilinmeyen hata',
+            listing_id: product.listing_id
+          };
+        }
+      }
+
+      return {
+        ...result,
+        message: "Ürün başarıyla güncellendi"
+      };
     } catch (error) {
-      console.error('Error updating product:', error)
+      console.error('[PRODUCT_FORM] Ürün güncelleme hatası:', error);
+      return {
+        success: false,
+        message: 'Ürün güncellenirken hata oluştu',
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      };
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   // Handle Delete Product
-  const onDeleteProduct = async (listingId: number) => {
+  const onDeleteProduct = async (listingId: number): Promise<CreateListingResponse> => {
     try {
-      setDeletingProductId(listingId)
-      await handleDeleteProduct(listingId)
-      setConfirmDeleteProductId(null)
+      setSubmitting(true);
+      
+      // Ürünü sil
+      const response = await fetch(`/api/etsy/listings/${listingId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("[PRODUCT_FORM] Delete listing error:", errorData);
+        return {
+          success: false,
+          message: 'Ürün silinirken hata oluştu',
+          error: errorData.error,
+          details: errorData.details
+        };
+      }
+
+      const result = await response.json();
+      console.log("[PRODUCT_FORM] Delete listing result:", result);
+
+      return {
+        ...result,
+        message: "Ürün başarıyla silindi"
+      };
     } catch (error) {
-      console.error('Error deleting product:', error)
+      console.error('[PRODUCT_FORM] Ürün silme hatası:', error);
+      return {
+        success: false,
+        message: 'Ürün silinirken hata oluştu',
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      };
     } finally {
-      setDeletingProductId(null)
+      setSubmitting(false);
     }
-  }
+  };
 
   // Grid Classes
   const gridClasses = {

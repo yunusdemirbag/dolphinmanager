@@ -62,7 +62,7 @@ interface CreateListingResponse {
 }
 
 interface ProductImage {
-  file?: File;
+  file: File;
   preview: string;
   uploading: boolean;
   error?: string;
@@ -75,32 +75,26 @@ interface DraggableImageProps {
   onRemove: (index: number) => void;
 }
 
-// Basit sürüklenebilir görsel bileşeni
+// DraggableImage bileşeni - Daha basit bir yaklaşım
 const DraggableImage = ({ image, index, moveImage, onRemove }: DraggableImageProps) => {
-  // HTML5 sürükleme API'si ile basit sürükle-bırak
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Basit HTML5 sürükleme işlemleri
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.setData('image-index', index.toString());
-    // Sürükleme sırasında gösterilecek bir önizleme ayarla
-    if (e.dataTransfer.setDragImage && ref.current) {
-      e.dataTransfer.setDragImage(ref.current, 75, 75);
-    }
+    e.dataTransfer.setData('text/plain', index.toString());
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); // Bırakmayı etkinleştirmek için gerekli
+    e.preventDefault();
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const draggedIndex = Number(e.dataTransfer.getData('image-index'));
-    
-    // Geçerli bir sürükleme olduğunu kontrol et
-    if (!isNaN(draggedIndex) && draggedIndex !== index) {
+    const draggedIndex = parseInt(e.dataTransfer.getData('text/plain'));
+    if (draggedIndex !== index) {
       moveImage(draggedIndex, index);
     }
   };
-
-  const ref = useRef<HTMLDivElement>(null);
 
   return (
     <div
@@ -112,21 +106,10 @@ const DraggableImage = ({ image, index, moveImage, onRemove }: DraggableImagePro
       className="relative group rounded-lg overflow-hidden"
       style={{ width: "150px", height: "150px", cursor: 'move' }}
     >
-      {/* Görsel eklenirken sabit CORS sorunlarını önlemek için crossOrigin="anonymous" ekle */}
       <img
         src={image.preview}
         alt="Product preview"
         className="w-full h-full object-cover pointer-events-none"
-        crossOrigin="anonymous"
-        loading="lazy"
-        draggable={false}
-        onError={(e) => {
-          // Resim yüklenirken hata oluşursa
-          const target = e.target as HTMLImageElement;
-          // Yedek görsel URL'si veya boş bir div göster
-          target.onerror = null; // Sonsuz döngüyü önle
-          target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23f0f0f0'/%3E%3Ctext x='75' y='75' font-family='Arial' font-size='12' text-anchor='middle' alignment-baseline='middle' fill='%23999'%3EResim yüklenemedi%3C/text%3E%3C/svg%3E";
-        }}
       />
       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
         <GripVertical className="text-white w-6 h-6 cursor-move" />
@@ -150,6 +133,20 @@ const DraggableImage = ({ image, index, moveImage, onRemove }: DraggableImagePro
     </div>
   );
 };
+
+interface ProductFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (product: Partial<Product>, state: "draft" | "active") => Promise<CreateListingResponse>;
+  initialData?: Partial<Product>;
+  modalTitle?: string;
+  submitButtonText?: string;
+  isSubmitting?: boolean;
+  shippingProfiles: ShippingProfile[];
+  processingProfiles: EtsyProcessingProfile[];
+  loadingShippingProfiles: boolean;
+  loadingProcessingProfiles: boolean;
+}
 
 // Standart fiyat bilgisi
 const DEFAULT_PRICES = {
@@ -220,20 +217,6 @@ const DEFAULT_PRICES = {
   }
 };
 
-interface ProductFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (product: Partial<Product>, state: "draft" | "active") => Promise<CreateListingResponse>;
-  initialData?: Partial<Product>;
-  modalTitle?: string;
-  submitButtonText?: string;
-  isSubmitting?: boolean;
-  shippingProfiles: ShippingProfile[];
-  processingProfiles: EtsyProcessingProfile[];
-  loadingShippingProfiles: boolean;
-  loadingProcessingProfiles: boolean;
-}
-
 export function ProductFormModal({
   isOpen,
   onClose,
@@ -291,9 +274,7 @@ export function ProductFormModal({
   
   // Resim yükleme state'leri
   const [productImages, setProductImages] = useState<ProductImage[]>([])
-  const [isDragging, setIsDragging] = useState(false)
 
-  // Effect hooks
   useEffect(() => {
     if (!initialData) return;
     if (!('price' in initialData)) return;
@@ -344,69 +325,15 @@ export function ProductFormModal({
     }
   }, [isOpen, initialData]);
 
-  // Etsy görsellerini yerel proxy üzerinden yükle
-  const getProxiedImageUrl = (url: string) => {
-    if (!url) return url;
-    // Eğer bu bir Etsy görseli ise ve CORS sorunu yaşanabilirse, proxy kullan
-    if (url.includes('etsystatic.com')) {
-      return `/api/etsy/image-proxy?url=${encodeURIComponent(url)}`;
-    }
-    return url;
-  };
-
-  // Görsel önizlemelerini proxy ile hazırla
-  const prepareImages = useCallback(async (initialImages: any[] | undefined) => {
-    if (!initialImages || !initialImages.length) return;
-    
-    try {
-      const newImages = await Promise.all(initialImages.map(async (img) => {
-        // Eğer bu bir uzak görsel URL'si ise
-        if (typeof img === 'string' || (typeof img === 'object' && img.url)) {
-          const imgUrl = typeof img === 'string' ? img : img.url;
-          const proxyUrl = getProxiedImageUrl(imgUrl);
-          
-          return {
-            file: undefined, // File yok, sadece önizleme
-            preview: proxyUrl,
-            uploading: false
-          };
-        }
-        
-        return null;
-      }));
-      
-      // null değerleri filtrele
-      const validImages = newImages.filter(img => img !== null) as ProductImage[];
-      
-      if (validImages.length > 0) {
-        setProductImages(validImages);
-      }
-    } catch (error) {
-      console.error("Resim hazırlama hatası:", error);
-    }
-  }, []);
-
-  // Resim önizlemelerini yükle
+  // Resim preview'lerini temizle
   useEffect(() => {
-    if (isOpen && initialData?.images) {
-      prepareImages(initialData.images);
-    }
-  }, [isOpen, initialData?.images, prepareImages]);
-
-  // Resimleri sürükleyip bırakma işleyicisi
-  const handleMoveImage = useCallback((dragIndex: number, hoverIndex: number) => {
-    setProductImages(prevImages => {
-      const newImages = [...prevImages];
-      const draggedImage = newImages[dragIndex];
-      
-      // Sürüklenen öğeyi kaldır
-      newImages.splice(dragIndex, 1);
-      // Hedef konuma ekle
-      newImages.splice(hoverIndex, 0, draggedImage);
-      
-      return newImages;
-    });
-  }, []);
+    return () => {
+      // Component unmount olduğunda preview URL'leri temizle
+      productImages.forEach(image => {
+        URL.revokeObjectURL(image.preview);
+      });
+    };
+  }, [productImages]);
 
   // Form değişikliklerini kontrol et
   const hasUnsavedChanges = () => {
@@ -537,16 +464,14 @@ export function ProductFormModal({
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    setIsDragging(true);
   };
 
   const handleDragLeave = () => {
-    setIsDragging(false);
+    // Sürükleme işlemi bittiğinde yapılacak işlemler
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragging(false);
 
     // Dosya sürükle-bırak
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -564,6 +489,17 @@ export function ProductFormModal({
     }
   };
 
+  const handleMoveImage = useCallback((dragIndex: number, hoverIndex: number) => {
+    setProductImages((prevImages) => {
+      const newImages = [...prevImages];
+      // Diziden çıkar ve yeni konuma ekle
+      const [draggedImage] = newImages.splice(dragIndex, 1);
+      newImages.splice(hoverIndex, 0, draggedImage);
+      return newImages;
+    });
+  }, []);
+
+  // Resim seçme işleyicisi
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
@@ -583,10 +519,9 @@ export function ProductFormModal({
   const handleRemoveImage = (index: number) => {
     setProductImages(prev => {
       const newImages = [...prev];
-      const url = newImages[index].preview;
-      if (url && url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
+      // Preview URL'yi temizle
+      URL.revokeObjectURL(newImages[index].preview);
+      // Resmi kaldır
       newImages.splice(index, 1);
       return newImages;
     });
@@ -693,36 +628,20 @@ export function ProductFormModal({
     );
 
     // Her kombinasyon için bir ürün oluştur
-    const products = combinations.map(combination => {
-      // Otomatik fiyat atama
-      let price = 0;
-      if (combination.length === 2) {
-        const [size, frame] = combination;
-        // Linter hatasını önlemek için as const ile type assertion
-        const sizeKey = size as keyof typeof DEFAULT_PRICES;
-        const frameKey = frame as keyof (typeof DEFAULT_PRICES)[typeof sizeKey];
-        if (
-          DEFAULT_PRICES[sizeKey] &&
-          DEFAULT_PRICES[sizeKey][frameKey]
-        ) {
-          price = DEFAULT_PRICES[sizeKey][frameKey];
-        }
-      }
-      return {
-        property_values: combination.map((value, index) => ({
-          property_id: variations[index].property_id,
-          property_name: variations[index].property_name,
-          value: value
-        })),
-        price: {
-          amount: price * 100,
-          divisor: 100,
-          currency_code: "USD"
-        },
-        quantity: 1,
-        is_enabled: true
-      };
-    });
+    const products = combinations.map(combination => ({
+      property_values: combination.map((value, index) => ({
+        property_id: variations[index].property_id,
+        property_name: variations[index].property_name,
+        value: value
+      })),
+      price: {
+        amount: 0,
+        divisor: 100,
+        currency_code: "USD"
+      },
+      quantity: 1,
+      is_enabled: true
+    }));
 
     return {
       products,
@@ -935,13 +854,7 @@ export function ProductFormModal({
 
   // Tüm varyasyonları devre dışı bırak
   const handleInventoryBulkDisable = () => {
-    setInventory(prev => ({
-      ...prev,
-      products: prev.products.map(product => ({
-        ...product,
-        is_enabled: false
-      }))
-    }));
+    // ... existing code ...
   };
 
   // Tüm varyasyonların fiyatını güncelle
@@ -968,6 +881,120 @@ export function ProductFormModal({
         quantity: value
       })),
       quantity_varies: false
+    }));
+  };
+
+  // Tüm varyasyonların özellik değerlerini seçenekten güncelle
+  const handleInventoryBulkPropertyValuesFromOption = (
+    variationIndex: number,
+    optionIndex: number
+  ) => {
+    const variation = variations[variationIndex];
+    if (!variation) return;
+
+    const option = variation.options[optionIndex];
+    if (!option) return;
+
+    setInventory(prev => ({
+      ...prev,
+      products: prev.products.map(p => ({
+        ...p,
+        property_values: p.property_values.map(pv =>
+          pv.property_id === variation.property_id
+            ? {
+                property_id: variation.property_id,
+                property_name: variation.property_name,
+                value: option.value
+              }
+            : pv
+        )
+      }))
+    }));
+  };
+
+  // Tüm varyasyonların özellik değerlerini varyasyon değerlerinden güncelle
+  const handleInventoryBulkPropertyValuesFromVariationValues = (
+    variationIndex: number,
+    values: string[]
+  ) => {
+    const variation = variations[variationIndex];
+    if (!variation) return;
+
+    setInventory(prev => ({
+      ...prev,
+      products: prev.products.map((p, i) => ({
+        ...p,
+        property_values: p.property_values.map(pv =>
+          pv.property_id === variation.property_id
+            ? {
+                property_id: variation.property_id,
+                property_name: variation.property_name,
+                value: values[i % values.length]
+              }
+            : pv
+        )
+      }))
+    }));
+  };
+
+  // Tüm varyasyonların özellik değerlerini etkin varyasyon seçeneklerinden güncelle
+  const handleInventoryBulkPropertyValuesFromVariationOptionsEnabled = (
+    variationIndex: number
+  ) => {
+    // ... existing code ...
+  };
+
+  // Tüm varyasyonların özellik değerlerini devre dışı varyasyon seçeneklerinden güncelle
+  const handleInventoryBulkPropertyValuesFromVariationOptionsDisabled = (
+    variationIndex: number
+  ) => {
+    const variation = variations[variationIndex];
+    if (!variation) return;
+
+    const disabledOptions = variation.options.filter(o => o.disabled);
+    if (disabledOptions.length === 0) return;
+
+    setInventory(prev => ({
+      ...prev,
+      products: prev.products.map((p, i) => ({
+        ...p,
+        property_values: p.property_values.map(pv =>
+          pv.property_id === variation.property_id
+            ? {
+                property_id: variation.property_id,
+                property_name: variation.property_name,
+                value: disabledOptions[i % disabledOptions.length].value
+              }
+            : pv
+        )
+      }))
+    }));
+  };
+
+  // Tüm varyasyonların özellik değerlerini rastgele varyasyon seçeneklerinden güncelle
+  const handleInventoryBulkPropertyValuesFromVariationOptionsRandom = (
+    variationIndex: number
+  ) => {
+    const variation = variations[variationIndex];
+    if (!variation) return;
+
+    const options = variation.options;
+    if (options.length === 0) return;
+
+    setInventory(prev => ({
+      ...prev,
+      products: prev.products.map(p => ({
+        ...p,
+        property_values: p.property_values.map(pv =>
+          pv.property_id === variation.property_id
+            ? {
+                property_id: variation.property_id,
+                property_name: variation.property_name,
+                value: options[Math.floor(Math.random() * options.length)].value
+              }
+            : pv
+        )
+      }))
     }));
   };
 
@@ -1057,9 +1084,7 @@ export function ProductFormModal({
       </div>
 
       <div
-        className={`border-2 border-dashed rounded-lg p-4 text-center ${
-          isDragging ? 'border-primary bg-primary/10' : 'border-gray-300'
-        }`}
+        className="border-2 border-dashed rounded-lg p-4 text-center border-gray-300 hover:border-primary hover:bg-primary/5"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -1189,291 +1214,289 @@ export function ProductFormModal({
   );
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{modalTitle || (initialData ? "Ürünü Düzenle" : "Yeni Ürün Oluştur")}</DialogTitle>
-            <DialogDescription>
-              {initialData ? "Etsy'deki ürün bilgilerinizi düzenleyin." : "Etsy'ye yeni ürün ekleyin."}
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{modalTitle || (initialData ? "Ürünü Düzenle" : "Yeni Ürün Oluştur")}</DialogTitle>
+          <DialogDescription>
+            {initialData ? "Etsy'deki ürün bilgilerinizi düzenleyin." : "Etsy'ye yeni ürün ekleyin."}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-4">
+          {/* Görseller Bölümü */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold border-b pb-2">Ürün Görselleri</h3>
+            <ImageSection />
+          </div>
           
-          <div className="grid gap-4 py-4">
-            {/* Görseller Bölümü */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Ürün Görselleri</h3>
-              <ImageSection />
+          {/* Temel Bilgiler */}
+          <section className="space-y-4 border-b pb-6">
+            <h3 className="text-lg font-semibold">Temel Bilgiler</h3>
+            <div>
+              <Label htmlFor="title">Başlık</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="description">Açıklama</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+              />
+            </div>
+          </section>
+
+          {/* Fiyat & Envanter */}
+          <section className="space-y-4 border-b pb-6">
+            <h3 className="text-lg font-semibold">Fiyat & Envanter</h3>
+            <div>
+              <Label htmlFor="price">Fiyat (USD) - Varyasyon yoksa</Label>
+              <Input
+                id="price"
+                type="number"
+                step="0.01"
+                value={price / 100}
+                onChange={(e) => setPrice(parseFloat(e.target.value) * 100)}
+                required
+                disabled={hasVariations}
+              />
+              {hasVariations && (
+                <p className="text-xs text-gray-500 mt-1">Varyasyonlar etkin olduğunda fiyatlar varyasyon bölümünden ayarlanır.</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="quantity">Miktar</Label>
+              <Input
+                id="quantity"
+                type="number"
+                step="1"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value))}
+                required
+              />
             </div>
             
-            {/* Temel Bilgiler */}
-            <section className="space-y-4 border-b pb-6">
-              <h3 className="text-lg font-semibold">Temel Bilgiler</h3>
+            {/* Etiketler ve Malzemeler */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
               <div>
-                <Label htmlFor="title">Başlık</Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Açıklama</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  required
-                />
-              </div>
-            </section>
-
-            {/* Fiyat & Envanter */}
-            <section className="space-y-4 border-b pb-6">
-              <h3 className="text-lg font-semibold">Fiyat & Envanter</h3>
-              <div>
-                <Label htmlFor="price">Fiyat (USD) - Varyasyon yoksa</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  value={price / 100}
-                  onChange={(e) => setPrice(parseFloat(e.target.value) * 100)}
-                  required
-                  disabled={hasVariations}
-                />
-                {hasVariations && (
-                  <p className="text-xs text-gray-500 mt-1">Varyasyonlar etkin olduğunda fiyatlar varyasyon bölümünden ayarlanır.</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="quantity">Miktar</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  step="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value))}
-                  required
-                />
+                <Label className="block mb-2">
+                  Etiketler <span className="text-gray-500 text-sm">(0-13)</span>
+                </Label>
+                <div className="flex items-center mb-2">
+                  <Input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    placeholder="Etiket ekleyin"
+                    onKeyDown={handleTagAdd}
+                    className="mr-2"
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={handleAddTag}
+                    disabled={tags.length >= 13 || !tagInput.trim()}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Ekle
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
+                  {tags.map((tag, index) => (
+                    <Badge key={index} className="px-3 py-1 flex items-center gap-1">
+                      {tag}
+                      <X 
+                        className="h-3 w-3 cursor-pointer" 
+                        onClick={() => handleRemoveTag(tag)}
+                      />
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-sm text-gray-500 mt-1">
+                  {tags.length}/13 etiket eklendi
+                </p>
               </div>
               
-              {/* Etiketler ve Malzemeler */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                <div>
-                  <Label className="block mb-2">
-                    Etiketler <span className="text-gray-500 text-sm">(0-13)</span>
-                  </Label>
-                  <div className="flex items-center mb-2">
-                    <Input
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      placeholder="Etiket ekleyin"
-                      onKeyDown={handleTagAdd}
-                      className="mr-2"
-                    />
-                    <Button 
-                      type="button" 
-                      onClick={handleAddTag}
-                      disabled={tags.length >= 13 || !tagInput.trim()}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Ekle
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
-                    {tags.map((tag, index) => (
-                      <Badge key={index} className="px-3 py-1 flex items-center gap-1">
-                        {tag}
-                        <X 
-                          className="h-3 w-3 cursor-pointer" 
-                          onClick={() => handleRemoveTag(tag)}
-                        />
-                      </Badge>
-                    ))}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {tags.length}/13 etiket eklendi
-                  </p>
+              <div>
+                <Label className="block mb-2">
+                  Malzemeler <span className="text-gray-500 text-sm">(0-5)</span>
+                </Label>
+                <div className="flex items-center mb-2">
+                  <Input
+                    value={materialInput}
+                    onChange={(e) => setMaterialInput(e.target.value)}
+                    placeholder="Malzeme ekleyin"
+                    onKeyDown={handleMaterialAdd}
+                    className="mr-2"
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={handleAddMaterial}
+                    disabled={materials.length >= 5 || !materialInput.trim()}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Ekle
+                  </Button>
                 </div>
-                
-                <div>
-                  <Label className="block mb-2">
-                    Malzemeler <span className="text-gray-500 text-sm">(0-5)</span>
-                  </Label>
-                  <div className="flex items-center mb-2">
-                    <Input
-                      value={materialInput}
-                      onChange={(e) => setMaterialInput(e.target.value)}
-                      placeholder="Malzeme ekleyin"
-                      onKeyDown={handleMaterialAdd}
-                      className="mr-2"
-                    />
-                    <Button 
-                      type="button" 
-                      onClick={handleAddMaterial}
-                      disabled={materials.length >= 5 || !materialInput.trim()}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Ekle
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
-                    {materials.map((material, index) => (
-                      <Badge key={index} className="px-3 py-1 flex items-center gap-1">
-                        {material}
-                        <X 
-                          className="h-3 w-3 cursor-pointer" 
-                          onClick={() => handleRemoveMaterial(material)}
-                        />
-                      </Badge>
-                    ))}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {materials.length}/5 malzeme eklendi
-                  </p>
+                <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
+                  {materials.map((material, index) => (
+                    <Badge key={index} className="px-3 py-1 flex items-center gap-1">
+                      {material}
+                      <X 
+                        className="h-3 w-3 cursor-pointer" 
+                        onClick={() => handleRemoveMaterial(material)}
+                      />
+                    </Badge>
+                  ))}
                 </div>
+                <p className="text-sm text-gray-500 mt-1">
+                  {materials.length}/5 malzeme eklendi
+                </p>
               </div>
-            </section>
-            
-            {/* Varyasyonlar Bölümü */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Varyasyonlar</h3>
-              <VariationsSection />
             </div>
-            
-            {/* Kargo ve İşlem Profilleri */}
-            <section className="space-y-4 border-b pb-6">
-              <h3 className="text-lg font-semibold">Kargo & İşlem Profilleri</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="shipping" className="block mb-1">
-                    Kargo Profili <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={shippingProfileId}
-                    onValueChange={setShippingProfileId}
-                    disabled={loadingShippingProfiles || shippingProfiles.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={
-                        loadingShippingProfiles
-                          ? "Kargo profilleri yükleniyor..."
-                          : shippingProfiles.length === 0
-                          ? "Kargo profili bulunamadı"
-                          : "Kargo profili seçin"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {shippingProfiles.map((profile) => (
-                        <SelectItem
-                          key={profile.shipping_profile_id}
-                          value={profile.shipping_profile_id.toString()}
-                        >
-                          {profile.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="processing" className="block mb-1">
-                    İşlem Profili <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={processingProfileId}
-                    onValueChange={setProcessingProfileId}
-                    disabled={loadingProcessingProfiles || processingProfiles.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={
-                        loadingProcessingProfiles
-                          ? "İşlem profilleri yükleniyor..."
-                          : processingProfiles.length === 0
-                          ? "İşlem profili bulunamadı"
-                          : "İşlem profili seçin"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {processingProfiles.map((profile) => (
-                        <SelectItem
-                          key={profile.processing_profile_id}
-                          value={profile.processing_profile_id.toString()}
-                        >
-                          {profile.title} ({profile.min_processing_days}-{profile.max_processing_days} gün)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </section>
+          </section>
+          
+          {/* Varyasyonlar Bölümü */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold border-b pb-2">Varyasyonlar</h3>
+            <VariationsSection />
           </div>
+          
+          {/* Kargo ve İşlem Profilleri */}
+          <section className="space-y-4 border-b pb-6">
+            <h3 className="text-lg font-semibold">Kargo & İşlem Profilleri</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="shipping" className="block mb-1">
+                  Kargo Profili <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={shippingProfileId}
+                  onValueChange={setShippingProfileId}
+                  disabled={loadingShippingProfiles || shippingProfiles.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      loadingShippingProfiles
+                        ? "Kargo profilleri yükleniyor..."
+                        : shippingProfiles.length === 0
+                        ? "Kargo profili bulunamadı"
+                        : "Kargo profili seçin"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shippingProfiles.map((profile) => (
+                      <SelectItem
+                        key={profile.shipping_profile_id}
+                        value={profile.shipping_profile_id.toString()}
+                      >
+                        {profile.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="processing" className="block mb-1">
+                  İşlem Profili <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={processingProfileId}
+                  onValueChange={setProcessingProfileId}
+                  disabled={loadingProcessingProfiles || processingProfiles.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      loadingProcessingProfiles
+                        ? "İşlem profilleri yükleniyor..."
+                        : processingProfiles.length === 0
+                        ? "İşlem profili bulunamadı"
+                        : "İşlem profili seçin"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {processingProfiles.map((profile) => (
+                      <SelectItem
+                        key={profile.processing_profile_id}
+                        value={profile.processing_profile_id.toString()}
+                      >
+                        {profile.title} ({profile.min_processing_days}-{profile.max_processing_days} gün)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </section>
+        </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleClose}>
-              İptal
-            </Button>
-            <Button
-              onClick={() => handleSubmit("draft")}
-              disabled={isSubmitting}
-              variant="secondary"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Kaydediliyor...
-                </>
-              ) : (
-                "Taslak Olarak Kaydet"
-              )}
-            </Button>
-            <Button
-              onClick={() => handleSubmit("active")}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Yayınlanıyor...
-                </>
-              ) : (
-                "Yayınla"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Kaydedilmemiş değişiklikler için onay dialog'u */}
-      <Dialog open={showUnsavedChangesDialog} onOpenChange={setShowUnsavedChangesDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Kaydedilmemiş Değişiklikler</DialogTitle>
-            <DialogDescription>
-              Kaydedilmemiş değişiklikleriniz var. Çıkmak istediğinizden emin misiniz?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUnsavedChangesDialog(false)}>
-              İptal
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setShowUnsavedChangesDialog(false);
-                onClose();
-              }}
-            >
-              Çık
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose}>
+            İptal
+          </Button>
+          <Button
+            onClick={() => handleSubmit("draft")}
+            disabled={isSubmitting}
+            variant="secondary"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Kaydediliyor...
+              </>
+            ) : (
+              "Taslak Olarak Kaydet"
+            )}
+          </Button>
+          <Button
+            onClick={() => handleSubmit("active")}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Yayınlanıyor...
+              </>
+            ) : (
+              "Yayınla"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    
+    {/* Kaydedilmemiş değişiklikler için onay dialog'u */}
+    <Dialog open={showUnsavedChangesDialog} onOpenChange={setShowUnsavedChangesDialog}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Kaydedilmemiş Değişiklikler</DialogTitle>
+          <DialogDescription>
+            Kaydedilmemiş değişiklikleriniz var. Çıkmak istediğinizden emin misiniz?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowUnsavedChangesDialog(false)}>
+            İptal
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              setShowUnsavedChangesDialog(false);
+              onClose();
+            }}
+          >
+            Çık
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
-}
+} 

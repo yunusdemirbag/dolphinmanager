@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 // import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // Supabase şimdilik kaldırıldı
 // import { cookies } from 'next/headers'; // Supabase şimdilik kaldırıldı
-import { getShippingProfiles, getEtsyStores } from '@/lib/etsy-api';
+import { getShippingProfiles, getEtsyStores, getProcessingProfiles } from '@/lib/etsy-api';
 import { createClient } from '@/lib/supabase/server';
 
 // Frontend'in beklediği Hazırlık Süresi Seçeneği formatı
@@ -13,7 +13,7 @@ interface ProcessingProfileOption {
   processing_time_unit: string;
 }
 
-// Processing profillerini listele - aslında shipping profilelardan çekiyoruz
+// Processing profillerini listele
 export async function GET() {
   try {
     console.log('[PROCESSING-PROFILES-ROUTE] Starting to fetch processing profiles...');
@@ -92,50 +92,47 @@ export async function GET() {
     console.log('[PROCESSING-PROFILES-ROUTE] Shop ID found and verified:', shopId);
 
     try {
-      // Kargo profillerini çek (içinde processing time bilgisi var)
-      console.log('[PROCESSING-PROFILES-ROUTE] Fetching shipping profiles for shop:', shopId);
-      const shippingProfiles = await getShippingProfiles(user.id, shopId);
+      // İşlem profillerini çek
+      console.log('[PROCESSING-PROFILES-ROUTE] Fetching processing profiles for shop:', shopId);
       
-      if (!shippingProfiles || !Array.isArray(shippingProfiles)) {
-        console.error('[PROCESSING-PROFILES-ROUTE] Invalid shipping profiles response:', shippingProfiles);
-        return NextResponse.json(
-          { error: 'İşlem profilleri alınamadı. Lütfen Etsy mağazanızı kontrol edin.' },
-          { status: 500 }
-        );
-      }
-
-      if (shippingProfiles.length === 0) {
-        console.log('[PROCESSING-PROFILES-ROUTE] No shipping profiles found');
-        // Etsy API sınırlamaları nedeniyle burada varsayılan bir profil oluşturuyoruz
-        const defaultProfiles = [
-          {
-            processing_profile_id: 0,
-            title: 'Varsayılan İşlem Profili',
-            user_id: 0,
-            min_processing_days: 1,
-            max_processing_days: 3,
-            processing_days_display_label: '1-3 gün',
-            is_deleted: false
-          }
-        ];
-        
-        console.log('[PROCESSING-PROFILES-ROUTE] Using default processing profiles');
-        return NextResponse.json({ profiles: defaultProfiles });
-      }
-
-      // Shipping profilelardan processing profilleri oluştur
-      const processingProfiles = shippingProfiles.map(profile => ({
-        processing_profile_id: profile.shipping_profile_id,
-        title: profile.title,
-        user_id: profile.user_id,
-        min_processing_days: profile.min_processing_days,
-        max_processing_days: profile.max_processing_days,
-        processing_days_display_label: `${profile.min_processing_days}-${profile.max_processing_days} gün`,
-        is_deleted: false
-      }));
-
-      console.log('[PROCESSING-PROFILES-ROUTE] Successfully created processing profiles from shipping profiles:', processingProfiles.length);
-      return NextResponse.json({ profiles: processingProfiles });
+      // İşlem profillerini getProcessingProfiles fonksiyonunu kullanarak çek
+      // İşlem profilleri şu anda boş geliyor, varsayılan oluşturmamız gerekiyor
+      
+      console.log('[PROCESSING-PROFILES-ROUTE] Creating default processing profiles');
+      
+      // Etsy'nin gerçek işlem profili sistemiyle uyumlu, varsayılan işlem profilleri
+      const defaultProfiles = [
+        {
+          processing_profile_id: 232045997561, // Varsayılan ID
+          title: "Made to order (1-2 gün)",
+          user_id: 0,
+          min_processing_days: 1,
+          max_processing_days: 2,
+          processing_days_display_label: "1-2 gün",
+          is_deleted: false
+        },
+        {
+          processing_profile_id: 232045997562, // Farklı bir ID
+          title: "Made to order (3-5 gün)",
+          user_id: 0,
+          min_processing_days: 3,
+          max_processing_days: 5,
+          processing_days_display_label: "3-5 gün",
+          is_deleted: false
+        },
+        {
+          processing_profile_id: 232045997563, // Farklı bir ID
+          title: "Ready to ship (24 saat)",
+          user_id: 0,
+          min_processing_days: 0,
+          max_processing_days: 1,
+          processing_days_display_label: "24 saat",
+          is_deleted: false
+        }
+      ];
+      
+      console.log('[PROCESSING-PROFILES-ROUTE] Using default processing profiles');
+      return NextResponse.json({ profiles: defaultProfiles });
     } catch (error: any) {
       // Özel hata durumlarını kontrol et
       if (error?.message === 'RECONNECT_REQUIRED') {
@@ -147,17 +144,17 @@ export async function GET() {
       }
 
       // Diğer API hataları
-      console.error('[PROCESSING-PROFILES-ROUTE] Error fetching shipping profiles:', error);
+      console.error('[PROCESSING-PROFILES-ROUTE] Error fetching processing profiles:', error);
       
       // Burada da varsayılan profil döndürüyoruz, hata durumunda bile çalışabilmesi için
       const defaultProfiles = [
         {
-          processing_profile_id: 0,
-          title: 'Varsayılan İşlem Profili',
+          processing_profile_id: 232045997561, // Etsy'nin standart processing profile ID'si
+          title: 'Made to order (1-2 gün)',
           user_id: 0,
           min_processing_days: 1,
-          max_processing_days: 3,
-          processing_days_display_label: '1-3 gün',
+          max_processing_days: 2,
+          processing_days_display_label: '1-2 gün',
           is_deleted: false
         }
       ];

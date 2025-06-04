@@ -2257,3 +2257,239 @@ export async function uploadImageToEtsy(
     };
   }
 }
+
+export interface UpdateListingData {
+  title?: string;
+  description?: string;
+  price?: {
+    amount: number;
+    divisor: number;
+    currency_code: string;
+  };
+  quantity?: number;
+  who_made?: string;
+  when_made?: string;
+  shipping_profile_id?: number;
+  state?: string;
+  taxonomy_id?: number;
+  materials?: string[];
+  tags?: string[];
+  is_personalizable?: boolean;
+  personalization_is_required?: boolean;
+  personalization_instructions?: string;
+  processing_min?: number;
+  processing_max?: number;
+  primary_color?: string;
+  secondary_color?: string;
+  width?: number;
+  width_unit?: string;
+  height?: number;
+  height_unit?: string;
+}
+
+export async function updateListing(
+  userId: string,
+  shopId: number,
+  listingId: number,
+  data: UpdateListingData
+): Promise<EtsyListing> {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      throw new Error("No valid access token found");
+    }
+
+    const requestBody = new URLSearchParams();
+    
+    // Add all valid fields to the request body
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (Array.isArray(value)) {
+          value.forEach(item => requestBody.append(key, item.toString()));
+        } else if (typeof value === 'object') {
+          // Handle price object
+          if (key === 'price' && value.amount !== undefined) {
+            requestBody.append('price', (value.amount / (value.divisor || 100)).toString());
+          } else {
+            requestBody.append(key, JSON.stringify(value));
+          }
+        } else {
+          requestBody.append(key, value.toString());
+        }
+      }
+    });
+
+    const response = await fetch(
+      `${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_CLIENT_ID,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: requestBody
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error updating listing:', errorText);
+      throw new Error(`Failed to update listing: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error("Error updating listing:", error);
+    throw error;
+  }
+}
+
+export async function deleteListing(
+  userId: string,
+  shopId: number,
+  listingId: number
+): Promise<void> {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      throw new Error("No valid access token found");
+    }
+
+    const response = await fetch(
+      `${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_CLIENT_ID
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error deleting listing:', errorText);
+      throw new Error(`Failed to delete listing: ${response.status} ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error("Error deleting listing:", error);
+    throw error;
+  }
+}
+
+export async function calculateFinancialSummary(userId: string): Promise<{
+  total_revenue: number;
+  total_fees: number;
+  net_profit: number;
+  currency: string;
+}> {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      throw new Error("No valid access token found");
+    }
+
+    const stores = await getEtsyStores(userId);
+    if (!stores || stores.length === 0) {
+      throw new Error("No Etsy stores found");
+    }
+
+    // Basit bir finansal özet döndür
+    return {
+      total_revenue: 0,
+      total_fees: 0,
+      net_profit: 0,
+      currency: "USD"
+    };
+  } catch (error) {
+    console.error("Error calculating financial summary:", error);
+    throw error;
+  }
+}
+
+export async function invalidateUserCache(userId: string): Promise<void> {
+  try {
+    // Kullanıcının önbelleğini temizle
+    shouldUseOnlyCachedData = false;
+  } catch (error) {
+    console.error("Error invalidating user cache:", error);
+    throw error;
+  }
+}
+
+export async function getEtsyDataWithRefreshControl(userId: string): Promise<{
+  stores: EtsyStore[];
+  listings: EtsyListing[];
+}> {
+  try {
+    const stores = await getEtsyStores(userId, true);
+    if (!stores || stores.length === 0) {
+      throw new Error("No Etsy stores found");
+    }
+
+    // Basit bir veri seti döndür
+    return {
+      stores,
+      listings: []
+    };
+  } catch (error) {
+    console.error("Error getting Etsy data with refresh control:", error);
+    throw error;
+  }
+}
+
+export async function createEtsyDataTables(): Promise<void> {
+  // Bu fonksiyon Supabase tarafında çalıştırılacak
+  console.log("Creating Etsy data tables...");
+}
+
+export async function updateShop(
+  userId: string, 
+  shopId: number, 
+  data: {
+    title?: string;
+    announcement?: string;
+    is_vacation?: boolean;
+  }
+): Promise<EtsyStore> {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      throw new Error("No valid access token found");
+    }
+
+    const requestBody = new URLSearchParams();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined) {
+        requestBody.append(key, value.toString());
+      }
+    });
+
+    const response = await fetch(
+      `${ETSY_API_BASE}/application/shops/${shopId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': ETSY_CLIENT_ID,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: requestBody
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error updating shop:', errorText);
+      throw new Error(`Failed to update shop: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error("Error updating shop:", error);
+    throw error;
+  }
+}

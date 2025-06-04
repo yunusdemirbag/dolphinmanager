@@ -1,14 +1,19 @@
 "use client"
-import { useEffect, useState } from "react"
+
+import * as React from "react"
 import { Sidebar } from "./Sidebar"
 
-export default function SidebarWithStoreName() {
-  const [currentStoreName, setCurrentStoreName] = useState<string | undefined>(undefined)
+interface SidebarWithStoreNameProps {
+  children: React.ReactNode
+}
 
-  useEffect(() => {
-    const name = localStorage.getItem("selectedStoreName")
-    if (name) setCurrentStoreName(name)
-  }, [])
-
-  return <Sidebar currentStoreName={currentStoreName} />
+export default function SidebarWithStoreName({ children }: SidebarWithStoreNameProps) {
+  return (
+    <div className="flex">
+      <Sidebar />
+      <main className="ml-16 md:ml-64 min-h-screen w-full">
+        {children}
+      </main>
+    </div>
+  )
 } 

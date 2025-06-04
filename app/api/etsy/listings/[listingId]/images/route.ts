@@ -263,36 +263,37 @@ export async function POST(
           'Authorization': `Bearer ${accessToken}`,
           'x-api-key': process.env.ETSY_CLIENT_ID as string,
         },
-        body: etsyFormData
+        body: etsyFormData,
+        // Timeout ayarı ekle
+        signal: AbortSignal.timeout(30000) // 30 saniye timeout
       }
     );
 
     // Get response details
     const responseStatus = etsyResponse.status;
     const responseStatusText = etsyResponse.statusText;
-    const responseText = await etsyResponse.text();
+    let responseData;
     
+    try {
+      responseData = await etsyResponse.json();
     console.log("[IMAGE_UPLOAD_API] Etsy response:", {
       status: responseStatus,
       statusText: responseStatusText,
-      body: responseText
+        data: responseData
     });
-
-    if (!etsyResponse.ok) {
-      console.error("[IMAGE_UPLOAD_API] Etsy upload failed:", responseText);
-      return NextResponse.json({
-        error: `Resim yükleme başarısız: ${responseStatus} ${responseStatusText}`,
-        details: responseText,
-        success: false
-      }, { status: responseStatus });
+    } catch (e) {
+      const responseText = await etsyResponse.text();
+      console.error("[IMAGE_UPLOAD_API] Failed to parse JSON response:", responseText);
+      responseData = { text: responseText };
     }
 
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (e) {
-      console.warn("[IMAGE_UPLOAD_API] Could not parse response as JSON:", e);
-      responseData = { text: responseText };
+    if (!etsyResponse.ok) {
+      console.error("[IMAGE_UPLOAD_API] Etsy upload failed:", responseData);
+      return NextResponse.json({
+        error: `Resim yükleme başarısız: ${responseStatus} ${responseStatusText}`,
+        details: responseData,
+        success: false
+      }, { status: responseStatus });
     }
 
     // Get uploaded image ID
@@ -306,10 +307,17 @@ export async function POST(
       }, { status: 500 });
     }
 
-    // Verify upload after delay
-    console.log("[IMAGE_UPLOAD_API] Waiting for Etsy to process image...");
-    await new Promise(resolve => setTimeout(resolve, 15000));
+    // Verify upload with retries
+    console.log("[IMAGE_UPLOAD_API] Verifying image upload...");
+    let imageVerified = false;
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 5000; // 5 saniye
 
+    while (!imageVerified && retryCount < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+
+      try {
     const verifyResponse = await fetch(
       `https://openapi.etsy.com/v3/application/listings/${listingId}/images`,
       {
@@ -322,41 +330,30 @@ export async function POST(
 
     if (verifyResponse.ok) {
       const verifyData = await verifyResponse.json();
-      const imageFound = verifyData.results?.some((img: any) => img.listing_image_id === uploadedImageId);
+          imageVerified = verifyData.results?.some((img: any) => img.listing_image_id === uploadedImageId);
       
-      if (!imageFound) {
-        console.warn("[IMAGE_UPLOAD_API] Image not found in verification. Waiting longer...");
-        await new Promise(resolve => setTimeout(resolve, 15000));
-        
-        // Check one more time
-        const finalVerifyResponse = await fetch(
-          `https://openapi.etsy.com/v3/application/listings/${listingId}/images`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'x-api-key': process.env.ETSY_CLIENT_ID as string,
-            }
-          }
-        );
-        
-        if (finalVerifyResponse.ok) {
-          const finalVerifyData = await finalVerifyResponse.json();
-          const finalImageFound = finalVerifyData.results?.some((img: any) => img.listing_image_id === uploadedImageId);
-          
-          if (!finalImageFound) {
-            console.warn("[IMAGE_UPLOAD_API] Image still not found after extended wait");
+          if (imageVerified) {
+            console.log("[IMAGE_UPLOAD_API] Image verified successfully");
+            break;
           }
         }
+      } catch (error) {
+        console.warn("[IMAGE_UPLOAD_API] Verification attempt failed:", error);
       }
+      
+      retryCount++;
+      console.log(`[IMAGE_UPLOAD_API] Retry ${retryCount}/${maxRetries}`);
     }
 
-    // Return success
+    if (!imageVerified) {
+      console.warn("[IMAGE_UPLOAD_API] Could not verify image upload after retries");
+          }
+
     return NextResponse.json({
       success: true,
-      message: "Resim başarıyla yüklendi",
-      data: responseData,
-      uploaded_image_id: uploadedImageId
-    }, { headers });
+      message: imageVerified ? "Resim başarıyla yüklendi ve doğrulandı" : "Resim yüklendi fakat doğrulanamadı",
+      listing_image_id: uploadedImageId
+    });
 
   } catch (error) {
     console.error("[IMAGE_UPLOAD_API] Unexpected error:", error);

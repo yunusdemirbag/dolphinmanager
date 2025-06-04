@@ -2,6 +2,10 @@ import * as React from "react"
 import "./globals.css"
 import SidebarWithStoreName from "./components/SidebarWithStoreName"
 import { Toaster } from "@/components/ui/toaster"
+import { Inter } from "next/font/google"
+import ClientLayout from "@/components/ClientLayout"
+
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
   title: "Dolphin Manager",
@@ -11,11 +15,14 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr">
-      <body className="bg-gray-50" suppressHydrationWarning>
-        <SidebarWithStoreName />
-        <main className="ml-16 md:ml-64 min-h-screen">{children}</main>
+    <html lang="tr" suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
+        <ClientLayout>
+          <SidebarWithStoreName>
+            {children}
+          </SidebarWithStoreName>
         <Toaster />
+        </ClientLayout>
       </body>
     </html>
   )

@@ -407,6 +407,19 @@ export function ProductFormModal({
 
   const handleSubmit = async (state: "draft" | "active") => {
     try {
+      // İşlem profili kontrolü
+      const parsedProcessingProfileId = processingProfileId ? parseInt(processingProfileId) : 0;
+      console.log("[PRODUCT_FORM] Processing profile check:", {
+        raw: processingProfileId,
+        type: typeof processingProfileId,
+        parsed: parsedProcessingProfileId,
+        isValid: !isNaN(parsedProcessingProfileId) && parsedProcessingProfileId > 0
+      });
+
+      if (isNaN(parsedProcessingProfileId) || parsedProcessingProfileId <= 0) {
+        throw new Error("Lütfen geçerli bir işlem profili seçin. Bu alan zorunludur.");
+      }
+
       // Form verilerini hazırla
       const formData = {
         title,
@@ -418,7 +431,7 @@ export function ProductFormModal({
         },
         quantity,
         shipping_profile_id: parseInt(shippingProfileId),
-        processing_profile_id: parseInt(processingProfileId),
+        processing_profile_id: parsedProcessingProfileId, // Parse edilmiş değeri kullan
         tags,
         materials,
         is_personalizable: isPersonalizable,
@@ -432,6 +445,11 @@ export function ProductFormModal({
         height_unit: heightUnit,
         taxonomy_id: taxonomyId
       };
+
+      console.log("[PRODUCT_FORM] Submitting form data:", JSON.stringify({
+        ...formData,
+        processing_profile_id: formData.processing_profile_id
+      }, null, 2));
 
       // Ürünü oluştur
       const response = await onSubmit(formData, state);

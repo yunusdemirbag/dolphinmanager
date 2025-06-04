@@ -2074,6 +2074,9 @@ export async function createDraftListing(
       console.log('[ETSY_API] Setting processing_profile_id:', processingProfileId);
     } else {
       console.log('[ETSY_API] No valid processing_profile_id found, skipping this field');
+      
+      // İşlem profili ID'si zorunludur. Geçerli bir ID yoksa hata dön.
+      throw new Error(`Geçerli bir işlem profili ID'si gerekli. Gönderilen değer: ${JSON.stringify(listingData.processing_profile_id)} (Tip: ${typeof listingData.processing_profile_id})`);
     }
 
     if (listingData.primary_color) {

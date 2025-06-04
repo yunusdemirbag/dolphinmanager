@@ -475,7 +475,7 @@ export function ProductFormModal({
             // Resimler arasında bekle
             if (i > 0) {
               console.log(`[PRODUCT_FORM] Waiting before uploading next image...`);
-              await new Promise(resolve => setTimeout(resolve, 8000));
+              await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
             // Form verilerini hazırla

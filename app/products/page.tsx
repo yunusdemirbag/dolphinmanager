@@ -11,6 +11,16 @@ import { Plus, Loader2 } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode } from "@/types/product"
 import { useProductsClient } from "./products-client"
 
+interface CreateListingResponse {
+  success: boolean;
+  listing_id?: number;
+  listing?: {
+    listing_id: number;
+    [key: string]: any;
+  };
+  message: string;
+}
+
 export default function ProductsPage() {
   const {
     products,
@@ -198,22 +208,33 @@ export default function ProductsPage() {
   }, [products, searchTerm, filterStatus, sortBy, sortOrder])
 
   // Handle Create Product
-  const onCreateProduct = async (productData: Partial<Product>, state: "draft" | "active" = "active") => {
+  const onCreateProduct = async (productData: Partial<Product>, state: "draft" | "active" = "active"): Promise<CreateListingResponse> => {
     try {
       setSubmitting(true)
       
-      // Instead of trying to merge with createForm, just pass the received data to handleCreateProduct
-      // The actual type conversion can be done in the handleCreateProduct function
-      await handleCreateProduct({
-        ...productData,
-        state
-      } as any) // Using any to bypass TypeScript errors, the actual implementation should handle this properly
+      // Make the API call and return the response
+      const response = await fetch('/api/etsy/listings/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productData)
+      });
+
+      const data = await response.json();
       
-      setShowCreateModal(false)
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create listing');
+      }
+
+      setShowCreateModal(false);
+      return data;
+      
     } catch (error) {
-      console.error('Error creating product:', error)
+      console.error('Error creating product:', error);
+      throw error;
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 

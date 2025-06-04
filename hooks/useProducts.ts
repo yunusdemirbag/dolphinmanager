@@ -4,6 +4,16 @@ import { useState, useEffect, useCallback } from "react"
 import { Product, CreateProductForm } from "@/types/product"
 import { toast } from "@/components/ui/use-toast"
 
+interface CreateListingResponse {
+  success: boolean;
+  listing_id?: number;
+  listing?: {
+    listing_id: number;
+    [key: string]: any;
+  };
+  message: string;
+}
+
 export function useProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
@@ -218,44 +228,32 @@ export function useProducts() {
     }
   }
 
-  const handleCreateProduct = async (form: CreateProductForm) => {
+  const handleCreateProduct = async (productData: Partial<Product>, state: "draft" | "active" = "active"): Promise<CreateListingResponse> => {
     try {
-      const response = await fetch("/api/etsy/listings/create", {
-        method: "POST",
+      const response = await fetch('/api/etsy/listings/create', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...form,
-          price: form.price && {
-            amount: Math.round((form.price as number) * 100),
-            divisor: 100,
-            currency_code: "USD"
-          }
-        }),
-      })
+          ...productData,
+          state
+        })
+      });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error("Failed to create product")
+        throw new Error(data.error || 'Failed to create listing');
       }
 
-      const data = await response.json()
+      // Refresh the products list
+      loadProducts();
       
-      toast({
-        title: "Başarılı!",
-        description: "Ürün başarıyla oluşturuldu",
-      })
-
-      await loadProducts(1)
-      return data.listing
+      return data;
     } catch (error) {
-      console.error("Error creating product:", error)
-      toast({
-        title: "Hata",
-        description: error instanceof Error ? error.message : "Ürün oluşturulamadı",
-        variant: "destructive",
-      })
-      throw error
+      console.error('Error creating product:', error);
+      throw error;
     }
   }
 

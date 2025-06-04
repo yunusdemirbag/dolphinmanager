@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
+        listing_id: newListing.listing_id,
         listing: newListing,
         message: "Listing created successfully"
       })

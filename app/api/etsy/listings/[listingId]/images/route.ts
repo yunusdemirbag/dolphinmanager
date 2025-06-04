@@ -137,11 +137,37 @@ export async function POST(
   { params }: { params: { listingId: string } },
 ) {
   try {
-    console.log("[IMAGE_UPLOAD_API] Image upload API called - Starting process");
+    console.log("[IMAGE_UPLOAD_API] Image upload API called");
+    
+    // Set CORS headers
+    const headers = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Cache-Control': 'no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    };
+    
+    // Handle CORS preflight request
+    if (request.method === 'OPTIONS') {
+      return new NextResponse(null, { 
+        status: 204,
+        headers
+      });
+    }
 
+    // Önce params'ı await et
     const resolvedParams = await params;
     const listingId = resolvedParams?.listingId ? parseInt(resolvedParams.listingId) : null;
-    console.log("[IMAGE_UPLOAD_API] Listing ID:", listingId);
+
+    if (!listingId || isNaN(listingId)) {
+      console.error("[IMAGE_UPLOAD_API] Invalid listing ID:", resolvedParams?.listingId);
+      return NextResponse.json({
+        error: "Geçersiz ürün ID'si",
+        success: false
+      }, { status: 400, headers });
+    }
 
     let userId = "71bca451-a580-4bdd-a7eb-91e2d8aa5d12"; // Default fallback
 
@@ -150,274 +176,209 @@ export async function POST(
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (!userError && user) {
         userId = user.id;
-        console.log("[IMAGE_UPLOAD_API] Authenticated user found:", userId);
-      } else {
-        console.log("[IMAGE_UPLOAD_API] Using fallback user ID:", userId);
       }
     } catch (authError) {
       console.log("[IMAGE_UPLOAD_API] Auth error (using fallback ID):", authError);
     }
 
-    if (!listingId || isNaN(listingId)) {
-      console.error("[IMAGE_UPLOAD_API] Invalid or missing listing ID");
-      return NextResponse.json({
-        error: "Invalid or missing listing ID",
-        success: false
+    // Get form data
+    const formData = await request.formData();
+    const imageFile = formData.get('image') as File;
+    const rank = formData.get('rank');
+
+    if (!imageFile) {
+      console.error("[IMAGE_UPLOAD_API] No image file provided");
+      return NextResponse.json({ 
+        error: "Resim dosyası bulunamadı", 
+        success: false 
       }, { status: 400 });
     }
 
-    const formData = await request.formData();
-    const imageFile = formData.get('image') as File;
-
-    if (!imageFile) {
-      console.error("[IMAGE_UPLOAD_API] No image file provided in FormData");
-      return NextResponse.json({ error: "No image file provided.", success: false }, { status: 400 });
+    // Validate image format
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(imageFile.type)) {
+      console.error("[IMAGE_UPLOAD_API] Invalid file type:", imageFile.type);
+      return NextResponse.json({ 
+        error: "Geçersiz dosya formatı. Sadece JPG, JPEG, PNG veya GIF formatları kabul edilir.", 
+        success: false 
+      }, { status: 400 });
     }
 
-    console.log("[IMAGE_UPLOAD_API] Image file details:", {
-      name: imageFile.name,
-      type: imageFile.type,
-      size: imageFile.size
-    });
+    // Validate image size (25MB limit)
+    const MAX_FILE_SIZE = 25 * 1024 * 1024;
+    if (imageFile.size > MAX_FILE_SIZE) {
+      console.error("[IMAGE_UPLOAD_API] File too large:", imageFile.size);
+      return NextResponse.json({ 
+        error: `Dosya boyutu çok büyük: ${(imageFile.size / 1024 / 1024).toFixed(2)}MB. Maximum 25MB kabul edilir.`,
+        success: false 
+      }, { status: 400 });
+    }
 
+    // Get store info
     const stores = await getEtsyStores(userId, true);
-    console.log("[IMAGE_UPLOAD_API] Etsy stores found:", stores?.length || 0);
-
     if (!stores || stores.length === 0) {
-      console.error("[IMAGE_UPLOAD_API] No Etsy stores found for user:", userId);
+      console.error("[IMAGE_UPLOAD_API] No stores found for user:", userId);
       return NextResponse.json({
-        error: "No Etsy stores found",
+        error: "Etsy mağazası bulunamadı",
         success: false,
-        reconnect_required: true,
-        message: "Your Etsy connection needs to be refreshed. Please reconnect your store."
+        reconnect_required: true
       }, { status: 401 });
     }
 
     const shopId = stores[0].shop_id;
     console.log("[IMAGE_UPLOAD_API] Using shop ID:", shopId);
 
-    // Get Etsy credentials including access token
-    const etsyAccessToken = await getValidAccessToken(userId);
-    const apiKey = process.env.ETSY_CLIENT_ID;
-
-    console.log("[IMAGE_UPLOAD_API] Etsy credentials check:", {
-      hasAccessToken: !!etsyAccessToken,
-      hasApiKey: !!apiKey
-    });
-
-    if (!etsyAccessToken || !apiKey) {
-      console.error("[IMAGE_UPLOAD_API] Etsy credentials not found for user:", userId);
+    // Get access token
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      console.error("[IMAGE_UPLOAD_API] No valid access token found");
       return NextResponse.json({
-        error: "Etsy credentials not found or invalid. Please reconnect your store.",
+        error: "Etsy bağlantısı geçersiz. Lütfen yeniden bağlanın.",
         success: false,
-        reconnect_required: true,
-        message: "Your Etsy connection needs to be refreshed. Please reconnect your store."
+        reconnect_required: true
       }, { status: 401 });
     }
 
-    // Use fetch-specific FormData implementation
-    const fetchFormData = new FormData();
-    
-    // Add image with original filename
-    fetchFormData.append('image', new Blob([await imageFile.arrayBuffer()], { type: imageFile.type }), imageFile.name);
-    
-    // Add rank parameter if provided
-    const rank = formData.get('rank');
+    // Prepare form data for Etsy
+    const etsyFormData = new FormData();
+    etsyFormData.append('image', new Blob([await imageFile.arrayBuffer()], { type: imageFile.type }), imageFile.name);
     if (rank !== null) {
-      fetchFormData.append('rank', rank.toString());
+      etsyFormData.append('rank', rank.toString());
     }
-    
-    console.log("[IMAGE_UPLOAD_API] Form data prepared:", {
-      hasImageFile: true,
-      imageFileName: imageFile.name,
-      imageFileType: imageFile.type,
-      imageFileSize: imageFile.size,
-      rank: rank?.toString() || 'not provided'
-    });
 
-    const etsyApiUrl = `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listingId}/images`;
-    console.log("[IMAGE_UPLOAD_API] Sending request to Etsy API URL:", etsyApiUrl);
+    // Upload image to Etsy
+    console.log("[IMAGE_UPLOAD_API] Uploading image to Etsy...");
+    const etsyResponse = await fetch(
+      `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listingId}/images`, 
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': process.env.ETSY_CLIENT_ID as string,
+        },
+        body: etsyFormData
+      }
+    );
 
-    // Use fetch with its native FormData handling
-    const etsyResponse = await fetch(etsyApiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${etsyAccessToken}`,
-        'x-api-key': apiKey,
-      },
-      body: fetchFormData,
-    });
-
-    console.log("[IMAGE_UPLOAD_API] Etsy API Response Status:", etsyResponse.status, etsyResponse.statusText);
-    
-    // Capture detailed response information for debugging
+    // Get response details
     const responseStatus = etsyResponse.status;
     const responseStatusText = etsyResponse.statusText;
-    const responseHeaders = Object.fromEntries(etsyResponse.headers.entries());
+    const responseText = await etsyResponse.text();
     
-    console.log("[IMAGE_UPLOAD_API] Etsy Image Upload Response Headers:", JSON.stringify(responseHeaders, null, 2));
-    
-    let responseBodyText = "Could not read response body";
-    try {
-      responseBodyText = await etsyResponse.text();
-      console.log("[IMAGE_UPLOAD_API] Etsy API Raw Response Body:", responseBodyText);
-    } catch (responseReadError) {
-      console.error("[IMAGE_UPLOAD_API] Error reading Etsy response body as text:", responseReadError);
-    }
-    
-    let responseData;
-    try {
-      responseData = JSON.parse(responseBodyText);
-      console.log("[IMAGE_UPLOAD_API] Etsy API Parsed Response Data:", JSON.stringify(responseData, null, 2));
-    } catch (jsonParseError) {
-      console.warn('[IMAGE_UPLOAD_API] Could not parse Etsy response as JSON, treating as text:', jsonParseError);
-      responseData = { message: responseBodyText, error: 'Non-JSON response from Etsy API' };
-    }
+    console.log("[IMAGE_UPLOAD_API] Etsy response:", {
+      status: responseStatus,
+      statusText: responseStatusText,
+      body: responseText
+    });
 
     if (!etsyResponse.ok) {
-      console.error(`[IMAGE_UPLOAD_API] Etsy API Error (upload image): Status ${responseStatus} ${responseStatusText}`);
-      
-      const errorDetails = responseData?.error || responseData?.details || responseData?.message || 'No specific error message from Etsy.';
-      console.error('[IMAGE_UPLOAD_API] Etsy API Error Details:', errorDetails);
-
+      console.error("[IMAGE_UPLOAD_API] Etsy upload failed:", responseText);
       return NextResponse.json({
-        error: `Etsy API'den resim yükleme hatası: ${responseStatus}. Detay: ${errorDetails}`,
-        details: responseData,
+        error: `Resim yükleme başarısız: ${responseStatus} ${responseStatusText}`,
+        details: responseText,
         success: false
       }, { status: responseStatus });
     }
 
-    console.log("[IMAGE_UPLOAD_API] Image uploaded successfully to Etsy:", JSON.stringify(responseData, null, 2));
-    
-    let uploadedImageId = null;
-    let imageUrls = null;
-    
-    if (responseData?.listing_image_id) {
-      uploadedImageId = responseData.listing_image_id;
-      imageUrls = {
-        small: responseData.url_75x75,
-        medium: responseData.url_170x135,
-        large: responseData.url_570xN,
-        full: responseData.url_fullxfull
-      };
-      console.log('[IMAGE_UPLOAD_API] Image ID and URLs:', { imageId: uploadedImageId, urls: imageUrls });
-    } else if (responseData?.data?.listing_image_id) {
-      uploadedImageId = responseData.data.listing_image_id;
-      imageUrls = {
-        small: responseData.data.url_75x75,
-        medium: responseData.data.url_170x135,
-        large: responseData.data.url_570xN,
-        full: responseData.data.url_fullxfull
-      };
-      console.log('[IMAGE_UPLOAD_API] Image ID and URLs from nested data:', { imageId: uploadedImageId, urls: imageUrls });
-    } else {
-      console.warn('[IMAGE_UPLOAD_API] No image ID or URLs found in Etsy response:', responseData);
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.warn("[IMAGE_UPLOAD_API] Could not parse response as JSON:", e);
+      responseData = { text: responseText };
     }
 
-    // Verify the image was actually uploaded by checking listing images
-    console.log("[IMAGE_UPLOAD_API] Starting image verification process...");
-    
-    try {
-      // Wait for 5 seconds before verification to allow Etsy to process the image
-      console.log("[IMAGE_UPLOAD_API] Waiting 5 seconds before verification...");
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // First, verify the listing exists and get its details
-      console.log("[IMAGE_UPLOAD_API] Verifying listing exists...");
-      const listingResponse = await fetch(`https://openapi.etsy.com/v3/application/listings/${listingId}`, {
+    // Get uploaded image ID
+    const uploadedImageId = responseData?.listing_image_id || responseData?.data?.listing_image_id;
+    if (!uploadedImageId) {
+      console.error("[IMAGE_UPLOAD_API] No image ID in response:", responseData);
+      return NextResponse.json({
+        error: "Resim yüklendi ancak ID alınamadı",
+        details: responseData,
+        success: false
+      }, { status: 500 });
+    }
+
+    // Verify upload after delay
+    console.log("[IMAGE_UPLOAD_API] Waiting for Etsy to process image...");
+    await new Promise(resolve => setTimeout(resolve, 15000));
+
+    const verifyResponse = await fetch(
+      `https://openapi.etsy.com/v3/application/listings/${listingId}/images`,
+      {
         headers: {
-          'Authorization': `Bearer ${etsyAccessToken}`,
-          'x-api-key': apiKey
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': process.env.ETSY_CLIENT_ID as string,
         }
-      });
-      
-      if (!listingResponse.ok) {
-        console.error(`[IMAGE_UPLOAD_API] Failed to verify listing: ${listingResponse.status} ${listingResponse.statusText}`);
-        const listingErrorText = await listingResponse.text();
-        console.error('[IMAGE_UPLOAD_API] Listing verification error:', listingErrorText);
-      } else {
-        const listingData = await listingResponse.json();
-        console.log('[IMAGE_UPLOAD_API] Listing verification successful:', JSON.stringify(listingData, null, 2));
       }
+    );
+
+    if (verifyResponse.ok) {
+      const verifyData = await verifyResponse.json();
+      const imageFound = verifyData.results?.some((img: any) => img.listing_image_id === uploadedImageId);
       
-      // Now check the images
-      console.log("[IMAGE_UPLOAD_API] Verifying image upload by checking listing images...");
-      const verifyResponse = await fetch(`https://openapi.etsy.com/v3/application/listings/${listingId}/images`, {
-        headers: {
-          'Authorization': `Bearer ${etsyAccessToken}`,
-          'x-api-key': apiKey
-        }
-      });
-      
-      if (verifyResponse.ok) {
-        const verifyData = await verifyResponse.json();
-        console.log(`[IMAGE_UPLOAD_API] Verification response:`, JSON.stringify(verifyData, null, 2));
-        console.log(`[IMAGE_UPLOAD_API] Verification result: Found ${verifyData.count || 0} images for listing ${listingId}`);
+      if (!imageFound) {
+        console.warn("[IMAGE_UPLOAD_API] Image not found in verification. Waiting longer...");
+        await new Promise(resolve => setTimeout(resolve, 15000));
         
-        if (verifyData.results && verifyData.results.length > 0) {
-          const foundUploadedImage = verifyData.results.some((img: any) => 
-            img.listing_image_id === uploadedImageId
-          );
-          
-          console.log(`[IMAGE_UPLOAD_API] Uploaded image (ID: ${uploadedImageId}) found in listing: ${foundUploadedImage}`);
-          
-          if (!foundUploadedImage) {
-            console.warn("[IMAGE_UPLOAD_API] Image was uploaded but not found in immediate verification. This might indicate Etsy's processing delay.");
-            
-            // Try one more time after a longer delay
-            console.log("[IMAGE_UPLOAD_API] Waiting additional 10 seconds before final verification...");
-            await new Promise(resolve => setTimeout(resolve, 10000));
-            
-            const finalVerifyResponse = await fetch(`https://openapi.etsy.com/v3/application/listings/${listingId}/images`, {
-              headers: {
-                'Authorization': `Bearer ${etsyAccessToken}`,
-                'x-api-key': apiKey
-              }
-            });
-            
-            if (finalVerifyResponse.ok) {
-              const finalVerifyData = await finalVerifyResponse.json();
-              const finalFoundUploadedImage = finalVerifyData.results?.some((img: any) => 
-                img.listing_image_id === uploadedImageId
-              );
-              
-              console.log(`[IMAGE_UPLOAD_API] Final verification result: Image found: ${finalFoundUploadedImage}`);
-              
-              if (!finalFoundUploadedImage) {
-                console.warn("[IMAGE_UPLOAD_API] Image still not found after extended wait. This might indicate an issue with the upload.");
-              }
+        // Check one more time
+        const finalVerifyResponse = await fetch(
+          `https://openapi.etsy.com/v3/application/listings/${listingId}/images`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'x-api-key': process.env.ETSY_CLIENT_ID as string,
             }
           }
+        );
+        
+        if (finalVerifyResponse.ok) {
+          const finalVerifyData = await finalVerifyResponse.json();
+          const finalImageFound = finalVerifyData.results?.some((img: any) => img.listing_image_id === uploadedImageId);
+          
+          if (!finalImageFound) {
+            console.warn("[IMAGE_UPLOAD_API] Image still not found after extended wait");
+          }
         }
-      } else {
-        const verifyErrorText = await verifyResponse.text();
-        console.warn(`[IMAGE_UPLOAD_API] Could not verify image upload: ${verifyResponse.status} ${verifyResponse.statusText}`, verifyErrorText);
       }
-    } catch (verifyError) {
-      console.warn("[IMAGE_UPLOAD_API] Error during verification check:", verifyError);
     }
 
-    // Add cache control headers to prevent caching
-    const headers = new Headers();
-    headers.append('Cache-Control', 'no-store, must-revalidate');
-    headers.append('Pragma', 'no-cache');
-    headers.append('Expires', '0');
-
+    // Return success
     return NextResponse.json({
       success: true,
-      message: "Image uploaded successfully to Etsy.",
-      data: responseData.data || responseData,
-      uploaded_image_id: uploadedImageId,
-      image_urls: imageUrls,
-      verification_note: "Image upload confirmed. If not immediately visible, please allow a few minutes for Etsy to process. You may need to refresh the page or check back in a few minutes."
+      message: "Resim başarıyla yüklendi",
+      data: responseData,
+      uploaded_image_id: uploadedImageId
     }, { headers });
 
   } catch (error) {
-    console.error("[IMAGE_UPLOAD_API] Error uploading image (catch block):", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error during image upload process";
+    console.error("[IMAGE_UPLOAD_API] Unexpected error:", error);
     return NextResponse.json({
-      error: `Resim yükleme sırasında beklenmeyen bir hata oluştu: ${errorMessage}`,
+      error: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu",
       success: false
-    }, { status: 500 });
+    }, { 
+      status: 500, 
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Cache-Control': 'no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   }
+}
+
+// Add OPTIONS method handler for CORS preflight requests
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, PUT, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+      'Access-Control-Max-Age': '86400' // 24 hours
+    }
+  });
 } 

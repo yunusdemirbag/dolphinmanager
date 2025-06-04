@@ -5,6 +5,32 @@ import { createServerClient } from "@supabase/ssr"
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   
+  // Handle CORS preflight requests for API routes
+  if (req.method === 'OPTIONS' && req.nextUrl.pathname.startsWith('/api')) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+        'Access-Control-Max-Age': '86400'
+      }
+    });
+  }
+  
+  // Add CORS headers to API responses
+  if (req.nextUrl.pathname.startsWith('/api')) {
+    // Clone the response to avoid modifying the original
+    const response = NextResponse.next();
+    
+    // Add CORS headers
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+    
+    return response;
+  }
+  
   // Create a Supabase client configured for the middleware
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

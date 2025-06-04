@@ -31,11 +31,22 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 
+// Add interface for API response
+interface CreateListingResponse {
+  success: boolean;
+  listing_id?: number;
+  listing?: {
+    listing_id: number;
+    [key: string]: any;
+  };
+  message: string;
+}
+
 interface ProductFormModalProps {
   isOpen: boolean
   onClose: () => void
   product?: Product
-  onSubmit: (product: Partial<Product>, state: "draft" | "active") => Promise<void>
+  onSubmit: (product: Partial<Product>, state: "draft" | "active") => Promise<CreateListingResponse>
   submitting: boolean
   shippingProfiles: ShippingProfile[]
   processingProfiles: EtsyProcessingProfile[]
@@ -84,37 +95,50 @@ export function ProductFormModal({
   const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || 0)
   
   // Ürün görselleri için state
-  const [productImages, setProductImages] = useState<File[]>([])
-  const [isDragging, setIsDragging] = useState(false)
+  const [productImages, setProductImages] = useState<{
+    file: File;
+    preview: string;
+    uploading: boolean;
+    error?: string;
+  }[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Reset form when modal opens/closes or product changes
   useEffect(() => {
     if (isOpen) {
-      // If product is provided, set fields to product values, otherwise reset to defaults
-      setTitle(product?.title || "")
-      setDescription(product?.description || "")
-      setPrice(product?.price?.amount || 0)
-      setQuantity(product?.quantity || 1)
-      setShippingProfileId(product?.shipping_profile_id?.toString() || "")
-      setProcessingProfileId(product?.processing_profile_id?.toString() || "")
-      setTags(product?.tags || [])
-      setTagInput("")
-      setMaterials(product?.materials || [])
-      setMaterialInput("")
-      setIsPersonalizable(product?.is_personalizable || false)
-      setPersonalizationRequired(product?.personalization_is_required || false)
-      setPersonalizationInstructions(product?.personalization_instructions || "")
-      setPrimaryColor(product?.primary_color || "")
-      setSecondaryColor(product?.secondary_color || "")
-      setWidth(product?.width || 0)
-      setWidthUnit(product?.width_unit || "cm")
-      setHeight(product?.height || 0)
-      setHeightUnit(product?.height_unit || "cm")
-      setTaxonomyId(product?.taxonomy_id || 0)
-      setProductImages([])
-      setIsDragging(false)
+      setTitle(product?.title || "");
+      setDescription(product?.description || "");
+      setPrice(product?.price?.amount || 0);
+      setQuantity(product?.quantity || 1);
+      setShippingProfileId(product?.shipping_profile_id?.toString() || "");
+      setProcessingProfileId(product?.processing_profile_id?.toString() || "");
+      setTags(product?.tags || []);
+      setTagInput("");
+      setMaterials(product?.materials || []);
+      setMaterialInput("");
+      setIsPersonalizable(product?.is_personalizable || false);
+      setPersonalizationRequired(product?.personalization_is_required || false);
+      setPersonalizationInstructions(product?.personalization_instructions || "");
+      setPrimaryColor(product?.primary_color || "");
+      setSecondaryColor(product?.secondary_color || "");
+      setWidth(product?.width || 0);
+      setWidthUnit(product?.width_unit || "cm");
+      setHeight(product?.height || 0);
+      setHeightUnit(product?.height_unit || "cm");
+      setTaxonomyId(product?.taxonomy_id || 0);
+      setProductImages([]);
+      setIsDragging(false);
     }
-  }, [isOpen, product])
+
+    // Cleanup previews on unmount
+    return () => {
+      productImages.forEach(img => {
+        if (img.preview) {
+          URL.revokeObjectURL(img.preview);
+        }
+      });
+    };
+  }, [isOpen, product]);
 
   // Form değişikliklerini kontrol et
   const hasUnsavedChanges = () => {
@@ -161,70 +185,94 @@ export function ProductFormModal({
     setMaterials(materials.filter(m => m !== material))
   }
 
-  // Drag and drop işleyicileri
-  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(true)
-  }, [])
+  // Resim yükleme işleyicileri
+  const handleImageDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
 
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-  }, [])
+    const files = Array.from(e.dataTransfer.files).filter(file => {
+      // Etsy'nin desteklediği formatları kontrol et
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+      return validTypes.includes(file.type);
+    });
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.dataTransfer.files) {
-      setIsDragging(true)
+    // Maksimum 10 resim kontrolü
+    if (productImages.length + files.length > 10) {
+      toast({
+        title: "Maksimum Limit",
+        description: "En fazla 10 resim yükleyebilirsiniz.",
+        variant: "destructive"
+      });
+      return;
     }
-  }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-    
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const newFiles = Array.from(e.dataTransfer.files).filter(file => 
-        file.type.startsWith('image/') && productImages.length + e.dataTransfer.files.length <= 10
-      )
-      setProductImages(prev => [...prev, ...newFiles])
-      e.dataTransfer.clearData()
+    // Her resim için önizleme oluştur
+    const newImages = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      uploading: false
+    }));
+
+    setProductImages(prev => [...prev, ...newImages]);
+  }, [productImages.length, toast]);
+
+  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+
+    const files = Array.from(e.target.files).filter(file => {
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+      return validTypes.includes(file.type);
+    });
+
+    if (productImages.length + files.length > 10) {
+      toast({
+        title: "Maksimum Limit",
+        description: "En fazla 10 resim yükleyebilirsiniz.",
+        variant: "destructive"
+      });
+      return;
     }
-  }, [productImages])
 
-  // Dosya yükleme işleyicisi
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files && files.length > 0) {
-      const newFiles = Array.from(files).filter(file => 
-        file.type.startsWith('image/') && productImages.length + files.length <= 10
-      )
-      setProductImages(prev => [...prev, ...newFiles])
-      // Input değerini sıfırla ki aynı dosyaları tekrar seçebilsin
-      e.target.value = ''
-    }
-  }
+    const newImages = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      uploading: false
+    }));
 
-  // Görsel kaldırma
-  const handleRemoveImage = (index: number) => {
-    setProductImages(prev => prev.filter((_, i) => i !== index))
-  }
+    setProductImages(prev => [...prev, ...newImages]);
+    e.target.value = ''; // Input'u sıfırla
+  }, [productImages.length, toast]);
+
+  const handleRemoveImage = useCallback((index: number) => {
+    setProductImages(prev => {
+      const newImages = [...prev];
+      if (newImages[index].preview) {
+        URL.revokeObjectURL(newImages[index].preview);
+      }
+      newImages.splice(index, 1);
+      return newImages;
+    });
+  }, []);
+
+  const handleReorderImages = useCallback((dragIndex: number, hoverIndex: number) => {
+    setProductImages(prev => {
+      const newImages = [...prev];
+      const draggedImage = newImages[dragIndex];
+      newImages.splice(dragIndex, 1);
+      newImages.splice(hoverIndex, 0, draggedImage);
+      return newImages;
+    });
+  }, []);
 
   const handleSubmit = async (state: "draft" | "active") => {
     try {
-      // Ensure price has a valid default value if not provided
-      const priceAmount = price || 1; // Default to 1 USD if price is not set
-      
-      // Send only the essential product data without including the File objects
-      const productData = {
+      // Form verilerini hazırla
+      const formData = {
         title,
         description,
         price: {
-          amount: priceAmount * 100, // Convert to cents and ensure it's not null
+          amount: Math.round(price * 100), // USD cents'e çevir
           divisor: 100,
           currency_code: "USD"
         },
@@ -242,249 +290,112 @@ export function ProductFormModal({
         width_unit: widthUnit,
         height,
         height_unit: heightUnit,
-        taxonomy_id: taxonomyId,
-        state
+        taxonomy_id: taxonomyId
       };
-      
-      console.log("Submitting product with processing profile ID:", processingProfileId);
-      
-      // Pass the product data to create the listing
-      const createdProduct = await onSubmit(productData, state);
-      
-      let successMessage = "Ürün başarıyla oluşturuldu";
-      let hasUploadedImages = false;
-      let uploadErrorCount = 0;
-      let uploadedImageIds: string[] = [];
-      const maxRetries = 2; // Allow up to 2 retries (3 attempts total)
-      
-      // Show initial toast for product creation
+
+      // Ürünü oluştur
+      const response = await onSubmit(formData, state);
+      console.log("[PRODUCT_FORM] Listing created:", response);
+
+      // listing_id'yi doğru şekilde al
+      const listingId = response.listing?.listing_id || response.listing_id;
+      if (!listingId) {
+        throw new Error("Ürün oluşturuldu ancak ID alınamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+      }
+
       toast({
-        title: "Başarılı!",
-        description: "Ürün oluşturuldu, resimler yükleniyor...",
+        title: "Ürün Oluşturuldu",
+        description: productImages.length > 0 ? "Resimler yükleniyor..." : "Ürün başarıyla oluşturuldu",
         variant: "default"
       });
-      
-      // If we have images and the product was created successfully
-      if (productImages.length > 0 && createdProduct && typeof createdProduct === 'object') {
-        const listingId = (createdProduct as any).listing_id;
-        
-        if (listingId) {
-          console.log("Product created with listing ID:", listingId, "- Uploading images...");
-          
-          // Upload images one by one with increased delay
-          for (let i = 0; i < productImages.length; i++) {
-            let retryCount = 0;
-            let uploadSuccess = false;
-            
-            // Show progress toast
+
+      // Resimleri yükle
+      if (productImages.length > 0) {
+        console.log(`[PRODUCT_FORM] Uploading ${productImages.length} images for listing ${listingId}`);
+
+        for (let i = 0; i < productImages.length; i++) {
+          try {
+            // Resim durumunu güncelle
+            setProductImages(prev => {
+              const newImages = [...prev];
+              newImages[i] = { ...newImages[i], uploading: true, error: undefined };
+              return newImages;
+            });
+
+            // İlerleme göster
             toast({
               title: "Resim Yükleniyor",
-              description: `Resim ${i+1}/${productImages.length} yükleniyor...`,
+              description: `Resim ${i + 1}/${productImages.length} yükleniyor...`,
               variant: "default"
             });
-            
-            while (retryCount <= maxRetries && !uploadSuccess) {
-              try {
-                const formData = new FormData();
-                formData.append('image', productImages[i]);
-                formData.append('rank', i.toString());
-                
-                console.log(`Uploading image ${i+1}/${productImages.length} for listing ${listingId}... (Attempt ${retryCount + 1}/${maxRetries + 1})`);
-                
-                // Add a longer delay between uploads to prevent race conditions
-                if (i > 0) {
-                  await new Promise(resolve => setTimeout(resolve, 3000)); // Increased from 2000 to 3000ms
-                }
-                
-                const uploadResponse = await fetch(`/api/etsy/listings/${listingId}/images`, {
-                  method: 'POST',
-                  body: formData,
-                  cache: 'no-store' // Prevent caching
-                });
-                
-                console.log(`Image upload response status: ${uploadResponse.status}`);
-                
-                if (!uploadResponse.ok) {
-                  throw new Error(`Upload failed with status: ${uploadResponse.status}`);
-                }
-                
-                const responseText = await uploadResponse.text();
-                let responseData;
-                
-                try {
-                  responseData = responseText ? JSON.parse(responseText) : null;
-                  console.log(`Image upload response:`, responseData);
-                  
-                  if (responseData?.success && responseData?.uploaded_image_id) {
-                    uploadSuccess = true;
-                    hasUploadedImages = true;
-                    uploadedImageIds.push(responseData.uploaded_image_id);
-                    console.log(`Successfully uploaded image ${i+1}, ID: ${responseData.uploaded_image_id}`);
-                    
-                    // Show success toast for each image
-                    toast({
-                      title: "Resim Yüklendi",
-                      description: `Resim ${i+1}/${productImages.length} başarıyla yüklendi`,
-                      variant: "success"
-                    });
-                    
-                    // Add a delay after successful upload to allow Etsy to process
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                  } else {
-                    throw new Error(`Upload response indicates failure: ${JSON.stringify(responseData)}`);
-                  }
-                } catch (parseError) {
-                  console.error(`Failed to parse response or upload unsuccessful:`, parseError);
-                  throw parseError;
-                }
-              } catch (uploadError) {
-                console.error(`Error uploading image ${i+1} (Attempt ${retryCount + 1}/${maxRetries + 1}):`, uploadError);
-                retryCount++;
-                
-                if (retryCount <= maxRetries) {
-                  console.log(`Retrying upload for image ${i+1} in 3 seconds...`);
-                  toast({
-                    title: "Yeniden Deneniyor",
-                    description: `Resim ${i+1} yüklenirken hata oluştu, yeniden deneniyor...`,
-                    variant: "default"
-                  });
-                  await new Promise(resolve => setTimeout(resolve, 3000));
-                } else {
-                  uploadErrorCount++;
-                  console.error(`Failed to upload image ${i+1} after all attempts`);
-                  toast({
-                    title: "Hata",
-                    description: `Resim ${i+1} yüklenemedi`,
-                    variant: "destructive"
-                  });
-                }
-              }
+
+            // Resimler arasında bekle
+            if (i > 0) {
+              console.log(`[PRODUCT_FORM] Waiting before uploading next image...`);
+              await new Promise(resolve => setTimeout(resolve, 8000));
             }
-          }
-          
-          // After all uploads, verify images are attached with increased wait time
-          if (hasUploadedImages) {
-            console.log(`Uploaded ${productImages.length - uploadErrorCount}/${productImages.length} images. Verifying...`);
-            
-            toast({
-              title: "Doğrulanıyor",
-              description: "Resimler yüklendi, Etsy'de görüntülenmesi bekleniyor...",
-              variant: "default"
+
+            // Form verilerini hazırla
+            const formData = new FormData();
+            formData.append('image', productImages[i].file);
+            formData.append('rank', (i + 1).toString());
+
+            // Resmi yükle
+            console.log(`[PRODUCT_FORM] Uploading image ${i + 1}/${productImages.length}`);
+            const uploadResponse = await fetch(`/api/etsy/listings/${listingId}/images`, {
+              method: 'POST',
+              body: formData
             });
-            
-            // Wait longer for Etsy to process the images
-            await new Promise(resolve => setTimeout(resolve, 8000)); // Increased from 5000 to 8000ms
-            
-            let verificationAttempts = 0;
-            const maxVerificationAttempts = 3;
-            let imagesVerified = false;
-            
-            while (verificationAttempts < maxVerificationAttempts && !imagesVerified) {
-              try {
-                const verifyResponse = await fetch(`/api/etsy/listings/${listingId}?verify_images=true`, {
-                  cache: 'no-store' // Prevent caching
-                });
-                if (verifyResponse.ok) {
-                  const verifyData = await verifyResponse.json();
-                  const hasImages = verifyData?.listing?.images && verifyData.listing.images.length > 0;
-                  
-                  if (hasImages) {
-                    console.log(`Verification successful: ${verifyData.listing.images.length} images attached`);
-                    imagesVerified = true;
-                    toast({
-                      title: "Başarılı!",
-                      description: "Resimler başarıyla yüklendi ve ürüne eklendi.",
-                      variant: "success"
-                    });
-                  } else {
-                    console.warn(`Verification attempt ${verificationAttempts + 1} shows no images attached to listing`);
-                    verificationAttempts++;
-                    
-                    if (verificationAttempts < maxVerificationAttempts) {
-                      console.log(`Waiting 5 seconds before next verification attempt...`);
-                      toast({
-                        title: "Doğrulanıyor",
-                        description: "Resimler işleniyor, lütfen bekleyin...",
-                        variant: "default"
-                      });
-                      await new Promise(resolve => setTimeout(resolve, 5000));
-                    } else {
-                      toast({
-                        title: "Bilgi",
-                        description: "Resimler yüklendi ancak Etsy'de görüntülenmesi birkaç dakika sürebilir. Lütfen sayfayı yenileyin veya birkaç dakika sonra tekrar kontrol edin.",
-                        variant: "default"
-                      });
-                      
-                      // Schedule a refresh after 30 seconds
-                      setTimeout(() => {
-                        window.location.reload();
-                      }, 30000);
-                    }
-                  }
-                }
-              } catch (verifyError) {
-                console.warn(`Failed to verify images:`, verifyError);
-                verificationAttempts++;
-                
-                if (verificationAttempts >= maxVerificationAttempts) {
-                  toast({
-                    title: "Uyarı",
-                    description: "Resimler yüklendi ancak doğrulama yapılamadı. Lütfen birkaç dakika sonra Etsy'de kontrol edin.",
-                    variant: "destructive"
-                  });
-                  
-                  // Schedule a refresh after 30 seconds
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 30000);
-                }
-              }
+
+            if (!uploadResponse.ok) {
+              const errorText = await uploadResponse.text();
+              throw new Error(`Upload failed: ${uploadResponse.status} - ${errorText}`);
             }
+
+            const uploadData = await uploadResponse.json();
+            
+            if (!uploadData.success) {
+              throw new Error(uploadData.error || "Upload failed");
+            }
+
+            // Resim durumunu başarılı olarak güncelle
+            setProductImages(prev => {
+              const newImages = [...prev];
+              newImages[i] = { ...newImages[i], uploading: false, error: undefined };
+              return newImages;
+            });
+
+          } catch (error) {
+            console.error(`[PRODUCT_FORM] Error uploading image ${i + 1}:`, error);
+            setProductImages(prev => {
+              const newImages = [...prev];
+              newImages[i] = { ...newImages[i], uploading: false, error: error instanceof Error ? error.message : 'Upload failed' };
+              return newImages;
+            });
+            throw error;
           }
-        } else {
-          console.error("No listing_id found in created product:", createdProduct);
-          toast({
-            title: "Hata",
-            description: "Ürün oluşturuldu ancak resimler yüklenemedi. Listing ID bulunamadı.",
-            variant: "destructive"
-          });
         }
       }
-      
-      // Show final success toast
-      if (state === "draft") {
-        successMessage = "Ürün taslak olarak kaydedildi";
-      }
-      
-      if (hasUploadedImages) {
-        if (uploadErrorCount > 0) {
-          successMessage += ` (${productImages.length - uploadErrorCount}/${productImages.length} görsel yüklendi)`;
-        } else {
-          successMessage += " ve görseller yüklendi";
-        }
-      } else if (productImages.length > 0) {
-        successMessage += " fakat görseller yüklenemedi";
-      }
-      
+
+      // Başarılı mesajı göster
       toast({
-        variant: "success",
-        title: "Başarılı!",
-        description: successMessage
+        title: "Başarılı",
+        description: "Ürün ve resimler başarıyla yüklendi",
+        variant: "default"
       });
-      
-      // Close the modal
+
+      // Formu kapat
       onClose();
-      
+
     } catch (error) {
-      console.error("Form gönderimi sırasında hata:", error);
-      
+      console.error("[PRODUCT_FORM] Error:", error);
       toast({
-        variant: "destructive",
         title: "Hata",
-        description: "Ürün oluşturulamadı. Lütfen tekrar deneyin."
+        description: error instanceof Error ? error.message : "Bir hata oluştu",
+        variant: "destructive"
       });
     }
-  }
+  };
 
   return (
     <>
@@ -502,32 +413,50 @@ export function ProductFormModal({
           <div className="space-y-6">
             {/* Ürün Görselleri */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Ürün Görselleri</h3>
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium">Ürün Görselleri</h3>
+                <p className="text-sm text-gray-500">
+                  {productImages.length}/10 resim
+                </p>
+              </div>
+              
               <div 
-                className={`border-2 border-dashed rounded-md p-6 transition-colors duration-300 ${
+                className={`border-2 border-dashed rounded-lg p-6 transition-colors duration-300 ${
                   isDragging ? "border-primary bg-primary/5" : "border-gray-300"
                 }`}
-                onDragEnter={handleDragEnter}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(false);
+                }}
+                onDrop={handleImageDrop}
               >
                 {productImages.length === 0 ? (
                   <div className="flex flex-col items-center text-center">
                     <ImageIcon className="h-12 w-12 text-gray-400" />
                     <h3 className="mt-2 text-sm font-semibold">Ürün Görselleri</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      En fazla 10 fotoğraf ekleyebilirsiniz
+                      JPG, JPEG, PNG veya GIF formatında resimler ekleyebilirsiniz
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
-                      Dosyaları sürükleyip bırakarak veya seçerek yükleyebilirsiniz
+                      En fazla 10 resim, her biri maksimum 25MB
                     </p>
                     <label htmlFor="file-upload" className="mt-4">
                       <div className="flex items-center cursor-pointer">
                         <Button type="button" className="flex items-center" asChild>
                           <span>
                             <Upload className="mr-2 h-4 w-4" />
-                            Fotoğraf Yükle
+                            Resim Yükle
                           </span>
                         </Button>
                       </div>
@@ -535,8 +464,8 @@ export function ProductFormModal({
                         id="file-upload"
                         type="file"
                         multiple
-                        accept="image/*"
-                        onChange={handleFileChange}
+                        accept="image/jpeg,image/jpg,image/png,image/gif"
+                        onChange={handleImageSelect}
                         className="sr-only"
                       />
                     </label>
@@ -544,58 +473,82 @@ export function ProductFormModal({
                 ) : (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-semibold">Yüklenen Görseller ({productImages.length}/10)</h3>
+                      <h3 className="text-sm font-semibold">
+                        Yüklenen Resimler ({productImages.length}/10)
+                      </h3>
                       <label htmlFor="file-upload" className="cursor-pointer">
-                        <Button type="button" variant="outline" size="sm" className="flex items-center" asChild>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex items-center"
+                          disabled={productImages.length >= 10}
+                          asChild
+                        >
                           <span>
                             <Plus className="mr-2 h-4 w-4" />
-                            Daha Fazla Ekle
+                            Resim Ekle
                           </span>
                         </Button>
                         <input
                           id="file-upload"
                           type="file"
                           multiple
-                          accept="image/*"
-                          onChange={handleFileChange}
+                          accept="image/jpeg,image/jpg,image/png,image/gif"
+                          onChange={handleImageSelect}
                           className="sr-only"
                         />
                       </label>
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {productImages.map((file, index) => (
-                        <div key={`${file.name}-${index}`} className="relative group">
-                          <div className="aspect-square rounded-md overflow-hidden border border-gray-200">
-                            <img 
-                              src={URL.createObjectURL(file)} 
-                              alt={`Ürün görseli ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
+                      {productImages.map((image, index) => (
+                        <div 
+                          key={image.preview} 
+                          className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200"
+                        >
+                          <img
+                            src={image.preview}
+                            alt={`Ürün görseli ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          {image.uploading && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <Loader2 className="h-6 w-6 text-white animate-spin" />
+                            </div>
+                          )}
+                          {image.error && (
+                            <div className="absolute inset-0 bg-red-500/50 flex items-center justify-center text-white text-xs p-2 text-center">
+                              {image.error}
+                            </div>
+                          )}
+                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => handleRemoveImage(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(index)}
-                            className="absolute top-1 right-1 bg-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-4 w-4 text-red-500" />
-                          </button>
                           {index === 0 && (
-                            <span className="absolute bottom-1 left-1 bg-primary text-white text-xs px-2 py-0.5 rounded">
+                            <div className="absolute bottom-2 left-2 bg-primary text-white text-xs px-2 py-1 rounded">
                               Ana Görsel
-                            </span>
+                            </div>
                           )}
                         </div>
                       ))}
                     </div>
                     
-                    <div className="text-xs text-gray-500 text-center">
+                    <p className="text-xs text-gray-500 text-center">
                       {isDragging ? (
-                        <p>Görselleri buraya bırakın</p>
+                        "Resimleri buraya bırakın"
                       ) : (
-                        <p>Daha fazla görsel eklemek için sürükleyip bırakabilirsiniz</p>
+                        "Resimleri sürükleyip bırakarak da ekleyebilirsiniz"
                       )}
-                    </div>
+                    </p>
                   </div>
                 )}
               </div>
@@ -1056,10 +1009,10 @@ export function ProductFormModal({
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {product ? 'Güncelleniyor...' : 'Ürünü Oluştur'}
+                    Yayınlanıyor...
                   </>
                 ) : (
-                  product ? 'Güncelle' : 'Ürünü Oluştur'
+                  "Yayınla"
                 )}
               </Button>
             </div>

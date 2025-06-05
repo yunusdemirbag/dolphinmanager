@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   try {
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
+        
     // 1. Kullanıcı oturumunu doğrula
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -21,10 +21,10 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '25');
     const state = searchParams.get('state') || 'active';
-
+                
     if (!shopId) {
       return NextResponse.json({ error: 'Shop ID is required' }, { status: 400 });
-    }
+              }
 
     // 3. Geçerli access token al
     const accessToken = await getValidAccessToken(session.user.id);
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         { status: 401 }
       );
     }
-
+    
     // 4. Etsy API'den ürünleri çek
     const endpoint = `/application/shops/${shopId}/listings/active`;
     const params = new URLSearchParams({

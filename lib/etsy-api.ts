@@ -35,7 +35,7 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
       console.log(`Found ${stores.length} stored stores for user: ${userId}`);
       return stores;
     }
-
+    
     // Veritabanında veri yoksa veya eski ise, API'den güncel verileri al
     console.log("No stored data or outdated, fetching from Etsy API");
     
@@ -45,7 +45,7 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
       console.error("Failed to get valid access token");
       throw new Error("Etsy hesabınız bağlı değil veya oturum süresi dolmuş. Lütfen mağazanızı tekrar bağlayın.");
     }
-
+    
     // API'den kullanıcının mağazalarını al
     const response = await fetch(`${ETSY_API_BASE}/application/shops`, {
       headers: {
@@ -63,22 +63,22 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
 
     // Mağazaları veritabanına kaydet
     const formattedStores = etsyShops.map((shop: any) => ({
-      id: shop.shop_id.toString(),
-      user_id: userId,
-      shop_id: shop.shop_id,
-      shop_name: shop.shop_name,
-      title: shop.title,
-      currency_code: shop.currency_code,
-      listing_active_count: shop.listing_active_count || 0,
-      num_favorers: shop.num_favorers || 0,
-      review_count: shop.review_count || 0,
-      review_average: shop.review_average || 0,
-      url: shop.url,
-      image_url: shop.icon_url_fullxfull,
-      is_active: true,
-      last_synced_at: new Date().toISOString()
-    }));
-
+        id: shop.shop_id.toString(),
+        user_id: userId,
+        shop_id: shop.shop_id,
+        shop_name: shop.shop_name,
+        title: shop.title,
+        currency_code: shop.currency_code,
+        listing_active_count: shop.listing_active_count || 0,
+        num_favorers: shop.num_favorers || 0,
+        review_count: shop.review_count || 0,
+        review_average: shop.review_average || 0,
+        url: shop.url,
+        image_url: shop.icon_url_fullxfull,
+        is_active: true,
+        last_synced_at: new Date().toISOString()
+      }));
+      
     // Veritabanını güncelle
     if (formattedStores.length > 0) {
       const { error: upsertError } = await supabase
@@ -93,7 +93,7 @@ export async function getEtsyStores(userId: string, skipCache = false): Promise<
     }
 
     return formattedStores;
-  } catch (error) {
+    } catch (error) {
     if (error instanceof Error) {
       console.error("Error in getEtsyStores:", error.message, error.stack);
       throw new Error("Etsy mağazaları alınırken hata oluştu: " + error.message);
@@ -192,7 +192,7 @@ export async function getEtsyListings(userId: string, shopId: number, limit = 10
 
 // uploadImageToEtsy
 export async function uploadImageToEtsy(userId: string, listingId: number, formData: FormData) {
-  const accessToken = await getValidAccessToken(userId);
+    const accessToken = await getValidAccessToken(userId);
   if (!accessToken) throw new Error('No valid access token');
   const response = await fetch(`${ETSY_API_BASE}/application/shops/${listingId}/images`, {
     method: 'POST',
@@ -216,16 +216,16 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
 export async function exchangeCodeForToken(code: string, userId: string) {
   // Basit örnek
   const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
-    method: 'POST',
+      method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'x-api-key': ETSY_CLIENT_ID },
-    body: new URLSearchParams({
+      body: new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: ETSY_CLIENT_ID,
       redirect_uri: 'http://localhost:3000/api/etsy/callback',
       code,
       code_verifier: 'dummy',
-    })
-  });
+      })
+    });
   if (!response.ok) throw new Error('Token exchange failed');
   return await response.json();
 }
@@ -387,7 +387,7 @@ export async function deleteListing(userId: string, shopId: number, listingId: n
 
 // getEtsyReceipts
 export async function getEtsyReceipts(userId: string, shopId: number, limit = 25, offset = 0, skipCache = false): Promise<{receipts: any[], count: number}> {
-  const accessToken = await getValidAccessToken(userId);
+    const accessToken = await getValidAccessToken(userId);
   if (!accessToken) throw new Error('No valid access token');
   const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
   const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/receipts?${params}`, {
@@ -420,12 +420,12 @@ export async function calculateFinancialSummary(userId: string): Promise<{ total
 // invalidateUserCache
 export async function invalidateUserCache(userId: string): Promise<void> {
   // Basit örnek
-  shouldUseOnlyCachedData = false;
+    shouldUseOnlyCachedData = false;
 }
 
 // getEtsyDataWithRefreshControl
 export async function getEtsyDataWithRefreshControl(userId: string): Promise<{ stores: any[]; listings: any[] }> {
-  const stores = await getEtsyStores(userId, true);
+    const stores = await getEtsyStores(userId, true);
   if (!stores || stores.length === 0) throw new Error("No Etsy stores found");
   return { stores, listings: [] };
 }
@@ -433,7 +433,7 @@ export async function getEtsyDataWithRefreshControl(userId: string): Promise<{ s
 // createEtsyDataTables
 export async function createEtsyDataTables(): Promise<void> {
   // Basit örnek
-  console.log("Creating Etsy data tables...");
+    console.log("Creating Etsy data tables...");
 }
 
 // checkEtsyTablesExist
@@ -468,9 +468,58 @@ export async function getSellerTaxonomyNodes(): Promise<any[]> {
 
 // fetchFromEtsyAPI
 export async function fetchFromEtsyAPI(endpoint: string, accessToken: string): Promise<any> {
-  const response = await fetch(`${ETSY_API_BASE}${endpoint}`, {
+    const response = await fetch(`${ETSY_API_BASE}${endpoint}`, {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID }
   });
   if (!response.ok) throw new Error('API request failed');
   return await response.json();
+}
+
+// getShippingProfiles
+export async function getShippingProfiles(userId: string, shopId: number): Promise<any[]> {
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) throw new Error('No valid access token');
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`, {
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID }
+  });
+  if (!response.ok) throw new Error('API request failed');
+  const data = await response.json();
+  return data.results || [];
+}
+
+// createShippingProfile
+export async function createShippingProfile(userId: string, shopId: number, data: any): Promise<any> {
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) throw new Error('No valid access token');
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(data)
+  });
+  if (!response.ok) throw new Error('API request failed');
+  return await response.json();
+}
+
+// updateShippingProfile
+export async function updateShippingProfile(userId: string, shopId: number, profileId: number, data: any): Promise<any> {
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) throw new Error('No valid access token');
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles/${profileId}`, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(data)
+  });
+  if (!response.ok) throw new Error('API request failed');
+  return await response.json();
+}
+
+// deleteShippingProfile
+export async function deleteShippingProfile(userId: string, shopId: number, profileId: number): Promise<void> {
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) throw new Error('No valid access token');
+  const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/shipping-profiles/${profileId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID }
+  });
+  if (!response.ok) throw new Error('API request failed');
 }

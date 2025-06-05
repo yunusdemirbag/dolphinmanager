@@ -708,6 +708,22 @@ export function ProductFormModal({
           price = DEFAULT_PRICES[sizeKey][frameKey];
         }
       }
+
+      // Belirli kombinasyonlar için varsayılan olarak devre dışı bırak
+      let isEnabled = true;
+      if (combination.length === 2) {
+        const [size, frame] = combination;
+        // 8"x12" - 20x30 cm boyutundaki belirli çerçeve tiplerini devre dışı bırak
+        if (size === "8\"x12\" - 20x30 cm" && 
+            (frame === "Standard Canvas" || 
+             frame === "White Frame" || 
+             frame === "Gold Frame" || 
+             frame === "Silver Frame" ||
+             frame === "Black Frame")) {
+          isEnabled = false;
+        }
+      }
+
       return {
         property_values: combination.map((value, index) => ({
           property_id: variations[index].property_id,
@@ -720,7 +736,7 @@ export function ProductFormModal({
           currency_code: "USD"
         },
         quantity: 1,
-        is_enabled: true
+        is_enabled: isEnabled
       };
     });
 

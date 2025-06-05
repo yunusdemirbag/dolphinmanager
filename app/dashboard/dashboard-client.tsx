@@ -182,24 +182,21 @@ export default function DashboardClient({ user, profile, dashboardData, lastData
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <Button 
+            {/* <Button 
               onClick={refreshData} 
               className="bg-black hover:bg-gray-800 text-white px-8 py-3 rounded-xl text-lg font-semibold shadow-lg transition-all duration-200"
               disabled={refreshing}
             >
               <RefreshCw className={`w-6 h-6 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
               {refreshing ? 'Yenileniyor...' : 'Verileri Güncelle'}
-            </Button>
-            {lastRefresh && (
-              <div className="text-xs text-gray-400 mt-1">Son güncelleme: {lastRefresh.toLocaleString()}</div>
-            )}
+            </Button> */}
           </div>
         </div>
 
         {/* Rate Limit Indicator */}
-        <div className="mb-6">
+        {/* <div className="mb-6">
           <RateLimitIndicator />
-        </div>
+        </div> */}
 
         {/* Yenileme durumu bildirimi */}
         {refreshStatus.message && (

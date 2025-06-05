@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Product, CreateProductForm } from "@/types/product"
 import { toast } from "@/components/ui/use-toast"
+import { useQuery } from '@tanstack/react-query'
 
 interface CreateListingResponse {
   success: boolean;
@@ -12,9 +13,98 @@ interface CreateListingResponse {
     [key: string]: any;
   };
   message: string;
+  error?: string;
+  details?: string;
 }
 
-export function useProducts() {
+export interface EtsyListing {
+  listing_id: number;
+  title: string;
+  description: string;
+  price: {
+    amount: number;
+    divisor: number;
+    currency_code: string;
+  };
+  quantity: number;
+  state: string;
+  url: string;
+  views: number;
+  tags: string[];
+  images: Array<{
+    url_570xN: string;
+    url_fullxfull?: string;
+    alt_text?: string;
+  }>;
+  shop_id: number;
+  created_timestamp: number;
+  last_modified_timestamp: number;
+  metrics?: {
+    views: number;
+    favorites: number;
+    sold: number;
+  };
+}
+
+interface UseProductsOptions {
+  shopId: string;
+  page?: number;
+  limit?: number;
+  state?: 'active' | 'inactive' | 'draft' | 'expired' | 'sold_out';
+}
+
+export function useProducts({ shopId, page = 1, limit = 25, state = 'active' }: UseProductsOptions) {
+  const [error, setError] = useState<string | null>(null);
+
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch
+  } = useQuery({
+    queryKey: ['products', shopId, page, limit, state],
+    queryFn: async () => {
+      try {
+        const params = new URLSearchParams({
+          shopId,
+          page: page.toString(),
+          limit: limit.toString(),
+          state
+        });
+
+        const response = await fetch(`/api/etsy/products?${params.toString()}`);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Ürünler alınırken bir hata oluştu');
+        }
+
+        const data = await response.json();
+        return {
+          listings: data.listings as EtsyListing[],
+          pagination: data.pagination
+        };
+      } catch (err: any) {
+        setError(err.message);
+        throw err;
+      }
+    },
+    enabled: !!shopId,
+    staleTime: 5 * 60 * 1000, // 5 dakika
+    cacheTime: 30 * 60 * 1000 // 30 dakika
+  });
+
+  return {
+    products: data?.listings || [],
+    pagination: data?.pagination,
+    isLoading,
+    isError,
+    error,
+    refetch
+  };
+}
+
+export function useProductsOld() {
   const [products, setProducts] = useState<Product[]>([])
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -257,7 +347,7 @@ export function useProducts() {
     }
   }
 
-  const handleUpdateProduct = async (product: Product) => {
+  const handleUpdateProduct = async (product: Product): Promise<CreateListingResponse> => {
     try {
       const response = await fetch(`/api/etsy/listings/${product.listing_id}`, {
         method: 'PATCH',
@@ -269,8 +359,16 @@ export function useProducts() {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to update product")
+        const errorData = await response.json();
+        return {
+          success: false,
+          message: errorData.error || "Failed to update product",
+          error: errorData.error,
+          details: errorData.details
+        };
       }
+
+      const data = await response.json();
 
       toast({
         title: "Başarılı",
@@ -279,14 +377,26 @@ export function useProducts() {
       })
 
       await loadProducts(currentPage)
+      
+      return {
+        success: true,
+        message: "Ürün başarıyla güncellendi",
+        listing_id: product.listing_id,
+        listing: data
+      };
     } catch (error) {
       console.error("Update product error:", error)
+      
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update product",
         variant: "destructive",
       })
-      throw error
+      
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to update product"
+      };
     }
   }
 

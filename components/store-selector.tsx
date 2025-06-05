@@ -9,7 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Store, ChevronDown, CheckCircle, Settings, Plus } from "lucide-react"
+import { Store, ChevronDown, CheckCircle, Settings, Plus, BarChart2, ArrowUpDown, ExternalLink } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface StoreSelectorProps {
   stores: any[]
@@ -24,6 +25,7 @@ export default function StoreSelector({
   onStoreChange,
   showAddStore = false,
 }: StoreSelectorProps) {
+  const router = useRouter();
   const currentStore = stores.find((store) => store.id === selectedStore) || stores[0]
 
   if (stores.length === 0) {
@@ -43,6 +45,7 @@ export default function StoreSelector({
         </div>
         <div className="truncate">
           <p className="font-medium text-sm text-gray-800">{currentStore?.shop_name}</p>
+          <p className="text-xs text-gray-500">Aktif Ürün: {currentStore?.listing_active_count || 0}</p>
         </div>
       </div>
     )
@@ -59,12 +62,17 @@ export default function StoreSelector({
             <div className="w-6 h-6 bg-blue-100 rounded-md flex items-center justify-center">
               <Store className="w-3.5 h-3.5 text-blue-600" />
             </div>
-            <span className="font-medium truncate">{currentStore?.shop_name}</span>
+            <div>
+              <span className="font-medium truncate">{currentStore?.shop_name}</span>
+              {currentStore?.listing_active_count && (
+                <p className="text-xs text-gray-500">Aktif Ürün: {currentStore?.listing_active_count}</p>
+              )}
+            </div>
           </div>
           <ChevronDown className="w-4 h-4 ml-2" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>Mağazalarınız</span>
           {showAddStore && (
@@ -86,21 +94,44 @@ export default function StoreSelector({
               </div>
               <div>
                 <p className="font-medium text-sm">{store.shop_name}</p>
-                {index === 0 && (
-                  <Badge variant="outline" className="text-xs px-1 py-0 mt-0.5">
-                    Ana
-                  </Badge>
-                )}
+                <div className="flex items-center mt-0.5 space-x-1">
+                  {index === 0 && (
+                    <Badge variant="outline" className="text-xs px-1 py-0">
+                      Ana
+                    </Badge>
+                  )}
+                  <span className="text-xs text-gray-500">Ürün: {store.listing_active_count || 0}</span>
+                </div>
+                <div className="flex items-center mt-0.5 space-x-1">
+                  {store.review_count > 0 && (
+                    <span className="text-xs text-gray-500">
+                      ⭐ {store.review_average?.toFixed(1) || 0} ({store.review_count})
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             {store.id === selectedStore && <CheckCircle className="w-4 h-4 text-green-600" />}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => (window.location.href = "/stores")} className="text-blue-600">
+        <DropdownMenuItem onClick={() => router.push("/analytics/stores")} className="text-blue-600">
+          <ArrowUpDown className="w-4 h-4 mr-2" />
+          Mağazaları Karşılaştır
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push("/stores")} className="text-blue-600">
           <Settings className="w-4 h-4 mr-2" />
           Mağaza Ayarları
         </DropdownMenuItem>
+        {currentStore?.url && (
+          <DropdownMenuItem 
+            onClick={() => window.open(currentStore.url, '_blank')}
+            className="text-emerald-600"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Etsy'de Görüntüle
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

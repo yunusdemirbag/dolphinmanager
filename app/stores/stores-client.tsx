@@ -36,7 +36,11 @@ import {
   RotateCcw,
   Check,
   Heart,
-  Clock
+  Clock,
+  Terminal,
+  Database,
+  Server,
+  User
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClientSupabase } from "@/lib/supabase"
@@ -46,682 +50,437 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 import { RateLimitIndicator } from "@/components/ui/rate-limit-indicator"
+import { useToast } from "@/hooks/use-toast"
+import { Database as DatabaseTypes } from "@/types/database.types"
+import { Separator } from "@/components/ui/separator"
 
 interface EtsyStore {
   shop_id: number
   shop_name: string
-  title: string
+  title: string | null
+  announcement: string | null
+  currency_code: string
+  is_vacation: boolean
   listing_active_count: number
   num_favorers: number
-  is_active: boolean
-  review_average: number
-  review_count: number
-  currency_code: string
   url: string
-  last_synced_at: string
-  connection_status: 'connected' | 'disconnected' | 'error'
-  monthly_revenue?: number
-  monthly_orders?: number
-  monthly_views?: number
-  conversion_rate?: number
-  trend?: 'up' | 'down' | 'stable'
-  avatar_url?: string
-  icon_url_fullxfull?: string
-  image_url_760x100?: string
+  image_url_760x100: string | null
+  review_count: number
+  review_average: number
+  is_active?: boolean
+  last_synced_at?: string
+  avatar_url?: string | null
 }
 
 interface StoresClientProps {
   user: any
   storesData: {
-    stores: any[]
+    stores: EtsyStore[]
     profile: any
+    error?: string
   }
 }
 
 export default function StoresClient({ user, storesData }: StoresClientProps) {
-  const [stores, setStores] = useState<EtsyStore[]>([])
-  const [loading, setLoading] = useState(true)
-  const [etsyConnected, setEtsyConnected] = useState(false)
-  const [reconnecting, setReconnecting] = useState(false)
-  const [resetting, setResetting] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [lastUpdate, setLastUpdate] = useState<string | null>(null)
-  const [connectionError, setConnectionError] = useState<string | null>(null)
-  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false)
-  const [currentStore, setCurrentStore] = useState<EtsyStore | null>(null)
-  const [refreshStatus, setRefreshStatus] = useState<{
-    success?: boolean;
-    message?: string;
-  }>({})
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
-  const [sessionExpired, setSessionExpired] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [debugLoading, setDebugLoading] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [showDebug, setShowDebug] = useState(false)
+  const [stores, setStores] = useState<EtsyStore[]>(storesData.stores || [])
+  const [connectionError, setConnectionError] = useState<string | null>(storesData.error || null)
   const router = useRouter()
-  const supabase = createClientSupabase()
-
-  useEffect(() => {
-    loadStores()
-    
-    // URL parametrelerini kontrol et - Etsy callback'den gelen mesajlar
-    const urlParams = new URLSearchParams(window.location.search)
-    const etsyStatus = urlParams.get('etsy')
-    const error = urlParams.get('error')
-    const details = urlParams.get('details')
-    const description = urlParams.get('description')
-    
-    if (etsyStatus === 'connected') {
-      alert("✅ Etsy mağazanız başarıyla bağlandı!")
-      // URL'yi temizle
-      window.history.replaceState({}, '', '/stores')
-      // Bağlantı durumunu yeniden kontrol et
-      setTimeout(() => loadStores(), 1000)
-    } else if (error) {
-      let errorMessage = "❌ Etsy bağlantısında hata oluştu."
-      
-      if (error === 'missing_params') {
-        errorMessage += "\n\nHata: Eksik parametreler. Lütfen tekrar deneyin."
-      } else if (error === 'etsy_connection_failed') {
-        errorMessage += "\n\nBağlantı başarısız oldu."
-        if (details) {
-          errorMessage += `\n\nDetay: ${decodeURIComponent(details)}`
-        }
-      } else if (description) {
-        errorMessage += `\n\nDetay: ${decodeURIComponent(description)}`
-      }
-      
-      alert(errorMessage)
-      // URL'yi temizle
-      window.history.replaceState({}, '', '/stores')
-    }
-  }, [])
-
-  const loadStores = async () => {
-    setLoading(true)
-    setConnectionError(null) // Reset any previous connection errors
-    try {
-      // Gerçek Etsy mağaza verilerini çekmeye çalış
-      const response = await fetch('/api/etsy/stores', { credentials: 'include' })
-      if (response.status === 401) {
-        setSessionExpired(true)
-        setStores([])
-        setEtsyConnected(false)
-        setLoading(false)
-        return
-      }
-      if (response.ok) {
-        const data = await response.json()
-        console.log("Stores API response:", data);
-        
-        // Check for connection errors
-        if (data.error === "RECONNECT_REQUIRED") {
-          setConnectionError("Etsy bağlantınız geçersiz olmuş. Lütfen yeniden bağlanın.")
-          setStores([])
-          setEtsyConnected(false)
-          return
-        }
-        
-        if (data.stores && data.stores.length > 0) {
-          // Add connection_status property if not exists
-          const enhancedStores = data.stores.map((store: any) => ({
-            ...store,
-            connection_status: store.connection_status || (data.source === 'database_fallback' ? 'connected' : 'connected'),
-            // Default values for missing properties
-            shop_id: store.shop_id || 0,
-            shop_name: store.shop_name || 'Unknown',
-            title: store.title || store.shop_name || 'Unknown Store',
-            listing_active_count: store.listing_active_count || 0,
-            num_favorers: store.num_favorers || 0,
-            review_average: store.review_average || 0,
-            review_count: store.review_count || 0
-          }));
-          
-          setStores(enhancedStores);
-          setEtsyConnected(true);
-          setLastUpdate(new Date().toLocaleString('tr-TR'));
-          setLastRefresh(new Date());
-        } else {
-          // Gerçek mağaza yok - boş liste göster
-          setStores([]);
-          setEtsyConnected(false);
-          
-          // Check if this is due to connection issues
-          if (data.message) {
-            setConnectionError(data.message);
-          }
-        }
-      } else {
-        // API hatası - boş liste göster
-        console.error("API error:", response.status, response.statusText);
-        const errorData = await response.json().catch(() => ({}));
-        setConnectionError(errorData.message || "Etsy API bağlantı hatası oluştu.");
-        setStores([]);
-        setEtsyConnected(false);
-      }
-    } catch (error) {
-      console.error('Error loading stores:', error);
-      setConnectionError("Etsy bağlantısı sırasında bir hata oluştu. Lütfen tekrar deneyin.");
-      setStores([]);
-      setEtsyConnected(false);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { toast } = useToast()
+  const [connecting, setConnecting] = useState(false)
+  const [statusChecking, setStatusChecking] = useState(false)
+  const [tokenCleaning, setTokenCleaning] = useState(false)
+  const [testResult, setTestResult] = useState<any>(null)
+  const [isSetupVisible, setIsSetupVisible] = useState(false)
 
   const handleConnectEtsy = async () => {
     try {
-      // API endpoint kullanarak Etsy auth URL'i al
-      const response = await fetch("/api/etsy/auth")
+      setConnecting(true)
+      const response = await fetch("/api/etsy/auth-url")
       const data = await response.json()
-
-      if (data.authUrl) {
-        // Backend tarafından oluşturulan güvenli URL'e yönlendir
-        window.location.href = data.authUrl
-      } else {
-        alert("Etsy bağlantı URL'i oluşturulamadı. Lütfen tekrar deneyin.")
-      }
-    } catch (error) {
-      console.error("Etsy auth error:", error)
-      alert("Etsy bağlantısı sırasında bir hata oluştu. Lütfen tekrar deneyin.")
-    }
-  };
-
-  // Handle reconnecting to Etsy if the connection was lost
-  const handleReconnectEtsy = async () => {
-    setReconnecting(true)
-    try {
-      // First try to reset the existing connection
-      await fetch('/api/etsy/reset', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      })
       
-      // Then initialize a new connection
-      const response = await fetch("/api/etsy/auth")
-      const data = await response.json()
-
-      if (data.authUrl) {
-        // Navigate to the Etsy auth URL
-        window.location.href = data.authUrl
+      if (data.url) {
+        window.location.href = data.url
       } else {
-        alert("Etsy bağlantı URL'i oluşturulamadı. Lütfen tekrar deneyin.")
+        throw new Error("Etsy bağlantı URL'si alınamadı")
       }
     } catch (error) {
-      console.error("Etsy reconnect error:", error)
-      alert("Etsy yeniden bağlantısı sırasında bir hata oluştu. Lütfen tekrar deneyin.")
-    } finally {
-      setReconnecting(false)
-    }
-  };
-
-  const handleResetEtsyConnection = async () => {
-    if (!confirm('Etsy bağlantısını tamamen sıfırlamak istediğinizden emin misiniz? Bu işlem tüm token\'ları ve bağlantı verilerini silecektir.')) {
-      return
-    }
-    setResetting(true)
-    try {
-      const response = await fetch('/api/etsy/reset', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
+      console.error("Etsy bağlantı hatası:", error)
+      toast({
+        title: "Hata",
+        description: "Etsy bağlantısı sırasında bir hata oluştu. Lütfen tekrar deneyin.",
+        variant: "destructive"
       })
-      if (response.status === 401) {
-        setSessionExpired(true)
-        setResetting(false)
-        return
-      }
-      if (response.ok) {
-        alert('✅ Etsy bağlantısı başarıyla sıfırlandı! Şimdi yeniden bağlanabilirsiniz.')
-        setEtsyConnected(false)
-        setStores([])
-        // Sayfayı yenile
-        setTimeout(() => loadStores(), 1000)
-      } else {
-        const errorData = await response.json()
-        console.error('Reset error:', errorData)
-        alert(`Sıfırlama hatası: ${errorData.details || errorData.error}`)
-      }
-    } catch (error) {
-      console.error('Error resetting Etsy connection:', error)
-      alert('Sıfırlama hatası: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
-      setResetting(false)
+      setConnecting(false)
     }
   }
 
-  const handleRefreshStores = async () => {
+  const handleCheckStatus = async () => {
+    setStatusChecking(true)
+    
     try {
-      if (refreshing) return; // Zaten yenileme işlemi devam ediyorsa çık
+      const response = await fetch("/api/etsy/test", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
       
-      // Son yenilemeden bu yana 5 dakika geçmediyse kullanıcıya sor
-      if (lastRefresh && (Date.now() - lastRefresh.getTime() < 5 * 60 * 1000)) {
-        const confirmRefresh = confirm(
-          "Son yenilemeden henüz 5 dakika geçmedi. API çağrı limitlerini aşmamak için gereksiz yenilemeler yapmamaya özen gösterilmelidir. Yine de yenilemek istiyor musunuz?"
-        );
-        
-        if (!confirmRefresh) return;
-      }
+      const result = await response.json()
+      setTestResult(result)
       
-      setRefreshing(true);
-      setRefreshStatus({ message: "Etsy verileri yenileniyor..." });
-      
-      // API'ye istek gönder
-      const response = await fetch("/api/etsy/refresh", {
+      toast({
+        title: result.success ? "Bağlantı Başarılı" : "Bağlantı Hatası",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      })
+    } catch (error) {
+      console.error("Error checking status:", error)
+      toast({
+        title: "Bağlantı Hatası",
+        description: "Etsy bağlantısı kontrol edilirken bir hata oluştu.",
+        variant: "destructive",
+      })
+    } finally {
+      setStatusChecking(false)
+    }
+  }
+
+  const handleCleanupTokens = async () => {
+    setTokenCleaning(true)
+    
+    try {
+      const response = await fetch("/api/etsy/cleanup-tokens", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          forceRefresh: true // Önbelleği temizle ve yeni veri çek
-        })
-      });
+      })
       
-      const result = await response.json();
+      const result = await response.json()
       
       if (result.success) {
-        // Başarılı yenileme sonrası mağaza verilerini yeniden yükle
-        await loadStores();
-        setLastRefresh(new Date());
-        
-        setRefreshStatus({
-          success: true,
-          message: "Etsy verileri başarıyla yenilendi"
-        });
+        toast({
+          title: "Token Temizleme Başarılı",
+          description: "Etsy token kayıtları başarıyla temizlendi.",
+          variant: "default",
+        })
       } else {
-        setRefreshStatus({
-          success: false,
-          message: `Yenileme hatası: ${result.message}`
-        });
-        console.error("Veri yenileme hatası:", result.message);
+        toast({
+          title: "Token Temizleme Hatası",
+          description: result.error || "Etsy token kayıtları temizlenirken bir hata oluştu.",
+          variant: "destructive",
+        })
       }
     } catch (error) {
-      setRefreshStatus({
-        success: false,
-        message: "Veri yenileme sırasında bir hata oluştu"
-      });
-      console.error("Veri yenileme hatası:", error);
-    } finally {
-      setRefreshing(false);
-      
-      // 5 saniye sonra bildirim mesajını temizle
-      setTimeout(() => {
-        setRefreshStatus({});
-      }, 5000);
-    }
-  }
-
-  const handleDisconnectStore = async () => {
-    setReconnecting(true)
-    try {
-      const storeToDisconnect = stores?.[0]?.shop_id;
-      if (!storeToDisconnect) {
-        alert('Bağlantı kesilecek mağaza bulunamadı');
-        return;
-      }
-      const response = await fetch(`/api/etsy/stores/${storeToDisconnect}/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
+      console.error("Error cleaning tokens:", error)
+      toast({
+        title: "Token Temizleme Hatası",
+        description: "Etsy token kayıtları temizlenirken bir hata oluştu.",
+        variant: "destructive",
       })
-      if (response.status === 401) {
-        setSessionExpired(true)
-        setReconnecting(false)
-        setDisconnectDialogOpen(false)
-        return
-      }
-      if (response.ok) {
-        setEtsyConnected(false)
-        setStores([])
-        alert('✅ Etsy bağlantısı başarıyla kesildi!')
-        
-        // Sayfayı yenile
-        setTimeout(() => loadStores(), 1000)
+    } finally {
+      setTokenCleaning(false)
+    }
+  }
+
+  const handleSetupEtsy = async () => {
+    try {
+      setDebugLoading(true)
+      const response = await fetch("/api/etsy/setup")
+      const data = await response.json()
+      
+      if (data.error) {
+        toast({
+          title: "Hata",
+          description: `Etsy kurulumu yapılamadı: ${data.error}`,
+          variant: "destructive"
+        })
       } else {
-        const errorData = await response.json()
-        console.error('Disconnect error:', errorData)
-        alert(`Bağlantı kesme hatası: ${errorData.details || errorData.error}`)
+        toast({
+          title: "Başarılı",
+          description: data.message,
+          variant: "default"
+        })
+        // Durum bilgisini güncelle
+        await handleCheckStatus()
       }
     } catch (error) {
-      console.error('Error disconnecting Etsy store:', error)
-      alert('Bağlantı kesme hatası: ' + (error instanceof Error ? error.message : String(error)))
+      console.error("Etsy kurulum hatası:", error)
+      toast({
+        title: "Hata",
+        description: "Etsy kurulumu sırasında bir hata oluştu.",
+        variant: "destructive"
+      })
     } finally {
-      setReconnecting(false)
-      setDisconnectDialogOpen(false)
+      setDebugLoading(false)
     }
   }
 
-  const getConnectionStatusBadge = (status: string) => {
-    switch (status) {
-      case 'connected':
-        return (
-          <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
-            <Check className="h-3 w-3 mr-1" />
-            Bağlı
-          </Badge>
-        )
-      case 'disconnected':
-        return (
-          <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50">
-            <Unlink className="h-3 w-3 mr-1" />
-            Bağlantısız
-          </Badge>
-        )
-      default:
-        return (
-          <Badge variant="outline" className="border-gray-500 text-gray-700 bg-gray-50">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Bilinmiyor
-          </Badge>
-        )
-    }
-  }
-
-  const getStoreStatusColor = (store: EtsyStore) => {
-    if (!store.is_active) return "bg-gray-500"
-    if (store.connection_status === 'connected') return "bg-green-500"
-    if (store.connection_status === 'error') return "bg-red-500"
-    return "bg-orange-500"
-  }
-
-  const getStoreStatusText = (store: EtsyStore) => {
-    if (!store.is_active) return "Pasif"
-    if (store.connection_status === 'connected') return "Aktif"
-    if (store.connection_status === 'error') return "Hata"
-    return "Bağlantısız"
-  }
-
-  const getTrendIcon = (trend?: string) => {
-    if (trend === 'up') {
-      return <TrendingUp className="w-4 h-4 text-green-600" />
-    } else if (trend === 'down') {
-      return <TrendingUp className="w-4 h-4 text-red-600 rotate-180" />
-    }
-    return <Activity className="w-4 h-4 text-gray-600" />
-  }
-
-  const connectedStores = stores.filter(s => s.connection_status === 'connected')
-  const disconnectedStores = stores.filter(s => s.connection_status !== 'connected')
-
-  // Calculate summary stats
-  const totalStores = stores.length;
-  const totalProducts = stores.reduce((sum, s) => sum + (s.listing_active_count || 0), 0);
-  const totalFollowers = stores.reduce((sum, s) => sum + (s.num_favorers || 0), 0);
-  const totalRevenue = stores.reduce((sum, s) => sum + (s.monthly_revenue || 0), 0);
-
-  const handleStoreSelect = (store: EtsyStore) => {
-    setCurrentStore(store);
-  }
-
-  // Oturum süresi dolduysa kullanıcıya uyarı göster
-  if (sessionExpired) {
+  // Mağaza bağlantısı yoksa veya hata varsa
+  if (!loading && (stores.length === 0 || connectionError)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[300px]">
-        <Alert className="mb-4" variant="destructive">
-          <AlertTitle>Oturumunuz sona erdi</AlertTitle>
-          <AlertDescription>
-            Lütfen tekrar giriş yapın. Oturumunuz sona erdiği için mağaza işlemleri gerçekleştirilemiyor.
-          </AlertDescription>
-        </Alert>
-        <Button className="bg-black text-white" onClick={() => window.location.href = '/login'}>
-          Giriş Yap
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col items-center mb-6">
-        <h1 className="text-2xl font-bold">Mağazalar</h1>
-        <CurrentStoreNameBadge />
-      </div>
-      
-      {/* Rate Limit Indicator */}
-      <div className="mb-6">
-        <RateLimitIndicator />
-      </div>
-      
-      {/* Yenileme durumu bildirimi */}
-      {refreshStatus.message && (
-        <div className={`mb-4 p-3 rounded border flex items-center ${
-          refreshStatus.success === undefined
-            ? 'bg-blue-50 border-blue-200 text-blue-700'  // Bilgi
-            : refreshStatus.success
-              ? 'bg-green-50 border-green-200 text-green-700'  // Başarılı
-              : 'bg-red-50 border-red-200 text-red-700'  // Hata
-        }`}>
-          {refreshStatus.success === undefined && <Activity className="h-5 w-5 mr-3" />}
-          {refreshStatus.success === true && <CheckCircle className="h-5 w-5 mr-3" />}
-          {refreshStatus.success === false && <XCircle className="h-5 w-5 mr-3" />}
-          <p className="text-sm font-medium flex-1">{refreshStatus.message}</p>
-          {refreshing && <Loader2 className="w-5 h-5 ml-3 animate-spin" />}
-        </div>
-      )}
-      
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Store className="h-8 w-8 text-indigo-500" />
-            Mağazalarım
-          </h1>
-          <div className='text-gray-500 text-sm mb-6'>{currentStore?.shop_name || 'Mağaza'}</div>
-          <p className="text-gray-600 mt-2">Etsy mağazalarınızı tek yerden yönetin</p>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleRefreshStores} 
-            disabled={refreshing}
-            className="bg-black hover:bg-gray-800 text-white border-none"
-          >
-            {refreshing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            {refreshing ? 'Yenileniyor...' : 'Verileri Güncelle'}
-          </Button>
-          {!etsyConnected && (
-            <Button onClick={handleConnectEtsy} className="bg-black hover:bg-gray-800 text-white">
-              <Link className="mr-2 h-4 w-4" />
-              Mağaza Ekle
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Son yenileme bilgisi */}
-      {lastRefresh && (
-        <div className="text-xs text-gray-500 mb-4 flex items-center">
-          <Clock className="w-3 h-3 mr-1" />
-          Son yenileme: {lastRefresh.toLocaleString()}
-        </div>
-      )}
-
-      {/* İstatistikler */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-indigo-600">{totalStores}</div>
-            <div className="text-sm text-gray-600">Toplam Mağaza</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{totalProducts}</div>
-            <div className="text-sm text-gray-600">Toplam Ürün</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-purple-600">{totalFollowers}</div>
-            <div className="text-sm text-gray-600">Toplam Takipçi</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-yellow-600">${totalRevenue.toLocaleString()}</div>
-            <div className="text-sm text-gray-600">Aylık Gelir</div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Durum Bilgisi */}
-      <div className="flex items-center text-sm text-gray-500 gap-2">
-        <div className="flex items-center">
-          <div className={`w-2 h-2 rounded-full mr-2 ${etsyConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <span>{etsyConnected ? 'Etsy Hesabı Bağlı' : 'Etsy Hesabı Bağlı Değil'}</span>
-        </div>
-        <div className="text-gray-400">•</div>
-        <div>Son güncelleme: {lastUpdate || '-'}</div>
-        {connectionError && (
-          <>
-            <div className="text-gray-400">•</div>
-            <div className="text-red-500 flex items-center">
-              <AlertCircle className="h-3 w-3 mr-1" />
-              {connectionError}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Store Management */}
-      {loading ? (
-        <Card>
-          <CardContent className="flex justify-center items-center min-h-[300px]">
-            <div className="flex flex-col items-center gap-3">
-              <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
-              <p className="text-gray-500">Mağazalar yükleniyor...</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : stores.length === 0 ? (
-        <Card className="bg-slate-50 border-2 border-dashed border-slate-200">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
-              <Store className="h-12 w-12 text-slate-400" />
-              <div>
-                <h3 className="text-lg font-medium">Henüz Etsy Mağazanız Bağlı Değil</h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Etsy hesabınızı bağlayarak mağazalarınızı ve ürünlerinizi yönetin.
-                </p>
-              </div>
-              {connectionError ? (
-                <Alert variant="destructive" className="mt-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Bağlantı Hatası</AlertTitle>
-                  <AlertDescription>{connectionError}</AlertDescription>
-                  <Button 
-                    variant="outline" 
-                    className="mt-2" 
-                    onClick={handleReconnectEtsy}
-                    disabled={reconnecting}
+      <div className="min-h-screen bg-gray-50">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col items-center justify-center min-h-[300px]">
+            <Alert className="mb-4" variant={connectionError ? "destructive" : "default"}>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle className="flex items-center gap-2">
+                {connectionError ? "Mağaza Bağlantı Hatası" : "Mağaza Bağlantısı Gerekli"}
+              </AlertTitle>
+              <AlertDescription>
+                {connectionError ? (
+                  <div className="space-y-2">
+                    <p>{connectionError}</p>
+                    <p>Mağaza verilerinize erişebilmek için lütfen Etsy hesabınızı tekrar bağlayın.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p>Henüz bağlı bir Etsy mağazanız bulunmuyor.</p>
+                    <p>Mağazanızı bağlayarak yönetmeye başlayabilirsiniz.</p>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+            <div className="mt-8 flex flex-col space-y-4">
+              {storesData.stores && storesData.stores.length > 0 ? (
+                <>
+                  <Button
+                    onClick={handleCheckStatus}
+                    className="w-full md:w-auto"
+                    disabled={statusChecking}
                   >
-                    {reconnecting ? (
+                    {statusChecking ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Yeniden Bağlanılıyor...
+                        Bağlantı Kontrol Ediliyor...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Bağlantıyı Kontrol Et
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button
+                    onClick={handleCleanupTokens}
+                    variant="outline"
+                    className="w-full md:w-auto"
+                    disabled={tokenCleaning}
+                  >
+                    {tokenCleaning ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Tokenler Temizleniyor...
                       </>
                     ) : (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        Yeniden Bağlan
+                        Token Kayıtlarını Temizle
                       </>
                     )}
                   </Button>
-                </Alert>
+                  
+                  <Button
+                    onClick={() => {
+                      setDebugLoading(true);
+                      fetch("/api/etsy/debug")
+                        .then(res => res.json())
+                        .then(data => {
+                          setDebugInfo(data);
+                          setShowDebug(true);
+                          setDebugLoading(false);
+                        })
+                        .catch(err => {
+                          console.error("Debug bilgisi alınamadı:", err);
+                          toast({
+                            title: "Hata",
+                            description: "Debug bilgisi alınamadı.",
+                            variant: "destructive"
+                          });
+                          setDebugLoading(false);
+                        });
+                    }}
+                    variant="outline"
+                    className="w-full md:w-auto"
+                    disabled={debugLoading}
+                  >
+                    {debugLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Bilgiler Alınıyor...
+                      </>
+                    ) : (
+                      <>
+                        <Terminal className="mr-2 h-4 w-4" />
+                        Bağlantı Bilgilerini Göster
+                      </>
+                    )}
+                  </Button>
+                </>
               ) : (
-                <Button onClick={handleConnectEtsy} className="mt-2">
-                  <Link className="mr-2 h-4 w-4" />
-                  Etsy Hesabını Bağla
+                <Button
+                  onClick={handleConnectEtsy}
+                  className="w-full md:w-auto"
+                  disabled={connecting}
+                >
+                  {connecting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Etsy'e Bağlanıyor...
+                    </>
+                  ) : (
+                    <>
+                      <Store className="mr-2 h-4 w-4" />
+                      Etsy Mağazanıza Bağlanın
+                    </>
+                  )}
                 </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Mağaza Kartları */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {stores.map((store) => (
-              <Card key={store.shop_id} className="relative">
-                <CardContent className="flex items-center">
-                  <div className="relative w-20 h-20 rounded-full overflow-hidden mr-4 bg-gray-200 flex items-center justify-center">
-                    {store.avatar_url || store.image_url_760x100 ? (
-                      <img
-                        src={store.avatar_url || store.image_url_760x100}
-                        alt={`${store.shop_name} avatar`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = `https://www.etsy.com/images/avatars/default_shop.png`; // Hata oluşursa default resim
-                        }}
-                      />
-                    ) : (
-                      <Store className="w-10 h-10 text-gray-500" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-center mb-1">{store.title}</h3>
-                    <div className="flex items-center gap-2 text-gray-500 mb-3">
-                      <a href={store.url} target="_blank" rel="noopener noreferrer" className="text-sm hover:text-indigo-600 flex items-center">
-                        Etsy'de Görüntüle
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </a>
-                    </div>
-                    <div className="flex items-center gap-1 text-yellow-600 mb-2">
-                      <Star className="h-4 w-4" />
-                      <span className="font-medium">{store.review_average?.toFixed(2) || 0}</span>
-                      <span className="text-gray-500 text-sm">({store.review_count})</span>
-                    </div>
-                    {getConnectionStatusBadge(store.connection_status)}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
           </div>
-        </>
-      )}
+        </main>
+        
+        {/* Debug Bileşeni */}
+        {showDebug && (
+          <div className="mt-10 px-4 sm:px-6 lg:px-8 pb-10">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Etsy Bağlantı Bilgileri</h2>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowDebug(false)}
+              >
+                <XCircle className="h-4 w-4 mr-1" /> 
+                Kapat
+              </Button>
+            </div>
+            <Separator className="mb-4" />
+            
+            {debugInfo ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium">Kullanıcı Bilgileri</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                        {JSON.stringify(debugInfo.user, null, 2)}
+                      </pre>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium">Veritabanı Durumu</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                        {JSON.stringify(debugInfo.database, null, 2)}
+                      </pre>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Token Bilgileri</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                      {JSON.stringify(debugInfo.tokens, null, 2)}
+                    </pre>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Çevre Değişkenleri</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                      {JSON.stringify(debugInfo.environment, null, 2)}
+                    </pre>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-500">Etsy bağlantı bilgileri yükleniyor...</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
 
-      {/* Disconnect Dialog */}
-      <Dialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mağaza Bağlantısını Kes</DialogTitle>
-            <DialogDescription>
-              Bu işlem mağazanızın Dolphin Manager ile bağlantısını kesecektir. Verileriniz silinmeyecek, sadece eşleştirme kaldırılacaktır.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-amber-600 font-medium mb-2 flex items-center">
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Bu işlemi gerçekleştirmek istediğinizden emin misiniz?
-            </p>
-            <p className="text-sm text-gray-500">
-              Mağazanızı daha sonra tekrar bağlayabilirsiniz. Ancak mevcut senkronizasyon durumunuz sıfırlanacaktır.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDisconnectDialogOpen(false)} className="border-gray-300">
-              İptal
-            </Button>
-            <Button variant="destructive" onClick={handleDisconnectStore} disabled={reconnecting} className="bg-black hover:bg-gray-800 text-white border-none">
-              {reconnecting ? <Loader2 className="w-4 w-4 mr-2 animate-spin" /> : <LogOut className="h-4 w-4 mr-2" />}
-              Bağlantıyı Kes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+  // Mağazalar varsa mağaza listesini göster
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {stores.map((store) => (
+            <Card key={store.shop_id} className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle>{store.shop_name}</CardTitle>
+                    <CardDescription>{store.title || "Mağaza başlığı yok"}</CardDescription>
+                  </div>
+                  {store.is_vacation && (
+                    <Badge variant="secondary">Tatil Modu</Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      <span>{store.listing_active_count} Ürün</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Heart className="h-4 w-4" />
+                      <span>{store.num_favorers} Favori</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Star className="h-4 w-4" />
+                      <span>{store.review_average.toFixed(1)} Puan</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      <span>{store.review_count} Değerlendirme</span>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => window.open(store.url, '_blank')}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Mağazayı Görüntüle
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </main>
     </div>
   )
 }

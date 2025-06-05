@@ -1,4 +1,220 @@
-import { cacheManager } from "./cache";
+import { Redis } from '@upstash/redis';
+
+// Redis client'ı oluştur
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL || '',
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+});
+
+interface CacheOptions {
+  ttl?: number; // saniye cinsinden
+  tags?: string[]; // cache etiketleri
+}
+
+/**
+ * Veriyi cache'e kaydeder
+ */
+export async function setCache(key: string, data: any, options: CacheOptions = {}): Promise<void> {
+  try {
+    const { ttl = 3600, tags = [] } = options;
+    
+    // Veriyi ve metadata'yı birlikte sakla
+    const cacheData = {
+      data,
+      metadata: {
+        timestamp: Date.now(),
+        tags,
+      },
+    };
+
+    // Redis'e kaydet
+    await redis.set(key, JSON.stringify(cacheData), {
+      ex: ttl,
+    });
+
+    // Etiketleri kaydet
+    if (tags.length > 0) {
+      await Promise.all(
+        tags.map(tag => redis.sadd(`cache:tags:${tag}`, key))
+      );
+    }
+  } catch (error) {
+    console.error('Cache set error:', error);
+  }
+}
+
+/**
+ * Cache'den veri okur
+ */
+export async function getCache<T>(key: string): Promise<T | null> {
+  try {
+    const cachedData = await redis.get<string>(key);
+    if (!cachedData) return null;
+
+    const { data, metadata } = JSON.parse(cachedData);
+    return data as T;
+  } catch (error) {
+    console.error('Cache get error:', error);
+    return null;
+  }
+}
+
+/**
+ * Cache'i temizler
+ */
+export async function invalidateCache(key: string): Promise<void> {
+  try {
+    await redis.del(key);
+  } catch (error) {
+    console.error('Cache invalidation error:', error);
+  }
+}
+
+/**
+ * Etiketlere göre cache'i temizler
+ */
+export async function invalidateCacheByTags(tags: string[]): Promise<void> {
+  try {
+    // Her etiket için ilgili key'leri bul
+    const keysToDelete = await Promise.all(
+      tags.map(tag => redis.smembers(`cache:tags:${tag}`))
+    );
+
+    // Tüm key'leri sil
+    const uniqueKeys = [...new Set(keysToDelete.flat())];
+    if (uniqueKeys.length > 0) {
+      await redis.del(...uniqueKeys);
+    }
+
+    // Etiket setlerini temizle
+    await Promise.all(
+      tags.map(tag => redis.del(`cache:tags:${tag}`))
+    );
+  } catch (error) {
+    console.error('Cache tag invalidation error:', error);
+  }
+}
+
+interface FetchWithCacheOptions {
+  url: string;
+  options?: RequestInit;
+  cacheKey?: string;
+  ttl?: number;
+  staleWhileRevalidateAge?: number;
+  retryCount?: number;
+  retryDelay?: number;
+  mockDataGenerator?: () => any;
+}
+
+/**
+ * Fetch ile cache entegrasyonu
+ */
+export async function fetchWithCache<T>({
+  url,
+  options = {},
+  cacheKey,
+  ttl = 3600,
+  staleWhileRevalidateAge = 300000, // 5 dakika
+  retryCount = 3,
+  retryDelay = 1000,
+  mockDataGenerator
+}: FetchWithCacheOptions): Promise<T> {
+  // Cache key belirtilmemişse URL'i kullan
+  const key = cacheKey || `cache:${url}`;
+
+  // Cache'den kontrol et
+  const cachedData = await getCache<T>(key);
+  if (cachedData) {
+    // Cache metadata'sını kontrol et
+    const cacheMetadata = await getCache<{ metadata: { timestamp: number; tags: string[] } }>(`${key}:metadata`);
+    
+    // Veri eskiyse arka planda yenile
+    if (cacheMetadata && Date.now() - cacheMetadata.metadata.timestamp > staleWhileRevalidateAge) {
+      console.log(`🔄 Data is stale, triggering background refresh for ${key}`);
+      fetchAndUpdateCache(url, options, key, ttl, retryCount, retryDelay, mockDataGenerator);
+    }
+    
+    return cachedData;
+  }
+
+  try {
+    // Cache'de yoksa fetch yap
+    const response = await fetch(url, options);
+    
+    // Rate limit kontrolü
+    if (response.status === 429) {
+      const retryAfter = parseInt(response.headers.get('Retry-After') || '1');
+      const delay = retryAfter * 1000 || retryDelay;
+      
+      console.log(`Rate limit exceeded. Waiting ${delay}ms before retry`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      return fetchWithCache({
+        url,
+        options,
+        cacheKey: key,
+        ttl,
+        staleWhileRevalidateAge,
+        retryCount: retryCount - 1,
+        retryDelay,
+        mockDataGenerator
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Cache'e kaydet
+    await setCache(key, data, {
+      ttl,
+      tags: [`url:${url}`],
+    });
+
+    return data;
+  } catch (error) {
+    console.error('Fetch error:', error);
+    
+    // Mock data varsa kullan
+    if (mockDataGenerator) {
+      const mockData = mockDataGenerator();
+      await setCache(key, mockData, { ttl: 300 }); // 5 dakika
+      return mockData;
+    }
+    
+    throw error;
+  }
+}
+
+async function fetchAndUpdateCache<T>(
+  url: string,
+  options: RequestInit,
+  cacheKey: string,
+  ttl: number,
+  retryCount: number,
+  retryDelay: number,
+  mockDataGenerator?: () => any
+): Promise<void> {
+  try {
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    await setCache(cacheKey, data, { ttl });
+  } catch (error) {
+    console.error('Background refresh error:', error);
+    
+    if (mockDataGenerator) {
+      const mockData = mockDataGenerator();
+      await setCache(cacheKey, mockData, { ttl: 300 }); // 5 dakika
+    }
+  }
+}
 
 export interface RequestOptions extends RequestInit {
   /** Number of retry attempts for the request (default: 2) */
@@ -268,7 +484,7 @@ export async function fetchWithCache<T>(
     
     // If we have cached data, return it even if stale
     if (cacheKey) {
-      const cachedData = cacheManager.get<T>(cacheKey);
+      const cachedData = await getCache<T>(cacheKey);
       if (cachedData) {
         console.log(`📦 Using stale cached data for ${cacheKey} due to rate limiting`);
         return cachedData;
@@ -282,7 +498,7 @@ export async function fetchWithCache<T>(
       
       // Cache the mock data with a short TTL
       if (cacheKey) {
-        cacheManager.set(cacheKey, mockData, { ttl: 5 * 60 * 1000 }); // 5 minutes
+        await setCache(cacheKey, mockData, { ttl: 5 * 60 * 1000 }); // 5 minutes
       }
       
       return mockData as T;
@@ -294,13 +510,13 @@ export async function fetchWithCache<T>(
   
   // Try to get from cache first
   if (cacheKey && !skipCache) {
-    const cachedData = cacheManager.get<T>(cacheKey);
+    const cachedData = await getCache<T>(cacheKey);
     if (cachedData) {
       console.log(`📦 Using cached data for ${cacheKey}`);
       
       // If the data is stale, trigger a background refresh
-      const cacheMetadata = cacheManager.getMetadata(cacheKey);
-      if (cacheMetadata && Date.now() - cacheMetadata.timestamp > staleWhileRevalidateAge) {
+      const cacheMetadata = await getCache<{ metadata: { timestamp: number; tags: string[] } }>(`${cacheKey}:metadata`);
+      if (cacheMetadata && Date.now() - cacheMetadata.metadata.timestamp > staleWhileRevalidateAge) {
         console.log(`🔄 Data is stale, triggering background refresh for ${cacheKey}`);
         fetchAndUpdateCache(url, fetchOptions, cacheKey, cacheTTL, 0, retryDelay, mockDataGenerator)
           .catch(error => console.error(`Background refresh failed for ${cacheKey}:`, error));
@@ -356,7 +572,7 @@ async function fetchAndUpdateCache<T>(
           
           // Cache the mock data with a short TTL
           if (cacheKey) {
-            cacheManager.set(cacheKey, mockData, { ttl: 5 * 60 * 1000 }); // 5 minutes
+            await setCache(cacheKey, mockData, { ttl: 5 * 60 * 1000 }); // 5 minutes
           }
           
           return mockData as T;
@@ -392,7 +608,7 @@ async function fetchAndUpdateCache<T>(
       
       // Update cache if we have a cache key
       if (cacheKey) {
-        cacheManager.set(cacheKey, data, { ttl: cacheTTL });
+        await setCache(cacheKey, data, { ttl: cacheTTL });
         console.log(`📦 Updated cache for ${cacheKey}`);
       }
       
@@ -415,7 +631,7 @@ async function fetchAndUpdateCache<T>(
     
     // Cache the mock data with a short TTL
     if (cacheKey) {
-      cacheManager.set(cacheKey, mockData, { ttl: 5 * 60 * 1000 }); // 5 minutes
+      await setCache(cacheKey, mockData, { ttl: 5 * 60 * 1000 }); // 5 minutes
     }
     
     return mockData as T;

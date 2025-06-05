@@ -1,9 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { Database } from '@/types/database.types'
+import { SupabaseClient } from '@supabase/supabase-js'
 
-export async function createClient() {
-  const cookieStore = await cookies()
+export async function createClient(): Promise<SupabaseClient<Database>> {
+  const cookieStore = cookies()
   
   // Debug bilgisi ekleyelim
   console.log("Creating server-side Supabase client with URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -13,7 +14,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name) {
+        get(name: string) {
           const cookie = cookieStore.get(name);
           if (name === 'sb-access-token' || name === 'sb-refresh-token') {
             console.log(`Reading auth cookie: ${name}, exists: ${!!cookie}`);

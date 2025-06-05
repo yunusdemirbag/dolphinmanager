@@ -1,16 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useProducts } from "@/hooks/useProducts"
+import { useProductsOld } from "@/hooks/useProducts"
 import { ProductCard } from "@/components/product/ProductCard"
 import { ProductFilters } from "@/components/product/ProductFilters"
 import { ProductFormModal } from "@/components/product/ProductFormModal"
 import { ProductDeleteModal } from "@/components/product/ProductDeleteModal"
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2 } from "lucide-react"
+import { Plus, Loader2, Store } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode } from "@/types/product"
 import { useProductsClient } from "./products-client"
 import { toast } from "@/components/ui/use-toast"
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { formatCurrency } from '@/lib/utils';
 
 interface CreateListingResponse {
   success: boolean;
@@ -45,7 +51,7 @@ export default function ProductsPage() {
     handleUpdateProduct,
     handleDeleteProduct,
     setFilteredProducts
-  } = useProducts()
+  } = useProductsOld()
 
   const {
     shippingProfiles,
@@ -173,38 +179,42 @@ export default function ProductsPage() {
     // Apply search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
-      filtered = filtered.filter(product =>
+      filtered = filtered.filter((product: Product) =>
         product.title.toLowerCase().includes(searchLower) ||
         product.description.toLowerCase().includes(searchLower) ||
-        product.tags.some(tag => tag.toLowerCase().includes(searchLower))
+        product.tags.some((tag: string) => tag.toLowerCase().includes(searchLower))
       )
     }
 
     // Apply status filter
     if (filterStatus !== 'all') {
-      filtered = filtered.filter(product => product.state === filterStatus)
+      filtered = filtered.filter((product: Product) => product.state === filterStatus)
     }
 
     // Apply sorting
-    filtered.sort((a, b) => {
+    filtered.sort((a: Product, b: Product) => {
       let aValue = a[sortBy as keyof Product]
       let bValue = b[sortBy as keyof Product]
 
       // Handle nested properties
       if (sortBy === 'price') {
-        aValue = a.price.amount / a.price.divisor
-        bValue = b.price.amount / b.price.divisor
+        aValue = a.price?.amount || 0
+        bValue = b.price?.amount || 0
       }
 
-      if (typeof aValue === 'string') {
-        return sortOrder === 'asc'
-          ? aValue.localeCompare(bValue as string)
-          : (bValue as string).localeCompare(aValue)
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortOrder === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue)
       }
 
-      return sortOrder === 'asc'
-        ? (aValue as number) - (bValue as number)
-        : (bValue as number) - (aValue as number)
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortOrder === 'asc' 
+          ? aValue - bValue
+          : bValue - aValue
+      }
+
+      return 0
     })
 
     setFilteredProducts(filtered)
@@ -638,54 +648,123 @@ export default function ProductsPage() {
         onGridTypeChange={setGridType}
       />
 
-      {/* Products Grid */}
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      ) : filteredProducts.length > 0 ? (
-        <div className={gridClasses[gridType]}>
-          {filteredProducts.map(product => (
-            <ProductCard
-              key={product.listing_id}
-              product={product}
-              listView={gridType === 'list'}
-              isSelected={false}
-              onSelect={() => {}}
-              onEdit={setShowEditModal}
-              onCopy={onCopyProduct}
-              onDelete={setConfirmDeleteProductId}
-              onUpdateState={(product, newState) => {
-                handleUpdateProduct({ ...product, state: newState })
-              }}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Ürün bulunamadı</p>
+      {/* Connection Error Message */}
+      {!etsyConnected && (
+        <div className="flex flex-col items-center justify-center py-16 px-4 h-[70vh] max-w-lg mx-auto text-center">
+          <div className="rounded-full bg-amber-100 p-4 mb-6">
+            <Store className="w-10 h-10 text-amber-600" />
+          </div>
+          <h3 className="text-2xl font-semibold text-gray-800 mb-3">
+            {reconnectRequired ? "Etsy Bağlantısı Gerekiyor" : "Etsy Mağazanız Bulunamadı"}
+          </h3>
+          <p className="text-gray-500 mb-8 max-w-md">
+            {reconnectRequired 
+              ? "Etsy hesabınızın yetkilendirmesi sona ermiş. Ürünlerinizi yönetmek için lütfen Etsy hesabınızı yeniden bağlayın."
+              : "Henüz bir Etsy mağazanız yok veya mağazanızı bağlamadınız. Ürün yönetimi için öncelikle bir Etsy mağazasına bağlanmanız gerekiyor."}
+          </p>
+          
+          <Button 
+            onClick={handleReconnectEtsy} 
+            className="bg-amber-600 hover:bg-amber-700 shadow-sm"
+            size="lg"
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Bağlanıyor...
+              </>
+            ) : (
+              <>
+                <Store className="mr-2 h-4 w-4" />
+                Etsy Mağazanızı Bağlayın
+              </>
+            )}
+          </Button>
+          
+          <div className="mt-8 border-t border-gray-100 pt-6 text-sm text-gray-400 max-w-sm">
+            Etsy bağlantısı sayesinde mağazanızdaki tüm ürünleri görüntüleyebilir ve yönetebilirsiniz.
+          </div>
         </div>
       )}
 
+      {/* Products Grid */}
+      {etsyConnected && (
+        <>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <div className="flex justify-center items-center h-64">
+                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    </div>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-12 px-4 border border-dashed border-gray-300 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-900">Ürün Bulunamadı</h3>
+              <p className="mt-1 text-gray-500">Henüz ürün eklenmemiş veya arama sonucu ürün bulunamadı.</p>
+              <div className="mt-6">
+                <Button onClick={() => setShowCreateModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Yeni Ürün Ekle
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className={`grid gap-6 ${
+              gridType === 'grid3' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' :
+              gridType === 'grid5' ? 'grid-cols-1 sm:grid-cols-3 lg:grid-cols-5' :
+              'grid-cols-1'
+            }`}>
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.listing_id}
+                  product={product}
+                  listView={gridType === 'list'}
+                  isSelected={false}
+                  onSelect={() => {}}
+                  onEdit={() => setShowEditModal(product)}
+                  onCopy={() => {}}
+                  onDelete={() => setConfirmDeleteProductId(product.listing_id)}
+                  onUpdateState={() => {}}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {/* Modals */}
-      <ProductFormModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSubmit={onCreateProduct}
-        submitting={submitting}
-        shippingProfiles={shippingProfiles}
-        processingProfiles={processingProfiles}
-        loadingShippingProfiles={loadingShippingProfiles}
-        loadingProcessingProfiles={loadingProcessingProfiles}
-      />
+      {showCreateModal && (
+        <ProductFormModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreateProduct}
+          modalTitle="Yeni Ürün Ekle"
+          submitButtonText="Ürünü Kaydet"
+          isSubmitting={submitting}
+          shippingProfiles={shippingProfiles}
+          processingProfiles={processingProfiles}
+          loadingShippingProfiles={loadingShippingProfiles}
+          loadingProcessingProfiles={loadingProcessingProfiles}
+        />
+      )}
 
       {showEditModal && (
         <ProductFormModal
-          isOpen={true}
+          isOpen={!!showEditModal}
           onClose={() => setShowEditModal(null)}
-          product={showEditModal}
-          onSubmit={(data) => onUpdateProduct({ ...showEditModal, ...data } as Product)}
-          submitting={submitting}
+          onSubmit={(data, state) => {
+            return handleUpdateProduct({...showEditModal, ...data} as Product) as Promise<CreateListingResponse>;
+          }}
+          initialData={showEditModal}
+          modalTitle="Ürünü Düzenle"
+          submitButtonText="Değişiklikleri Kaydet"
+          isSubmitting={submitting}
           shippingProfiles={shippingProfiles}
           processingProfiles={processingProfiles}
           loadingShippingProfiles={loadingShippingProfiles}

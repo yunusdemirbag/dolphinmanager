@@ -10,51 +10,86 @@ interface StoreDetails {
 export function useProductsClient() {
   // Shipping Profiles State
   const [shippingProfiles, setShippingProfiles] = useState<ShippingProfile[]>([]);
-  const [loadingShippingProfiles, setLoadingShippingProfiles] = useState(false);
+  const [loadingShippingProfiles, setLoadingShippingProfiles] = useState(true);
   
   // Processing Profiles State
   const [processingProfiles, setProcessingProfiles] = useState<EtsyProcessingProfile[]>([]);
-  const [loadingProcessingProfiles, setLoadingProcessingProfiles] = useState(false);
+  const [loadingProcessingProfiles, setLoadingProcessingProfiles] = useState(true);
   
   const [storeDetails, setStoreDetails] = useState<StoreDetails | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [isEtsyConnected, setIsEtsyConnected] = useState(true);
 
   // Fetch store details and shipping profiles
   const fetchStoreDetailsAndProfiles = async () => {
     try {
       setLoadingShippingProfiles(true);
       setLoadingProcessingProfiles(true);
+      setConnectionError(null);
       
-      // Önce mağaza bilgilerini al
+      // Mağaza bilgilerini al
       const storeResponse = await fetch('/api/etsy/stores');
-      if (!storeResponse.ok) {
-        throw new Error(`Error fetching store details: ${storeResponse.status}`);
+      const storeData = await storeResponse.json();
+      
+      // Etsy bağlantısı kontrolü
+      if (storeResponse.status === 401 || (storeData.error && storeData.error.includes('Unauthorized'))) {
+        setIsEtsyConnected(false);
+        setConnectionError('Etsy hesabınıza bağlı değilsiniz. Lütfen önce Etsy hesabınızı bağlayın.');
+        return;
       }
       
-      const storeData = await storeResponse.json();
       if (!storeData.stores || storeData.stores.length === 0) {
-        throw new Error('No Etsy stores found');
+        setIsEtsyConnected(false);
+        setConnectionError('Etsy mağazanız bulunamadı. Lütfen Etsy hesabınızı bağlayın veya mağaza oluşturun.');
+        return;
       }
-
-      const firstStore = storeData.stores[0];
+      
       setStoreDetails({
-        shop_id: firstStore.shop_id,
-        shop_name: firstStore.shop_name
+        shop_id: storeData.stores[0].shop_id,
+        shop_name: storeData.stores[0].shop_name
       });
-
-      // Mağaza ID'si ile kargo profillerini al
-      const profilesResponse = await fetch(`/api/etsy/shipping-profiles`);
-      if (!profilesResponse.ok) {
-        throw new Error('Kargo profilleri yüklenirken bir hata oluştu');
-      }
-
-      const profilesData = await profilesResponse.json();
-      console.log('Fetched shipping profiles:', profilesData);
-
-      if (!profilesData.profiles || profilesData.profiles.length === 0) {
-        toast.error('Etsy mağazanızda kargo profili bulunamadı. Lütfen önce Etsy\'de bir kargo profili oluşturun.');
-        // Devam et, diğer profilleri yine de yükleyelim
+      
+      // Kargo profillerini al
+      const shippingProfilesResponse = await fetch('/api/etsy/shipping-profiles');
+      
+      if (!shippingProfilesResponse.ok) {
+        if (shippingProfilesResponse.status === 404) {
+          console.warn('Mağaza için kargo profili bulunamadı');
+          // Varsayılan profil ekle - ShippingProfile tipine uygun şekilde
+          const defaultProfile: ShippingProfile = {
+            shipping_profile_id: 0,
+            title: 'Varsayılan Kargo Profili',
+            user_id: storeData.stores[0].user_id || 0,
+            min_processing_days: 1,
+            max_processing_days: 3,
+            processing_days_display_label: '1-3 gün',
+            origin_country_iso: 'TR',
+            is_deleted: false,
+            shipping_carrier_id: 0,
+            mail_class: 'None',
+            min_delivery_days: 3,
+            max_delivery_days: 5,
+            destination_country_iso: 'TR',
+            destination_region: 'EU',
+            primary_cost: {
+              amount: 1000,
+              divisor: 100,
+              currency_code: 'USD'
+            },
+            secondary_cost: {
+              amount: 500,
+              divisor: 100,
+              currency_code: 'USD'
+            }
+          };
+          setShippingProfiles([defaultProfile]);
+        } else {
+          console.error('Kargo profilleri alınamadı:', await shippingProfilesResponse.text());
+          setConnectionError('Kargo profilleri yüklenirken bir sorun oluştu.');
+        }
       } else {
-        setShippingProfiles(profilesData.profiles);
+        const shippingProfilesData = await shippingProfilesResponse.json();
+        setShippingProfiles(shippingProfilesData.profiles || []);
       }
       
       // İşlem profillerini al
@@ -86,7 +121,6 @@ export function useProductsClient() {
         }
       } catch (processingError) {
         console.error('Error fetching processing profiles:', processingError);
-        toast.error('İşlem profilleri yüklenirken bir hata oluştu');
         
         // Hata durumunda varsayılan profil ekle
         const defaultProfile = {
@@ -102,7 +136,8 @@ export function useProductsClient() {
       }
     } catch (error) {
       console.error('Error in fetchStoreDetailsAndProfiles:', error);
-      toast.error(error instanceof Error ? error.message : 'Profiller yüklenirken bir hata oluştu');
+      setConnectionError(error instanceof Error ? error.message : 'Profiller yüklenirken bir hata oluştu');
+      setIsEtsyConnected(false);
     } finally {
       setLoadingShippingProfiles(false);
       setLoadingProcessingProfiles(false);
@@ -120,6 +155,8 @@ export function useProductsClient() {
     processingProfiles,
     loadingProcessingProfiles,
     storeDetails,
-    fetchStoreDetailsAndProfiles
+    fetchStoreDetailsAndProfiles,
+    connectionError,
+    isEtsyConnected
   };
 } 

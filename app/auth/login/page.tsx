@@ -89,7 +89,7 @@ export default function LoginPage() {
             </div>
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Dolphin Manager'a Hoş Geldiniz</h2>
-          <p className="mt-2 text-sm text-gray-600">Etsy mağazanızı profesyonelce yönetin</p>
+          <p className="mt-2 text-sm text-gray-600">Mağazanızı Yönetin</p>
         </div>
 
         <Card className="shadow-xl border-0">

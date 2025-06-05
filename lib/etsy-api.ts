@@ -166,4 +166,10 @@ async function refreshEtsyToken(userId: string, refreshToken: string): Promise<s
   }
 }
 
-export { getStoredEtsyDataByType };
+export {
+  getStoredEtsyDataByType,
+  getValidAccessToken,
+  refreshEtsyToken,
+  syncEtsyDataToDatabase
+  // Diğer fonksiyonlar da burada export edilmeli (örn: getEtsyAuthUrl, exchangeCodeForToken, cleanupDuplicateTokens, uploadImageToEtsy, vs.)
+};

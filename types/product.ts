@@ -64,6 +64,7 @@ export interface Product {
     sold: number
   }
   processing_profile_id?: number
+  variations?: any[]
 }
 
 export interface CreateProductForm {

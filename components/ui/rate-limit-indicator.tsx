@@ -16,31 +16,50 @@ export function RateLimitIndicator() {
     // API rate limit bilgisini al
     const fetchRateLimit = async () => {
       try {
-        const response = await fetch("/api/etsy/rate-limit")
+        // Hata yakalamayı güçlendir
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 saniye timeout ekle
+        
+        const response = await fetch("/api/etsy/rate-limit", {
+          signal: controller.signal,
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        clearTimeout(timeoutId);
+        
         if (response.ok) {
-          const data = await response.json()
+          const data = await response.json();
           if (data.limit) {
             // Yüzde hesapla
-            const percentage = Math.min(Math.round((data.used / data.limit) * 100), 100)
+            const percentage = Math.min(Math.round((data.used / data.limit) * 100), 100);
             
             setRateLimit({
               used: data.used || 0,
               limit: data.limit || 40,
               resetAt: data.resetAt ? new Date(data.resetAt) : null,
               percentage
-            })
+            });
           }
+        } else {
+          console.warn("Rate limit bilgisi alınamadı, sunucu hatası:", response.status);
         }
       } catch (error) {
-        console.error("Rate limit bilgisi alınamadı:", error)
+        if (error instanceof DOMException && error.name === "AbortError") {
+          console.warn("Rate limit isteği zaman aşımına uğradı");
+        } else {
+          console.error("Rate limit bilgisi alınamadı:", error);
+        }
+        // Hata durumunda mevcut durumu koru, sessizce başarısız ol
       }
     }
 
     // Sayfa yüklendiğinde ve her 5 dakikada bir güncelle
-    fetchRateLimit()
-    const interval = setInterval(fetchRateLimit, 5 * 60 * 1000)
+    fetchRateLimit();
+    const interval = setInterval(fetchRateLimit, 5 * 60 * 1000);
     
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval);
+    }
   }, [])
 
   // Kalan zamanı hesapla

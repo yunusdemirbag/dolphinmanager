@@ -32,6 +32,22 @@ import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { Switch } from "@/components/ui/switch"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { predefinedVariations } from '@/lib/etsy-variation-presets';
+
+// Sabit Digital Prints kategori ID
+const DIGITAL_PRINTS_TAXONOMY_ID = 1;
+
+// Default materials
+const DEFAULT_MATERIALS = ["Cotton Canvas", "Wood Frame", "Hanger"];
 
 // Add interface for API response
 interface CreateListingResponse {
@@ -48,12 +64,10 @@ interface ProductFormModalProps {
   isOpen: boolean
   onClose: () => void
   product?: Product
-  onSubmit: (product: Partial<Product>, state: "draft" | "active") => Promise<CreateListingResponse>
+  onSubmit: (product: Partial<Product> & { variations?: any[] }, state: "draft" | "active") => Promise<CreateListingResponse>
   submitting: boolean
   shippingProfiles: ShippingProfile[]
-  processingProfiles: EtsyProcessingProfile[]
   loadingShippingProfiles: boolean
-  loadingProcessingProfiles: boolean
 }
 
 // Sabit item type tanımla
@@ -189,38 +203,41 @@ export function ProductFormModal({
   onSubmit,
   submitting,
   shippingProfiles,
-  processingProfiles,
-  loadingShippingProfiles,
-  loadingProcessingProfiles
+  loadingShippingProfiles
 }: ProductFormModalProps) {
   const { toast } = useToast()
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false)
   const [title, setTitle] = useState(product?.title || "")
   const [description, setDescription] = useState(product?.description || "")
   const [price, setPrice] = useState(product?.price?.amount || 0)
-  const [quantity, setQuantity] = useState(product?.quantity || 1)
-  const [shippingProfileId, setShippingProfileId] = useState<string>(
+  const [quantity, setQuantity] = useState(product?.quantity || 4)
+  const [shippingProfileId, setShippingProfileId] = useState(
     product?.shipping_profile_id?.toString() || ""
-  )
-  const [processingProfileId, setProcessingProfileId] = useState<string>(
-    product?.processing_profile_id?.toString() || ""
   )
 
   // Additional fields to match Etsy
-  const [tags, setTags] = useState<string[]>(product?.tags || [])
+  const [tags, setTags] = useState(product?.tags || [])
   const [tagInput, setTagInput] = useState("")
-  const [materials, setMaterials] = useState<string[]>(product?.materials || [])
+  const [materials, setMaterials] = useState(product?.materials || DEFAULT_MATERIALS)
   const [materialInput, setMaterialInput] = useState("")
-  const [isPersonalizable, setIsPersonalizable] = useState(product?.is_personalizable || false)
+  const [isPersonalizable, setIsPersonalizable] = useState(product?.is_personalizable || true)
   const [personalizationRequired, setPersonalizationRequired] = useState(product?.personalization_is_required || false)
-  const [personalizationInstructions, setPersonalizationInstructions] = useState(product?.personalization_instructions || "")
+  const [personalizationInstructions, setPersonalizationInstructions] = useState(
+    product?.personalization_instructions || "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
+  )
   const [primaryColor, setPrimaryColor] = useState(product?.primary_color || "")
   const [secondaryColor, setSecondaryColor] = useState(product?.secondary_color || "")
   const [width, setWidth] = useState(product?.width || 0)
   const [widthUnit, setWidthUnit] = useState(product?.width_unit || "cm")
   const [height, setHeight] = useState(product?.height || 0)
   const [heightUnit, setHeightUnit] = useState(product?.height_unit || "cm")
-  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || 0)
+  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || DIGITAL_PRINTS_TAXONOMY_ID)
+  
+  // Use a ref instead of state for hasVariations
+  const hasVariationsRef = useRef(true)
+  const [variations, setVariations] = useState(product?.variations || predefinedVariations)
+  const [shopSections, setShopSections] = useState<{shop_section_id: number, title: string}[]>([])
+  const [selectedShopSection, setSelectedShopSection] = useState<string>("")
   
   // Ürün görselleri için state
   const [productImages, setProductImages] = useState<{
@@ -231,31 +248,79 @@ export function ProductFormModal({
   }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Reset form when modal opens/closes or product changes
+  // Mağaza bölümlerini yükle
+  useEffect(() => {
+    async function loadShopSections() {
+      try {
+        const response = await fetch('/api/etsy/shop-sections');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.sections && Array.isArray(data.sections)) {
+            setShopSections(data.sections);
+            // İlk bölümü varsayılan olarak seç
+            if (data.sections.length > 0 && !selectedShopSection) {
+              setSelectedShopSection(data.sections[0].shop_section_id.toString());
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Shop sections yüklenirken hata:", error);
+      }
+    }
+    
+    if (isOpen) {
+      loadShopSections();
+      
+      // İlk kargo profilini varsayılan olarak seç
+      if (shippingProfiles.length > 0 && !shippingProfileId) {
+        setShippingProfileId(shippingProfiles[0].shipping_profile_id.toString());
+      }
+    }
+  }, [isOpen, shippingProfiles, shippingProfileId, selectedShopSection]);
+
+  // Modified reset form useEffect
   useEffect(() => {
     if (isOpen) {
       setTitle(product?.title || "");
       setDescription(product?.description || "");
       setPrice(product?.price?.amount || 0);
-      setQuantity(product?.quantity || 1);
+      setQuantity(product?.quantity || 4);
       setShippingProfileId(product?.shipping_profile_id?.toString() || "");
-      setProcessingProfileId(product?.processing_profile_id?.toString() || "");
       setTags(product?.tags || []);
       setTagInput("");
-      setMaterials(product?.materials || []);
+      setMaterials(product?.materials || DEFAULT_MATERIALS);
       setMaterialInput("");
-      setIsPersonalizable(product?.is_personalizable || false);
+      setIsPersonalizable(product?.is_personalizable || true);
       setPersonalizationRequired(product?.personalization_is_required || false);
-      setPersonalizationInstructions(product?.personalization_instructions || "");
+      setPersonalizationInstructions(
+        product?.personalization_instructions || "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
+      );
       setPrimaryColor(product?.primary_color || "");
       setSecondaryColor(product?.secondary_color || "");
       setWidth(product?.width || 0);
       setWidthUnit(product?.width_unit || "cm");
       setHeight(product?.height || 0);
       setHeightUnit(product?.height_unit || "cm");
-      setTaxonomyId(product?.taxonomy_id || 0);
+      setTaxonomyId(product?.taxonomy_id || DIGITAL_PRINTS_TAXONOMY_ID);
       setProductImages([]);
       setIsDragging(false);
+
+      // Always set variations to be enabled
+      hasVariationsRef.current = true
+      
+      // Varyasyonları resetle - her zaman aktif olarak başlat
+      const initialVariations = product?.variations && product.variations.length > 0 
+        ? product.variations 
+        : predefinedVariations;
+      setVariations(initialVariations);
+
+      if (product?.images?.length) {
+        setProductImages(product.images.map(img => ({
+          file: new File([], img.url_fullxfull || ''), // Gerçek dosya değil, sadece placeholder
+          preview: img.url_fullxfull || '',
+          uploading: false
+        })));
+      }
     }
 
     // Cleanup previews on unmount
@@ -271,9 +336,8 @@ export function ProductFormModal({
   // Form değişikliklerini kontrol et
   const hasUnsavedChanges = () => {
     if (!product) {
-      return title !== "" || description !== "" || price !== 0 || quantity !== 1 || 
-             shippingProfileId !== "" || processingProfileId !== "" ||
-             tags.length > 0 || materials.length > 0 || productImages.length > 0
+      return title !== "" || description !== "" || price !== 0 || quantity !== 4 || 
+             shippingProfileId !== "" || tags.length > 0 || materials.length > 0 || productImages.length > 0
     }
     return false
   }
@@ -405,10 +469,24 @@ export function ProductFormModal({
     });
   }, []);
 
+  const handleVariationChange = (index: number, field: 'price' | 'is_active', value: string | number | boolean) => {
+    const newVariations = [...variations];
+    const variationToUpdate = { ...newVariations[index] };
+  
+    if (field === 'price') {
+      variationToUpdate.price = Number(value);
+    } else if (field === 'is_active') {
+      variationToUpdate.is_active = !!value;
+    }
+  
+    newVariations[index] = variationToUpdate;
+    setVariations(newVariations);
+  };
+
   const handleSubmit = async (state: "draft" | "active") => {
     try {
       // Form verilerini hazırla
-      const formData = {
+      const productData = {
         title,
         description,
         price: {
@@ -418,7 +496,6 @@ export function ProductFormModal({
         },
         quantity,
         shipping_profile_id: parseInt(shippingProfileId),
-        processing_profile_id: parseInt(processingProfileId),
         tags,
         materials,
         is_personalizable: isPersonalizable,
@@ -430,11 +507,13 @@ export function ProductFormModal({
         width_unit: widthUnit,
         height,
         height_unit: heightUnit,
-        taxonomy_id: taxonomyId
+        taxonomy_id: taxonomyId,
+        variations: hasVariationsRef.current ? variations.filter((v: any) => v.is_active) : undefined,
+        shop_section_id: selectedShopSection ? parseInt(selectedShopSection) : undefined,
       };
 
       // Ürünü oluştur
-      const response = await onSubmit(formData, state);
+      const response = await onSubmit(productData, state);
       console.log("[PRODUCT_FORM] Listing created:", response);
 
       // listing_id'yi doğru şekilde al
@@ -668,6 +747,66 @@ export function ProductFormModal({
     </div>
   );
 
+  // Modified varyasyonlar section in the UI
+  const VariationsSection = () => (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium">Varyasyonlar</h3>
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="hasVariations"
+          checked={hasVariationsRef.current}
+          onCheckedChange={(checked) => {
+            hasVariationsRef.current = !!checked
+          }}
+        />
+        <label
+          htmlFor="hasVariations"
+          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+        >
+          Varyasyonlar var
+        </label>
+      </div>
+
+      {hasVariationsRef.current && (
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[250px]">Size</TableHead>
+                <TableHead>Pattern</TableHead>
+                <TableHead className="w-[120px]">Fiyat</TableHead>
+                <TableHead className="w-[80px]">Görünür</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {variations.map((variation, index) => (
+                <TableRow key={index}>
+                  <TableCell className="font-medium">{variation.size}</TableCell>
+                  <TableCell>{variation.pattern}</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={variation.price === 0 ? '' : variation.price}
+                      placeholder="Fiyat"
+                      onChange={(e) => handleVariationChange(index, 'price', e.target.value)}
+                      className="h-8"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={variation.is_active}
+                      onCheckedChange={(checked) => handleVariationChange(index, 'is_active', checked)}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={() => handleCloseModal()}>
@@ -715,6 +854,7 @@ export function ProductFormModal({
                         type="number"
                         value={price}
                         onChange={(e) => setPrice(parseFloat(e.target.value))}
+                        disabled={hasVariationsRef.current}
                       />
                     </div>
                   </div>
@@ -743,6 +883,57 @@ export function ProductFormModal({
                       className="min-h-[100px]"
                       placeholder="Ürününüzün detaylı açıklamasını girin"
                     />
+                  </div>
+
+                  {/* Kategori seçimi */}
+                  <div className="col-span-2">
+                    <Label htmlFor="taxonomy" className="block mb-1">
+                      Kategori <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={taxonomyId.toString()}
+                      onValueChange={(value) => setTaxonomyId(parseInt(value))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Kategori seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={DIGITAL_PRINTS_TAXONOMY_ID.toString()}>Digital Prints</SelectItem>
+                        <SelectItem value="2">Art & Collectibles</SelectItem>
+                        <SelectItem value="3">Home & Living</SelectItem>
+                        <SelectItem value="4">Home Decor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Shop Section seçimi */}
+                  <div className="col-span-2">
+                    <Label htmlFor="shopSection" className="block mb-1">
+                      Shop Section
+                    </Label>
+                    <Select
+                      value={selectedShopSection}
+                      onValueChange={setSelectedShopSection}
+                      disabled={shopSections.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          shopSections.length === 0 
+                            ? "Bölüm bulunamadı" 
+                            : "Bölüm seçin"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shopSections.map((section) => (
+                          <SelectItem 
+                            key={section.shop_section_id} 
+                            value={section.shop_section_id.toString()}
+                          >
+                            {section.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -877,37 +1068,6 @@ export function ProductFormModal({
                       </SelectContent>
                     </Select>
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="processing" className="block mb-1">
-                      İşlem Profili <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={processingProfileId}
-                      onValueChange={setProcessingProfileId}
-                      disabled={loadingProcessingProfiles || processingProfiles.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          loadingProcessingProfiles
-                            ? "İşlem profilleri yükleniyor..."
-                            : processingProfiles.length === 0
-                            ? "İşlem profili bulunamadı"
-                            : "İşlem profili seçin"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {processingProfiles.map((profile) => (
-                          <SelectItem
-                            key={profile.processing_profile_id}
-                            value={profile.processing_profile_id.toString()}
-                          >
-                            {profile.title} ({profile.min_processing_days}-{profile.max_processing_days} gün)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
               </div>
 
@@ -1001,72 +1161,7 @@ export function ProductFormModal({
               <Separator />
               
               {/* Varyasyonlar */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Varyasyonlar</h3>
-                <div className="border-2 border-dashed rounded-md p-6">
-                  <div className="flex flex-col space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium">Ürün Varyasyonları</h4>
-                        <p className="text-sm text-gray-500">
-                          Renk, boyut, çerçeve gibi farklı seçenekler ekleyin
-                        </p>
-                      </div>
-                      <Button type="button" variant="outline" size="sm" className="flex items-center">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Varyasyon Ekle
-                      </Button>
-                    </div>
-                    
-                    {/* Boş varyasyon bölümü */}
-                    <div className="flex items-center justify-center h-32 border rounded-md border-dashed">
-                      <div className="text-center">
-                        <p className="text-gray-500 mb-2">Henüz varyasyon eklenmemiş</p>
-                        <Button type="button" variant="outline" size="sm" className="flex items-center mx-auto">
-                          <Plus className="mr-2 h-4 w-4" />
-                          İlk Varyasyonu Ekle
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {/* Varyasyon ayarları - gizli, sadece varyasyon eklenince görünecek */}
-                    <div className="hidden border-t pt-4 space-y-4">
-                      <h4 className="font-medium">Varyasyon Ayarları</h4>
-                      
-                      <div className="space-y-3">
-                        <div className="flex items-center">
-                          <Checkbox id="price-vary" />
-                          <Label htmlFor="price-vary" className="ml-2 font-normal">
-                            Fiyatlar varyasyona göre değişir
-                          </Label>
-                        </div>
-                        
-                        <div className="flex items-center">
-                          <Checkbox id="processing-vary" />
-                          <Label htmlFor="processing-vary" className="ml-2 font-normal">
-                            İşlem profilleri varyasyona göre değişir 
-                            <Badge className="ml-2 bg-blue-100 text-blue-800 hover:bg-blue-200">Yeni</Badge>
-                          </Label>
-                        </div>
-                        
-                        <div className="flex items-center">
-                          <Checkbox id="quantity-vary" />
-                          <Label htmlFor="quantity-vary" className="ml-2 font-normal">
-                            Stok miktarları varyasyona göre değişir
-                          </Label>
-                        </div>
-                        
-                        <div className="flex items-center">
-                          <Checkbox id="sku-vary" />
-                          <Label htmlFor="sku-vary" className="ml-2 font-normal">
-                            SKU'lar varyasyona göre değişir
-                          </Label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <VariationsSection />
 
               <Separator />
 
@@ -1108,6 +1203,9 @@ export function ProductFormModal({
                           onChange={(e) => setPersonalizationInstructions(e.target.value)}
                           placeholder="Alıcıya kişiselleştirme talimatlarınızı yazın"
                         />
+                        <p className="text-sm text-gray-500 mt-1">
+                          Karakter sınırı: {personalizationInstructions.length}/256
+                        </p>
                       </div>
                     </div>
                   )}

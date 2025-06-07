@@ -4,126 +4,100 @@ import { createDraftListing, getEtsyStores, CreateListingData } from "@/lib/etsy
 
 export async function POST(request: NextRequest) {
   try {
-    // Modern Supabase client oluştur - await ile bekle
+    // Kullanıcıyı doğrula
     const supabase = await createClient()
-    
-    // Kullanıcı doğrulama
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
-      console.error("Yetkilendirme hatası:", userError)
-      return NextResponse.json({ error: "Unauthorized", details: userError?.message }, { status: 401 })
+      console.error("Create listing API auth error:", userError)
+      return NextResponse.json(
+        { error: "Unauthorized" }, 
+        { status: 401 }
+      )
     }
-
-    // Request body'yi parse et
-    const listingData: CreateListingData = await request.json()
-
-    // Başlık uzunluğunu kontrol et (Etsy limiti 140 karakter)
-    if (listingData.title && listingData.title.length > 140) {
-      listingData.title = listingData.title.substring(0, 140);
-      console.log("Başlık Etsy limiti olan 140 karaktere kısaltıldı:", listingData.title);
-    }
-
-    // Fiyat kontrolü - fiyat yoksa veya hatalıysa varsayılan değer ata
-    if (!listingData.price || !listingData.price.amount) {
-      listingData.price = {
-        amount: 100, // 1 USD varsayılan değer
-        divisor: 100,
-        currency_code: "USD"
-      };
-      console.log("Fiyat belirtilmediği veya geçersiz olduğu için varsayılan fiyat ayarlandı: 1 USD");
-    }
-
-    console.log("Creating listing for user:", user.id, "Data:", JSON.stringify(listingData))
-
-    // Etsy store bilgilerini çek
-    const etsyStores = await getEtsyStores(user.id, true) // skipCache=true ile her zaman taze veri al
     
-    if (etsyStores.length === 0) {
-      return NextResponse.json({
-        error: "No Etsy stores connected",
-        message: "Please connect your Etsy store first"
-      }, { status: 400 })
-    }
-
-    const primaryStore = etsyStores[0] // İlk mağazayı kullan
-    console.log("Creating listing for store:", primaryStore.shop_name)
-
-    // image_ids konsola yazdır
-    if (listingData.image_ids && listingData.image_ids.length > 0) {
-      console.log("Listing will use image IDs:", listingData.image_ids);
-    }
-
+    // İstek gövdesinden verileri al
+    const listingData = await request.json()
+    
     try {
-      // Listing oluştur
-      const newListing = await createDraftListing(user.id, primaryStore.shop_id, listingData)
+      // Etsy mağazalarını al
+      const etsyStores = await getEtsyStores(user.id)
+      
+      if (!etsyStores || etsyStores.length === 0) {
+        return NextResponse.json(
+          { error: "No Etsy stores found" }, 
+          { status: 400 }
+        )
+      }
+      
+      // İlk mağazayı kullan
+      const shopName = etsyStores[0].shop_name
+      console.log(`Creating listing for store: ${shopName}`)
+      
+      // Eksik alanları kontrol et ve varsayılan değerler ata
+      if (!listingData.title || listingData.title.trim() === '') {
+        listingData.title = 'New Canvas Print'; // Varsayılan başlık
+      }
+      
+      if (!listingData.description || listingData.description.trim() === '') {
+        listingData.description = 'Beautiful canvas print for your home decoration.'; // Varsayılan açıklama
+      }
+      
+      // Dil bilgisinin her zaman ayarlandığından emin ol
+      listingData.language = listingData.language || 'en'; // Varsayılan dil
+      
+      // Fiyat kontrolü - fiyat yoksa veya hatalıysa varsayılan değer ata
+      if (!listingData.price || !listingData.price.amount) {
+        listingData.price = {
+          amount: 100, // 1 USD varsayılan değer
+          divisor: 100,
+          currency_code: "USD"
+        };
+        console.log("Fiyat belirtilmediği veya geçersiz olduğu için varsayılan fiyat ayarlandı: 1 USD");
+      }
 
-      console.log("Listing created successfully:", newListing.listing_id)
+      // shipping_profile_id zorunlu kontrolü
+      if (!listingData.shipping_profile_id) {
+        return NextResponse.json({
+          error: "Kargo profili seçilmeden ürün eklenemez.",
+          details: "shipping_profile_id zorunludur.",
+          success: false
+        }, { status: 400 });
+      }
 
+      console.log("Creating listing for user:", user.id, "Data:", JSON.stringify(listingData))
+
+      // image_ids konsola yazdır
+      if (listingData.image_ids && listingData.image_ids.length > 0) {
+        console.log("Listing will use image IDs:", listingData.image_ids);
+      }
+
+      // Listing'i oluştur
+      const primaryStore = etsyStores[0];
+      const listing = await createDraftListing(user.id, primaryStore.shop_id, listingData)
+      
       return NextResponse.json({
         success: true,
-        listing_id: newListing.listing_id,
-        listing: newListing,
+        listing_id: listing.listing_id,
         message: "Listing created successfully"
       })
-    } catch (createError: any) {
-      console.error("Create listing error:", createError.message);
-      
-      // Etsy API yanıt hatalarını daha detaylı işle
-      let errorDetails = createError.message || "Unknown error";
-      let statusCode = 400;
-      
-      // Bad Request (title too long gibi format hataları) için
-      if (errorDetails.includes("Bad Request")) {
-        statusCode = 400;
-      }
-      
-      // Unauthorized hatalarını yakala
-      if (errorDetails.includes("Unauthorized") || 
-          errorDetails.includes("401") ||
-          errorDetails.includes("token")) {
-        statusCode = 401;
-        errorDetails = "Etsy authorization required. Please reconnect your Etsy account.";
-      }
+    } catch (error: any) {
+      console.error("Create listing error:", error.message || error)
       
       return NextResponse.json(
         { 
-          error: "Failed to create listing", 
-          details: errorDetails,
-          success: false
-        },
-        { status: statusCode }
+          error: error.message || "Failed to create listing",
+          details: error.details || null
+        }, 
+        { status: 400 }
       )
     }
   } catch (error: any) {
     console.error("Create listing API error:", error)
     
-    // Etsy API yanıt hatalarını daha detaylı işle
-    let errorDetails = error.message || "Unknown error";
-    let statusCode = 500;
-    
-    // Bad Request (title too long gibi format hataları) için
-    if (error.message && error.message.includes("Bad Request")) {
-      statusCode = 400;
-    }
-    
-    // Unauthorized hatalarını yakala
-    if (error.message && (
-      error.message.includes("Unauthorized") || 
-      error.message.includes("401") ||
-      error.message.includes("token")
-    )) {
-      statusCode = 401;
-      errorDetails = "Etsy authorization required. Please reconnect your Etsy account.";
-    }
-    
     return NextResponse.json(
-      { 
-        error: "Failed to create listing", 
-        details: errorDetails,
-        success: false
-      },
-      { status: statusCode }
+      { error: "Server error" }, 
+      { status: 500 }
     )
   }
 } 

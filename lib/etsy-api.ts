@@ -1594,7 +1594,7 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
   try {
     console.log(`Fetching shipping profiles for user ${userId} and shop ${shopId}...`);
     
-  const accessToken = await getValidAccessToken(userId);
+    const accessToken = await getValidAccessToken(userId);
     
     if (!accessToken) {
       console.log(`No valid access token for user ${userId} - cannot fetch shipping profiles`);
@@ -1933,6 +1933,12 @@ export interface CreateListingData {
   image_ids?: number[];
   who_made?: "i_did" | "someone_else" | "collective";
   when_made?: string;
+  variations?: {
+    size: string;
+    pattern: string;
+    price: number;
+    is_active: boolean;
+  }[];
 }
 
 // Function to invalidate shop cache to ensure fresh data on next fetch
@@ -2019,17 +2025,33 @@ export async function createDraftListing(
       };
     }
 
+    const hasVariations = listingData.variations && listingData.variations.length > 0;
+
     // Prepare listing data for API request
+    let priceValue = '';
+    if (hasVariations) {
+      const activeVariations = listingData.variations?.filter(v => v.is_active && v.price > 0) || [];
+      if (activeVariations.length > 0) {
+        const minPrice = Math.min(...activeVariations.map(v => v.price));
+        priceValue = minPrice.toString();
+      } else {
+        // Aktif varyasyon yoksa veya fiyatları 0 ise, ana formu kullan
+        priceValue = (listingData.price.amount / listingData.price.divisor).toString();
+      }
+    } else {
+      priceValue = (listingData.price.amount / listingData.price.divisor).toString();
+    }
+
     const requestBody = new URLSearchParams({
       title: listingData.title,
       description: listingData.description,
-      price: (listingData.price.amount / listingData.price.divisor).toString(),
-      quantity: listingData.quantity.toString(),
       who_made: listingData.who_made || 'i_did',
       when_made: listingData.when_made || 'made_to_order',
       shipping_profile_id: listingData.shipping_profile_id.toString(),
       state: listingData.state,
-      taxonomy_id: (listingData.taxonomy_id || 1).toString()
+      taxonomy_id: (listingData.taxonomy_id || 1).toString(),
+      quantity: listingData.quantity.toString(),
+      price: priceValue,
     });
 
     // Add optional fields if they exist
@@ -2057,25 +2079,6 @@ export async function createDraftListing(
       requestBody.append('personalization_instructions', listingData.personalization_instructions);
     }
 
-    // Enhanced processing profile handling with better validation
-    const processingProfileId = typeof listingData.processing_profile_id === 'string' 
-      ? parseInt(listingData.processing_profile_id) 
-      : listingData.processing_profile_id;
-    
-    console.log('[ETSY_API] Processing profile check:', {
-      raw: listingData.processing_profile_id,
-      type: typeof listingData.processing_profile_id,
-      parsedId: processingProfileId,
-      isValidNumber: !isNaN(processingProfileId) && processingProfileId > 0
-    });
-
-    if (!isNaN(processingProfileId) && processingProfileId > 0) {
-      requestBody.append('processing_profile_id', processingProfileId.toString());
-      console.log('[ETSY_API] Setting processing_profile_id:', processingProfileId);
-    } else {
-      console.log('[ETSY_API] No valid processing_profile_id found, skipping this field');
-    }
-
     if (listingData.primary_color) {
       requestBody.append('primary_color', listingData.primary_color);
     }
@@ -2092,6 +2095,49 @@ export async function createDraftListing(
     if (listingData.height) {
       requestBody.append('height', listingData.height.toString());
       requestBody.append('height_unit', listingData.height_unit || 'cm');
+    }
+
+    if (hasVariations) {
+      // Etsy'nin beklediği varyasyon yapısını oluştur
+      const uniqueSizes = [...new Set(listingData.variations?.map(v => v.size))];
+      const uniquePatterns = [...new Set(listingData.variations?.map(v => v.pattern))];
+
+      // Property ID'ler (Bunlar Etsy'nin standart ID'leri veya özel ID'ler olabilir)
+      // 513: Size, 514: Style/Pattern
+      const sizePropertyId = 513;
+      const patternPropertyId = 514;
+
+      const property_values = [
+        {
+          property_id: sizePropertyId,
+          property_name: "Size",
+          values: uniqueSizes,
+        },
+        {
+          property_id: patternPropertyId,
+          property_name: "Pattern",
+          values: uniquePatterns,
+        }
+      ];
+
+      const offerings = listingData.variations?.map(v => ({
+        price: v.price,
+        quantity: 999, // Varsayılan stok miktarı
+        is_enabled: v.is_active,
+        property_values: [
+          {
+            property_id: sizePropertyId,
+            value_ids: [uniqueSizes.indexOf(v.size)],
+          },
+          {
+            property_id: patternPropertyId,
+            value_ids: [uniquePatterns.indexOf(v.pattern)],
+          }
+        ]
+      }));
+
+      requestBody.append('product_offerings', JSON.stringify(offerings));
+      requestBody.append('product_properties', JSON.stringify(property_values));
     }
 
     // Log the complete request body for debugging
@@ -2148,5 +2194,92 @@ export async function createDraftListing(
     }
     
     throw error;
+  }
+}
+
+// Shop Sections interface
+export interface EtsyShopSection {
+  shop_section_id: number;
+  title: string;
+  rank: number;
+  user_id: number;
+  active_listing_count: number;
+}
+
+// Get shop sections for a shop
+export async function getShopSections(userId: string, shopId?: number): Promise<EtsyShopSection[]> {
+  try {
+    console.log(`Fetching shop sections for user ${userId}`);
+    
+    // Get access token
+    const accessToken = await getValidAccessToken(userId);
+    
+    if (!accessToken) {
+      console.log(`No valid access token for user ${userId} - cannot fetch shop sections`);
+      throw new Error('RECONNECT_REQUIRED');
+    }
+    
+    // If no shopId provided, get the first shop
+    if (!shopId) {
+      const stores = await getEtsyStores(userId, true);
+      if (stores.length === 0) {
+        throw new Error('No Etsy stores found for this user');
+      }
+      shopId = stores[0].shop_id;
+    }
+    
+    console.log('Making request to Etsy API for shop sections...');
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/sections`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID
+      }
+    });
+    
+    // Log the response status and headers for debugging
+    console.log('Shop sections API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response from Etsy API:', errorText);
+      
+      if (response.status === 401) {
+        throw new Error('RECONNECT_REQUIRED');
+      }
+      
+      throw new Error(`Failed to fetch shop sections: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+    
+    const responseText = await response.text();
+    console.log('Raw API response:', responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse JSON response:', e);
+      throw new Error('Invalid JSON response from Etsy API');
+    }
+    
+    if (!data || !data.results || !Array.isArray(data.results)) {
+      console.error('Invalid API response format:', data);
+      return [];
+    }
+    
+    return data.results.map((section: any) => ({
+      shop_section_id: section.shop_section_id,
+      title: section.title,
+      rank: section.rank,
+      user_id: section.user_id,
+      active_listing_count: section.active_listing_count
+    }));
+  } catch (error) {
+    console.error('Error fetching shop sections:', error);
+    // Return empty array instead of throwing to prevent UI errors
+    return [];
   }
 }

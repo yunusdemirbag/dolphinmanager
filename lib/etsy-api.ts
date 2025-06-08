@@ -2010,24 +2010,44 @@ export async function createDraftListing(
       processing_profile_id: listingData.processing_profile_id,
       state: listingData.state
     });
-
+    
+    // Access token al
     const accessToken = await getValidAccessToken(userId);
     if (!accessToken) {
-      throw new Error("No valid access token found");
+      throw new Error('RECONNECT_REQUIRED');
     }
-
-    const hasVariations = listingData.variations && listingData.variations.length > 0;
     
-    // Log varyasyonlar hakkında detaylı bilgi
-    if (hasVariations && listingData.variations) {
-      console.log(`[ETSY_API] Creating listing with ${listingData.variations.length} variations.`);
-      // Varyasyon detaylarını logla
-      console.log(`[ETSY_API] Variation types: Size and Pattern`);
-      console.log(`[ETSY_API] First variation sample:`, JSON.stringify(listingData.variations[0]));
+    // Varyasyonları kontrol et
+    const hasVariations = !!(
+      listingData.variations && 
+      listingData.variations.length > 0 &&
+      listingData.variations.some(v => v.is_active)
+    );
+    
+    if (hasVariations) {
+      console.log(`[ETSY_API] Creating listing with ${listingData.variations?.filter(v => v.is_active).length} variations.`);
+      console.log('[ETSY_API] Variation types: Size and Pattern');
+      console.log('[ETSY_API] First variation sample:', JSON.stringify(listingData.variations?.[0]));
+      
+      // Varyasyonlu ürünler için en düşük fiyatı bul
+      const activeVariations = listingData.variations?.filter(v => v.is_active) || [];
+      if (activeVariations.length > 0) {
+        const minPrice = Math.min(...activeVariations.map(v => v.price));
+        console.log(`[ETSY_API] Setting base price to minimum variation price: ${minPrice}`);
+        
+        // En düşük fiyatı product.price.amount değerine at - cents olarak
+        if (listingData.price) {
+          listingData.price.amount = minPrice * 100;
+        }
+      }
     }
-
-    // ÖNEMLİ: İki aşamalı yaklaşım için:
-    // 1. Adım: Temel listeyi oluştur
+    
+    // Varsayılan materials oluştur (eğer gönderilmemişse)
+    if (!listingData.materials || listingData.materials.length === 0) {
+      listingData.materials = ["Hanger"];
+    }
+    
+    // Temel isteğe ekleme yapılacak kısım - should_auto_renew değerini ekleyelim
     let baseRequestBody = new URLSearchParams({
       title: listingData.title,
       description: listingData.description,
@@ -2044,41 +2064,28 @@ export async function createDraftListing(
       baseRequestBody.append('state', listingData.state);
     }
 
-    // Varyasyon durumunu belirt - API dokümanlarında has_variations=true olarak belirtilmeli
+    // Varyasyonlar varsa has_variations=true olarak ayarla
     if (hasVariations) {
       baseRequestBody.append('has_variations', 'true');
-      // Varyasyonlu ürünler için is_customizable false olmalı
-      baseRequestBody.append('is_customizable', 'false');
     } else {
-      // Varyasyonsuz ürünlerde is_customizable değeri kullanıcının seçimine bağlı
-      if (listingData.is_personalizable !== undefined) {
-        baseRequestBody.append('is_customizable', listingData.is_personalizable.toString());
-      }
+      baseRequestBody.append('has_variations', 'false');
     }
 
-    // Shop section ID değeri varsa ekle
-    if (listingData.shop_section_id) {
+    // Özelleştirilebilir mi?
+    baseRequestBody.append('is_customizable', 'false');
+
+    // Shop section ID'si kontrol ediliyor ve gönderiliyor
+    // Sadece geçerli bir shop_section_id varsa ve sıfırdan büyükse ekle
+    if (listingData.shop_section_id && listingData.shop_section_id > 0) {
+      console.log(`[ETSY_API] Using shop_section_id: ${listingData.shop_section_id}`);
       baseRequestBody.append('shop_section_id', listingData.shop_section_id.toString());
+    } else {
+      console.log('[ETSY_API] No shop_section_id specified or it is 0, will use default section');
     }
 
-    // Varyasyonlu ürünler için temel isteğe price ekleniyor
-    if (!hasVariations) {
-      // Varyasyonsuz ürünler için fiyat ekle
-      const priceValue = (listingData.price.amount / listingData.price.divisor).toString();
-      baseRequestBody.append('price', priceValue);
-    } else {
-      // Varyasyonlu ürünler için minimum fiyatı ekle
-      const activeVariations = listingData.variations?.filter(v => v.is_active && v.price > 0) || [];
-      if (activeVariations.length > 0) {
-        const minPrice = Math.min(...activeVariations.map(v => v.price));
-        baseRequestBody.append('price', minPrice.toString());
-        console.log(`[ETSY_API] Setting base price to minimum variation price: ${minPrice}`);
-      } else {
-        // Aktif varyasyon yoksa ana fiyatı kullan
-        const priceValue = (listingData.price.amount / listingData.price.divisor).toString();
-        baseRequestBody.append('price', priceValue);
-        console.log(`[ETSY_API] No active variations with price, using base price: ${priceValue}`);
-      }
+    // Fiyat bilgisini ekle
+    if (listingData.price) {
+      baseRequestBody.append('price', listingData.price.amount.toString());
     }
 
     // Add optional fields if they exist

@@ -519,7 +519,7 @@ export function ProductFormModal({
         height_unit: heightUnit,
         taxonomy_id: taxonomyId,
         variations: hasVariations ? variations.filter((v: any) => v.is_active) : undefined,
-        shop_section_id: parseInt(selectedShopSection || "0"), // Varsayılan olarak 0 (Home) bölümünü kullan
+        shop_section_id: selectedShopSection === "0" ? undefined : parseInt(selectedShopSection || "0"), // Eğer 0 ise undefined gönder
         state: state,
       };
 

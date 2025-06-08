@@ -4,6 +4,7 @@ import { getShopSections, getEtsyStores } from "@/lib/etsy-api"
 
 // Mock data for development/testing
 const MOCK_SHOP_SECTIONS = [
+  { shop_section_id: 0, title: "Home", rank: 0, user_id: 123, active_listing_count: 0 },
   { shop_section_id: 1, title: "Woman Art", rank: 1, user_id: 123, active_listing_count: 10 },
   { shop_section_id: 2, title: "Abstract Art", rank: 2, user_id: 123, active_listing_count: 5 },
   { shop_section_id: 3, title: "Love Art", rank: 3, user_id: 123, active_listing_count: 8 },
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
     // Extract shopId from query parameters if needed
     const { searchParams } = new URL(request.url);
     const shopIdParam = searchParams.get('shopId');
+    const useMockData = searchParams.get('mock') === 'true';
     
     let shopId: number | undefined;
     
@@ -60,9 +62,27 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // For now, use mock data to avoid API issues
-    // const sections = await getShopSections(userId, shopId);
-    const sections = MOCK_SHOP_SECTIONS;
+    let sections;
+    
+    if (useMockData) {
+      // Test için mock data kullan
+      sections = MOCK_SHOP_SECTIONS;
+    } else {
+      try {
+        // Gerçek Etsy API'den bölümleri al
+        const apiSections = await getShopSections(userId, shopId);
+        
+        // "Home" bölümünü manuel olarak ekle (Etsy'de varsayılan olarak bulunmaz)
+        sections = [
+          { shop_section_id: 0, title: "Home", rank: 0, user_id: 0, active_listing_count: 0 },
+          ...apiSections
+        ];
+      } catch (error) {
+        console.error("Error fetching shop sections from API:", error);
+        // API hatası durumunda mock data kullan
+        sections = MOCK_SHOP_SECTIONS;
+      }
+    }
     
     // Add cache-control header to prevent browser caching
     const headers = new Headers();

@@ -329,8 +329,16 @@ export function ProductFormModal({
         })));
       }
 
-      // Shop Section'ı sıfırla
-      setSelectedShopSection("0");
+      // Shop Section'ı sıfırla - Home (0) bölümü yerine, ürünün bir bölümü varsa onu, yoksa ilk bölümü seç
+      if (product?.shop_section_id) {
+        setSelectedShopSection(product.shop_section_id.toString());
+      } else if (shopSections.length > 0) {
+        // Home (0) bölümünü filtrele
+        const filteredSections = shopSections.filter(s => s.shop_section_id !== 0);
+        if (filteredSections.length > 0) {
+          setSelectedShopSection(filteredSections[0].shop_section_id.toString());
+        }
+      }
     }
 
     // Cleanup previews on unmount
@@ -519,7 +527,7 @@ export function ProductFormModal({
         height_unit: heightUnit,
         taxonomy_id: taxonomyId,
         variations: hasVariations ? variations.filter((v: any) => v.is_active) : undefined,
-        shop_section_id: selectedShopSection === "0" ? undefined : parseInt(selectedShopSection || "0"), // Eğer 0 ise undefined gönder
+        shop_section_id: selectedShopSection ? parseInt(selectedShopSection) : undefined, // Seçili shop section'ı doğrudan kullan
         state: state,
       };
 
@@ -926,11 +934,13 @@ export function ProductFormModal({
                         <SelectValue placeholder="Bir mağaza bölümü seçin" />
                       </SelectTrigger>
                       <SelectContent>
-                        {shopSections.map(section => (
-                          <SelectItem key={section.shop_section_id} value={section.shop_section_id.toString()}>
-                            {section.title}
-                          </SelectItem>
-                        ))}
+                        {shopSections
+                          .filter(section => section.shop_section_id !== 0) // Home bölümünü filtrele
+                          .map(section => (
+                            <SelectItem key={section.shop_section_id} value={section.shop_section_id.toString()}>
+                              {section.title}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>

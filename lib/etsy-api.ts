@@ -1939,6 +1939,7 @@ export interface CreateListingData {
     price: number;
     is_active: boolean;
   }[];
+  shop_section_id?: number;
 }
 
 // Function to invalidate shop cache to ensure fresh data on next fetch
@@ -2015,135 +2016,149 @@ export async function createDraftListing(
       throw new Error("No valid access token found");
     }
 
-    // Validate and ensure price has a valid value
-    if (!listingData.price || !listingData.price.amount) {
-      console.log('[ETSY_API] Price is missing or invalid, setting default price of 1 USD');
-      listingData.price = {
-        amount: 100, // 1 USD in cents
-        divisor: 100,
-        currency_code: "USD"
-      };
-    }
-
     const hasVariations = listingData.variations && listingData.variations.length > 0;
-
-    // Prepare listing data for API request
-    let priceValue = '';
-    if (hasVariations) {
-      const activeVariations = listingData.variations?.filter(v => v.is_active && v.price > 0) || [];
-      if (activeVariations.length > 0) {
-        const minPrice = Math.min(...activeVariations.map(v => v.price));
-        priceValue = minPrice.toString();
-      } else {
-        // Aktif varyasyon yoksa veya fiyatları 0 ise, ana formu kullan
-        priceValue = (listingData.price.amount / listingData.price.divisor).toString();
-      }
-    } else {
-      priceValue = (listingData.price.amount / listingData.price.divisor).toString();
+    
+    // Log varyasyonlar hakkında detaylı bilgi
+    if (hasVariations && listingData.variations) {
+      console.log(`[ETSY_API] Creating listing with ${listingData.variations.length} variations.`);
+      // Varyasyon detaylarını logla
+      console.log(`[ETSY_API] Variation types: Size and Pattern`);
+      console.log(`[ETSY_API] First variation sample:`, JSON.stringify(listingData.variations[0]));
     }
 
-    const requestBody = new URLSearchParams({
+    // ÖNEMLİ: İki aşamalı yaklaşım için:
+    // 1. Adım: Temel listeyi oluştur
+    let baseRequestBody = new URLSearchParams({
       title: listingData.title,
       description: listingData.description,
       who_made: listingData.who_made || 'i_did',
       when_made: listingData.when_made || 'made_to_order',
       shipping_profile_id: listingData.shipping_profile_id.toString(),
-      state: listingData.state,
-      taxonomy_id: (listingData.taxonomy_id || 1).toString(),
+      taxonomy_id: (listingData.taxonomy_id || 4).toString(), // Digital Prints kategori ID'si
       quantity: listingData.quantity.toString(),
-      price: priceValue,
+      should_auto_renew: 'true', // Otomatik yenileme etkin
     });
+
+    // State değeri varsa ekle (draft veya active)
+    if (listingData.state === 'draft' || listingData.state === 'active') {
+      baseRequestBody.append('state', listingData.state);
+    }
+
+    // Varyasyon durumunu belirt - API dokümanlarında has_variations=true olarak belirtilmeli
+    if (hasVariations) {
+      baseRequestBody.append('has_variations', 'true');
+      // Varyasyonlu ürünler için is_customizable false olmalı
+      baseRequestBody.append('is_customizable', 'false');
+    } else {
+      // Varyasyonsuz ürünlerde is_customizable değeri kullanıcının seçimine bağlı
+      if (listingData.is_personalizable !== undefined) {
+        baseRequestBody.append('is_customizable', listingData.is_personalizable.toString());
+      }
+    }
+
+    // Shop section ID değeri varsa ekle
+    if (listingData.shop_section_id) {
+      baseRequestBody.append('shop_section_id', listingData.shop_section_id.toString());
+    }
+
+    // Varyasyonlu ürünler için temel isteğe price ekleniyor
+    if (!hasVariations) {
+      // Varyasyonsuz ürünler için fiyat ekle
+      const priceValue = (listingData.price.amount / listingData.price.divisor).toString();
+      baseRequestBody.append('price', priceValue);
+    } else {
+      // Varyasyonlu ürünler için minimum fiyatı ekle
+      const activeVariations = listingData.variations?.filter(v => v.is_active && v.price > 0) || [];
+      if (activeVariations.length > 0) {
+        const minPrice = Math.min(...activeVariations.map(v => v.price));
+        baseRequestBody.append('price', minPrice.toString());
+        console.log(`[ETSY_API] Setting base price to minimum variation price: ${minPrice}`);
+      } else {
+        // Aktif varyasyon yoksa ana fiyatı kullan
+        const priceValue = (listingData.price.amount / listingData.price.divisor).toString();
+        baseRequestBody.append('price', priceValue);
+        console.log(`[ETSY_API] No active variations with price, using base price: ${priceValue}`);
+      }
+    }
 
     // Add optional fields if they exist
     if (listingData.materials && listingData.materials.length > 0) {
       listingData.materials.forEach(material => {
-        requestBody.append('materials', material);
+        baseRequestBody.append('materials', material);
+      });
+    } else {
+      // Default malzemeleri ekle
+      const defaultMaterials = [
+        "Polycotton canvas",
+        "Pigmented ink", 
+        "Wooden stretcher",
+        "Frame",
+        "Staples"
+      ];
+      defaultMaterials.forEach(material => {
+        baseRequestBody.append('materials', material);
       });
     }
 
     if (listingData.tags && listingData.tags.length > 0) {
       listingData.tags.forEach(tag => {
-        requestBody.append('tags', tag);
+        baseRequestBody.append('tags', tag);
       });
     }
 
-    if (listingData.is_personalizable !== undefined) {
-      requestBody.append('is_personalizable', listingData.is_personalizable.toString());
-    }
+    // Varyasyonsuz ürünler için kişiselleştirme seçenekleri
+    if (!hasVariations) {
+      if (listingData.is_personalizable !== undefined) {
+        baseRequestBody.append('is_personalizable', listingData.is_personalizable.toString());
+      }
 
-    if (listingData.personalization_is_required !== undefined) {
-      requestBody.append('personalization_is_required', listingData.personalization_is_required.toString());
-    }
+      if (listingData.personalization_is_required !== undefined) {
+        baseRequestBody.append('personalization_is_required', listingData.personalization_is_required.toString());
+      }
 
-    if (listingData.personalization_instructions) {
-      requestBody.append('personalization_instructions', listingData.personalization_instructions);
+      if (listingData.personalization_instructions) {
+        baseRequestBody.append('personalization_instructions', listingData.personalization_instructions);
+      }
+    } else {
+      // Varyasyonlu ürünler için de personalization desteği ekle
+      if (listingData.is_personalizable !== undefined) {
+        baseRequestBody.append('is_personalizable', listingData.is_personalizable.toString());
+      }
+
+      if (listingData.personalization_is_required !== undefined) {
+        baseRequestBody.append('personalization_is_required', listingData.personalization_is_required.toString());
+      }
+
+      if (listingData.personalization_instructions) {
+        baseRequestBody.append('personalization_instructions', listingData.personalization_instructions);
+      }
     }
 
     if (listingData.primary_color) {
-      requestBody.append('primary_color', listingData.primary_color);
+      baseRequestBody.append('primary_color', listingData.primary_color);
     }
 
     if (listingData.secondary_color) {
-      requestBody.append('secondary_color', listingData.secondary_color);
+      baseRequestBody.append('secondary_color', listingData.secondary_color);
     }
 
-    if (listingData.width) {
-      requestBody.append('width', listingData.width.toString());
-      requestBody.append('width_unit', listingData.width_unit || 'cm');
+    if (listingData.width && listingData.width_unit) {
+      baseRequestBody.append('width', listingData.width.toString());
+      baseRequestBody.append('width_unit', listingData.width_unit);
     }
 
-    if (listingData.height) {
-      requestBody.append('height', listingData.height.toString());
-      requestBody.append('height_unit', listingData.height_unit || 'cm');
+    if (listingData.height && listingData.height_unit) {
+      baseRequestBody.append('height', listingData.height.toString());
+      baseRequestBody.append('height_unit', listingData.height_unit);
     }
 
-    if (hasVariations) {
-      // Etsy'nin beklediği varyasyon yapısını oluştur
-      const uniqueSizes = [...new Set(listingData.variations?.map(v => v.size))];
-      const uniquePatterns = [...new Set(listingData.variations?.map(v => v.pattern))];
-
-      // Property ID'ler (Bunlar Etsy'nin standart ID'leri veya özel ID'ler olabilir)
-      // 513: Size, 514: Style/Pattern
-      const sizePropertyId = 513;
-      const patternPropertyId = 514;
-
-      const property_values = [
-        {
-          property_id: sizePropertyId,
-          property_name: "Size",
-          values: uniqueSizes,
-        },
-        {
-          property_id: patternPropertyId,
-          property_name: "Pattern",
-          values: uniquePatterns,
-        }
-      ];
-
-      const offerings = listingData.variations?.map(v => ({
-        price: v.price,
-        quantity: 999, // Varsayılan stok miktarı
-        is_enabled: v.is_active,
-        property_values: [
-          {
-            property_id: sizePropertyId,
-            value_ids: [uniqueSizes.indexOf(v.size)],
-          },
-          {
-            property_id: patternPropertyId,
-            value_ids: [uniquePatterns.indexOf(v.pattern)],
-          }
-        ]
-      }));
-
-      requestBody.append('product_offerings', JSON.stringify(offerings));
-      requestBody.append('product_properties', JSON.stringify(property_values));
+    if (listingData.image_ids && listingData.image_ids.length > 0) {
+      baseRequestBody.append('image_ids', listingData.image_ids.join(','));
     }
 
-    // Log the complete request body for debugging
-    console.log('[ETSY_API] Listing creation - Request body:', Object.fromEntries(requestBody.entries()));
-    console.log('[ETSY_API] Making request to Etsy API to create listing...');
-    
+    console.log('[ETSY_API] Making createDraftListing request with body:', Object.fromEntries(baseRequestBody.entries()));
+
+    // API isteği gönder
     const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings`, {
       method: 'POST',
       headers: {
@@ -2151,26 +2166,13 @@ export async function createDraftListing(
         'x-api-key': ETSY_CLIENT_ID,
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: requestBody
+      body: baseRequestBody
     });
 
-    // Log the response status and headers for debugging
-    console.log('[ETSY_API] Create listing API response:', {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-  
-    // Get response text for proper error handling
     const responseText = await response.text();
-    
+
     if (!response.ok) {
-      console.error('[ETSY_API] Error response from Etsy API:', responseText);
-      
-      if (response.status === 401) {
-        throw new Error('RECONNECT_REQUIRED');
-      }
-      
+      console.error('[ETSY_API] Error in createDraftListing response:', responseText);
       throw new Error(`Failed to create listing: ${response.status} ${response.statusText} - ${responseText}`);
     }
 
@@ -2179,6 +2181,18 @@ export async function createDraftListing(
     try {
       data = JSON.parse(responseText);
       console.log('[ETSY_API] Successfully created draft listing:', data.listing_id);
+      
+      // 2. Adım: Varyasyonlu ürünler için, inventory endpoint'ini kullanarak varyasyonları ekle
+      if (hasVariations && data.listing_id) {
+        try {
+          await createListingInventory(userId, shopId, data.listing_id, listingData);
+        } catch (inventoryError) {
+          console.error('[ETSY_API] Error adding inventory to listing:', inventoryError);
+          // Inventory hatası oluşsa bile ana ürün oluşturuldu, hatayı loglayıp devam et
+          console.log('[ETSY_API] Continuing with base listing despite inventory error');
+        }
+      }
+      
     } catch (parseError) {
       console.error('[ETSY_API] Error parsing response JSON:', parseError);
       throw new Error(`Failed to parse Etsy API response: ${responseText}`);
@@ -2194,6 +2208,214 @@ export async function createDraftListing(
     }
     
     throw error;
+  }
+}
+
+// Etsy inventory endpoint'i ile varyasyonları ekleme
+async function createListingInventory(
+  userId: string,
+  shopId: number,
+  listingId: number,
+  listingData: CreateListingData
+): Promise<void> {
+  try {
+    console.log(`[ETSY_API] Adding inventory/variations to listing ${listingId}`);
+    
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      throw new Error("No valid access token found");
+    }
+    
+    if (!listingData.variations || listingData.variations.length === 0) {
+      console.log('[ETSY_API] No variations to add');
+      return;
+    }
+    
+    // Unique Size ve Pattern değerlerini bul
+    const uniqueSizes = [...new Set(listingData.variations.map(v => v.size))];
+    const uniquePatterns = [...new Set(listingData.variations.map(v => v.pattern))];
+    
+    console.log(`[ETSY_API] Found ${uniqueSizes.length} unique sizes and ${uniquePatterns.length} unique patterns`);
+    
+    // Property ID'ler - Etsy API dokümanlarına göre özel varyasyonlar için 513 ve 514 kullanılmalı
+    const sizePropertyId = 513; // Size için property ID
+    const patternPropertyId = 514; // Pattern için property ID
+    
+    // Önce varyasyonun özelliklerini tanımla (Etsy'nin iki aşamalı varyasyon yaklaşımı)
+    const propertiesData = {
+      properties: [
+        {
+          property_id: sizePropertyId,
+          property_name: "Size",
+          scale_id: null,
+          scale_name: null,
+          values: uniqueSizes
+        },
+        {
+          property_id: patternPropertyId,
+          property_name: "Pattern",
+          scale_id: null,
+          scale_name: null,
+          values: uniquePatterns
+        }
+      ]
+    };
+    
+    console.log('[ETSY_API] Setting up variation properties:', JSON.stringify(propertiesData));
+    
+    // Önce özellik tanımlamaları için API çağrısı yap
+    const propertiesResponse = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/variation-images`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(propertiesData)
+    });
+    
+    const propertiesText = await propertiesResponse.text();
+    if (!propertiesResponse.ok) {
+      console.warn('[ETSY_API] Warning setting variation properties:', propertiesText);
+      // Hata olsa da devam et, bazı durumlarda önceden tanımlanmış olabilir
+    } else {
+      console.log('[ETSY_API] Successfully set variation properties');
+    }
+    
+    // TÜM kombinasyonları içeren products array'ini oluştur
+    // Etsy API'si tüm olası kombinasyonların sağlanmasını bekliyor
+    const products = [];
+    
+    // Aktif varyasyonlar için lookup map oluştur - hangi kombinasyonların aktif olduğunu takip etmek için
+    const activeVariationsMap = new Map();
+    listingData.variations.forEach(v => {
+      if (v.is_active) {
+        const key = `${v.size}---${v.pattern}`;
+        activeVariationsMap.set(key, v);
+      }
+    });
+    
+    // Tüm olası kombinasyonları oluştur
+    let productIndex = 0;
+    for (const size of uniqueSizes) {
+      for (const pattern of uniquePatterns) {
+        const key = `${size}---${pattern}`;
+        const isActive = activeVariationsMap.has(key);
+        const variation = activeVariationsMap.get(key);
+        
+        // Eğer bu kombinasyon aktif değilse, varsayılan bir varyasyon ekle
+        // Fiyat: aktif ise variation.price, değilse en düşük aktif varyasyon fiyatı veya 100
+        const price = isActive ? variation.price : (listingData.price?.amount || 100);
+        
+        products.push({
+          // SKU'yu boş string olarak gönder
+          sku: "",
+          property_values: [
+            {
+              property_id: sizePropertyId,
+              property_name: "Size",
+              values: [size]
+            },
+            {
+              property_id: patternPropertyId,
+              property_name: "Pattern",
+              values: [pattern]
+            }
+          ],
+          offerings: [
+            {
+              price: price,
+              quantity: 1, // Her varyasyon için sabit 1 değeri
+              is_enabled: isActive // Aktif değilse etkin değil
+            }
+          ]
+        });
+      }
+    }
+    
+    console.log(`[ETSY_API] Created ${products.length} product variations (${activeVariationsMap.size} active, ${products.length - activeVariationsMap.size} inactive)`);
+    
+    // İstek verilerini hazırla - ID'lerin sırası önemli, API'de belirtildiği gibi aynı sırada olmalı
+    const inventoryData = {
+      products: products,
+      price_on_property: [sizePropertyId, patternPropertyId],
+      // quantity_on_property kaldırıldı çünkü varyasyonlar arasında quantity olmasını istemiyoruz
+      sku_on_property: [] // Boş array olarak gönderiliyor - SKU kullanılmıyor
+    };
+    
+    console.log('[ETSY_API] Setting inventory data with variations:', 
+      JSON.stringify(inventoryData).substring(0, 200) + '...',
+      `Total products: ${products.length}`
+    );
+    
+    // Inventory verilerini ayarla
+    const inventoryResponse = await fetch(`${ETSY_API_BASE}/application/listings/${listingId}/inventory`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(inventoryData)
+    });
+    
+    const inventoryText = await inventoryResponse.text();
+    
+    if (!inventoryResponse.ok) {
+      console.error('[ETSY_API] Error setting inventory:', inventoryText);
+      throw new Error(`Failed to set inventory: ${inventoryResponse.status} ${inventoryResponse.statusText} - ${inventoryText}`);
+    }
+    
+    console.log('[ETSY_API] Successfully set inventory with variations');
+    
+    // Varyasyonları etkinleştirmek için ürünü güncelle
+    await enableVariationsOnListing(userId, shopId, listingId);
+    
+  } catch (error) {
+    console.error('[ETSY_API] Error in createListingInventory:', error);
+    throw error;
+  }
+}
+
+// Varyasyonları etkinleştirmek için ürünü güncelle
+async function enableVariationsOnListing(userId: string, shopId: number, listingId: number): Promise<void> {
+  try {
+    console.log(`[ETSY_API] Enabling variations on listing ${listingId}`);
+    
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) {
+      throw new Error("No valid access token found");
+    }
+    
+    // Ürünü has_variations=true olarak güncelle
+    const updateParams = new URLSearchParams({
+      has_variations: 'true',
+      should_auto_renew: 'false'
+    });
+    
+    const updateResponse = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: updateParams
+    });
+    
+    const updateText = await updateResponse.text();
+    
+    if (!updateResponse.ok) {
+      console.error('[ETSY_API] Error enabling variations:', updateText);
+      // Hata fırlat ama işlemi durdurmadan devam et
+      console.warn('[ETSY_API] Will continue despite error enabling variations');
+    } else {
+      console.log('[ETSY_API] Successfully enabled variations on listing');
+    }
+  } catch (error) {
+    console.error('[ETSY_API] Error in enableVariationsOnListing:', error);
+    // Hata fırlat ama işlemi durdurmadan devam et
+    console.warn('[ETSY_API] Will continue despite error enabling variations');
   }
 }
 

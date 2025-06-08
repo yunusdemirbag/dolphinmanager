@@ -43,11 +43,11 @@ import {
 } from "@/components/ui/table"
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
 
-// Sabit Digital Prints kategori ID
-const DIGITAL_PRINTS_TAXONOMY_ID = 1;
+// Sabit Art & Collectibles kategori ID - Bu Etsy'de geçerli bir kategori ID'sidir
+const DIGITAL_PRINTS_TAXONOMY_ID = 4;  // Digital Prints kategorisi
 
 // Default materials
-const DEFAULT_MATERIALS = ["Cotton Canvas", "Wood Frame", "Hanger"];
+const DEFAULT_MATERIALS = ["Polycotton canvas", "Pigmented ink", "Wooden stretcher", "Frame", "Staples"];
 
 // Add interface for API response
 interface CreateListingResponse {
@@ -220,7 +220,7 @@ export function ProductFormModal({
   const [tagInput, setTagInput] = useState("")
   const [materials, setMaterials] = useState(product?.materials || DEFAULT_MATERIALS)
   const [materialInput, setMaterialInput] = useState("")
-  const [isPersonalizable, setIsPersonalizable] = useState(product?.is_personalizable || true)
+  const [isPersonalizable, setIsPersonalizable] = useState<boolean>(product?.is_personalizable ?? true)
   const [personalizationRequired, setPersonalizationRequired] = useState(product?.personalization_is_required || false)
   const [personalizationInstructions, setPersonalizationInstructions] = useState(
     product?.personalization_instructions || "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
@@ -233,11 +233,10 @@ export function ProductFormModal({
   const [heightUnit, setHeightUnit] = useState(product?.height_unit || "cm")
   const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || DIGITAL_PRINTS_TAXONOMY_ID)
   
-  // Use a ref instead of state for hasVariations
-  const hasVariationsRef = useRef(true)
+  const [hasVariations, setHasVariations] = useState<boolean>(true);
   const [variations, setVariations] = useState(product?.variations || predefinedVariations)
   const [shopSections, setShopSections] = useState<{shop_section_id: number, title: string}[]>([])
-  const [selectedShopSection, setSelectedShopSection] = useState<string>("")
+  const [selectedShopSection, setSelectedShopSection] = useState<string>("0")
   
   // Ürün görselleri için state
   const [productImages, setProductImages] = useState<{
@@ -257,9 +256,18 @@ export function ProductFormModal({
           const data = await response.json();
           if (data.sections && Array.isArray(data.sections)) {
             setShopSections(data.sections);
-            // İlk bölümü varsayılan olarak seç
-            if (data.sections.length > 0 && !selectedShopSection) {
-              setSelectedShopSection(data.sections[0].shop_section_id.toString());
+            // Ürünün bir bölümü varsa onu seç, yoksa 0 (Home) bölümünü kullan
+            if (product?.shop_section_id) {
+              setSelectedShopSection(product.shop_section_id.toString());
+            } else if (data.sections.length > 0 && !selectedShopSection) {
+              // Eğer Home (0) bölümü varsa onu seç
+              const homeSection = data.sections.find((s: {shop_section_id: number, title: string}) => s.shop_section_id === 0);
+              if (homeSection) {
+                setSelectedShopSection("0");
+              } else if (data.sections[0]) {
+                // Yoksa ilk bölümü seç
+                setSelectedShopSection(data.sections[0].shop_section_id.toString());
+              }
             }
           }
         }
@@ -276,7 +284,7 @@ export function ProductFormModal({
         setShippingProfileId(shippingProfiles[0].shipping_profile_id.toString());
       }
     }
-  }, [isOpen, shippingProfiles, shippingProfileId, selectedShopSection]);
+  }, [isOpen, shippingProfiles, shippingProfileId, selectedShopSection, product]);
 
   // Modified reset form useEffect
   useEffect(() => {
@@ -290,8 +298,8 @@ export function ProductFormModal({
       setTagInput("");
       setMaterials(product?.materials || DEFAULT_MATERIALS);
       setMaterialInput("");
-      setIsPersonalizable(product?.is_personalizable || true);
-      setPersonalizationRequired(product?.personalization_is_required || false);
+      setIsPersonalizable(product?.is_personalizable ?? true);
+      setPersonalizationRequired(product?.personalization_is_required ?? false);
       setPersonalizationInstructions(
         product?.personalization_instructions || "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
       );
@@ -305,8 +313,7 @@ export function ProductFormModal({
       setProductImages([]);
       setIsDragging(false);
 
-      // Always set variations to be enabled
-      hasVariationsRef.current = true
+      setHasVariations(product?.variations ? product.variations.length > 0 : true);
       
       // Varyasyonları resetle - her zaman aktif olarak başlat
       const initialVariations = product?.variations && product.variations.length > 0 
@@ -321,6 +328,9 @@ export function ProductFormModal({
           uploading: false
         })));
       }
+
+      // Shop Section'ı sıfırla
+      setSelectedShopSection("0");
     }
 
     // Cleanup previews on unmount
@@ -508,8 +518,9 @@ export function ProductFormModal({
         height,
         height_unit: heightUnit,
         taxonomy_id: taxonomyId,
-        variations: hasVariationsRef.current ? variations.filter((v: any) => v.is_active) : undefined,
-        shop_section_id: selectedShopSection ? parseInt(selectedShopSection) : undefined,
+        variations: hasVariations ? variations.filter((v: any) => v.is_active) : undefined,
+        shop_section_id: parseInt(selectedShopSection || "0"), // Varsayılan olarak 0 (Home) bölümünü kullan
+        state: state,
       };
 
       // Ürünü oluştur
@@ -754,10 +765,8 @@ export function ProductFormModal({
       <div className="flex items-center space-x-2">
         <Checkbox
           id="hasVariations"
-          checked={hasVariationsRef.current}
-          onCheckedChange={(checked) => {
-            hasVariationsRef.current = !!checked
-          }}
+          checked={hasVariations}
+          onCheckedChange={checked => setHasVariations(Boolean(checked))}
         />
         <label
           htmlFor="hasVariations"
@@ -767,7 +776,7 @@ export function ProductFormModal({
         </label>
       </div>
 
-      {hasVariationsRef.current && (
+      {hasVariations && (
         <div className="border rounded-md">
           <Table>
             <TableHeader>
@@ -854,7 +863,7 @@ export function ProductFormModal({
                         type="number"
                         value={price}
                         onChange={(e) => setPrice(parseFloat(e.target.value))}
-                        disabled={hasVariationsRef.current}
+                        disabled={hasVariations}
                       />
                     </div>
                   </div>
@@ -908,27 +917,17 @@ export function ProductFormModal({
                   
                   {/* Shop Section seçimi */}
                   <div className="col-span-2">
-                    <Label htmlFor="shopSection" className="block mb-1">
-                      Shop Section
-                    </Label>
+                    <Label htmlFor="shopSection">Shop Section</Label>
                     <Select
                       value={selectedShopSection}
-                      onValueChange={setSelectedShopSection}
-                      disabled={shopSections.length === 0}
+                      onValueChange={(value) => setSelectedShopSection(value)}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          shopSections.length === 0 
-                            ? "Bölüm bulunamadı" 
-                            : "Bölüm seçin"
-                        } />
+                      <SelectTrigger id="shopSection">
+                        <SelectValue placeholder="Bir mağaza bölümü seçin" />
                       </SelectTrigger>
                       <SelectContent>
-                        {shopSections.map((section) => (
-                          <SelectItem 
-                            key={section.shop_section_id} 
-                            value={section.shop_section_id.toString()}
-                          >
+                        {shopSections.map(section => (
+                          <SelectItem key={section.shop_section_id} value={section.shop_section_id.toString()}>
                             {section.title}
                           </SelectItem>
                         ))}

@@ -210,7 +210,7 @@ export function ProductFormModal({
   const [title, setTitle] = useState(product?.title || "")
   const [description, setDescription] = useState(product?.description || "")
   const [price, setPrice] = useState(product?.price?.amount || 0)
-  const [quantity, setQuantity] = useState(product?.quantity || 4)
+  const [quantity, setQuantity] = useState(4)
   const [shippingProfileId, setShippingProfileId] = useState(
     product?.shipping_profile_id?.toString() || ""
   )
@@ -218,7 +218,13 @@ export function ProductFormModal({
   // Additional fields to match Etsy
   const [tags, setTags] = useState(product?.tags || [])
   const [tagInput, setTagInput] = useState("")
-  const [materials, setMaterials] = useState(product?.materials || DEFAULT_MATERIALS)
+  const [materials, setMaterials] = useState(product?.materials || [
+    "Polycotton canvas",
+    "Pigmented ink",
+    "Wooden stretcher",
+    "Frame",
+    "Staples"
+  ])
   const [materialInput, setMaterialInput] = useState("")
   const [isPersonalizable, setIsPersonalizable] = useState<boolean>(product?.is_personalizable ?? true)
   const [personalizationRequired, setPersonalizationRequired] = useState(product?.personalization_is_required || false)
@@ -231,7 +237,7 @@ export function ProductFormModal({
   const [widthUnit, setWidthUnit] = useState(product?.width_unit || "cm")
   const [height, setHeight] = useState(product?.height || 0)
   const [heightUnit, setHeightUnit] = useState(product?.height_unit || "cm")
-  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || DIGITAL_PRINTS_TAXONOMY_ID)
+  const [taxonomyId, setTaxonomyId] = useState(DIGITAL_PRINTS_TAXONOMY_ID)
   
   const [hasVariations, setHasVariations] = useState<boolean>(true);
   const [variations, setVariations] = useState(product?.variations || predefinedVariations)
@@ -292,7 +298,7 @@ export function ProductFormModal({
       setTitle(product?.title || "");
       setDescription(product?.description || "");
       setPrice(product?.price?.amount || 0);
-      setQuantity(product?.quantity || 4);
+      setQuantity(4);
       setShippingProfileId(product?.shipping_profile_id?.toString() || "");
       setTags(product?.tags || []);
       setTagInput("");
@@ -309,7 +315,7 @@ export function ProductFormModal({
       setWidthUnit(product?.width_unit || "cm");
       setHeight(product?.height || 0);
       setHeightUnit(product?.height_unit || "cm");
-      setTaxonomyId(product?.taxonomy_id || DIGITAL_PRINTS_TAXONOMY_ID);
+      setTaxonomyId(DIGITAL_PRINTS_TAXONOMY_ID);
       setProductImages([]);
       setIsDragging(false);
 
@@ -503,6 +509,12 @@ export function ProductFormModal({
 
   const handleSubmit = async (state: "draft" | "active") => {
     try {
+      // Personalization instructions boşsa varsayılan mesajı kullan
+      const defaultPersonalization = "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\".";
+      const personalizationValue = personalizationInstructions && personalizationInstructions.trim().length > 0
+        ? personalizationInstructions
+        : defaultPersonalization;
+
       // Form verilerini hazırla
       const productData = {
         title,
@@ -512,13 +524,13 @@ export function ProductFormModal({
           divisor: 100,
           currency_code: "USD"
         },
-        quantity,
+        quantity: 4,
         shipping_profile_id: parseInt(shippingProfileId),
         tags,
         materials,
         is_personalizable: isPersonalizable,
         personalization_is_required: personalizationRequired,
-        personalization_instructions: personalizationInstructions,
+        personalization_instructions: personalizationValue,
         primary_color: primaryColor,
         secondary_color: secondaryColor,
         width,
@@ -884,8 +896,8 @@ export function ProductFormModal({
                       id="quantity"
                       type="number"
                       value={quantity}
-                      onChange={(e) => setQuantity(parseInt(e.target.value))}
-                      min="1"
+                      disabled
+                      className="w-full"
                     />
                   </div>
 

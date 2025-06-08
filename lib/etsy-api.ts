@@ -2047,18 +2047,34 @@ export async function createDraftListing(
       listingData.materials = ["Hanger"];
     }
     
-    // Temel isteğe ekleme yapılacak kısım - should_auto_renew değerini ekleyelim
+    // Materials alanı her zaman 5'li diziyle gönderilsin
+    const defaultMaterials = [
+      "Polycotton canvas",
+      "Pigmented ink",
+      "Wooden stretcher",
+      "Frame",
+      "Staples"
+    ];
+    const materials = (listingData.materials && listingData.materials.length > 0)
+      ? listingData.materials
+      : defaultMaterials;
+
     let baseRequestBody = new URLSearchParams({
       title: listingData.title,
       description: listingData.description,
       who_made: listingData.who_made || 'i_did',
       when_made: listingData.when_made || 'made_to_order',
       shipping_profile_id: listingData.shipping_profile_id.toString(),
-      taxonomy_id: (listingData.taxonomy_id || 4).toString(), // Digital Prints kategori ID'si
-      quantity: listingData.quantity.toString(),
-      should_auto_renew: 'true', // Otomatik yenileme etkin
+      taxonomy_id: '4', // Digital Prints
+      quantity: '4',
+      should_auto_renew: 'true',
+      state: listingData.state || 'draft',
+      has_variations: hasVariations ? 'true' : 'false',
+      is_customizable: 'false',
+      price: (listingData.price?.amount || 100).toString(),
+      materials: materials.join(",")
     });
-
+    
     // State değeri varsa ekle (draft veya active)
     if (listingData.state === 'draft' || listingData.state === 'active') {
       baseRequestBody.append('state', listingData.state);

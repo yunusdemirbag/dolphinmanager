@@ -1173,6 +1173,7 @@ export function ProductFormModal({
                       id="isPersonalizable" 
                       checked={isPersonalizable}
                       onCheckedChange={(checked) => setIsPersonalizable(!!checked)}
+                      defaultChecked={true}
                     />
                     <Label htmlFor="isPersonalizable" className="font-normal">
                       Bu ürün kişiselleştirilebilir
@@ -1186,6 +1187,7 @@ export function ProductFormModal({
                           id="personalizationRequired" 
                           checked={personalizationRequired}
                           onCheckedChange={(checked) => setPersonalizationRequired(!!checked)}
+                          defaultChecked={false}
                         />
                         <Label htmlFor="personalizationRequired" className="font-normal">
                           Kişiselleştirme zorunlu olsun

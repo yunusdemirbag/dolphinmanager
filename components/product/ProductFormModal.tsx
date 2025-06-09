@@ -46,7 +46,7 @@ import { predefinedVariations } from '@/lib/etsy-variation-presets';
 // Sabit Art & Collectibles kategori ID - Bu Etsy'de geçerli bir kategori ID'sidir
 const DIGITAL_PRINTS_TAXONOMY_ID = 68887271;  // Art & Collectibles > Prints > Digital Prints
 
-// Default materials
+// Default materials - API'de sabit değerler gönderildiği için burada kullanılmayacak
 const DEFAULT_MATERIALS = ["Cotton Canvas", "Wood Frame", "Hanger"];
 
 // Add interface for API response
@@ -218,8 +218,7 @@ export function ProductFormModal({
   // Additional fields to match Etsy
   const [tags, setTags] = useState(product?.tags || [])
   const [tagInput, setTagInput] = useState("")
-  const [materials, setMaterials] = useState(product?.materials || DEFAULT_MATERIALS)
-  const [materialInput, setMaterialInput] = useState("")
+  // Materials kısmı kaldırıldı - API'de sabit değerler gönderildiği için
   const [isPersonalizable, setIsPersonalizable] = useState<boolean>(product?.is_personalizable ?? true)
   const [personalizationRequired, setPersonalizationRequired] = useState(product?.personalization_is_required || false)
   const [personalizationInstructions, setPersonalizationInstructions] = useState(
@@ -296,8 +295,6 @@ export function ProductFormModal({
       setShippingProfileId(product?.shipping_profile_id?.toString() || "");
       setTags(product?.tags || []);
       setTagInput("");
-      setMaterials(product?.materials || DEFAULT_MATERIALS);
-      setMaterialInput("");
       setIsPersonalizable(product?.is_personalizable ?? true);
       setPersonalizationRequired(product?.personalization_is_required ?? false);
       setPersonalizationInstructions(
@@ -355,7 +352,7 @@ export function ProductFormModal({
   const hasUnsavedChanges = () => {
     if (!product) {
       return title !== "" || description !== "" || price !== 0 || quantity !== 4 || 
-             shippingProfileId !== "" || tags.length > 0 || materials.length > 0 || productImages.length > 0
+             shippingProfileId !== "" || tags.length > 0 || productImages.length > 0
     }
     return false
   }
@@ -382,18 +379,7 @@ export function ProductFormModal({
     setTags(tags.filter(t => t !== tag))
   }
 
-  // Material ekleme
-  const handleAddMaterial = () => {
-    if (materialInput.trim() && materials.length < 5) {
-      setMaterials([...materials, materialInput.trim()])
-      setMaterialInput("")
-    }
-  }
-
-  // Material silme
-  const handleRemoveMaterial = (material: string) => {
-    setMaterials(materials.filter(m => m !== material))
-  }
+  // Material işlemleri kaldırıldı - API'de sabit değerler kullanılıyor
 
   // Resim yükleme işleyicileri
   const handleImageDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -522,7 +508,7 @@ export function ProductFormModal({
         quantity: 4, // Her zaman 4 olarak sabit
         shipping_profile_id: parseInt(shippingProfileId),
         tags,
-        materials: DEFAULT_MATERIALS, // Her zaman varsayılan materials listesini kullan
+        // materials field'ı kaldırıldı - API'de sabit değerler kullanılıyor
         is_personalizable: isPersonalizable,
         personalization_is_required: personalizationRequired,
         personalization_instructions: personalizationValue,
@@ -872,47 +858,21 @@ export function ProductFormModal({
                     </p>
                   </div>
 
+                  {/* Malzemeler kısmı kaldırıldı - API'de sabit değerler kullanılıyor */}
                   <div>
                     <Label className="block mb-2">
-                      Malzemeler <span className="text-gray-500 text-sm">(0-5)</span>
+                      Malzemeler
                     </Label>
-                    <div className="flex items-center mb-2">
-                      <Input
-                        value={materialInput}
-                        onChange={(e) => setMaterialInput(e.target.value)}
-                        placeholder="Malzeme ekleyin"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddMaterial();
-                          }
-                        }}
-                        className="mr-2"
-                      />
-                      <Button 
-                        type="button" 
-                        onClick={handleAddMaterial}
-                        disabled={materials.length >= 5 || !materialInput.trim()}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Ekle
-                      </Button>
+                    <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded border border-gray-200">
+                      <p>Bu ürün için kullanılan malzemeler:</p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {DEFAULT_MATERIALS.map((material, i) => (
+                          <Badge key={i} variant="secondary" className="px-3 py-1">
+                            {material}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
-                      {materials.map((material, index) => (
-                        <Badge key={index} className="px-3 py-1 flex items-center gap-1">
-                          {material}
-                          <X 
-                            className="h-3 w-3 cursor-pointer" 
-                            onClick={() => handleRemoveMaterial(material)}
-                          />
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {materials.length}/5 malzeme eklendi
-                    </p>
                   </div>
                 </div>
               </div>

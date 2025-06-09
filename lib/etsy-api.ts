@@ -2042,10 +2042,9 @@ export async function createDraftListing(
       }
     }
     
-    // Her zaman varsayılan materials kullan
-    if (!listingData.materials || listingData.materials.length === 0) {
-      listingData.materials = ["Cotton Canvas", "Wood Frame", "Hanger"];
-    }
+    // Her zaman varsayılan materials kullan - kullanıcı girdisi göz ardı edilir
+    listingData.materials = ["Cotton Canvas", "Wood Frame", "Hanger"];
+    console.log('[ETSY_API] Forcing fixed materials list:', listingData.materials);
 
     let baseRequestBody = new URLSearchParams({
       title: listingData.title,
@@ -2092,24 +2091,21 @@ export async function createDraftListing(
       baseRequestBody.append('price', listingData.price.amount.toString());
     }
 
-    // DEBUG: Materials kontrolü
-    console.log('[ETSY_API] DEBUG - Raw materials data:', JSON.stringify(listingData.materials));
-    console.log('[ETSY_API] DEBUG - Materials type:', typeof listingData.materials);
-    console.log('[ETSY_API] DEBUG - Is array:', Array.isArray(listingData.materials));
-
-    if (!listingData.materials || !Array.isArray(listingData.materials) || listingData.materials.length === 0) {
-      listingData.materials = ["Cotton Canvas", "Wood Frame", "Hanger"];
-    }
-    console.log('[ETSY_API] DEBUG - Final materials to send:', listingData.materials);
-
-    listingData.materials.forEach((material, index) => {
-      const cleanMaterial = material.trim();
-      baseRequestBody.append('materials', cleanMaterial);
-      baseRequestBody.append(`materials[${index}]`, cleanMaterial);
-      console.log(`[ETSY_API] DEBUG - Added materials: "${cleanMaterial}" as both 'materials' and 'materials[${index}]'`);
+    // Her zaman sabit malzeme listesini kullan (Etsy'ye gönderilecek)
+    const fixedMaterials = ["Cotton Canvas", "Wood Frame", "Hanger"];
+    console.log('[ETSY_API] Using fixed materials list:', fixedMaterials);
+    
+    // Sabit malzeme listesini ekle
+    fixedMaterials.forEach((material, index) => {
+      baseRequestBody.append('materials', material);
+      baseRequestBody.append(`materials[${index}]`, material);
     });
-    console.log('[ETSY_API] DEBUG - All materials in request:', baseRequestBody.getAll('materials'));
-    console.log('[ETSY_API] DEBUG - All materials[] in request:', listingData.materials.map((m, i) => baseRequestBody.get(`materials[${i}]`)));
+    
+    // Kontrol et - materials parametrelerini göster
+    console.log('[ETSY_API] All materials in request:', baseRequestBody.getAll('materials'));
+    fixedMaterials.forEach((material, index) => {
+      console.log(`[ETSY_API] Materials[${index}] = ${baseRequestBody.get(`materials[${index}]`)}`);
+    });
 
     if (listingData.tags && listingData.tags.length > 0) {
       listingData.tags.forEach(tag => {
@@ -2400,10 +2396,8 @@ async function createListingInventory(
     // Varyasyonları etkinleştirmek için ürünü güncelle
     await enableVariationsOnListing(userId, shopId, listingId);
     
-    // Materials'ı inventory endpoint ile de gönder
-    if (listingData.materials && listingData.materials.length > 0) {
-      await updateListingMaterials(userId, shopId, listingId, listingData.materials);
-    }
+    // Materials'ı her zaman gönder (sabit değerler)
+    await updateListingMaterials(userId, shopId, listingId, []);
     
   } catch (error) {
     console.error('[ETSY_API] Error in createListingInventory:', error);
@@ -2545,10 +2539,23 @@ async function updateListingMaterials(userId: string, shopId: number, listingId:
   try {
     const accessToken = await getValidAccessToken(userId);
     if (!accessToken) return;
+    
+    // Her zaman sabit malzeme listesini kullan
+    const fixedMaterials = ["Cotton Canvas", "Wood Frame", "Hanger"];
+    
+    console.log('[ETSY_API] Updating materials for listing:', listingId);
+    console.log('[ETSY_API] Using fixed materials:', fixedMaterials);
+    
     const materialsUpdateParams = new URLSearchParams();
-    materials.forEach(material => {
-      materialsUpdateParams.append('materials', material.trim());
+    
+    // Sadece materials[0], materials[1], ... olarak ekle
+    fixedMaterials.forEach((material, index) => {
+      materialsUpdateParams.append(`materials[${index}]`, material);
     });
+    
+    // API isteğini log et
+    console.log('[ETSY_API] Materials update params:', Object.fromEntries(materialsUpdateParams.entries()));
+    
     const materialsResponse = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`, {
       method: 'PATCH',
       headers: {
@@ -2558,10 +2565,13 @@ async function updateListingMaterials(userId: string, shopId: number, listingId:
       },
       body: materialsUpdateParams
     });
+    
+    const responseText = await materialsResponse.text();
+    
     if (materialsResponse.ok) {
-      console.log('[ETSY_API] Successfully updated materials');
+      console.log('[ETSY_API] Successfully updated materials:', responseText);
     } else {
-      console.warn('[ETSY_API] Could not update materials via PATCH');
+      console.warn('[ETSY_API] Failed to update materials via PATCH:', materialsResponse.status, responseText);
     }
   } catch (materialsError) {
     console.warn('[ETSY_API] Materials update failed:', materialsError);

@@ -2055,7 +2055,7 @@ export async function createDraftListing(
       // Sabit taxonomy_id kullanıyoruz - geçerli bir değer
       taxonomy_id: '1027', // Home & Living > Home Decor > Wall Decor
       quantity: '4', // Sabit miktar 4
-      should_auto_renew: 'true',
+      should_auto_renew: 'true', // Her zaman otomatik yenileme
       state: listingData.state || 'draft',
       has_variations: hasVariations ? 'true' : 'false',
       is_customizable: 'false',
@@ -2180,6 +2180,9 @@ export async function createDraftListing(
     } else {
       baseRequestBody.append('taxonomy_id', '1027'); // Home & Living > Home Decor > Wall Decor
     }
+
+    // Ekstra güvenlik için tekrar ekle (override için)
+    baseRequestBody.set('should_auto_renew', 'true');
 
     console.log('[ETSY_API] Making createDraftListing request with body:', Object.fromEntries(baseRequestBody.entries()));
 

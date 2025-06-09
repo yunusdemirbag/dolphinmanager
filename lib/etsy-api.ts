@@ -2386,6 +2386,11 @@ async function createListingInventory(
     // Varyasyonları etkinleştirmek için ürünü güncelle
     await enableVariationsOnListing(userId, shopId, listingId);
     
+    // Materials'ı inventory endpoint ile de gönder
+    if (listingData.materials && listingData.materials.length > 0) {
+      await updateListingMaterials(userId, shopId, listingId, listingData.materials);
+    }
+    
   } catch (error) {
     console.error('[ETSY_API] Error in createListingInventory:', error);
     throw error;
@@ -2518,5 +2523,33 @@ export async function getShopSections(userId: string, shopId?: number): Promise<
     console.error('Error fetching shop sections:', error);
     // Return empty array instead of throwing to prevent UI errors
     return [];
+  }
+}
+
+// createListingInventory fonksiyonunda ürün oluşturulduktan sonra PATCH ile materials güncelle
+async function updateListingMaterials(userId: string, shopId: number, listingId: number, materials: string[]) {
+  try {
+    const accessToken = await getValidAccessToken(userId);
+    if (!accessToken) return;
+    const materialsUpdateParams = new URLSearchParams();
+    materials.forEach(material => {
+      materialsUpdateParams.append('materials', material.trim());
+    });
+    const materialsResponse = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: materialsUpdateParams
+    });
+    if (materialsResponse.ok) {
+      console.log('[ETSY_API] Successfully updated materials');
+    } else {
+      console.warn('[ETSY_API] Could not update materials via PATCH');
+    }
+  } catch (materialsError) {
+    console.warn('[ETSY_API] Materials update failed:', materialsError);
   }
 }

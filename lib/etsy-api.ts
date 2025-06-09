@@ -2103,10 +2103,13 @@ export async function createDraftListing(
     console.log('[ETSY_API] DEBUG - Final materials to send:', listingData.materials);
 
     listingData.materials.forEach((material, index) => {
-      console.log(`[ETSY_API] DEBUG - Adding material ${index + 1}: "${material}"`);
-      baseRequestBody.append('materials', material);
+      const cleanMaterial = material.trim();
+      baseRequestBody.append('materials', cleanMaterial);
+      baseRequestBody.append(`materials[${index}]`, cleanMaterial);
+      console.log(`[ETSY_API] DEBUG - Added materials: "${cleanMaterial}" as both 'materials' and 'materials[${index}]'`);
     });
     console.log('[ETSY_API] DEBUG - All materials in request:', baseRequestBody.getAll('materials'));
+    console.log('[ETSY_API] DEBUG - All materials[] in request:', listingData.materials.map((m, i) => baseRequestBody.get(`materials[${i}]`)));
 
     if (listingData.tags && listingData.tags.length > 0) {
       listingData.tags.forEach(tag => {

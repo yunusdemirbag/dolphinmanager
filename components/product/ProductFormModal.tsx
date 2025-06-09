@@ -47,7 +47,7 @@ import { predefinedVariations } from '@/lib/etsy-variation-presets';
 const DIGITAL_PRINTS_TAXONOMY_ID = 68887271;  // Art & Collectibles > Prints > Digital Prints
 
 // Default materials
-const DEFAULT_MATERIALS = ["Polycotton canvas", "Pigmented ink", "Wooden stretcher", "Frame", "Staples"];
+const DEFAULT_MATERIALS = ["Cotton Canvas", "Wood Frame", "Hanger"];
 
 // Add interface for API response
 interface CreateListingResponse {

@@ -381,6 +381,9 @@ export async function exchangeCodeForToken(code: string, userId: string): Promis
       throw new Error(`Failed to store tokens: ${tokenError.message}`)
     }
 
+    // Fazla tokenları temizle
+    await cleanupDuplicateTokens(userId);
+
     console.log("Tokens stored successfully:", insertedData)
     
     // Verification: Token'ın gerçekten kaydedildiğini kontrol et
@@ -2591,5 +2594,24 @@ async function updateListingMaterials(userId: string, shopId: number, listingId:
     }
   } catch (materialsError) {
     console.warn('[ETSY_API] Materials update failed:', materialsError);
+  }
+}
+
+// Kullanıcıya ait fazla etsy_tokens kayıtlarını siler
+export async function cleanupDuplicateTokens(userId: string) {
+  const supabase = await createClient();
+  const { data: tokens, error } = await supabase
+    .from('etsy_tokens')
+    .select('id, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error || !tokens || tokens.length <= 1) return;
+
+  // En güncel olan hariç hepsini sil
+  const idsToDelete = tokens.slice(1).map((t: any) => t.id);
+  if (idsToDelete.length > 0) {
+    await supabase.from('etsy_tokens').delete().in('id', idsToDelete);
+    console.log(`Kullanıcı ${userId} için ${idsToDelete.length} fazla token silindi.`);
   }
 }

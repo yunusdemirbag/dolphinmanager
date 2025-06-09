@@ -635,11 +635,11 @@ export async function getValidAccessToken(userId: string): Promise<string | null
       token_type: tokens.access_token.startsWith('v3_') ? 'OAuth2' : 'OAuth1',
     });
 
-    // Token'ın türünü kontrol et - OAuth1 tokenları ise hatayı raporla
-    if (!tokens.access_token.startsWith('v3_')) {
-      console.error("OAuth1 token detected. Need to migrate to OAuth2.");
-      throw new Error('RECONNECT_REQUIRED');
-    }
+    // Token'ın türünü kontrol etme ve RECONNECT_REQUIRED fırlatma kodunu kaldırdım
+    // if (!tokens.access_token.startsWith('v3_')) {
+    //   console.error("OAuth1 token detected. Need to migrate to OAuth2.");
+    //   throw new Error('RECONNECT_REQUIRED');
+    // }
 
     // Token hala geçerli mi kontrol et - 5 dakikalık bir tampon bırak
     if (tokens.expires_at && new Date(tokens.expires_at) > new Date(Date.now() + 5 * 60 * 1000)) {

@@ -75,7 +75,7 @@ export default function ProductsPage() {
     price: 0,
     quantity: 4,
     tags: [],
-    materials: [],
+    materials: ["Cotton Canvas", "Wood Frame", "Hanger"],
     who_made: "i_did",
     when_made: "made_to_order",
     taxonomy_id: 0,

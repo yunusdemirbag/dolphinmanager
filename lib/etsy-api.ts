@@ -2181,6 +2181,11 @@ export async function createDraftListing(
       baseRequestBody.append('taxonomy_id', '1027'); // Home & Living > Home Decor > Wall Decor
     }
 
+    // Kişiselleştirme alanlarını otomatik ekle
+    baseRequestBody.set('personalization_instructions', 'To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type "NO".');
+    baseRequestBody.set('personalization_char_count_max', '256');
+    baseRequestBody.set('personalization_is_required', 'false');
+
     // Ekstra güvenlik için tekrar ekle (override için)
     baseRequestBody.set('should_auto_renew', 'true');
 

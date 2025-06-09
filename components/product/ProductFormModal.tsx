@@ -30,8 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import { useDrag, useDrop } from 'react-dnd';
 import { Switch } from "@/components/ui/switch"
 import {
   Table,
@@ -42,6 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
+import { useRouter } from "next/navigation"
 
 // Sabit Art & Collectibles kategori ID - Bu Etsy'de geçerli bir kategori ID'sidir
 const DIGITAL_PRINTS_TAXONOMY_ID = 68887271;  // Art & Collectibles > Prints > Digital Prints
@@ -246,6 +246,19 @@ export function ProductFormModal({
   }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
+  // 1. videoFile state'ini genişlet
+  const [videoFile, setVideoFile] = useState<{
+    file: File;
+    preview: string;
+    uploading: boolean;
+    error?: string;
+  } | null>(null);
+
+  // 2. useRef ile file input'a eriş
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const router = useRouter()
+
   // Mağaza bölümlerini yükle
   useEffect(() => {
     async function loadShopSections() {
@@ -386,70 +399,38 @@ export function ProductFormModal({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-
-    let files: File[] = [];
-    if (e.dataTransfer.items) {
-      // Modern browser
-      for (let i = 0; i < e.dataTransfer.items.length; i++) {
-        if (e.dataTransfer.items[i].kind === 'file') {
-          const file = e.dataTransfer.items[i].getAsFile();
-          if (file) files.push(file);
-        }
-      }
+    const files = e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+    const videoFiles = files.filter(f => f.type.startsWith('video/'));
+    if (productImages.length + imageFiles.length > 10) {
+      toast({ title: "Maksimum Resim Limiti", description: "En fazla 10 resim yükleyebilirsiniz.", variant: "destructive" });
     } else {
-      // Fallback
-      files = Array.from(e.dataTransfer.files);
+      const newImages = imageFiles.map(file => ({ file, preview: URL.createObjectURL(file), uploading: false }));
+      setProductImages(prev => [...prev, ...newImages]);
     }
-
-    files = files.filter(file => {
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-      return validTypes.includes(file.type);
-    });
-
-    if (productImages.length + files.length > 10) {
-      toast({
-        title: "Maksimum Limit",
-        description: "En fazla 10 resim yükleyebilirsiniz.",
-        variant: "destructive"
-      });
-      return;
+    if (videoFiles.length > 0) {
+      if (videoFile) URL.revokeObjectURL(videoFile.preview);
+      setVideoFile({ file: videoFiles[0], preview: URL.createObjectURL(videoFiles[0]), uploading: false });
     }
-
-    const newImages = files.map(file => ({
-      file,
-      preview: URL.createObjectURL(file),
-      uploading: false
-    }));
-
-    setProductImages(prev => [...prev, ...newImages]);
-  }, [productImages.length, toast]);
+  }, [productImages.length, videoFile, toast]);
 
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
-
-    const files = Array.from(e.target.files).filter(file => {
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-      return validTypes.includes(file.type);
-    });
-
-    if (productImages.length + files.length > 10) {
-      toast({
-        title: "Maksimum Limit",
-        description: "En fazla 10 resim yükleyebilirsiniz.",
-        variant: "destructive"
-      });
-      return;
+    const files = Array.from(e.target.files);
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+    const videoFiles = files.filter(f => f.type.startsWith('video/'));
+    if (productImages.length + imageFiles.length > 10) {
+      toast({ title: "Maksimum Resim Limiti", description: "En fazla 10 resim yükleyebilirsiniz.", variant: "destructive" });
+    } else {
+      const newImages = imageFiles.map(file => ({ file, preview: URL.createObjectURL(file), uploading: false }));
+      setProductImages(prev => [...prev, ...newImages]);
     }
-
-    const newImages = files.map(file => ({
-      file,
-      preview: URL.createObjectURL(file),
-      uploading: false
-    }));
-
-    setProductImages(prev => [...prev, ...newImages]);
-    e.target.value = ''; // Input'u sıfırla
-  }, [productImages.length, toast]);
+    if (videoFiles.length > 0) {
+      if (videoFile) URL.revokeObjectURL(videoFile.preview);
+      setVideoFile({ file: videoFiles[0], preview: URL.createObjectURL(videoFiles[0]), uploading: false });
+    }
+    e.target.value = '';
+  }, [productImages.length, videoFile, toast]);
 
   const handleRemoveImage = useCallback((index: number) => {
     setProductImages(prev => {
@@ -524,25 +505,131 @@ export function ProductFormModal({
         // taxonomy_id parametresi geçici olarak kaldırıldı
       };
 
-      // Ürünü oluştur
-      const response = await onSubmit(productData, state);
-      console.log("[PRODUCT_FORM] Listing created:", response);
-
-      if (response.success) {
-        toast({
-          title: product ? "Ürün güncellendi" : "Ürün oluşturuldu",
-          description: `İşlem başarıyla tamamlandı. Ürün ID: ${response.listing_id}`,
-        });
-        
-        // Formu kapat
-        onClose();
-      } else {
+      // Önce ürün oluşturma/güncelleme isteğini gönder
+      const listingResponse = await onSubmit(productData, state);
+      if (!listingResponse.success || !listingResponse.listing_id) {
         toast({
           variant: "destructive",
           title: "Hata",
-          description: "Ürün oluşturulurken bir hata oluştu.",
+          description: listingResponse.message || "Ürün oluşturulurken/güncellenirken bir hata oluştu.",
+        });
+        return;
+      }
+      const listing_id = listingResponse.listing_id;
+      // 2. ADIM: Video varsa videoyu yükle
+      if (videoFile) {
+        setVideoFile(prev => prev ? { ...prev, uploading: true, error: undefined } : null);
+        toast({ title: "Video Yükleniyor...", description: "Lütfen bekleyin." });
+        console.log("Video yükleme başlatılıyor, file:", videoFile.file.name);
+        
+        const formData = new FormData();
+        formData.append('video', videoFile.file);
+        formData.append('name', videoFile.file.name);
+        
+        try {
+          console.log(`Video yükleme API çağrısı yapılıyor: /api/etsy/listings/${listing_id}/video`);
+          const videoResponse = await fetch(`/api/etsy/listings/${listing_id}/video`, {
+            method: 'POST',
+            body: formData,
+          });
+          
+          console.log("Video API yanıt durumu:", videoResponse.status);
+          
+          if (!videoResponse.ok) {
+            const errorText = await videoResponse.text();
+            console.error("Video yükleme hatası - ham yanıt:", errorText);
+            
+            let errorData;
+            try {
+              errorData = await JSON.parse(errorText);
+            } catch (e) {
+              errorData = { error: errorText };
+            }
+            
+            console.error("Video yükleme hata detayları:", errorData);
+            
+            // OAuth hatası kontrolü
+            if (errorData.details?.error?.includes('OAuth1 support has been deprecated') || 
+                errorData.message?.includes('OAuth1 support has been deprecated') || 
+                errorText.includes('OAuth1 support has been deprecated')) {
+              console.error("OAuth1 hatası tespit edildi");
+              
+              toast({
+                variant: "destructive",
+                title: "Etsy bağlantınız güncel değil",
+                description: "Etsy hesabınızı yeniden bağlamanız gerekiyor. Lütfen Mağazalar sayfasına gidin ve Etsy hesabınızı yeniden bağlayın.",
+              });
+              
+              setVideoFile(prev => prev ? { 
+                ...prev, 
+                uploading: false, 
+                error: "Etsy bağlantınız güncel değil. Lütfen Etsy hesabınızı yeniden bağlayın." 
+              } : null);
+              
+              // Mağazalar sayfasına yönlendirmeyi önerin
+              const shouldRedirect = window.confirm(
+                "Etsy API bağlantınız güncellenmelidir. Mağazalar sayfasına gitmek ister misiniz?"
+              );
+              
+              if (shouldRedirect) {
+                router.push("/stores");
+                return;
+              }
+            } else {
+              // Diğer hatalar
+              const errorMessage = errorData.message || errorData.error || "Video yüklenirken bir hata oluştu.";
+              toast({
+                variant: "destructive",
+                title: "Video Yüklenemedi",
+                description: errorMessage,
+              });
+              
+              setVideoFile(prev => prev ? { 
+                ...prev, 
+                uploading: false, 
+                error: errorMessage 
+              } : null);
+            }
+            return;
+          }
+          
+          // Başarılı yanıt
+          console.log("Video başarıyla yüklendi");
+          const videoData = await videoResponse.json();
+          
+          toast({
+            title: "Video Yüklendi",
+            description: "Video başarıyla yüklendi.",
+          });
+          
+          setVideoFile(prev => prev ? { 
+            ...prev, 
+            uploading: false, 
+            uploaded: true,
+            videoId: videoData.video_id || videoData.listing_video_id || null 
+          } : null);
+        } catch (error) {
+          console.error("Video yükleme işlemi sırasında beklenmeyen hata:", error);
+          
+          toast({
+            variant: "destructive",
+            title: "Video Yüklenemedi",
+            description: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu.",
+          });
+          
+          setVideoFile(prev => prev ? { 
+            ...prev, 
+            uploading: false,
+            error: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu." 
+          } : null);
+        }
+      } else {
+        toast({
+          title: product ? "Ürün güncellendi" : "Ürün oluşturuldu",
+          description: `İşlem başarıyla tamamlandı. Ürün ID: ${listing_id}`,
         });
       }
+      onClose();
     } catch (error) {
       console.error('Form gönderimi sırasında hata:', error);
       toast({
@@ -556,13 +643,52 @@ export function ProductFormModal({
   // Resim bölümü
   const ImageSection = () => (
     <div className="space-y-4">
+      {/* BAŞLIK VE RESİM/VIDEO SAYACI */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Ürün Görselleri</h3>
+        <h3 className="text-lg font-medium">Medya</h3>
         <div className="text-sm text-gray-500">
-          {productImages.length}/10 resim
+          {productImages.length}/10 resim, {videoFile ? 1 : 0}/1 video
         </div>
       </div>
 
+      {/* VİDEO ÖNİZLEME KARTI */}
+      {videoFile && (
+        <div className="mt-4 space-y-2">
+          <h4 className="text-md font-medium text-gray-700">Video</h4>
+          <div className="relative group rounded-lg overflow-hidden border p-2 bg-slate-50">
+            <video
+              src={videoFile.preview}
+              controls={!videoFile.uploading}
+              className="w-full rounded-md max-h-64 aspect-video object-cover"
+            />
+            {videoFile.uploading && (
+              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white">
+                <Loader2 className="w-8 h-8 animate-spin" />
+                <p className="mt-2 text-sm">Video Etsy'e yükleniyor...</p>
+              </div>
+            )}
+            {videoFile.error && (
+              <div className="absolute bottom-2 left-2 right-2 px-2 py-1 bg-red-500 text-white text-xs rounded text-center">
+                {videoFile.error}
+              </div>
+            )}
+            {!videoFile.uploading && (
+              <button
+                type="button"
+                onClick={() => {
+                  URL.revokeObjectURL(videoFile.preview);
+                  setVideoFile(null);
+                }}
+                className="absolute top-2 right-2 z-10 p-1 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+              >
+                <X className="w-4 h-4 text-gray-700" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SÜRÜKLE-BIRAK ALANI VE RESİM LİSTESİ */}
       <div
         className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
           isDragging ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50"
@@ -578,30 +704,22 @@ export function ProductFormModal({
           setIsDragging(false);
         }}
       >
-        {productImages.length === 0 ? (
+        {productImages.length === 0 && !videoFile ? (
           <div className="text-center">
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
               <Upload className="w-6 h-6 text-primary" />
             </div>
-            <p className="text-sm font-medium mb-1">Resimleri buraya sürükleyin</p>
+            <p className="text-sm font-medium mb-1">Medya dosyalarını buraya sürükleyin</p>
             <p className="text-sm text-gray-500 mb-4">veya</p>
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              className="hidden"
-              id="image-upload"
-              onChange={(e) => e.target.files && handleImageSelect(e)}
-            />
             <Button
               type="button"
               variant="outline"
-              onClick={() => document.getElementById('image-upload')?.click()}
+              onClick={() => fileInputRef.current?.click()}
             >
               Bilgisayardan Seçin
             </Button>
             <p className="text-xs text-gray-500 mt-4">
-              PNG, JPG veya GIF • Resim başına max. 20MB
+              PNG, JPG, GIF veya MP4/QuickTime video • Resim başına max. 20MB
             </p>
           </div>
         ) : (
@@ -618,11 +736,11 @@ export function ProductFormModal({
             {productImages.length < 10 && (
               <button
                 type="button"
-                onClick={() => document.getElementById('image-upload')?.click()}
+                onClick={() => fileInputRef.current?.click()}
                 className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-primary/50 transition-colors"
               >
                 <Upload className="w-6 h-6 text-gray-400 mb-2" />
-                <span className="text-sm text-gray-500">Resim Ekle</span>
+                <span className="text-sm text-gray-500">Medya Ekle</span>
               </button>
             )}
           </div>
@@ -702,364 +820,362 @@ export function ProductFormModal({
             </DialogDescription>
           </DialogHeader>
 
-          <DndProvider backend={HTML5Backend}>
-            <div className="space-y-6">
-              {/* Resim Bölümü */}
-              <ImageSection />
+          <div className="space-y-6">
+            {/* Resim Bölümü */}
+            <ImageSection />
 
-              <Separator />
-              
-              {/* Temel Bilgiler Bölümü */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Temel Bilgiler</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <Label htmlFor="title" className="block mb-1">
-                      Başlık <span className="text-red-500">*</span>
-                    </Label>
+            <Separator />
+            
+            {/* Temel Bilgiler Bölümü */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Temel Bilgiler</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label htmlFor="title" className="block mb-1">
+                    Başlık <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="price" className="block mb-1">
+                    Fiyat <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="flex items-center">
+                    <span className="mr-2">$</span>
                     <Input
-                      id="title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="price" className="block mb-1">
-                      Fiyat <span className="text-red-500">*</span>
-                    </Label>
-                    <div className="flex items-center">
-                      <span className="mr-2">$</span>
-                      <Input
-                        id="price"
-                        type="number"
-                        value={price}
-                        onChange={(e) => setPrice(parseFloat(e.target.value))}
-                        disabled={hasVariations}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="quantity" className="block mb-1">
-                      Adet / Stok Miktarı <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="quantity"
+                      id="price"
                       type="number"
-                      value={quantity}
-                      disabled
-                      className="w-full"
+                      value={price}
+                      onChange={(e) => setPrice(parseFloat(e.target.value))}
+                      disabled={hasVariations}
                     />
                   </div>
-
-                  <div className="col-span-2">
-                    <Label htmlFor="description" className="block mb-1">
-                      Açıklama <span className="text-red-500">*</span>
-                    </Label>
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="min-h-[100px]"
-                      placeholder="Ürününüzün detaylı açıklamasını girin"
-                    />
-                  </div>
-
-                  {/* Kategori seçimi */}
-                  <div className="col-span-2">
-                    <Label htmlFor="category" className="block mb-1">Kategori *</Label>
-                    <Select
-                      value={taxonomyId.toString()}
-                      onValueChange={(val) => setTaxonomyId(Number(val))}
-                      required
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue>{taxonomyId === 2078 ? "Digital Prints" : "Wall Decor"}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1027">Wall Decor</SelectItem>
-                        <SelectItem value="2078">Digital Prints</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {/* Shop Section seçimi */}
-                  <div className="col-span-2">
-                    <Label htmlFor="shopSection">Shop Section</Label>
-                    <Select
-                      value={selectedShopSection}
-                      onValueChange={(value) => setSelectedShopSection(value)}
-                    >
-                      <SelectTrigger id="shopSection">
-                        <SelectValue placeholder="Bir mağaza bölümü seçin" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {shopSections
-                          .filter(section => section.shop_section_id !== 0) // Home bölümünü filtrele
-                          .map(section => (
-                            <SelectItem key={section.shop_section_id} value={section.shop_section_id.toString()}>
-                              {section.title}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
-              </div>
 
-              <Separator />
-
-              {/* Etiketler ve Malzemeler */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Etiketler & Malzemeler</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label className="block mb-2">
-                      Etiketler <span className="text-gray-500 text-sm">(0-13)</span>
-                    </Label>
-                    <div className="flex items-center mb-2">
-                      <Input
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        placeholder="Etiket ekleyin"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddTag();
-                          }
-                        }}
-                        className="mr-2"
-                      />
-                      <Button 
-                        type="button" 
-                        onClick={handleAddTag}
-                        disabled={tags.length >= 13 || !tagInput.trim()}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Ekle
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
-                      {tags.map((tag, index) => (
-                        <Badge key={index} className="px-3 py-1 flex items-center gap-1">
-                          {tag}
-                          <X 
-                            className="h-3 w-3 cursor-pointer" 
-                            onClick={() => handleRemoveTag(tag)}
-                          />
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {tags.length}/13 etiket eklendi
-                    </p>
-                  </div>
-
-                  {/* Malzemeler kısmı kaldırıldı - API'de sabit değerler kullanılıyor */}
-                  <div>
-                    <Label className="block mb-2">
-                      Malzemeler
-                    </Label>
-                    <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded border border-gray-200">
-                      <p>Bu ürün için kullanılan malzemeler:</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {DEFAULT_MATERIALS.map((material, i) => (
-                          <Badge key={i} variant="secondary" className="px-3 py-1">
-                            {material}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                <div>
+                  <Label htmlFor="quantity" className="block mb-1">
+                    Adet / Stok Miktarı <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    value={quantity}
+                    disabled
+                    className="w-full"
+                  />
                 </div>
-              </div>
 
-              <Separator />
+                <div className="col-span-2">
+                  <Label htmlFor="description" className="block mb-1">
+                    Açıklama <span className="text-red-500">*</span>
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="min-h-[100px]"
+                    placeholder="Ürününüzün detaylı açıklamasını girin"
+                  />
+                </div>
 
-              {/* Kargo ve İşlem Profilleri */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Kargo & İşlem Profilleri</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="shipping" className="block mb-1">
-                      Kargo Profili <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={shippingProfileId}
-                      onValueChange={setShippingProfileId}
-                      disabled={loadingShippingProfiles || shippingProfiles.length === 0}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          loadingShippingProfiles
-                            ? "Kargo profilleri yükleniyor..."
-                            : shippingProfiles.length === 0
-                            ? "Kargo profili bulunamadı"
-                            : "Kargo profili seçin"
-                        } />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {shippingProfiles.map((profile) => (
-                          <SelectItem
-                            key={profile.shipping_profile_id}
-                            value={profile.shipping_profile_id.toString()}
-                          >
-                            {profile.title}
+                {/* Kategori seçimi */}
+                <div className="col-span-2">
+                  <Label htmlFor="category" className="block mb-1">Kategori *</Label>
+                  <Select
+                    value={taxonomyId.toString()}
+                    onValueChange={(val) => setTaxonomyId(Number(val))}
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>{taxonomyId === 2078 ? "Digital Prints" : "Wall Decor"}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1027">Wall Decor</SelectItem>
+                      <SelectItem value="2078">Digital Prints</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Shop Section seçimi */}
+                <div className="col-span-2">
+                  <Label htmlFor="shopSection">Shop Section</Label>
+                  <Select
+                    value={selectedShopSection}
+                    onValueChange={(value) => setSelectedShopSection(value)}
+                  >
+                    <SelectTrigger id="shopSection">
+                      <SelectValue placeholder="Bir mağaza bölümü seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {shopSections
+                        .filter(section => section.shop_section_id !== 0) // Home bölümünü filtrele
+                        .map(section => (
+                          <SelectItem key={section.shop_section_id} value={section.shop_section_id.toString()}>
+                            {section.title}
                           </SelectItem>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Fiziksel Özellikler */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Fiziksel Özellikler</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="primaryColor" className="block mb-1">
-                      Ana Renk
-                    </Label>
-                    <Input
-                      id="primaryColor"
-                      type="text"
-                      value={primaryColor}
-                      onChange={(e) => setPrimaryColor(e.target.value)}
-                      placeholder="Örn: Mavi"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="secondaryColor" className="block mb-1">
-                      İkincil Renk
-                    </Label>
-                    <Input
-                      id="secondaryColor"
-                      type="text"
-                      value={secondaryColor}
-                      onChange={(e) => setSecondaryColor(e.target.value)}
-                      placeholder="Örn: Beyaz"
-                    />
-                  </div>
-                  
-                  <div className="col-span-2">
-                    <Label className="block mb-2">
-                      Boyutlar
-                    </Label>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center flex-grow">
-                        <Label htmlFor="width" className="mr-2 whitespace-nowrap">Genişlik:</Label>
-                        <Input
-                          id="width"
-                          type="number"
-                          value={width || ""}
-                          onChange={(e) => setWidth(parseFloat(e.target.value) || 0)}
-                          className="mr-2"
-                        />
-                        <Select value={widthUnit} onValueChange={setWidthUnit}>
-                          <SelectTrigger className="w-24">
-                            <SelectValue placeholder="Birim" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cm">cm</SelectItem>
-                            <SelectItem value="mm">mm</SelectItem>
-                            <SelectItem value="m">m</SelectItem>
-                            <SelectItem value="in">inç</SelectItem>
-                            <SelectItem value="ft">ft</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <span className="mx-2">×</span>
-                      <div className="flex items-center flex-grow">
-                        <Label htmlFor="height" className="mr-2 whitespace-nowrap">Yükseklik:</Label>
-                        <Input
-                          id="height"
-                          type="number"
-                          value={height || ""}
-                          onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
-                          className="mr-2"
-                        />
-                        <Select value={heightUnit} onValueChange={setHeightUnit}>
-                          <SelectTrigger className="w-24">
-                            <SelectValue placeholder="Birim" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cm">cm</SelectItem>
-                            <SelectItem value="mm">mm</SelectItem>
-                            <SelectItem value="m">m</SelectItem>
-                            <SelectItem value="in">inç</SelectItem>
-                            <SelectItem value="ft">ft</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-              
-              {/* Varyasyonlar */}
-              <VariationsSection />
-
-              <Separator />
-
-              {/* Kişiselleştirme Ayarları */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Kişiselleştirme</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="isPersonalizable" 
-                      checked={isPersonalizable}
-                      onCheckedChange={(checked) => setIsPersonalizable(!!checked)}
-                      defaultChecked={true}
-                    />
-                    <Label htmlFor="isPersonalizable" className="font-normal">
-                      Bu ürün kişiselleştirilebilir
-                    </Label>
-                  </div>
-                  
-                  {isPersonalizable && (
-                    <div className="space-y-4 pl-6">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="personalizationRequired" 
-                          checked={personalizationRequired}
-                          onCheckedChange={(checked) => setPersonalizationRequired(!!checked)}
-                          defaultChecked={false}
-                        />
-                        <Label htmlFor="personalizationRequired" className="font-normal">
-                          Kişiselleştirme zorunlu olsun
-                        </Label>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="personalizationInstructions" className="mb-2 block">
-                          Kişiselleştirme Talimatları
-                        </Label>
-                        <Textarea
-                          id="personalizationInstructions"
-                          value={personalizationInstructions}
-                          onChange={(e) => setPersonalizationInstructions(e.target.value)}
-                          placeholder="Alıcıya kişiselleştirme talimatlarınızı yazın"
-                        />
-                        <p className="text-sm text-gray-500 mt-1">
-                          Karakter sınırı: {personalizationInstructions.length}/256
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
-          </DndProvider>
+
+            <Separator />
+
+            {/* Etiketler ve Malzemeler */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Etiketler & Malzemeler</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label className="block mb-2">
+                    Etiketler <span className="text-gray-500 text-sm">(0-13)</span>
+                  </Label>
+                  <div className="flex items-center mb-2">
+                    <Input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      placeholder="Etiket ekleyin"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
+                      className="mr-2"
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={handleAddTag}
+                      disabled={tags.length >= 13 || !tagInput.trim()}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Ekle
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
+                    {tags.map((tag, index) => (
+                      <Badge key={index} className="px-3 py-1 flex items-center gap-1">
+                        {tag}
+                        <X 
+                          className="h-3 w-3 cursor-pointer" 
+                          onClick={() => handleRemoveTag(tag)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {tags.length}/13 etiket eklendi
+                  </p>
+                </div>
+
+                {/* Malzemeler kısmı kaldırıldı - API'de sabit değerler kullanılıyor */}
+                <div>
+                  <Label className="block mb-2">
+                    Malzemeler
+                  </Label>
+                  <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded border border-gray-200">
+                    <p>Bu ürün için kullanılan malzemeler:</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {DEFAULT_MATERIALS.map((material, i) => (
+                        <Badge key={i} variant="secondary" className="px-3 py-1">
+                          {material}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Kargo ve İşlem Profilleri */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Kargo & İşlem Profilleri</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="shipping" className="block mb-1">
+                    Kargo Profili <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={shippingProfileId}
+                    onValueChange={setShippingProfileId}
+                    disabled={loadingShippingProfiles || shippingProfiles.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={
+                        loadingShippingProfiles
+                          ? "Kargo profilleri yükleniyor..."
+                          : shippingProfiles.length === 0
+                          ? "Kargo profili bulunamadı"
+                          : "Kargo profili seçin"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {shippingProfiles.map((profile) => (
+                        <SelectItem
+                          key={profile.shipping_profile_id}
+                          value={profile.shipping_profile_id.toString()}
+                        >
+                          {profile.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Fiziksel Özellikler */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Fiziksel Özellikler</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="primaryColor" className="block mb-1">
+                    Ana Renk
+                  </Label>
+                  <Input
+                    id="primaryColor"
+                    type="text"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    placeholder="Örn: Mavi"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="secondaryColor" className="block mb-1">
+                    İkincil Renk
+                  </Label>
+                  <Input
+                    id="secondaryColor"
+                    type="text"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    placeholder="Örn: Beyaz"
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <Label className="block mb-2">
+                    Boyutlar
+                  </Label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center flex-grow">
+                      <Label htmlFor="width" className="mr-2 whitespace-nowrap">Genişlik:</Label>
+                      <Input
+                        id="width"
+                        type="number"
+                        value={width || ""}
+                        onChange={(e) => setWidth(parseFloat(e.target.value) || 0)}
+                        className="mr-2"
+                      />
+                      <Select value={widthUnit} onValueChange={setWidthUnit}>
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Birim" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cm">cm</SelectItem>
+                          <SelectItem value="mm">mm</SelectItem>
+                          <SelectItem value="m">m</SelectItem>
+                          <SelectItem value="in">inç</SelectItem>
+                          <SelectItem value="ft">ft</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <span className="mx-2">×</span>
+                    <div className="flex items-center flex-grow">
+                      <Label htmlFor="height" className="mr-2 whitespace-nowrap">Yükseklik:</Label>
+                      <Input
+                        id="height"
+                        type="number"
+                        value={height || ""}
+                        onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
+                        className="mr-2"
+                      />
+                      <Select value={heightUnit} onValueChange={setHeightUnit}>
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Birim" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cm">cm</SelectItem>
+                          <SelectItem value="mm">mm</SelectItem>
+                          <SelectItem value="m">m</SelectItem>
+                          <SelectItem value="in">inç</SelectItem>
+                          <SelectItem value="ft">ft</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+            
+            {/* Varyasyonlar */}
+            <VariationsSection />
+
+            <Separator />
+
+            {/* Kişiselleştirme Ayarları */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Kişiselleştirme</h3>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="isPersonalizable" 
+                    checked={isPersonalizable}
+                    onCheckedChange={(checked) => setIsPersonalizable(!!checked)}
+                    defaultChecked={true}
+                  />
+                  <Label htmlFor="isPersonalizable" className="font-normal">
+                    Bu ürün kişiselleştirilebilir
+                  </Label>
+                </div>
+                
+                {isPersonalizable && (
+                  <div className="space-y-4 pl-6">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="personalizationRequired" 
+                        checked={personalizationRequired}
+                        onCheckedChange={(checked) => setPersonalizationRequired(!!checked)}
+                        defaultChecked={false}
+                      />
+                      <Label htmlFor="personalizationRequired" className="font-normal">
+                        Kişiselleştirme zorunlu olsun
+                      </Label>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="personalizationInstructions" className="mb-2 block">
+                        Kişiselleştirme Talimatları
+                      </Label>
+                      <Textarea
+                        id="personalizationInstructions"
+                        value={personalizationInstructions}
+                        onChange={(e) => setPersonalizationInstructions(e.target.value)}
+                        placeholder="Alıcıya kişiselleştirme talimatlarınızı yazın"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        Karakter sınırı: {personalizationInstructions.length}/256
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
           <DialogFooter className="flex justify-between mt-6">
             <div>

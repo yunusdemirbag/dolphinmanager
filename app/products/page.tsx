@@ -11,6 +11,8 @@ import { Plus, Loader2 } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode } from "@/types/product"
 import { useProductsClient } from "./products-client"
 import { toast } from "@/components/ui/use-toast"
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 interface CreateListingResponse {
   success: boolean;
@@ -304,116 +306,118 @@ export default function ProductsPage() {
   }
   
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Ürünler</h1>
-          <p className="text-gray-500">
-            {totalCount} ürün • Son güncelleme: {lastRefresh?.toLocaleString() || 'Hiç'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {reconnectRequired && (
-            <Button onClick={handleReconnectEtsy} disabled={refreshing}>
-              {refreshing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Bağlanıyor...
-                </>
-              ) : (
-                "Etsy'ye Bağlan"
-              )}
+    <DndProvider backend={HTML5Backend}>
+      <div className="container mx-auto py-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Ürünler</h1>
+            <p className="text-gray-500">
+              {totalCount} ürün • Son güncelleme: {lastRefresh?.toLocaleString() || 'Hiç'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {reconnectRequired && (
+              <Button onClick={handleReconnectEtsy} disabled={refreshing}>
+                {refreshing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Bağlanıyor...
+                  </>
+                ) : (
+                  "Etsy'ye Bağlan"
+                )}
+              </Button>
+            )}
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Yeni Ürün
             </Button>
-          )}
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Yeni Ürün
-          </Button>
+          </div>
         </div>
-      </div>
 
-      {/* Store Info */}
-      {currentStore && (
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h2 className="font-semibold">{currentStore.shop_name}</h2>
-          <p className="text-sm text-gray-500">Mağaza ID: {currentStore.shop_id}</p>
-        </div>
-      )}
+        {/* Store Info */}
+        {currentStore && (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h2 className="font-semibold">{currentStore.shop_name}</h2>
+            <p className="text-sm text-gray-500">Mağaza ID: {currentStore.shop_id}</p>
+          </div>
+        )}
 
-      {/* Filters */}
-      <ProductFilters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        filterStatus={filterStatus}
-        onFilterStatusChange={setFilterStatus}
-        sortBy={sortBy}
-        onSortByChange={setSortBy}
-        sortOrder={sortOrder}
-        onSortOrderChange={setSortOrder}
-        gridType={gridType}
-        onGridTypeChange={setGridType}
-      />
+        {/* Filters */}
+        <ProductFilters
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          filterStatus={filterStatus}
+          onFilterStatusChange={setFilterStatus}
+          sortBy={sortBy}
+          onSortByChange={setSortBy}
+          sortOrder={sortOrder}
+          onSortOrderChange={setSortOrder}
+          gridType={gridType}
+          onGridTypeChange={setGridType}
+        />
 
-      {/* Products Grid */}
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      ) : filteredProducts.length > 0 ? (
-        <div className={gridClasses[gridType]}>
-          {filteredProducts.map(product => (
-            <ProductCard
-              key={product.listing_id}
-              product={product}
-              listView={gridType === 'list'}
-              isSelected={false}
-              onSelect={() => {}}
-              onEdit={setShowEditModal}
-              onCopy={onCopyProduct}
-              onDelete={setConfirmDeleteProductId}
-              onUpdateState={(product, newState) => {
-                handleUpdateProduct({ ...product, state: newState })
-              }}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Ürün bulunamadı</p>
-        </div>
-      )}
+        {/* Products Grid */}
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : filteredProducts.length > 0 ? (
+          <div className={gridClasses[gridType]}>
+            {filteredProducts.map(product => (
+              <ProductCard
+                key={product.listing_id}
+                product={product}
+                listView={gridType === 'list'}
+                isSelected={false}
+                onSelect={() => {}}
+                onEdit={setShowEditModal}
+                onCopy={onCopyProduct}
+                onDelete={setConfirmDeleteProductId}
+                onUpdateState={(product, newState) => {
+                  handleUpdateProduct({ ...product, state: newState })
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Ürün bulunamadı</p>
+          </div>
+        )}
 
-      {/* Modals */}
-      <ProductFormModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSubmit={onCreateProduct}
-        submitting={submitting}
-        shippingProfiles={shippingProfiles}
-        loadingShippingProfiles={loadingShippingProfiles}
-      />
-
-      {showEditModal && (
+        {/* Modals */}
         <ProductFormModal
-          isOpen={true}
-          onClose={() => setShowEditModal(null)}
-          product={showEditModal}
-          onSubmit={(data) => onUpdateProduct({ ...showEditModal, ...data } as Product)}
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={onCreateProduct}
           submitting={submitting}
           shippingProfiles={shippingProfiles}
           loadingShippingProfiles={loadingShippingProfiles}
         />
-      )}
 
-      {confirmDeleteProductId && (
-        <ProductDeleteModal
-          confirmDeleteProductId={confirmDeleteProductId}
-          setConfirmDeleteProductId={setConfirmDeleteProductId}
-          onDeleteProduct={onDeleteProduct}
-          deletingProductId={deletingProductId}
-        />
-      )}
-    </div>
+        {showEditModal && (
+          <ProductFormModal
+            isOpen={true}
+            onClose={() => setShowEditModal(null)}
+            product={showEditModal}
+            onSubmit={(data) => onUpdateProduct({ ...showEditModal, ...data } as Product)}
+            submitting={submitting}
+            shippingProfiles={shippingProfiles}
+            loadingShippingProfiles={loadingShippingProfiles}
+          />
+        )}
+
+        {confirmDeleteProductId && (
+          <ProductDeleteModal
+            confirmDeleteProductId={confirmDeleteProductId}
+            setConfirmDeleteProductId={setConfirmDeleteProductId}
+            onDeleteProduct={onDeleteProduct}
+            deletingProductId={deletingProductId}
+          />
+        )}
+      </div>
+    </DndProvider>
   )
 }

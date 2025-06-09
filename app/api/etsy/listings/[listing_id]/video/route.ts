@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getValidAccessToken, storeEtsyShopsInDatabase } from '@/lib/etsy-api';
+import { getValidAccessToken } from '@/lib/etsy-api';
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(
@@ -37,21 +37,28 @@ export async function POST(
       return NextResponse.json({ message: 'No valid access token' }, { status: 401 });
     }
 
-    // 4. Mağaza bilgisini al
-    let { data: store, error: storeError } = await supabase
-      .from('etsy_stores')
-      .select('shop_id')
-      .eq('user_id', user.id)
-      .single();
-
-    // Eğer mağaza bulunamazsa, Etsy'den çek ve kaydet
-    if (storeError || !store) {
-      console.log("Mağaza bulunamadı, Etsy'den çekiliyor...");
-      const shopInfo = await storeEtsyShopsInDatabase(user.id, accessToken);
-      if (!shopInfo) {
-        return NextResponse.json({ message: 'No Etsy store found' }, { status: 400 });
+    // 4. Önce listing bilgisini al (shop_id için)
+    const listingResponse = await fetch(
+      `https://openapi.etsy.com/v3/application/listings/${listing_id}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': process.env.ETSY_CLIENT_ID || "",
+        }
       }
-      store = { shop_id: shopInfo.shop_id.toString() };
+    );
+
+    if (!listingResponse.ok) {
+      console.error("Listing bilgisi alınamadı:", await listingResponse.text());
+      return NextResponse.json({ message: 'Could not fetch listing info' }, { status: 400 });
+    }
+
+    const listingData = await listingResponse.json();
+    const shopId = listingData.shop_id;
+
+    if (!shopId) {
+      console.error("Shop ID bulunamadı");
+      return NextResponse.json({ message: 'No shop_id found in listing' }, { status: 400 });
     }
 
     // 5. Form verilerini al
@@ -69,7 +76,7 @@ export async function POST(
     etsyFormData.append('video', videoFile, videoName || videoFile.name || 'listing-video.mp4');
     etsyFormData.append('name', videoName || videoFile.name || 'listing-video.mp4');
     
-    const etsyApiUrl = `https://openapi.etsy.com/v3/application/shops/${store.shop_id}/listings/${listing_id}/videos`;
+    const etsyApiUrl = `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listing_id}/videos`;
     console.log("Etsy API'sine istek gönderiliyor:", etsyApiUrl);
     
     const headers = {

@@ -2043,13 +2043,9 @@ export async function createDraftListing(
     }
     
     // Her zaman varsayılan materials kullan
-    listingData.materials = [
-      "Polycotton canvas",
-      "Pigmented ink",
-      "Wooden stretcher",
-      "Frame",
-      "Staples"
-    ];
+    if (!listingData.materials || listingData.materials.length === 0) {
+      listingData.materials = ["Cotton Canvas", "Wood Frame", "Hanger"];
+    }
 
     let baseRequestBody = new URLSearchParams({
       title: listingData.title,

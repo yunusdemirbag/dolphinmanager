@@ -2615,3 +2615,67 @@ export async function cleanupDuplicateTokens(userId: string) {
     console.log(`Kullanıcı ${userId} için ${idsToDelete.length} fazla token silindi.`);
   }
 }
+
+export async function storeEtsyShopsInDatabase(userId: string, accessToken: string) {
+  try {
+    console.log("[ETSY_API] Fetching and storing shop information for user:", userId);
+    const shops = await fetchFromEtsyAPI('/application/shops', accessToken);
+    
+    if (!shops || !Array.isArray(shops.results) || shops.results.length === 0) {
+      console.error("[ETSY_API] No shops found for user");
+      return null;
+    }
+
+    const supabase = await createClient();
+    
+    // Her bir mağaza için upsert işlemi yap
+    for (const shop of shops.results) {
+      const { data, error } = await supabase
+        .from('etsy_stores')
+        .upsert({
+          user_id: userId,
+          shop_id: shop.shop_id.toString(),
+          shop_name: shop.shop_name,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id, shop_id'
+        });
+
+      if (error) {
+        console.error("[ETSY_API] Error storing shop:", error);
+        continue;
+      }
+      
+      console.log("[ETSY_API] Successfully stored/updated shop:", shop.shop_name);
+    }
+
+    return shops.results[0];
+  } catch (error) {
+    console.error("[ETSY_API] Error in storeEtsyShopsInDatabase:", error);
+    return null;
+  }
+}
+
+async function fetchFromEtsyAPI(endpoint: string, accessToken: string) {
+  try {
+    const baseUrl = 'https://openapi.etsy.com/v3';
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': process.env.ETSY_CLIENT_ID || '',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error(`[ETSY_API] Error fetching ${endpoint}:`, errorData);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`[ETSY_API] Error in fetchFromEtsyAPI for ${endpoint}:`, error);
+    return null;
+  }
+}

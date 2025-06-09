@@ -536,92 +536,59 @@ export function ProductFormModal({
           console.log("Video API yanıt durumu:", videoResponse.status);
           
           if (!videoResponse.ok) {
-            const errorText = await videoResponse.text();
-            console.error("Video yükleme hatası - ham yanıt:", errorText);
+            const errorData = await videoResponse.json();
+            console.error("Video yükleme hatası - ham yanıt:", JSON.stringify(errorData));
             
-            let errorData;
-            try {
-              errorData = await JSON.parse(errorText);
-            } catch (e) {
-              errorData = { error: errorText };
+            // Özel hata durumlarını kontrol et
+            if (errorData.message === 'No Etsy store found') {
+              toast({
+                title: "Mağaza Bağlantı Hatası",
+                description: "Etsy mağazanıza erişilemiyor. Lütfen mağaza bağlantınızı kontrol edin.",
+                variant: "destructive"
+              });
+              router.push('/stores');
+              return;
             }
+            
+            // Diğer hata durumları
+            setVideoFile(prev => prev ? {
+              ...prev,
+              uploading: false,
+              error: errorData.message || 'Video yüklenirken bir hata oluştu'
+            } : null);
+            
+            toast({
+              title: "Video Yükleme Hatası",
+              description: errorData.message || 'Video yüklenirken bir hata oluştu',
+              variant: "destructive"
+            });
             
             console.error("Video yükleme hata detayları:", errorData);
-            
-            // OAuth hatası kontrolü
-            if (errorData.details?.error?.includes('OAuth1 support has been deprecated') || 
-                errorData.message?.includes('OAuth1 support has been deprecated') || 
-                errorText.includes('OAuth1 support has been deprecated')) {
-              console.error("OAuth1 hatası tespit edildi");
-              
-              toast({
-                variant: "destructive",
-                title: "Etsy bağlantınız güncel değil",
-                description: "Etsy hesabınızı yeniden bağlamanız gerekiyor. Lütfen Mağazalar sayfasına gidin ve Etsy hesabınızı yeniden bağlayın.",
-              });
-              
-              setVideoFile(prev => prev ? { 
-                ...prev, 
-                uploading: false, 
-                error: "Etsy bağlantınız güncel değil. Lütfen Etsy hesabınızı yeniden bağlayın." 
-              } : null);
-              
-              // Mağazalar sayfasına yönlendirmeyi önerin
-              const shouldRedirect = window.confirm(
-                "Etsy API bağlantınız güncellenmelidir. Mağazalar sayfasına gitmek ister misiniz?"
-              );
-              
-              if (shouldRedirect) {
-                router.push("/stores");
-                return;
-              }
-            } else {
-              // Diğer hatalar
-              const errorMessage = errorData.message || errorData.error || "Video yüklenirken bir hata oluştu.";
-              toast({
-                variant: "destructive",
-                title: "Video Yüklenemedi",
-                description: errorMessage,
-              });
-              
-              setVideoFile(prev => prev ? { 
-                ...prev, 
-                uploading: false, 
-                error: errorMessage 
-              } : null);
-            }
             return;
           }
+
+          const result = await videoResponse.json();
+          console.log("Video başarıyla yüklendi:", result);
           
-          // Başarılı yanıt
-          console.log("Video başarıyla yüklendi");
-          const videoData = await videoResponse.json();
-          
+          setVideoFile(prev => prev ? { ...prev, uploading: false, uploaded: true } : null);
           toast({
             title: "Video Yüklendi",
-            description: "Video başarıyla yüklendi.",
+            description: "Video başarıyla yüklendi!",
+            variant: "default"
           });
-          
-          setVideoFile(prev => prev ? { 
-            ...prev, 
-            uploading: false, 
-            uploaded: true,
-            videoId: videoData.video_id || videoData.listing_video_id || null 
-          } : null);
         } catch (error) {
-          console.error("Video yükleme işlemi sırasında beklenmeyen hata:", error);
+          console.error("Video yükleme işleminde hata:", error);
+          setVideoFile(prev => prev ? {
+            ...prev,
+            uploading: false,
+            error: 'Video yüklenirken bir hata oluştu'
+          } : null);
           
           toast({
-            variant: "destructive",
-            title: "Video Yüklenemedi",
-            description: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu.",
+            title: "Video Yükleme Hatası",
+            description: "Video yüklenirken beklenmeyen bir hata oluştu.",
+            variant: "destructive"
           });
-          
-          setVideoFile(prev => prev ? { 
-            ...prev, 
-            uploading: false,
-            error: error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu." 
-          } : null);
         }
       } else {
         toast({

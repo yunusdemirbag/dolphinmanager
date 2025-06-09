@@ -2092,10 +2092,21 @@ export async function createDraftListing(
       baseRequestBody.append('price', listingData.price.amount.toString());
     }
 
-    // Materials için her zaman tüm 5 elemanı kullan
-    listingData.materials.forEach(material => {
+    // DEBUG: Materials kontrolü
+    console.log('[ETSY_API] DEBUG - Raw materials data:', JSON.stringify(listingData.materials));
+    console.log('[ETSY_API] DEBUG - Materials type:', typeof listingData.materials);
+    console.log('[ETSY_API] DEBUG - Is array:', Array.isArray(listingData.materials));
+
+    if (!listingData.materials || !Array.isArray(listingData.materials) || listingData.materials.length === 0) {
+      listingData.materials = ["Cotton Canvas", "Wood Frame", "Hanger"];
+    }
+    console.log('[ETSY_API] DEBUG - Final materials to send:', listingData.materials);
+
+    listingData.materials.forEach((material, index) => {
+      console.log(`[ETSY_API] DEBUG - Adding material ${index + 1}: "${material}"`);
       baseRequestBody.append('materials', material);
     });
+    console.log('[ETSY_API] DEBUG - All materials in request:', baseRequestBody.getAll('materials'));
 
     if (listingData.tags && listingData.tags.length > 0) {
       listingData.tags.forEach(tag => {

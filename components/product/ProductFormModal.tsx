@@ -44,7 +44,7 @@ import {
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
 
 // Sabit Art & Collectibles kategori ID - Bu Etsy'de geçerli bir kategori ID'sidir
-const DIGITAL_PRINTS_TAXONOMY_ID = 4;  // Digital Prints kategorisi
+const DIGITAL_PRINTS_TAXONOMY_ID = 68887271;  // Art & Collectibles > Prints > Digital Prints
 
 // Default materials
 const DEFAULT_MATERIALS = ["Polycotton canvas", "Pigmented ink", "Wooden stretcher", "Frame", "Staples"];
@@ -218,13 +218,7 @@ export function ProductFormModal({
   // Additional fields to match Etsy
   const [tags, setTags] = useState(product?.tags || [])
   const [tagInput, setTagInput] = useState("")
-  const [materials, setMaterials] = useState(product?.materials || [
-    "Polycotton canvas",
-    "Pigmented ink",
-    "Wooden stretcher",
-    "Frame",
-    "Staples"
-  ])
+  const [materials, setMaterials] = useState(product?.materials || DEFAULT_MATERIALS)
   const [materialInput, setMaterialInput] = useState("")
   const [isPersonalizable, setIsPersonalizable] = useState<boolean>(product?.is_personalizable ?? true)
   const [personalizationRequired, setPersonalizationRequired] = useState(product?.personalization_is_required || false)
@@ -237,7 +231,7 @@ export function ProductFormModal({
   const [widthUnit, setWidthUnit] = useState(product?.width_unit || "cm")
   const [height, setHeight] = useState(product?.height || 0)
   const [heightUnit, setHeightUnit] = useState(product?.height_unit || "cm")
-  const [taxonomyId, setTaxonomyId] = useState(DIGITAL_PRINTS_TAXONOMY_ID)
+  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || 1027);
   
   const [hasVariations, setHasVariations] = useState<boolean>(true);
   const [variations, setVariations] = useState(product?.variations || predefinedVariations)
@@ -315,7 +309,7 @@ export function ProductFormModal({
       setWidthUnit(product?.width_unit || "cm");
       setHeight(product?.height || 0);
       setHeightUnit(product?.height_unit || "cm");
-      setTaxonomyId(DIGITAL_PRINTS_TAXONOMY_ID);
+      setTaxonomyId(product?.taxonomy_id || 1027);
       setProductImages([]);
       setIsDragging(false);
 
@@ -507,6 +501,7 @@ export function ProductFormModal({
     setVariations(newVariations);
   };
 
+  // Form verilerini handle eden fonksiyon
   const handleSubmit = async (state: "draft" | "active") => {
     try {
       // Personalization instructions boşsa varsayılan mesajı kullan
@@ -524,10 +519,10 @@ export function ProductFormModal({
           divisor: 100,
           currency_code: "USD"
         },
-        quantity: 4,
+        quantity: 4, // Her zaman 4 olarak sabit
         shipping_profile_id: parseInt(shippingProfileId),
         tags,
-        materials,
+        materials: DEFAULT_MATERIALS, // Her zaman varsayılan materials listesini kullan
         is_personalizable: isPersonalizable,
         personalization_is_required: personalizationRequired,
         personalization_instructions: personalizationValue,
@@ -537,165 +532,37 @@ export function ProductFormModal({
         width_unit: widthUnit,
         height,
         height_unit: heightUnit,
-        taxonomy_id: taxonomyId,
         variations: hasVariations ? variations.filter((v: any) => v.is_active) : undefined,
         shop_section_id: selectedShopSection ? parseInt(selectedShopSection) : undefined, // Seçili shop section'ı doğrudan kullan
         state: state,
+        // taxonomy_id parametresi geçici olarak kaldırıldı
       };
 
       // Ürünü oluştur
       const response = await onSubmit(productData, state);
       console.log("[PRODUCT_FORM] Listing created:", response);
 
-      // listing_id'yi doğru şekilde al
-      const listingId = response.listing?.listing_id || response.listing_id;
-      if (!listingId) {
-        throw new Error("Ürün oluşturuldu ancak ID alınamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+      if (response.success) {
+        toast({
+          title: product ? "Ürün güncellendi" : "Ürün oluşturuldu",
+          description: `İşlem başarıyla tamamlandı. Ürün ID: ${response.listing_id}`,
+        });
+        
+        // Formu kapat
+        onClose();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Ürün oluşturulurken bir hata oluştu.",
+        });
       }
-
-      // Başarılı ürün oluşturma bildirimi
-      toast({
-        title: state === "draft" ? "Ürün Taslak Olarak Kaydedildi" : "Ürün Başarıyla Yayınlandı",
-        description: `"${title}" ${state === "draft" ? "taslak olarak kaydedildi" : "başarıyla yayınlandı"}. ${productImages.length > 0 ? "Resimler yükleniyor..." : ""}`,
-        variant: "success",
-        duration: 3000,
-      });
-
-      // Resimleri yükle
-      if (productImages.length > 0) {
-        console.log(`[PRODUCT_FORM] Uploading ${productImages.length} images for listing ${listingId}`);
-
-        for (let i = 0; i < productImages.length; i++) {
-          try {
-            // Resim durumunu güncelle
-            setProductImages(prev => {
-              const newImages = [...prev];
-              newImages[i] = { ...newImages[i], uploading: true, error: undefined };
-              return newImages;
-            });
-
-            // İlerleme göster
-            toast({
-              title: "Resim Yükleniyor",
-              description: `Resim ${i + 1}/${productImages.length} yükleniyor...`,
-              variant: "default",
-              duration: 2000,
-            });
-
-            // Resimler arasında bekle
-            if (i > 0) {
-              console.log(`[PRODUCT_FORM] Waiting before uploading next image...`);
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-
-            // Form verilerini hazırla
-            const formData = new FormData();
-            formData.append('image', productImages[i].file);
-            formData.append('rank', (i + 1).toString());
-
-            // Resmi yükle - CORS sorunları için retry mekanizması
-            console.log(`[PRODUCT_FORM] Uploading image ${i + 1}/${productImages.length}`);
-            
-            // Upload with retry mechanism
-            let uploadResponse = null;
-            let retryCount = 0;
-            const MAX_RETRIES = 3;
-            
-            while (retryCount < MAX_RETRIES && !uploadResponse) {
-              try {
-                if (retryCount > 0) {
-                  console.log(`[PRODUCT_FORM] Retry attempt ${retryCount} for image ${i + 1}`);
-                  // Exponential backoff for retries
-                  await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-                  
-                  toast({
-                    title: "Yükleme Yeniden Deneniyor",
-                    description: `Resim ${i + 1} için yükleme yeniden deneniyor (${retryCount}/${MAX_RETRIES})...`,
-                    variant: "default",
-                    duration: 2000,
-                  });
-                }
-                
-                // Add a timestamp parameter to avoid caching
-                uploadResponse = await fetch(`/api/etsy/listings/${listingId}/images?t=${Date.now()}`, {
-                  method: 'POST',
-                  body: formData,
-                  credentials: 'same-origin',
-                  cache: 'no-store'
-                });
-                
-              } catch (error) {
-                console.error(`[PRODUCT_FORM] Network error on attempt ${retryCount + 1}:`, error);
-                retryCount++;
-                
-                if (retryCount >= MAX_RETRIES) {
-                  throw new Error(`Network error after ${MAX_RETRIES} attempts: ${error instanceof Error ? error.message : String(error)}`);
-                }
-              }
-            }
-
-            if (!uploadResponse || !uploadResponse.ok) {
-              const errorText = uploadResponse ? await uploadResponse.text() : "No response";
-              throw new Error(`Upload failed: ${uploadResponse?.status || 'No response'} - ${errorText}`);
-            }
-
-            const uploadData = await uploadResponse.json();
-            
-            if (!uploadData.success) {
-              throw new Error(uploadData.error || "Upload failed");
-            }
-
-            // Resim durumunu başarılı olarak güncelle
-            setProductImages(prev => {
-              const newImages = [...prev];
-              newImages[i] = { ...newImages[i], uploading: false, error: undefined };
-              return newImages;
-            });
-
-          } catch (error) {
-            console.error(`[PRODUCT_FORM] Error uploading image ${i + 1}:`, error);
-            setProductImages(prev => {
-              const newImages = [...prev];
-              newImages[i] = { ...newImages[i], uploading: false, error: error instanceof Error ? error.message : 'Upload failed' };
-              return newImages;
-            });
-            
-            toast({
-              title: "Resim Yükleme Hatası",
-              description: `Resim ${i + 1} yüklenirken hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`,
-              variant: "destructive",
-              duration: 5000,
-            });
-            
-            // Continue with next image rather than stopping entirely
-            continue;
-          }
-        }
-      }
-
-      // Check if any images failed
-      const failedImages = productImages.filter(img => img.error);
-      
-      // Tüm işlemler tamamlandı bildirimi
-      toast({
-        title: "İşlem Tamamlandı",
-        description: `"${title}" ürünü ${failedImages.length > 0 
-          ? `eklendi, fakat ${failedImages.length} resim yüklenemedi` 
-          : `ve ${productImages.length} resim başarıyla eklendi`}`,
-        variant: failedImages.length > 0 ? "default" : "success",
-        duration: 5000,
-      });
-
-      // Formu kapat
-      onClose();
-
     } catch (error) {
-      console.error("[PRODUCT_FORM] Error:", error);
+      console.error('Form gönderimi sırasında hata:', error);
       toast({
-        title: "Hata",
-        description: error instanceof Error ? error.message : "Bir hata oluştu",
         variant: "destructive",
-        duration: 5000,
+        title: "Hata",
+        description: error instanceof Error ? error.message : "Ürün oluşturulurken bir hata oluştu.",
       });
     }
   };
@@ -916,21 +783,18 @@ export function ProductFormModal({
 
                   {/* Kategori seçimi */}
                   <div className="col-span-2">
-                    <Label htmlFor="taxonomy" className="block mb-1">
-                      Kategori <span className="text-red-500">*</span>
-                    </Label>
+                    <Label htmlFor="category" className="block mb-1">Kategori *</Label>
                     <Select
                       value={taxonomyId.toString()}
-                      onValueChange={(value) => setTaxonomyId(parseInt(value))}
+                      onValueChange={(val) => setTaxonomyId(Number(val))}
+                      required
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Kategori seçin" />
+                      <SelectTrigger className="w-full">
+                        <SelectValue>{taxonomyId === 2078 ? "Digital Prints" : "Wall Decor"}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={DIGITAL_PRINTS_TAXONOMY_ID.toString()}>Digital Prints</SelectItem>
-                        <SelectItem value="2">Art & Collectibles</SelectItem>
-                        <SelectItem value="3">Home & Living</SelectItem>
-                        <SelectItem value="4">Home Decor</SelectItem>
+                        <SelectItem value="1027">Wall Decor</SelectItem>
+                        <SelectItem value="2078">Digital Prints</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1257,6 +1121,7 @@ export function ProductFormModal({
                 )}
               </Button>
               <Button 
+                variant="secondary" 
                 onClick={() => handleSubmit("active")} 
                 disabled={submitting}
               >

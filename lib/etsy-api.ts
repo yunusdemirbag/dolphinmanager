@@ -2042,22 +2042,14 @@ export async function createDraftListing(
       }
     }
     
-    // Varsayılan materials oluştur (eğer gönderilmemişse)
-    if (!listingData.materials || listingData.materials.length === 0) {
-      listingData.materials = ["Hanger"];
-    }
-    
-    // Materials alanı her zaman 5'li diziyle gönderilsin
-    const defaultMaterials = [
+    // Her zaman varsayılan materials kullan
+    listingData.materials = [
       "Polycotton canvas",
       "Pigmented ink",
       "Wooden stretcher",
       "Frame",
       "Staples"
     ];
-    const materials = (listingData.materials && listingData.materials.length > 0)
-      ? listingData.materials
-      : defaultMaterials;
 
     let baseRequestBody = new URLSearchParams({
       title: listingData.title,
@@ -2065,14 +2057,14 @@ export async function createDraftListing(
       who_made: listingData.who_made || 'i_did',
       when_made: listingData.when_made || 'made_to_order',
       shipping_profile_id: listingData.shipping_profile_id.toString(),
-      taxonomy_id: '4', // Digital Prints
-      quantity: '4',
+      // Sabit taxonomy_id kullanıyoruz - geçerli bir değer
+      taxonomy_id: '1027', // Home & Living > Home Decor > Wall Decor
+      quantity: '4', // Sabit miktar 4
       should_auto_renew: 'true',
       state: listingData.state || 'draft',
       has_variations: hasVariations ? 'true' : 'false',
       is_customizable: 'false',
       price: (listingData.price?.amount || 100).toString(),
-      materials: materials.join(",")
     });
     
     // State değeri varsa ekle (draft veya active)
@@ -2104,24 +2096,10 @@ export async function createDraftListing(
       baseRequestBody.append('price', listingData.price.amount.toString());
     }
 
-    // Add optional fields if they exist
-    if (listingData.materials && listingData.materials.length > 0) {
-      listingData.materials.forEach(material => {
-        baseRequestBody.append('materials', material);
-      });
-    } else {
-      // Default malzemeleri ekle
-      const defaultMaterials = [
-        "Polycotton canvas",
-        "Pigmented ink", 
-        "Wooden stretcher",
-        "Frame",
-        "Staples"
-      ];
-      defaultMaterials.forEach(material => {
-        baseRequestBody.append('materials', material);
-      });
-    }
+    // Materials için her zaman tüm 5 elemanı kullan
+    listingData.materials.forEach(material => {
+      baseRequestBody.append('materials', material);
+    });
 
     if (listingData.tags && listingData.tags.length > 0) {
       listingData.tags.forEach(tag => {
@@ -2133,6 +2111,8 @@ export async function createDraftListing(
     if (!hasVariations) {
       if (listingData.is_personalizable !== undefined) {
         baseRequestBody.append('is_personalizable', listingData.is_personalizable.toString());
+      } else {
+        baseRequestBody.append('is_personalizable', 'true');
       }
 
       if (listingData.personalization_is_required !== undefined) {
@@ -2141,11 +2121,15 @@ export async function createDraftListing(
 
       if (listingData.personalization_instructions) {
         baseRequestBody.append('personalization_instructions', listingData.personalization_instructions);
+      } else {
+        baseRequestBody.append('personalization_instructions', 'To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type "NO".');
       }
     } else {
       // Varyasyonlu ürünler için de personalization desteği ekle
       if (listingData.is_personalizable !== undefined) {
         baseRequestBody.append('is_personalizable', listingData.is_personalizable.toString());
+      } else {
+        baseRequestBody.append('is_personalizable', 'true');
       }
 
       if (listingData.personalization_is_required !== undefined) {
@@ -2154,6 +2138,8 @@ export async function createDraftListing(
 
       if (listingData.personalization_instructions) {
         baseRequestBody.append('personalization_instructions', listingData.personalization_instructions);
+      } else {
+        baseRequestBody.append('personalization_instructions', 'To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type "NO".');
       }
     }
 
@@ -2177,6 +2163,16 @@ export async function createDraftListing(
 
     if (listingData.image_ids && listingData.image_ids.length > 0) {
       baseRequestBody.append('image_ids', listingData.image_ids.join(','));
+    }
+
+    // taxonomy_id'yi kesinlikle number olarak ekle
+    if (listingData.taxonomy_id) {
+      // Geçici olarak devre dışı bırakıldı, hata nedeniyle
+      // baseRequestBody.append('taxonomy_id', Number(listingData.taxonomy_id).toString());
+      // Sabit taxonomy_id kullanılıyor
+      baseRequestBody.append('taxonomy_id', '1027'); // Home & Living > Home Decor > Wall Decor
+    } else {
+      baseRequestBody.append('taxonomy_id', '1027'); // Home & Living > Home Decor > Wall Decor
     }
 
     console.log('[ETSY_API] Making createDraftListing request with body:', Object.fromEntries(baseRequestBody.entries()));
@@ -2348,7 +2344,7 @@ async function createListingInventory(
           offerings: [
             {
               price: price,
-              quantity: 1, // Her varyasyon için sabit 1 değeri
+              quantity: 4, // Her varyasyon için sabit 4 değeri
               is_enabled: isActive // Aktif değilse etkin değil
             }
           ]

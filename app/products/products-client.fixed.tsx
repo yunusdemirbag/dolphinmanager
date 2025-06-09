@@ -746,8 +746,9 @@ export default function ProductsClient() {
         body: JSON.stringify({
           ...createForm,
           price: Math.round(createForm.price * 100), // USD cents'e çevir
+          should_auto_renew: true
         })
-      })
+      });
 
       if (response.ok) {
         const data = await response.json()

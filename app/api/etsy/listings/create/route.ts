@@ -17,7 +17,16 @@ export async function POST(request: NextRequest) {
     }
     
     // İstek gövdesinden verileri al
-    const listingData = await request.json()
+    const body = await request.json()
+    
+    // taxonomy_id'yi number'a çevir
+    if (body.taxonomy_id) {
+      // Geçici olarak devre dışı bırakıldı, taxonomy_id hatası nedeniyle
+      // body.taxonomy_id = Number(body.taxonomy_id);
+      body.taxonomy_id = 1027; // Home & Living > Home Decor > Wall Decor
+    } else {
+      body.taxonomy_id = 1027; // Home & Living > Home Decor > Wall Decor
+    }
     
     try {
       // Etsy mağazalarını al
@@ -35,20 +44,20 @@ export async function POST(request: NextRequest) {
       console.log(`Creating listing for store: ${shopName}`)
       
       // Eksik alanları kontrol et ve varsayılan değerler ata
-      if (!listingData.title || listingData.title.trim() === '') {
-        listingData.title = 'New Canvas Print'; // Varsayılan başlık
+      if (!body.title || body.title.trim() === '') {
+        body.title = 'New Canvas Print'; // Varsayılan başlık
       }
       
-      if (!listingData.description || listingData.description.trim() === '') {
-        listingData.description = 'Beautiful canvas print for your home decoration.'; // Varsayılan açıklama
+      if (!body.description || body.description.trim() === '') {
+        body.description = 'Beautiful canvas print for your home decoration.'; // Varsayılan açıklama
       }
       
       // Dil bilgisinin her zaman ayarlandığından emin ol
-      listingData.language = listingData.language || 'en'; // Varsayılan dil
+      body.language = body.language || 'en'; // Varsayılan dil
       
       // Fiyat kontrolü - fiyat yoksa veya hatalıysa varsayılan değer ata
-      if (!listingData.price || !listingData.price.amount) {
-        listingData.price = {
+      if (!body.price || !body.price.amount) {
+        body.price = {
           amount: 100, // 1 USD varsayılan değer
           divisor: 100,
           currency_code: "USD"
@@ -57,7 +66,7 @@ export async function POST(request: NextRequest) {
       }
 
       // shipping_profile_id zorunlu kontrolü
-      if (!listingData.shipping_profile_id) {
+      if (!body.shipping_profile_id) {
         return NextResponse.json({
           error: "Kargo profili seçilmeden ürün eklenemez.",
           details: "shipping_profile_id zorunludur.",
@@ -65,16 +74,16 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      console.log("Creating listing for user:", user.id, "Data:", JSON.stringify(listingData))
+      console.log("Creating listing for user:", user.id, "Data:", JSON.stringify(body))
 
       // image_ids konsola yazdır
-      if (listingData.image_ids && listingData.image_ids.length > 0) {
-        console.log("Listing will use image IDs:", listingData.image_ids);
+      if (body.image_ids && body.image_ids.length > 0) {
+        console.log("Listing will use image IDs:", body.image_ids);
       }
 
       // Listing'i oluştur
       const primaryStore = etsyStores[0];
-      const listing = await createDraftListing(user.id, primaryStore.shop_id, listingData)
+      const listing = await createDraftListing(user.id, primaryStore.shop_id, body)
       
       return NextResponse.json({
         success: true,

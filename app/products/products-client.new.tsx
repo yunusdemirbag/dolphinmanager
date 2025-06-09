@@ -145,7 +145,7 @@ export default function ProductsClient() {
     title: "",
     description: "",
     price: 0,
-    quantity: 1,
+    quantity: 4,
     tags: [],
     materials: [],
     who_made: "i_did",

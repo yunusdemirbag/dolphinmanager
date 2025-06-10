@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server"
 import { getValidAccessToken, getEtsyStores, getShopSections } from "@/lib/etsy-api"
 
@@ -14,7 +15,8 @@ const MOCK_SHOP_SECTIONS = [
 
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user } } = await createClient().auth.getUser();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return new NextResponse("Yetkisiz", { status: 401 });
 
     const accessToken = await getValidAccessToken(user.id);

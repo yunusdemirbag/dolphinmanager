@@ -45,8 +45,9 @@ import { predefinedVariations } from '@/lib/etsy-variation-presets';
 import { useRouter } from "next/navigation"
 import { ProductMediaSection, MediaFile } from './ProductMediaSection';
 
-// Sabit Art & Collectibles kategori ID - Bu Etsy'de geçerli bir kategori ID'sidir
-const DIGITAL_PRINTS_TAXONOMY_ID = 68887271;  // Art & Collectibles > Prints > Digital Prints
+// Sabit kategori ID'leri
+const WALL_DECOR_TAXONOMY_ID = 1027;
+const DIGITAL_PRINTS_TAXONOMY_ID = 2078;
 
 // Default materials - API'de sabit değerler gönderildiği için burada kullanılmayacak
 const DEFAULT_MATERIALS = ["Cotton Canvas", "Wood Frame", "Hanger"];
@@ -227,7 +228,7 @@ export function ProductFormModal({
   const [widthUnit, setWidthUnit] = useState(product?.width_unit || "cm")
   const [height, setHeight] = useState(product?.height || 0)
   const [heightUnit, setHeightUnit] = useState(product?.height_unit || "cm")
-  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || 1027);
+  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
   
   const [hasVariations, setHasVariations] = useState<boolean>(true);
   const [variations, setVariations] = useState(product?.variations || predefinedVariations)
@@ -288,7 +289,7 @@ export function ProductFormModal({
       setWidthUnit(product?.width_unit || "cm");
       setHeight(product?.height || 0);
       setHeightUnit(product?.height_unit || "cm");
-      setTaxonomyId(product?.taxonomy_id || 1027);
+      setTaxonomyId(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
       setProductImages([]);
       setVideoFile(null);
 
@@ -475,7 +476,7 @@ export function ProductFormModal({
             
             // --- 👇 EKSİK OLAN SABİT DEĞERLER 👇 ---
             quantity: 4, // Etsy için sabit bir stok miktarı
-            taxonomy_id: 1366, // Wall Decor kategorisi
+            taxonomy_id: taxonomyId, // Seçilen kategori ID'si
             who_made: "i_did",
             when_made: "made_to_order",
             is_supply: false,
@@ -776,34 +777,33 @@ export function ProductFormModal({
               <div className="col-span-2">
                 <Label htmlFor="category" className="block mb-1">Kategori *</Label>
                 <Select
-                  value={taxonomyId.toString()}
+                  value={taxonomyId ? taxonomyId.toString() : WALL_DECOR_TAXONOMY_ID.toString()}
                   onValueChange={(val) => setTaxonomyId(Number(val))}
                   required
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue>{taxonomyId === 2078 ? "Digital Prints" : "Wall Decor"}</SelectValue>
+                    <SelectValue>{taxonomyId === DIGITAL_PRINTS_TAXONOMY_ID ? "Digital Prints" : "Wall Decor"}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1027">Wall Decor</SelectItem>
-                    <SelectItem value="2078">Digital Prints</SelectItem>
+                    <SelectItem value={WALL_DECOR_TAXONOMY_ID.toString()}>Wall Decor</SelectItem>
+                    <SelectItem value={DIGITAL_PRINTS_TAXONOMY_ID.toString()}>Digital Prints</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
               {/* Shop Section seçimi */}
               <div className="col-span-2">
-                <Label htmlFor="shopSection">Dükkan Bölümü</Label>
+                <Label htmlFor="shopSection">Kanvas Kategorileri</Label>
                 <Select
                   value={selectedShopSection}
                   onValueChange={setSelectedShopSection}
                   disabled={shopSections.length === 0}
                 >
                   <SelectTrigger id="shopSection">
-                    <SelectValue placeholder="Bir bölüm seçin..." />
+                    <SelectValue placeholder="Bir kategori seçin..." />
                   </SelectTrigger>
                   <SelectContent>
                     {shopSections.map(section => (
-                      // ⭐️ DEĞER OLARAK GERÇEK ETSY ID'Sİ KULLANILIYOR ⭐️
                       <SelectItem 
                         key={section.shop_section_id} 
                         value={section.shop_section_id.toString()}

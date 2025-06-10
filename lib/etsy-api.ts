@@ -2123,7 +2123,7 @@ export async function addInventoryWithVariations(accessToken: string, listingId:
                 offerings: [{
                     // Eğer kombinasyon aktifse kendi fiyatını, değilse 0 kullan
                     price: activeVariation ? Number(activeVariation.price) : 0,
-                    quantity: 999,
+                    quantity: 4,
                     is_enabled: !!activeVariation // Aktif kombinasyon haritasında varsa true, yoksa false
                 }]
             });

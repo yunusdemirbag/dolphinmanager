@@ -217,10 +217,10 @@ export function ProductFormModal({
   // Additional fields to match Etsy
   const [tags, setTags] = useState(product?.tags || [])
   const [newTag, setNewTag] = useState("")
-  const [isPersonalizable, setIsPersonalizable] = useState<boolean>(product?.is_personalizable ?? true)
-  const [personalizationRequired, setPersonalizationRequired] = useState(product?.personalization_is_required || false)
+  const [isPersonalizable, setIsPersonalizable] = useState<boolean>(true)
+  const [personalizationRequired, setPersonalizationRequired] = useState(false)
   const [personalizationInstructions, setPersonalizationInstructions] = useState(
-    product?.personalization_instructions || "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
+    "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
   )
   const [primaryColor, setPrimaryColor] = useState(product?.primary_color || "")
   const [secondaryColor, setSecondaryColor] = useState(product?.secondary_color || "")
@@ -278,10 +278,10 @@ export function ProductFormModal({
       setShippingProfileId(product?.shipping_profile_id?.toString() || "");
       setTags(product?.tags || []);
       setNewTag("");
-      setIsPersonalizable(product?.is_personalizable ?? true);
-      setPersonalizationRequired(product?.personalization_is_required ?? false);
+      setIsPersonalizable(true);
+      setPersonalizationRequired(false);
       setPersonalizationInstructions(
-        product?.personalization_instructions || "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
+        "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
       );
       setPrimaryColor(product?.primary_color || "");
       setSecondaryColor(product?.secondary_color || "");
@@ -1024,45 +1024,41 @@ export function ProductFormModal({
               <div className="flex items-center space-x-2">
                 <Checkbox 
                   id="isPersonalizable" 
-                  checked={isPersonalizable}
-                  onCheckedChange={(checked) => setIsPersonalizable(!!checked)}
-                  defaultChecked={true}
+                  checked={true}
+                  onCheckedChange={() => {}}
+                  disabled
                 />
                 <Label htmlFor="isPersonalizable" className="font-normal">
                   Bu ürün kişiselleştirilebilir
                 </Label>
               </div>
-              
-              {isPersonalizable && (
-                <div className="space-y-4 pl-6">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="personalizationRequired" 
-                      checked={personalizationRequired}
-                      onCheckedChange={(checked) => setPersonalizationRequired(!!checked)}
-                      defaultChecked={false}
-                    />
-                    <Label htmlFor="personalizationRequired" className="font-normal">
-                      Kişiselleştirme zorunlu olsun
-                    </Label>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="personalizationInstructions" className="mb-2 block">
-                      Kişiselleştirme Talimatları
-                    </Label>
-                    <Textarea
-                      id="personalizationInstructions"
-                      value={personalizationInstructions}
-                      onChange={(e) => setPersonalizationInstructions(e.target.value)}
-                      placeholder="Alıcıya kişiselleştirme talimatlarınızı yazın"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Karakter sınırı: {personalizationInstructions.length}/256
-                    </p>
-                  </div>
+              <div className="space-y-4 pl-6">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="personalizationRequired" 
+                    checked={false}
+                    onCheckedChange={() => {}}
+                    disabled
+                  />
+                  <Label htmlFor="personalizationRequired" className="font-normal">
+                    Kişiselleştirme zorunlu olsun
+                  </Label>
                 </div>
-              )}
+                <div>
+                  <Label htmlFor="personalizationInstructions" className="mb-2 block">
+                    Kişiselleştirme Talimatları
+                  </Label>
+                  <Textarea
+                    id="personalizationInstructions"
+                    value={personalizationInstructions}
+                    onChange={() => {}}
+                    disabled
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Karakter sınırı: {personalizationInstructions.length}/256
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

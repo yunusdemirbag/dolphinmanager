@@ -42,6 +42,8 @@ import {
 } from "@/components/ui/table"
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
 import { useRouter } from "next/navigation"
+import { ProductMediaSection } from './ProductMediaSection';
+import { ProductVariationsSection } from './ProductVariationsSection';
 
 // Sabit Art & Collectibles kategori ID - Bu Etsy'de geçerli bir kategori ID'sidir
 const DIGITAL_PRINTS_TAXONOMY_ID = 68887271;  // Art & Collectibles > Prints > Digital Prints
@@ -471,13 +473,33 @@ export function ProductFormModal({
   // Form verilerini handle eden fonksiyon
   const handleSubmit = async (state: "draft" | "active") => {
     try {
+      // Resim kontrolü
+      if (productImages.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "En az bir ürün resmi seçmelisiniz."
+        });
+        return;
+      }
+
+      // Kargo profili kontrolü
+      if (!shippingProfileId) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Kargo profili seçmelisiniz."
+        });
+        return;
+      }
+
       // Personalization instructions boşsa varsayılan mesajı kullan
       const defaultPersonalization = "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\".";
       const personalizationValue = personalizationInstructions && personalizationInstructions.trim().length > 0
         ? personalizationInstructions
         : defaultPersonalization;
 
-      // Form verilerini hazırla
+      // Ürün verilerini hazırla
       const productData = {
         title,
         description,
@@ -489,7 +511,6 @@ export function ProductFormModal({
         quantity: 4, // Her zaman 4 olarak sabit
         shipping_profile_id: parseInt(shippingProfileId),
         tags,
-        // materials field'ı kaldırıldı - API'de sabit değerler kullanılıyor
         is_personalizable: isPersonalizable,
         personalization_is_required: personalizationRequired,
         personalization_instructions: personalizationValue,
@@ -500,102 +521,55 @@ export function ProductFormModal({
         height,
         height_unit: heightUnit,
         variations: hasVariations ? variations.filter((v: any) => v.is_active) : undefined,
-        shop_section_id: selectedShopSection ? parseInt(selectedShopSection) : undefined, // Seçili shop section'ı doğrudan kullan
-        state: state,
-        // taxonomy_id parametresi geçici olarak kaldırıldı
+        shop_section_id: selectedShopSection ? parseInt(selectedShopSection) : undefined,
+        targetState: state, // Aktifleştirme durumu
       };
 
-      // Önce ürün oluşturma/güncelleme isteğini gönder
-      const listingResponse = await onSubmit(productData, state);
-      if (!listingResponse.success || !listingResponse.listing_id) {
-        toast({
-          variant: "destructive",
-          title: "Hata",
-          description: listingResponse.message || "Ürün oluşturulurken/güncellenirken bir hata oluştu.",
-        });
-        return;
-      }
-      const listing_id = listingResponse.listing_id;
-      // 2. ADIM: Video varsa videoyu yükle
-      if (videoFile) {
-        setVideoFile(prev => prev ? { ...prev, uploading: true, error: undefined } : null);
-        toast({ title: "Video Yükleniyor...", description: "Lütfen bekleyin." });
-        console.log("Video yükleme başlatılıyor, file:", videoFile.file.name);
-        
-        const formData = new FormData();
-        formData.append('video', videoFile.file);
-        formData.append('name', videoFile.file.name);
-        
-        try {
-          console.log(`Video yükleme API çağrısı yapılıyor: /api/etsy/listings/${listing_id}/video`);
-          const videoResponse = await fetch(`/api/etsy/listings/${listing_id}/video`, {
-            method: 'POST',
-            body: formData,
-          });
-          
-          console.log("Video API yanıt durumu:", videoResponse.status);
-          
-          if (!videoResponse.ok) {
-            const errorData = await videoResponse.json();
-            console.error("Video yükleme hatası - ham yanıt:", JSON.stringify(errorData));
-            
-            // Özel hata durumlarını kontrol et
-            if (errorData.message === 'No Etsy store found') {
-              toast({
-                title: "Mağaza Bağlantı Hatası",
-                description: "Etsy mağazanıza erişilemiyor. Lütfen mağaza bağlantınızı kontrol edin.",
-                variant: "destructive"
-              });
-              router.push('/stores');
-              return;
-            }
-            
-            // Diğer hata durumları
-            setVideoFile(prev => prev ? {
-              ...prev,
-              uploading: false,
-              error: errorData.message || 'Video yüklenirken bir hata oluştu'
-            } : null);
-            
-            toast({
-              title: "Video Yükleme Hatası",
-              description: errorData.message || 'Video yüklenirken bir hata oluştu',
-              variant: "destructive"
-            });
-            
-            console.error("Video yükleme hata detayları:", errorData);
-            return;
-          }
-
-          const result = await videoResponse.json();
-          console.log("Video başarıyla yüklendi:", result);
-          
-          setVideoFile(prev => prev ? { ...prev, uploading: false, uploaded: true } : null);
-          toast({
-            title: "Video Yüklendi",
-            description: "Video başarıyla yüklendi!",
-            variant: "default"
-          });
-        } catch (error) {
-          console.error("Video yükleme işleminde hata:", error);
-          setVideoFile(prev => prev ? {
-            ...prev,
-            uploading: false,
-            error: 'Video yüklenirken bir hata oluştu'
-          } : null);
-          
-          toast({
-            title: "Video Yükleme Hatası",
-            description: "Video yüklenirken beklenmeyen bir hata oluştu.",
-            variant: "destructive"
-          });
+      // FormData oluştur - tüm verileri tek bir istekte göndermek için
+      const formData = new FormData();
+      
+      // JSON verisini ekle
+      formData.append('listingData', JSON.stringify(productData));
+      
+      // Resimleri ekle
+      productImages.forEach((image) => {
+        if (image.file.size > 0) { // Sadece gerçek dosyaları gönder
+          formData.append('imageFiles', image.file);
         }
-      } else {
-        toast({
-          title: product ? "Ürün güncellendi" : "Ürün oluşturuldu",
-          description: `İşlem başarıyla tamamlandı. Ürün ID: ${listing_id}`,
-        });
+      });
+      
+      // Video varsa ekle
+      if (videoFile && videoFile.file.size > 0) {
+        formData.append('videoFile', videoFile.file);
       }
+      
+      // Kullanıcıya bilgi ver
+      toast({ 
+        title: "Yükleniyor", 
+        description: "Ürün ve görseller yükleniyor..." 
+      });
+      
+      // API'ye tek bir istekle gönder
+      const response = await fetch('/api/etsy/listings', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      // Yanıtı kontrol et
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ürün oluşturulurken bir hata oluştu');
+      }
+      
+      const result = await response.json();
+      
+      // Başarılı mesaj göster
+      toast({
+        title: product ? "Ürün güncellendi" : "Ürün oluşturuldu",
+        description: result.message || `İşlem başarıyla tamamlandı. Ürün ID: ${result.listing_id}`,
+      });
+      
+      // Modalı kapat
       onClose();
     } catch (error) {
       console.error('Form gönderimi sırasında hata:', error);
@@ -606,173 +580,6 @@ export function ProductFormModal({
       });
     }
   };
-
-  // Resim bölümü
-  const ImageSection = () => (
-    <div className="space-y-4">
-      {/* BAŞLIK VE RESİM/VIDEO SAYACI */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Medya</h3>
-        <div className="text-sm text-gray-500">
-          {productImages.length}/10 resim, {videoFile ? 1 : 0}/1 video
-        </div>
-      </div>
-
-      {/* VİDEO ÖNİZLEME KARTI */}
-      {videoFile && (
-        <div className="mt-4 space-y-2">
-          <h4 className="text-md font-medium text-gray-700">Video</h4>
-          <div className="relative group rounded-lg overflow-hidden border p-2 bg-slate-50">
-            <video
-              src={videoFile.preview}
-              controls={!videoFile.uploading}
-              className="w-full rounded-md max-h-64 aspect-video object-cover"
-            />
-            {videoFile.uploading && (
-              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white">
-                <Loader2 className="w-8 h-8 animate-spin" />
-                <p className="mt-2 text-sm">Video Etsy'e yükleniyor...</p>
-              </div>
-            )}
-            {videoFile.error && (
-              <div className="absolute bottom-2 left-2 right-2 px-2 py-1 bg-red-500 text-white text-xs rounded text-center">
-                {videoFile.error}
-              </div>
-            )}
-            {!videoFile.uploading && (
-              <button
-                type="button"
-                onClick={() => {
-                  URL.revokeObjectURL(videoFile.preview);
-                  setVideoFile(null);
-                }}
-                className="absolute top-2 right-2 z-10 p-1 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
-              >
-                <X className="w-4 h-4 text-gray-700" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* SÜRÜKLE-BIRAK ALANI VE RESİM LİSTESİ */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
-          isDragging ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50"
-        }`}
-        onDrop={handleImageDrop}
-        onDragOver={e => e.preventDefault()}
-        onDragEnter={e => {
-          e.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragLeave={e => {
-          e.preventDefault();
-          setIsDragging(false);
-        }}
-      >
-        {productImages.length === 0 && !videoFile ? (
-          <div className="text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <Upload className="w-6 h-6 text-primary" />
-            </div>
-            <p className="text-sm font-medium mb-1">Medya dosyalarını buraya sürükleyin</p>
-            <p className="text-sm text-gray-500 mb-4">veya</p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Bilgisayardan Seçin
-            </Button>
-            <p className="text-xs text-gray-500 mt-4">
-              PNG, JPG, GIF veya MP4/QuickTime video • Resim başına max. 20MB
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {productImages.map((image, index) => (
-              <DraggableImage
-                key={`${index}-${image.preview}`}
-                image={image}
-                index={index}
-                moveImage={moveImage}
-                onRemove={handleRemoveImage}
-              />
-            ))}
-            {productImages.length < 10 && (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-primary/50 transition-colors"
-              >
-                <Upload className="w-6 h-6 text-gray-400 mb-2" />
-                <span className="text-sm text-gray-500">Medya Ekle</span>
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // Modified varyasyonlar section in the UI
-  const VariationsSection = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium">Varyasyonlar</h3>
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id="hasVariations"
-          checked={hasVariations}
-          onCheckedChange={checked => setHasVariations(Boolean(checked))}
-        />
-        <label
-          htmlFor="hasVariations"
-          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-        >
-          Varyasyonlar var
-        </label>
-      </div>
-
-      {hasVariations && (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[250px]">Size</TableHead>
-                <TableHead>Pattern</TableHead>
-                <TableHead className="w-[120px]">Fiyat</TableHead>
-                <TableHead className="w-[80px]">Görünür</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {variations.map((variation, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium">{variation.size}</TableCell>
-                  <TableCell>{variation.pattern}</TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={variation.price === 0 ? '' : variation.price}
-                      placeholder="Fiyat"
-                      onChange={(e) => handleVariationChange(index, 'price', e.target.value)}
-                      className="h-8"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={variation.is_active}
-                      onCheckedChange={(checked) => handleVariationChange(index, 'is_active', checked)}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-    </div>
-  )
 
   return (
     <>
@@ -788,8 +595,13 @@ export function ProductFormModal({
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Resim Bölümü */}
-            <ImageSection />
+            {/* Medya Bölümü */}
+            <ProductMediaSection
+              productImages={productImages}
+              setProductImages={setProductImages}
+              videoFile={videoFile}
+              setVideoFile={setVideoFile}
+            />
 
             <Separator />
             
@@ -1090,7 +902,12 @@ export function ProductFormModal({
             <Separator />
             
             {/* Varyasyonlar */}
-            <VariationsSection />
+            <ProductVariationsSection
+              hasVariations={hasVariations}
+              setHasVariations={setHasVariations}
+              variations={variations}
+              setVariations={setVariations}
+            />
 
             <Separator />
 

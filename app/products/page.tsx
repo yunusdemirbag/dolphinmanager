@@ -307,34 +307,26 @@ export default function ProductsPage() {
   
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="container mx-auto py-8 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Ürünler</h1>
-            <p className="text-gray-500">
-              {totalCount} ürün • Son güncelleme: {lastRefresh?.toLocaleString() || 'Hiç'}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            {reconnectRequired && (
-              <Button onClick={handleReconnectEtsy} disabled={refreshing}>
-                {refreshing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Bağlanıyor...
-                  </>
-                ) : (
-                  "Etsy'ye Bağlan"
-                )}
-              </Button>
-            )}
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Yeni Ürün
-            </Button>
-          </div>
+      <div className="container mx-auto py-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Ürünler</h1>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Yeni Ürün Ekle
+          </Button>
         </div>
+
+        {/* Yeni Ürün Ekleme Modalı */}
+        {showCreateModal && (
+          <ProductFormModal
+            isOpen={showCreateModal}
+            onClose={() => setShowCreateModal(false)}
+            onSubmit={onCreateProduct}
+            submitting={submitting}
+            shippingProfiles={shippingProfiles}
+            loadingShippingProfiles={loadingShippingProfiles}
+          />
+        )}
 
         {/* Store Info */}
         {currentStore && (
@@ -386,16 +378,6 @@ export default function ProductsPage() {
             <p className="text-gray-500">Ürün bulunamadı</p>
           </div>
         )}
-
-        {/* Modals */}
-        <ProductFormModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={onCreateProduct}
-          submitting={submitting}
-          shippingProfiles={shippingProfiles}
-          loadingShippingProfiles={loadingShippingProfiles}
-        />
 
         {showEditModal && (
           <ProductFormModal

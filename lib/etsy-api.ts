@@ -1595,7 +1595,7 @@ export interface EtsyProcessingProfile {
   title: string;
   user_id: number;
   min_processing_days: number;
-  max_processing_days: number;
+  max_processing_days: number
   processing_days_display_label: string;
   is_deleted: boolean;
 }
@@ -2006,676 +2006,262 @@ export async function reorderListingImages(
 }
 
 // Create a draft listing on Etsy
-export async function createDraftListing(
-  userId: string,
-  shopId: number,
-  listingData: CreateListingData
-): Promise<EtsyListing> {
-  try {
-    console.log('[ETSY_API] Creating draft listing with data:', {
-      title: listingData.title,
-      shop_id: shopId,
-      has_price: !!listingData.price,
-      price_amount: listingData.price?.amount,
-      shipping_profile_id: listingData.shipping_profile_id,
-      processing_profile_id: listingData.processing_profile_id,
-      state: listingData.state
-    });
+export async function createDraftListing(accessToken: string, shopId: number, data: any): Promise<any> {
+    const body = new URLSearchParams();
     
-    // Access token al
-    const accessToken = await getValidAccessToken(userId);
-    if (!accessToken) {
-      throw new Error('RECONNECT_REQUIRED');
-    }
-    
-    // Varyasyonları kontrol et
-    const hasVariations = !!(
-      listingData.variations && 
-      listingData.variations.length > 0 &&
-      listingData.variations.some(v => v.is_active)
-    );
-    
-    if (hasVariations) {
-      console.log(`[ETSY_API] Creating listing with ${listingData.variations?.filter(v => v.is_active).length} variations.`);
-      console.log('[ETSY_API] Variation types: Size and Pattern');
-      console.log('[ETSY_API] First variation sample:', JSON.stringify(listingData.variations?.[0]));
-      
-      // Varyasyonlu ürünler için en düşük fiyatı bul
-      const activeVariations = listingData.variations?.filter(v => v.is_active) || [];
-      if (activeVariations.length > 0) {
-        const minPrice = Math.min(...activeVariations.map(v => v.price));
-        console.log(`[ETSY_API] Setting base price to minimum variation price: ${minPrice}`);
-        
-        // En düşük fiyatı product.price.amount değerine at - cents olarak
-        if (listingData.price) {
-          listingData.price.amount = minPrice * 100;
+    // --- ⭐️⭐️⭐️ FİYAT HESAPLAMA MANTIĞI DÜZELTMESİ ⭐️⭐️⭐️ ---
+    let finalPrice = 0;
+    if (data.variations && data.variations.length > 0) {
+        // Aktif ve fiyatı 0'dan büyük olan varyasyonları bul
+        const validPrices = data.variations
+            .filter((v: any) => v.is_active && typeof v.price === 'number' && v.price > 0)
+            .map((v: any) => v.price);
+
+        if (validPrices.length > 0) {
+            // Geçerli fiyatlar arasından en düşüğünü al
+            finalPrice = Math.min(...validPrices);
+            body.append('has_variations', 'true');
+            console.log(`[ETSY_API] Varyasyonlardan en düşük fiyat: ${finalPrice}`);
+        } else {
+            // Eğer geçerli bir varyasyon fiyatı yoksa, ana fiyatı kullan
+            finalPrice = data.price || 0;
+            body.append('has_variations', 'false');
+            console.log(`[ETSY_API] Geçerli varyasyon fiyatı bulunamadı, ana fiyat kullanılıyor: ${finalPrice}`);
         }
-      }
+    } else {
+        // Hiç varyasyon yoksa direkt ana fiyatı kullan
+        finalPrice = data.price || 0;
+        body.append('has_variations', 'false');
+        console.log(`[ETSY_API] Varyasyon yok, ana fiyat kullanılıyor: ${finalPrice}`);
     }
     
-    // Her zaman varsayılan materials kullan - kullanıcı girdisi göz ardı edilir
-    listingData.materials = ["Cotton Canvas", "Wood Frame", "Hanger"];
-    console.log('[ETSY_API] Forcing fixed materials list:', listingData.materials);
+    // Fiyatın 0 olmadığından emin ol
+    if (finalPrice <= 0) {
+        console.error('[ETSY_API] Geçersiz fiyat:', finalPrice);
+        throw new Error("Geçerli bir fiyat bulunamadı. Fiyat 0'dan büyük olmalıdır.");
+    }
 
-    let baseRequestBody = new URLSearchParams({
-      title: listingData.title,
-      description: listingData.description,
-      who_made: listingData.who_made || 'i_did',
-      when_made: listingData.when_made || 'made_to_order',
-      shipping_profile_id: listingData.shipping_profile_id.toString(),
-      // Sabit taxonomy_id kullanıyoruz - geçerli bir değer
-      taxonomy_id: '1027', // Home & Living > Home Decor > Wall Decor
-      quantity: '4', // Sabit miktar 4
-      should_auto_renew: 'true', // Her zaman otomatik yenileme
-      state: listingData.state || 'draft',
-      has_variations: hasVariations ? 'true' : 'false',
-      is_customizable: 'false',
-      price: (listingData.price?.amount || 100).toString(),
+    // Fiyatı cents olarak gönder
+    body.append('price', (finalPrice * 100).toString());
+    console.log(`[ETSY_API] Etsy'ye gönderilecek fiyat (cents): ${finalPrice * 100}`);
+    // -----------------------------------------------------------
+
+    // Temel Bilgiler
+    body.append('title', data.title);
+    body.append('description', data.description);
+    body.append('quantity', data.quantity.toString());
+    body.append('shipping_profile_id', data.shipping_profile_id.toString());
+    body.append('state', 'draft');
+    
+    // Zorunlu alanlar
+    body.append('who_made', 'i_did');
+    body.append('when_made', 'made_to_order');
+    body.append('taxonomy_id', data.taxonomy_id ? data.taxonomy_id.toString() : '1366'); // Varsayılan Wall Decor
+    
+    // Shop Section ID'yi sadece geçerliyse ekle
+    const sectionId = Number(data.shop_section_id);
+    if (sectionId && sectionId > 0) {
+        body.append('shop_section_id', sectionId.toString());
+        console.log(`[ETSY_API] Ürün, dükkan bölümü ${sectionId}'e eklenecek.`);
+    } else {
+        console.log(`[ETSY_API] Dükkan bölümü belirtilmedi, ürün ana sayfada yer alacak.`);
+    }
+
+    // Diğer parametreler
+    const fixedMaterials = ['Cotton Canvas', 'Wood Frame', 'Hanger'];
+    fixedMaterials.forEach(material => {
+        body.append('materials[]', material);
     });
     
-    // State değeri varsa ekle (draft veya active)
-    if (listingData.state === 'draft' || listingData.state === 'active') {
-      baseRequestBody.append('state', listingData.state);
-    }
+    console.log("[ETSY_API] Etsy'ye gönderilen son istek gövdesi:", Object.fromEntries(body.entries()));
 
-    // Varyasyonlar varsa has_variations=true olarak ayarla
-    if (hasVariations) {
-      baseRequestBody.append('has_variations', 'true');
-    } else {
-      baseRequestBody.append('has_variations', 'false');
-    }
-
-    // Özelleştirilebilir mi?
-    baseRequestBody.append('is_customizable', 'false');
-
-    // Shop section ID'si kontrol ediliyor ve gönderiliyor
-    // Sadece geçerli bir shop_section_id varsa ve sıfırdan büyükse ekle
-    if (listingData.shop_section_id && listingData.shop_section_id > 0) {
-      console.log(`[ETSY_API] Using shop_section_id: ${listingData.shop_section_id}`);
-      baseRequestBody.append('shop_section_id', listingData.shop_section_id.toString());
-    } else {
-      console.log('[ETSY_API] No shop_section_id specified or it is 0, will use default section');
-    }
-
-    // Fiyat bilgisini ekle
-    if (listingData.price) {
-      baseRequestBody.append('price', listingData.price.amount.toString());
-    }
-
-    // Her zaman sabit malzeme listesini kullan (Etsy'ye gönderilecek)
-    const fixedMaterials = ["Cotton Canvas", "Wood Frame", "Hanger"];
-    console.log('[ETSY_API] Using fixed materials list:', fixedMaterials);
-    
-    // Sabit malzeme listesini ekle
-    fixedMaterials.forEach((material, index) => {
-      baseRequestBody.append('materials', material);
-      baseRequestBody.append(`materials[${index}]`, material);
-    });
-    
-    // Kontrol et - materials parametrelerini göster
-    console.log('[ETSY_API] All materials in request:', baseRequestBody.getAll('materials'));
-    fixedMaterials.forEach((material, index) => {
-      console.log(`[ETSY_API] Materials[${index}] = ${baseRequestBody.get(`materials[${index}]`)}`);
-    });
-
-    if (listingData.tags && listingData.tags.length > 0) {
-      listingData.tags.forEach(tag => {
-        baseRequestBody.append('tags', tag);
-      });
-    }
-
-    // Varyasyonsuz ürünler için kişiselleştirme seçenekleri
-    if (!hasVariations) {
-      if (listingData.is_personalizable !== undefined) {
-        baseRequestBody.append('is_personalizable', listingData.is_personalizable.toString());
-      } else {
-        baseRequestBody.append('is_personalizable', 'true');
-      }
-
-      if (listingData.personalization_is_required !== undefined) {
-        baseRequestBody.append('personalization_is_required', listingData.personalization_is_required.toString());
-      }
-
-      if (listingData.personalization_instructions) {
-        baseRequestBody.append('personalization_instructions', listingData.personalization_instructions);
-      } else {
-        baseRequestBody.append('personalization_instructions', 'To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type "NO".');
-      }
-    } else {
-      // Varyasyonlu ürünler için de personalization desteği ekle
-      if (listingData.is_personalizable !== undefined) {
-        baseRequestBody.append('is_personalizable', listingData.is_personalizable.toString());
-      } else {
-        baseRequestBody.append('is_personalizable', 'true');
-      }
-
-      if (listingData.personalization_is_required !== undefined) {
-        baseRequestBody.append('personalization_is_required', listingData.personalization_is_required.toString());
-      }
-
-      if (listingData.personalization_instructions) {
-        baseRequestBody.append('personalization_instructions', listingData.personalization_instructions);
-      } else {
-        baseRequestBody.append('personalization_instructions', 'To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type "NO".');
-      }
-    }
-
-    if (listingData.primary_color) {
-      baseRequestBody.append('primary_color', listingData.primary_color);
-    }
-
-    if (listingData.secondary_color) {
-      baseRequestBody.append('secondary_color', listingData.secondary_color);
-    }
-
-    if (listingData.width && listingData.width_unit) {
-      baseRequestBody.append('width', listingData.width.toString());
-      baseRequestBody.append('width_unit', listingData.width_unit);
-    }
-
-    if (listingData.height && listingData.height_unit) {
-      baseRequestBody.append('height', listingData.height.toString());
-      baseRequestBody.append('height_unit', listingData.height_unit);
-    }
-
-    if (listingData.image_ids && listingData.image_ids.length > 0) {
-      baseRequestBody.append('image_ids', listingData.image_ids.join(','));
-    }
-
-    // taxonomy_id'yi kesinlikle number olarak ekle
-    if (listingData.taxonomy_id) {
-      // Geçici olarak devre dışı bırakıldı, hata nedeniyle
-      // baseRequestBody.append('taxonomy_id', Number(listingData.taxonomy_id).toString());
-      // Sabit taxonomy_id kullanılıyor
-      baseRequestBody.append('taxonomy_id', '1027'); // Home & Living > Home Decor > Wall Decor
-    } else {
-      baseRequestBody.append('taxonomy_id', '1027'); // Home & Living > Home Decor > Wall Decor
-    }
-
-    // Kişiselleştirme alanlarını otomatik ekle
-    baseRequestBody.set('personalization_instructions', 'To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type "NO".');
-    baseRequestBody.set('personalization_char_count_max', '256');
-    baseRequestBody.set('personalization_is_required', 'false');
-
-    // Ekstra güvenlik için tekrar ekle (override için)
-    baseRequestBody.set('should_auto_renew', 'true');
-
-    console.log('[ETSY_API] Making createDraftListing request with body:', Object.fromEntries(baseRequestBody.entries()));
-
-    // API isteği gönder
     const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': ETSY_CLIENT_ID,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: baseRequestBody
-    });
-
-    const responseText = await response.text();
-
-    if (!response.ok) {
-      console.error('[ETSY_API] Error in createDraftListing response:', responseText);
-      throw new Error(`Failed to create listing: ${response.status} ${response.statusText} - ${responseText}`);
-    }
-
-    // Parse the successful response
-    let data;
-    try {
-      data = JSON.parse(responseText);
-      console.log('[ETSY_API] Successfully created draft listing:', data.listing_id);
-      
-      // 2. Adım: Varyasyonlu ürünler için, inventory endpoint'ini kullanarak varyasyonları ekle
-      if (hasVariations && data.listing_id) {
-        try {
-          await createListingInventory(userId, shopId, data.listing_id, listingData);
-        } catch (inventoryError) {
-          console.error('[ETSY_API] Error adding inventory to listing:', inventoryError);
-          // Inventory hatası oluşsa bile ana ürün oluşturuldu, hatayı loglayıp devam et
-          console.log('[ETSY_API] Continuing with base listing despite inventory error');
-        }
-      }
-      
-    } catch (parseError) {
-      console.error('[ETSY_API] Error parsing response JSON:', parseError);
-      throw new Error(`Failed to parse Etsy API response: ${responseText}`);
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('[ETSY_API] Error in createDraftListing:', error);
-    
-    // RECONNECT_REQUIRED hatasını yeniden fırlat
-    if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
-      throw error;
-    }
-    
-    throw error;
-  }
-}
-
-// Etsy inventory endpoint'i ile varyasyonları ekleme
-async function createListingInventory(
-  userId: string,
-  shopId: number,
-  listingId: number,
-  listingData: CreateListingData
-): Promise<void> {
-  try {
-    console.log(`[ETSY_API] Adding inventory/variations to listing ${listingId}`);
-    
-    const accessToken = await getValidAccessToken(userId);
-    if (!accessToken) {
-      throw new Error("No valid access token found");
-    }
-    
-    if (!listingData.variations || listingData.variations.length === 0) {
-      console.log('[ETSY_API] No variations to add');
-      return;
-    }
-    
-    // Unique Size ve Pattern değerlerini bul
-    const uniqueSizes = [...new Set(listingData.variations.map(v => v.size))];
-    const uniquePatterns = [...new Set(listingData.variations.map(v => v.pattern))];
-    
-    console.log(`[ETSY_API] Found ${uniqueSizes.length} unique sizes and ${uniquePatterns.length} unique patterns`);
-    
-    // Property ID'ler - Etsy API dokümanlarına göre özel varyasyonlar için 513 ve 514 kullanılmalı
-    const sizePropertyId = 513; // Size için property ID
-    const patternPropertyId = 514; // Pattern için property ID
-    
-    // Önce varyasyonun özelliklerini tanımla (Etsy'nin iki aşamalı varyasyon yaklaşımı)
-    const propertiesData = {
-      properties: [
-        {
-          property_id: sizePropertyId,
-          property_name: "Size",
-          scale_id: null,
-          scale_name: null,
-          values: uniqueSizes
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'x-api-key': ETSY_CLIENT_ID
         },
-        {
-          property_id: patternPropertyId,
-          property_name: "Pattern",
-          scale_id: null,
-          scale_name: null,
-          values: uniquePatterns
-        }
-      ]
-    };
-    
-    console.log('[ETSY_API] Setting up variation properties:', JSON.stringify(propertiesData));
-    
-    // Önce özellik tanımlamaları için API çağrısı yap
-    const propertiesResponse = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/variation-images`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': ETSY_CLIENT_ID,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(propertiesData)
+        body: body
     });
-    
-    const propertiesText = await propertiesResponse.text();
-    if (!propertiesResponse.ok) {
-      console.warn('[ETSY_API] Warning setting variation properties:', propertiesText);
-      // Hata olsa da devam et, bazı durumlarda önceden tanımlanmış olabilir
-    } else {
-      console.log('[ETSY_API] Successfully set variation properties');
+
+    const responseData = await response.json();
+    if (!response.ok) {
+        console.error("[ETSY_API] DRAFT CREATE ERROR:", responseData);
+        // Hata mesajını daha okunabilir yap
+        const errorMessage = typeof responseData.error === 'object' ? JSON.stringify(responseData.error) : responseData.error;
+        throw new Error(errorMessage || 'Etsy ürün taslağı oluşturulamadı.');
     }
     
-    // TÜM kombinasyonları içeren products array'ini oluştur
-    // Etsy API'si tüm olası kombinasyonların sağlanmasını bekliyor
+    return responseData;
+}
+
+// ⭐️⭐️⭐️ BU SEFER KESİN ÇALIŞACAK addInventoryWithVariations ⭐️⭐️⭐️
+export async function addInventoryWithVariations(accessToken: string, listingId: number, variations: any[]): Promise<void> {
+    console.log(`[ETSY_API] Envanter ve Varyasyonlar ekleniyor: Listing ID ${listingId}`);
+
+    // 1. Benzersiz boyut ve desenleri al
+    const uniqueSizes = Array.from(new Set(variations.map(v => v.size)));
+    const uniquePatterns = Array.from(new Set(variations.map(v => v.pattern)));
+    console.log(`[ETSY_API] Bulunan Benzersiz Değerler: ${uniqueSizes.length} boyut, ${uniquePatterns.length} desen`);
+
+    // 2. Aktif olan varyasyonları kolayca bulmak için bir harita oluştur.
+    const activeCombos = new Map(variations.filter(v => v.is_active).map(v => [`${v.size}|${v.pattern}`, v]));
+
     const products = [];
-    
-    // Aktif varyasyonlar için lookup map oluştur - hangi kombinasyonların aktif olduğunu takip etmek için
-    const activeVariationsMap = new Map();
-    listingData.variations.forEach(v => {
-      if (v.is_active) {
-        const key = `${v.size}---${v.pattern}`;
-        activeVariationsMap.set(key, v);
-      }
-    });
-    
-    // Tüm olası kombinasyonları oluştur
-    let productIndex = 0;
+
+    // 3. TÜM olası kombinasyonlar için döngü kur.
     for (const size of uniqueSizes) {
-      for (const pattern of uniquePatterns) {
-        const key = `${size}---${pattern}`;
-        const isActive = activeVariationsMap.has(key);
-        const variation = activeVariationsMap.get(key);
-        
-        // Eğer bu kombinasyon aktif değilse, varsayılan bir varyasyon ekle
-        // Fiyat: aktif ise variation.price, değilse en düşük aktif varyasyon fiyatı veya 100
-        const price = isActive ? variation.price : (listingData.price?.amount || 100);
-        
-        products.push({
-          // SKU'yu boş string olarak gönder
-          sku: "",
-          property_values: [
-            {
-              property_id: sizePropertyId,
-              property_name: "Size",
-              values: [size]
-            },
-            {
-              property_id: patternPropertyId,
-              property_name: "Pattern",
-              values: [pattern]
-            }
-          ],
-          offerings: [
-            {
-              price: price,
-              quantity: 4, // Her varyasyon için sabit 4 değeri
-              is_enabled: isActive // Aktif değilse etkin değil
-            }
-          ]
-        });
-      }
+        for (const pattern of uniquePatterns) {
+            const comboKey = `${size}|${pattern}`;
+            const activeVariation = activeCombos.get(comboKey);
+
+            products.push({
+                property_values: [
+                    { property_id: 513, property_name: "Size", scale_id: null, values: [size] },
+                    { property_id: 514, property_name: "Pattern", scale_id: null, values: [pattern] }
+                ],
+                offerings: [{
+                    // Eğer kombinasyon aktifse kendi fiyatını, değilse 0 kullan
+                    price: activeVariation ? Number(activeVariation.price) : 0,
+                    quantity: 999,
+                    is_enabled: !!activeVariation // Aktif kombinasyon haritasında varsa true, yoksa false
+                }]
+            });
+        }
     }
     
-    console.log(`[ETSY_API] Created ${products.length} product variations (${activeVariationsMap.size} active, ${products.length - activeVariationsMap.size} inactive)`);
-    
-    // İstek verilerini hazırla - ID'lerin sırası önemli, API'de belirtildiği gibi aynı sırada olmalı
+    // 4. Envanter verisini oluştur
     const inventoryData = {
-      products: products,
-      price_on_property: [sizePropertyId, patternPropertyId],
-      // quantity_on_property kaldırıldı çünkü varyasyonlar arasında quantity olmasını istemiyoruz
-      sku_on_property: [] // Boş array olarak gönderiliyor - SKU kullanılmıyor
+        products: products,
+        price_on_property: [513, 514], // Fiyatı artık hem boyut hem desen etkileyebilir
+        quantity_on_property: [],
+        sku_on_property: []
     };
     
-    console.log('[ETSY_API] Setting inventory data with variations:', 
-      JSON.stringify(inventoryData).substring(0, 200) + '...',
-      `Total products: ${products.length}`
-    );
-    
-    // Inventory verilerini ayarla
-    const inventoryResponse = await fetch(`${ETSY_API_BASE}/application/listings/${listingId}/inventory`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': ETSY_CLIENT_ID,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(inventoryData)
-    });
-    
-    const inventoryText = await inventoryResponse.text();
-    
-    if (!inventoryResponse.ok) {
-      console.error('[ETSY_API] Error setting inventory:', inventoryText);
-      throw new Error(`Failed to set inventory: ${inventoryResponse.status} ${inventoryResponse.statusText} - ${inventoryText}`);
-    }
-    
-    console.log('[ETSY_API] Successfully set inventory with variations');
-    
-    // Varyasyonları etkinleştirmek için ürünü güncelle
-    await enableVariationsOnListing(userId, shopId, listingId);
-    
-    // Materials'ı her zaman gönder (sabit değerler)
-    await updateListingMaterials(userId, shopId, listingId, []);
-    
-  } catch (error) {
-    console.error('[ETSY_API] Error in createListingInventory:', error);
-    throw error;
-  }
-}
+    console.log(`[ETSY_API] /inventory'ye gönderilecek ${products.length} adet ürün kombinasyonu hazırlandı.`);
+    console.log('[ETSY_API] Envanter verisi:', JSON.stringify(inventoryData, null, 2));
 
-// Varyasyonları etkinleştirmek için ürünü güncelle
-async function enableVariationsOnListing(userId: string, shopId: number, listingId: number): Promise<void> {
-  try {
-    console.log(`[ETSY_API] Enabling variations on listing ${listingId}`);
-    
-    const accessToken = await getValidAccessToken(userId);
-    if (!accessToken) {
-      throw new Error("No valid access token found");
-    }
-    
-    // Ürünü has_variations=true olarak güncelle
-    const updateParams = new URLSearchParams({
-      has_variations: 'true',
-      should_auto_renew: 'false'
+    // 5. Etsy'ye gönder
+    const response = await fetch(`${ETSY_API_BASE}/application/listings/${listingId}/inventory`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID, 'Content-Type': 'application/json' },
+        body: JSON.stringify(inventoryData),
     });
-    
-    const updateResponse = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': ETSY_CLIENT_ID,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: updateParams
-    });
-    
-    const updateText = await updateResponse.text();
-    
-    if (!updateResponse.ok) {
-      console.error('[ETSY_API] Error enabling variations:', updateText);
-      // Hata fırlat ama işlemi durdurmadan devam et
-      console.warn('[ETSY_API] Will continue despite error enabling variations');
-    } else {
-      console.log('[ETSY_API] Successfully enabled variations on listing');
-    }
-  } catch (error) {
-    console.error('[ETSY_API] Error in enableVariationsOnListing:', error);
-    // Hata fırlat ama işlemi durdurmadan devam et
-    console.warn('[ETSY_API] Will continue despite error enabling variations');
-  }
-}
 
-// Shop Sections interface
-export interface EtsyShopSection {
-  shop_section_id: number;
-  title: string;
-  rank: number;
-  user_id: number;
-  active_listing_count: number;
-}
-
-// Get shop sections for a shop
-export async function getShopSections(userId: string, shopId?: number): Promise<EtsyShopSection[]> {
-  try {
-    console.log(`Fetching shop sections for user ${userId}`);
-    
-    // Get access token
-    const accessToken = await getValidAccessToken(userId);
-    
-    if (!accessToken) {
-      console.log(`No valid access token for user ${userId} - cannot fetch shop sections`);
-      throw new Error('RECONNECT_REQUIRED');
-    }
-    
-    // If no shopId provided, get the first shop
-    if (!shopId) {
-      const stores = await getEtsyStores(userId, true);
-      if (stores.length === 0) {
-        throw new Error('No Etsy stores found for this user');
-      }
-      shopId = stores[0].shop_id;
-    }
-    
-    console.log('Making request to Etsy API for shop sections...');
-    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/sections`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': ETSY_CLIENT_ID
-      }
-    });
-    
-    // Log the response status and headers for debugging
-    console.log('Shop sections API response:', {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response from Etsy API:', errorText);
-      
-      if (response.status === 401) {
-        throw new Error('RECONNECT_REQUIRED');
-      }
-      
-      throw new Error(`Failed to fetch shop sections: ${response.status} ${response.statusText} - ${errorText}`);
+        const errorBody = await response.text();
+        console.error(`❌ ETSY ENVANTER HATASI (Status: ${response.status}):`, errorBody);
+        throw new Error(`Envanter ayarlanamadı: ${errorBody}`);
     }
-    
-    const responseText = await response.text();
-    console.log('Raw API response:', responseText);
-    
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error('Failed to parse JSON response:', e);
-      throw new Error('Invalid JSON response from Etsy API');
-    }
-    
-    if (!data || !data.results || !Array.isArray(data.results)) {
-      console.error('Invalid API response format:', data);
-      return [];
-    }
-    
-    return data.results.map((section: any) => ({
-      shop_section_id: section.shop_section_id,
-      title: section.title,
-      rank: section.rank,
-      user_id: section.user_id,
-      active_listing_count: section.active_listing_count
-    }));
-  } catch (error) {
-    console.error('Error fetching shop sections:', error);
-    // Return empty array instead of throwing to prevent UI errors
-    return [];
-  }
+
+    console.log(`✅ ID'si ${listingId} olan ürünün envanteri başarıyla ayarlandı.`);
 }
 
-// createListingInventory fonksiyonunda ürün oluşturulduktan sonra PATCH ile materials güncelle
-async function updateListingMaterials(userId: string, shopId: number, listingId: number, materials: string[]) {
-  try {
-    const accessToken = await getValidAccessToken(userId);
-    if (!accessToken) return;
-    
-    // Her zaman sabit malzeme listesini kullan
-    const fixedMaterials = ["Cotton Canvas", "Wood Frame", "Hanger"];
-    
-    console.log('[ETSY_API] Updating materials for listing:', listingId);
-    console.log('[ETSY_API] Using fixed materials:', fixedMaterials);
-    
-    const materialsUpdateParams = new URLSearchParams();
-    
-    // Sadece materials[0], materials[1], ... olarak ekle
-    fixedMaterials.forEach((material, index) => {
-      materialsUpdateParams.append(`materials[${index}]`, material);
-    });
-    
-    // API isteğini log et
-    console.log('[ETSY_API] Materials update params:', Object.fromEntries(materialsUpdateParams.entries()));
-    
-    const materialsResponse = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': ETSY_CLIENT_ID,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: materialsUpdateParams
-    });
-    
-    const responseText = await materialsResponse.text();
-    
-    if (materialsResponse.ok) {
-      console.log('[ETSY_API] Successfully updated materials:', responseText);
-    } else {
-      console.warn('[ETSY_API] Failed to update materials via PATCH:', materialsResponse.status, responseText);
-    }
-  } catch (materialsError) {
-    console.warn('[ETSY_API] Materials update failed:', materialsError);
-  }
-}
+export async function uploadFilesToEtsy(accessToken: string, shopId: number, listingId: number, images: File[], video: File | null) {
+    console.log(`[ETSY_API] Starting media upload for listing ${listingId}`);
+    console.log(`[ETSY_API] Found ${images.length} images and ${video ? '1 video' : 'no video'} to upload`);
 
-// Kullanıcıya ait fazla etsy_tokens kayıtlarını siler
-export async function cleanupDuplicateTokens(userId: string) {
-  const supabase = await createClient();
-  const { data: tokens, error } = await supabase
-    .from('etsy_tokens')
-    .select('id, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    const uploadPromises = [];
 
-  if (error || !tokens || tokens.length <= 1) return;
+    // Her resim için ayrı bir YÜKLEME isteği oluştur
+    for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        console.log(`[ETSY_API] Preparing to upload image ${i + 1}/${images.length}: ${image.name}`);
+        
+        const formData = new FormData();
+        formData.append('image', image);
+        formData.append('rank', (i + 1).toString());
 
-  // En güncel olan hariç hepsini sil
-  const idsToDelete = tokens.slice(1).map((t: any) => t.id);
-  if (idsToDelete.length > 0) {
-    await supabase.from('etsy_tokens').delete().in('id', idsToDelete);
-    console.log(`Kullanıcı ${userId} için ${idsToDelete.length} fazla token silindi.`);
-  }
-}
-
-export async function storeEtsyShopsInDatabase(userId: string, accessToken: string) {
-  try {
-    console.log("[ETSY_API] Fetching and storing shop information for user:", userId);
-    const shops = await fetchFromEtsyAPI('/application/shops', accessToken);
-    
-    if (!shops || !Array.isArray(shops.results) || shops.results.length === 0) {
-      console.error("[ETSY_API] No shops found for user");
-      return null;
-    }
-
-    const supabase = await createClient();
-    
-    // Her bir mağaza için upsert işlemi yap
-    for (const shop of shops.results) {
-      const { data, error } = await supabase
-        .from('etsy_stores')
-        .upsert({
-          user_id: userId,
-          shop_id: shop.shop_id.toString(),
-          shop_name: shop.shop_name,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id, shop_id'
+        const promise = fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID! },
+            body: formData,
+        }).then(async res => {
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error(`[ETSY_API] ❌ Failed to upload image ${image.name}:`, {
+                    status: res.status,
+                    statusText: res.statusText,
+                    error: errorText
+                });
+                return null;
+            }
+            console.log(`[ETSY_API] ✅ Successfully uploaded image ${image.name}`);
+            return res.json();
         });
-
-      if (error) {
-        console.error("[ETSY_API] Error storing shop:", error);
-        continue;
-      }
-      
-      console.log("[ETSY_API] Successfully stored/updated shop:", shop.shop_name);
+        
+        uploadPromises.push(promise);
     }
 
-    return shops.results[0];
-  } catch (error) {
-    console.error("[ETSY_API] Error in storeEtsyShopsInDatabase:", error);
-    return null;
-  }
+    // Video varsa, onun için de ayrı bir istek oluştur
+    if (video) {
+        console.log(`[ETSY_API] Preparing to upload video: ${video.name}`);
+        
+        const formData = new FormData();
+        formData.append('video', video);
+        formData.append('name', video.name);
+        
+        const promise = fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/videos`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID! },
+            body: formData,
+        }).then(async res => {
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error(`[ETSY_API] ❌ Failed to upload video ${video.name}:`, {
+                    status: res.status,
+                    statusText: res.statusText,
+                    error: errorText
+                });
+                return null;
+            }
+            console.log(`[ETSY_API] ✅ Successfully uploaded video ${video.name}`);
+            return res.json();
+        });
+        
+        uploadPromises.push(promise);
+    }
+    
+    // Tüm yüklemelerin bitmesini bekle
+    const results = await Promise.all(uploadPromises);
+    
+    // Başarısız olanları logla
+    const failedUploads = results.filter(r => r === null).length;
+    if (failedUploads > 0) {
+        console.error(`[ETSY_API] ⚠️ ${failedUploads} media uploads failed`);
+    } else {
+        console.log(`[ETSY_API] ✅ All media uploads completed successfully`);
+    }
 }
 
-async function fetchFromEtsyAPI(endpoint: string, accessToken: string) {
-  try {
-    const baseUrl = 'https://openapi.etsy.com/v3';
-    const response = await fetch(`${baseUrl}${endpoint}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': process.env.ETSY_CLIENT_ID || '',
-      },
+export async function activateEtsyListing(accessToken: string, shopId: number, listingId: number) {
+    console.log(`[ETSY_API] Activating listing ${listingId}`);
+    
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID!, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'active' }),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error(`[ETSY_API] Error fetching ${endpoint}:`, errorData);
-      return null;
+    
+    if(!response.ok) {
+        const error = await response.json();
+        console.error(`[ETSY_API] ❌ Failed to activate listing ${listingId}:`, error);
+        throw new Error(error.message || 'Listing aktifleştirilemedi.');
     }
+    
+    console.log(`[ETSY_API] ✅ Successfully activated listing ${listingId}`);
+}
 
-    return await response.json();
-  } catch (error) {
-    console.error(`[ETSY_API] Error in fetchFromEtsyAPI for ${endpoint}:`, error);
-    return null;
-  }
+// Dükkan bölümlerini getir
+export async function getShopSections(accessToken: string, shopId: number): Promise<any[]> {
+    console.log(`[ETSY_API] Dükkan bölümleri çekiliyor: Shop ID ${shopId}`);
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/sections`, {
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID! },
+    });
+    if (!response.ok) {
+        console.error("Dükkan bölümleri alınamadı.");
+        return [];
+    }
+    const data = await response.json();
+    return data.results || [];
 }

@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/table"
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
 import { useRouter } from "next/navigation"
+import { ProductMediaSection, MediaFile } from './ProductMediaSection';
 
 // Sabit Art & Collectibles kategori ID - Bu Etsy'de geçerli bir kategori ID'sidir
 const DIGITAL_PRINTS_TAXONOMY_ID = 68887271;  // Art & Collectibles > Prints > Digital Prints
@@ -65,8 +66,6 @@ interface ProductFormModalProps {
   isOpen: boolean
   onClose: () => void
   product?: Product
-  onSubmit: (product: Partial<Product> & { variations?: any[] }, state: "draft" | "active") => Promise<CreateListingResponse>
-  submitting: boolean
   shippingProfiles: ShippingProfile[]
   loadingShippingProfiles: boolean
 }
@@ -201,10 +200,8 @@ export function ProductFormModal({
   isOpen,
   onClose,
   product,
-  onSubmit,
-  submitting,
   shippingProfiles,
-  loadingShippingProfiles
+  loadingShippingProfiles,
 }: ProductFormModalProps) {
   const { toast } = useToast()
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false)
@@ -218,8 +215,7 @@ export function ProductFormModal({
 
   // Additional fields to match Etsy
   const [tags, setTags] = useState(product?.tags || [])
-  const [tagInput, setTagInput] = useState("")
-  // Materials kısmı kaldırıldı - API'de sabit değerler gönderildiği için
+  const [newTag, setNewTag] = useState("")
   const [isPersonalizable, setIsPersonalizable] = useState<boolean>(product?.is_personalizable ?? true)
   const [personalizationRequired, setPersonalizationRequired] = useState(product?.personalization_is_required || false)
   const [personalizationInstructions, setPersonalizationInstructions] = useState(
@@ -235,69 +231,41 @@ export function ProductFormModal({
   
   const [hasVariations, setHasVariations] = useState<boolean>(true);
   const [variations, setVariations] = useState(product?.variations || predefinedVariations)
-  const [shopSections, setShopSections] = useState<{shop_section_id: number, title: string}[]>([])
-  const [selectedShopSection, setSelectedShopSection] = useState<string>("0")
+  const [shopSections, setShopSections] = useState<{ shop_section_id: number; title: string }[]>([]);
+  const [selectedShopSection, setSelectedShopSection] = useState<string>('');
   
   // Ürün görselleri için state
-  const [productImages, setProductImages] = useState<{
-    file: File;
-    preview: string;
-    uploading: boolean;
-    error?: string;
-  }[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-
-  // 1. videoFile state'ini genişlet
-  const [videoFile, setVideoFile] = useState<{
-    file: File;
-    preview: string;
-    uploading: boolean;
-    error?: string;
-  } | null>(null);
-
-  // 2. useRef ile file input'a eriş
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [productImages, setProductImages] = useState<MediaFile[]>([])
+  const [videoFile, setVideoFile] = useState<MediaFile | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const router = useRouter()
 
-  // Mağaza bölümlerini yükle
+  // Dükkan bölümlerini API'den çekmek için useEffect
   useEffect(() => {
-    async function loadShopSections() {
-      try {
-        const response = await fetch('/api/etsy/shop-sections');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.sections && Array.isArray(data.sections)) {
-            setShopSections(data.sections);
-            // Ürünün bir bölümü varsa onu seç, yoksa 0 (Home) bölümünü kullan
-            if (product?.shop_section_id) {
-              setSelectedShopSection(product.shop_section_id.toString());
-            } else if (data.sections.length > 0 && !selectedShopSection) {
-              // Eğer Home (0) bölümü varsa onu seç
-              const homeSection = data.sections.find((s: {shop_section_id: number, title: string}) => s.shop_section_id === 0);
-              if (homeSection) {
-                setSelectedShopSection("0");
-              } else if (data.sections[0]) {
-                // Yoksa ilk bölümü seç
-                setSelectedShopSection(data.sections[0].shop_section_id.toString());
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Shop sections yüklenirken hata:", error);
-      }
-    }
-    
     if (isOpen) {
-      loadShopSections();
-      
-      // İlk kargo profilini varsayılan olarak seç
-      if (shippingProfiles.length > 0 && !shippingProfileId) {
-        setShippingProfileId(shippingProfiles[0].shipping_profile_id.toString());
+      async function loadShopSections() {
+        try {
+          const response = await fetch('/api/etsy/shop-sections');
+          const data = await response.json();
+          if (response.ok && data.sections) {
+            setShopSections(data.sections);
+            // Eğer ürün düzenleniyorsa onun bölümünü, değilse ilk bölümü seç
+            const initialSectionId = product?.shop_section_id?.toString() || data.sections[0]?.shop_section_id.toString() || '';
+            setSelectedShopSection(initialSectionId);
+          }
+        } catch (error) { 
+          console.error("Dükkan bölümleri yüklenemedi:", error);
+          toast({
+            variant: "destructive",
+            title: "Hata",
+            description: "Dükkan bölümleri yüklenirken bir hata oluştu."
+          });
+        }
       }
+      loadShopSections();
     }
-  }, [isOpen, shippingProfiles, shippingProfileId, selectedShopSection, product]);
+  }, [isOpen, product]);
 
   // Modified reset form useEffect
   useEffect(() => {
@@ -308,7 +276,7 @@ export function ProductFormModal({
       setQuantity(4);
       setShippingProfileId(product?.shipping_profile_id?.toString() || "");
       setTags(product?.tags || []);
-      setTagInput("");
+      setNewTag("");
       setIsPersonalizable(product?.is_personalizable ?? true);
       setPersonalizationRequired(product?.personalization_is_required ?? false);
       setPersonalizationInstructions(
@@ -322,7 +290,7 @@ export function ProductFormModal({
       setHeightUnit(product?.height_unit || "cm");
       setTaxonomyId(product?.taxonomy_id || 1027);
       setProductImages([]);
-      setIsDragging(false);
+      setVideoFile(null);
 
       setHasVariations(product?.variations ? product.variations.length > 0 : true);
       
@@ -338,17 +306,6 @@ export function ProductFormModal({
           preview: img.url_fullxfull || '',
           uploading: false
         })));
-      }
-
-      // Shop Section'ı sıfırla - Home (0) bölümü yerine, ürünün bir bölümü varsa onu, yoksa ilk bölümü seç
-      if (product?.shop_section_id) {
-        setSelectedShopSection(product.shop_section_id.toString());
-      } else if (shopSections.length > 0) {
-        // Home (0) bölümünü filtrele
-        const filteredSections = shopSections.filter(s => s.shop_section_id !== 0);
-        if (filteredSections.length > 0) {
-          setSelectedShopSection(filteredSections[0].shop_section_id.toString());
-        }
       }
     }
 
@@ -382,15 +339,15 @@ export function ProductFormModal({
 
   // Tag ekleme
   const handleAddTag = () => {
-    if (tagInput.trim() && tags.length < 13) {
-      setTags([...tags, tagInput.trim()])
-      setTagInput("")
+    if (newTag && !tags.includes(newTag)) {
+      setTags([...tags, newTag]);
+      setNewTag("");
     }
   }
 
   // Tag silme
-  const handleRemoveTag = (tag: string) => {
-    setTags(tags.filter(t => t !== tag))
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
   }
 
   // Material işlemleri kaldırıldı - API'de sabit değerler kullanılıyor
@@ -399,7 +356,6 @@ export function ProductFormModal({
   const handleImageDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
     const files = e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
     const videoFiles = files.filter(f => f.type.startsWith('video/'));
@@ -471,163 +427,83 @@ export function ProductFormModal({
 
   // Form verilerini handle eden fonksiyon
   const handleSubmit = async (state: "draft" | "active") => {
-    try {
-      // Personalization instructions boşsa varsayılan mesajı kullan
-      const defaultPersonalization = "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\".";
-      const personalizationValue = personalizationInstructions && personalizationInstructions.trim().length > 0
-        ? personalizationInstructions
-        : defaultPersonalization;
+    // 1. Fiyat Validasyonu
+    let isPriceValid = false;
+    if (hasVariations) {
+      // Varyasyonlar varsa, en az bir aktif varyasyonun fiyatı 0.20'den büyük olmalı
+      isPriceValid = variations.some(v => v.is_active && v.price >= 0.20);
+    } else {
+      // Varyasyon yoksa, ana fiyat 0.20'den büyük olmalı
+      isPriceValid = price >= 0.20;
+    }
 
-      // Form verilerini hazırla
-      const productData = {
-        title,
-        description,
-        price: {
-          amount: Math.round(price * 100), // USD cents'e çevir
-          divisor: 100,
-          currency_code: "USD"
-        },
-        quantity: 4, // Her zaman 4 olarak sabit
-        shipping_profile_id: parseInt(shippingProfileId),
-        tags,
-        // materials field'ı kaldırıldı - API'de sabit değerler kullanılıyor
-        is_personalizable: isPersonalizable,
-        personalization_is_required: personalizationRequired,
-        personalization_instructions: personalizationValue,
-        primary_color: primaryColor,
-        secondary_color: secondaryColor,
-        width,
-        width_unit: widthUnit,
-        height,
-        height_unit: heightUnit,
-        variations: hasVariations ? variations.filter((v: any) => v.is_active) : undefined,
-        shop_section_id: selectedShopSection ? parseInt(selectedShopSection) : undefined, // Seçili shop section'ı doğrudan kullan
-        state: state,
-        // taxonomy_id parametresi geçici olarak kaldırıldı
-      };
-
-      // Önce ürün oluşturma/güncelleme isteğini gönder
-      const listingResponse = await onSubmit(productData, state);
-      if (!listingResponse.success || !listingResponse.listing_id) {
-        toast({
-          variant: "destructive",
-          title: "Hata",
-          description: listingResponse.message || "Ürün oluşturulurken/güncellenirken bir hata oluştu.",
-        });
-        return;
-      }
-      const listing_id = listingResponse.listing_id;
-      // 2. ADIM: Video varsa videoyu yükle
-      if (videoFile) {
-        setVideoFile(prev => prev ? { ...prev, uploading: true, error: undefined } : null);
-        toast({ title: "Video Yükleniyor...", description: "Lütfen bekleyin." });
-        console.log("Video yükleme başlatılıyor, file:", videoFile.file.name);
-        
-        const formData = new FormData();
-        formData.append('video', videoFile.file);
-        formData.append('name', videoFile.file.name);
-        
-        try {
-          console.log(`Video yükleme API çağrısı yapılıyor: /api/etsy/listings/${listing_id}/video`);
-          const videoResponse = await fetch(`/api/etsy/listings/${listing_id}/video`, {
-            method: 'POST',
-            body: formData,
-          });
-          
-          console.log("Video API yanıt durumu:", videoResponse.status);
-          
-          if (!videoResponse.ok) {
-            const errorData = await videoResponse.json();
-            console.error("Video yükleme hatası - ham yanıt:", JSON.stringify(errorData));
-            
-            // Özel hata durumlarını kontrol et
-            if (errorData.message === 'No Etsy store found') {
-              // Mağaza bilgisini yeniden çekmeyi dene
-              const storeResponse = await fetch('/api/etsy/stores');
-              if (!storeResponse.ok) {
-                toast({
-                  title: "Mağaza Bağlantı Hatası",
-                  description: "Etsy mağazanıza erişilemiyor. Lütfen sayfayı yenileyip tekrar deneyin.",
-                  variant: "destructive"
-                });
-                return;
-              }
-              
-              // Mağaza bilgisi varsa, video yüklemeyi tekrar dene
-              const stores = await storeResponse.json();
-              if (stores?.stores?.length > 0) {
-                // Video yüklemeyi tekrar dene
-                const retryResponse = await fetch(`/api/etsy/listings/${listing_id}/video`, {
-                  method: 'POST',
-                  body: formData,
-                });
-                
-                if (retryResponse.ok) {
-                  const result = await retryResponse.json();
-                  setVideoFile(prev => prev ? { ...prev, uploading: false, uploaded: true } : null);
-                  toast({
-                    title: "Video Yüklendi",
-                    description: "Video başarıyla yüklendi!",
-                    variant: "default"
-                  });
-                  return;
-                }
-              }
-            }
-            
-            // Diğer hata durumları
-            setVideoFile(prev => prev ? {
-              ...prev,
-              uploading: false,
-              error: errorData.message || 'Video yüklenirken bir hata oluştu'
-            } : null);
-            
-            toast({
-              title: "Video Yükleme Hatası",
-              description: errorData.message || 'Video yüklenirken bir hata oluştu',
-              variant: "destructive"
-            });
-            
-            return;
-          }
-
-          const result = await videoResponse.json();
-          console.log("Video başarıyla yüklendi:", result);
-          
-          setVideoFile(prev => prev ? { ...prev, uploading: false, uploaded: true } : null);
-          toast({
-            title: "Video Yüklendi",
-            description: "Video başarıyla yüklendi!",
-            variant: "default"
-          });
-        } catch (error) {
-          console.error("Video yükleme işleminde hata:", error);
-          setVideoFile(prev => prev ? {
-            ...prev,
-            uploading: false,
-            error: 'Video yüklenirken bir hata oluştu'
-          } : null);
-          
-          toast({
-            title: "Video Yükleme Hatası",
-            description: "Video yüklenirken beklenmeyen bir hata oluştu.",
-            variant: "destructive"
-          });
-        }
-      } else {
-        toast({
-          title: product ? "Ürün güncellendi" : "Ürün oluşturuldu",
-          description: `İşlem başarıyla tamamlandı. Ürün ID: ${listing_id}`,
-        });
-      }
-      onClose();
-    } catch (error) {
-      console.error('Form gönderimi sırasında hata:', error);
+    if (!isPriceValid) {
       toast({
         variant: "destructive",
-        title: "Hata",
-        description: error instanceof Error ? error.message : "Ürün oluşturulurken bir hata oluştu.",
+        title: "Geçersiz Fiyat",
+        description: "Lütfen en az bir ürün veya varyasyon için 0.20 USD'den yüksek bir fiyat girin.",
       });
+      return; // Gönderimi durdur
+    }
+
+    // 2. Diğer Validasyonlar
+    if (!title || !shippingProfileId || productImages.length === 0) {
+      toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
+      return;
+    }
+    
+    setSubmitting(true);
+    
+    try {
+        const formData = new FormData();
+
+        // ⭐️⭐️⭐️ HATAYI ÇÖZECEK GÜNCELLEME BURADA ⭐️⭐️⭐️
+        const listingData = {
+            // Formdan gelen dinamik değerler
+            title,
+            description,
+            price,
+            shipping_profile_id: Number(shippingProfileId),
+            tags,
+            is_personalizable: isPersonalizable,
+            personalization_required: personalizationRequired,
+            personalization_instructions: personalizationInstructions,
+            has_variations: hasVariations,
+            variations: hasVariations ? variations.filter((v:any) => v.is_active) : [],
+            state: state,
+            shop_section_id: Number(selectedShopSection) || undefined,
+            
+            // --- 👇 EKSİK OLAN SABİT DEĞERLER 👇 ---
+            quantity: 4, // Etsy için sabit bir stok miktarı
+            taxonomy_id: 1366, // Wall Decor kategorisi
+            who_made: "i_did",
+            when_made: "made_to_order",
+            is_supply: false,
+        };
+        // ⭐️⭐️⭐️ DÜZELTME SONU ⭐️⭐️⭐️
+        
+        formData.append('listingData', JSON.stringify(listingData));
+        productImages.forEach(image => formData.append('imageFiles', image.file));
+        if (videoFile) formData.append('videoFile', videoFile.file);
+
+        const response = await fetch('/api/etsy/listings/create', {
+            method: 'POST',
+            body: formData,
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
+        }
+
+        toast({ title: "Başarılı!", description: result.message });
+        onClose();
+        router.refresh();
+
+    } catch (error) {
+        toast({ variant: "destructive", title: 'İşlem Başarısız', description: (error as Error).message });
+    } finally {
+        setSubmitting(false);
     }
   };
 
@@ -682,17 +558,15 @@ export function ProductFormModal({
       {/* SÜRÜKLE-BIRAK ALANI VE RESİM LİSTESİ */}
       <div
         className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
-          isDragging ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50"
+          productImages.length === 0 && !videoFile ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50"
         }`}
         onDrop={handleImageDrop}
         onDragOver={e => e.preventDefault()}
         onDragEnter={e => {
           e.preventDefault();
-          setIsDragging(true);
         }}
         onDragLeave={e => {
           e.preventDefault();
-          setIsDragging(false);
         }}
       >
         {productImages.length === 0 && !videoFile ? (
@@ -705,7 +579,9 @@ export function ProductFormModal({
             <Button
               type="button"
               variant="outline"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                // Implement file input for image selection
+              }}
             >
               Bilgisayardan Seçin
             </Button>
@@ -727,7 +603,9 @@ export function ProductFormModal({
             {productImages.length < 10 && (
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => {
+                  // Implement file input for image selection
+                }}
                 className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-primary/50 transition-colors"
               >
                 <Upload className="w-6 h-6 text-gray-400 mb-2" />
@@ -812,7 +690,6 @@ export function ProductFormModal({
           setHasVariations(true);
           setVariations(predefinedVariations);
           setProductImages([]);
-          setIsDragging(false);
           setSelectedShopSection("0");
         }
         onClose();
@@ -915,22 +792,25 @@ export function ProductFormModal({
               
               {/* Shop Section seçimi */}
               <div className="col-span-2">
-                <Label htmlFor="shopSection">Shop Section</Label>
+                <Label htmlFor="shopSection">Dükkan Bölümü</Label>
                 <Select
                   value={selectedShopSection}
-                  onValueChange={(value) => setSelectedShopSection(value)}
+                  onValueChange={setSelectedShopSection}
+                  disabled={shopSections.length === 0}
                 >
                   <SelectTrigger id="shopSection">
-                    <SelectValue placeholder="Bir mağaza bölümü seçin" />
+                    <SelectValue placeholder="Bir bölüm seçin..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {shopSections
-                      .filter(section => section.shop_section_id !== 0) // Home bölümünü filtrele
-                      .map(section => (
-                        <SelectItem key={section.shop_section_id} value={section.shop_section_id.toString()}>
-                          {section.title}
-                        </SelectItem>
-                      ))}
+                    {shopSections.map(section => (
+                      // ⭐️ DEĞER OLARAK GERÇEK ETSY ID'Sİ KULLANILIYOR ⭐️
+                      <SelectItem 
+                        key={section.shop_section_id} 
+                        value={section.shop_section_id.toString()}
+                      >
+                        {section.title}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -949,9 +829,8 @@ export function ProductFormModal({
                 </Label>
                 <div className="flex items-center mb-2">
                   <Input
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    placeholder="Etiket ekleyin"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -963,7 +842,7 @@ export function ProductFormModal({
                   <Button 
                     type="button" 
                     onClick={handleAddTag}
-                    disabled={tags.length >= 13 || !tagInput.trim()}
+                    disabled={tags.length >= 13 || !newTag.trim()}
                     variant="outline"
                     size="sm"
                   >

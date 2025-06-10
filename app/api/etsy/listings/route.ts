@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getEtsyListings, getEtsyStores } from "@/lib/etsy-api"
+import { getEtsyListings, getEtsyStores, getValidAccessToken, createEtsyListing, uploadFilesToEtsy, activateEtsyListing } from "@/lib/etsy-api"
 
 export async function GET(request: NextRequest) {
   try {
@@ -198,4 +198,54 @@ export async function GET(request: NextRequest) {
       count: 0
     }, { status: 500 })
   }
+}
+
+// Yeni ürün oluşturmak için POST isteği
+export async function POST(request: Request) {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return new NextResponse("Yetkilendirme Gerekli", { status: 401 });
+        
+        // 1. Paketi (FormData) al ve içeriğini kontrol et
+        const formData = await request.formData();
+        const listingDataJSON = formData.get('listingData') as string;
+        if (!listingDataJSON) throw new Error("Listeleme verisi eksik.");
+
+        const imageFiles = formData.getAll('imageFiles') as File[];
+        
+        // ---- 🐞 HATA AYIKLAMA KONTROL NOKTASI 🐞 ----
+        console.log("✅ Sunucuya Ulaşan Resim Dosyaları:", imageFiles.map(f => ({ name: f.name, size: f.size })));
+        if(imageFiles.length === 0) {
+            console.error("❌ Sunucuya hiçbir resim dosyası ulaşmadı!");
+        }
+        // ---------------------------------------------
+        
+        const listingData = JSON.parse(listingDataJSON);
+        const videoFile = formData.get('videoFile') as File | null;
+        
+        // 2. Etsy API ile etkileşim için gerekli bilgileri al
+        const accessToken = await getValidAccessToken(user.id);
+        const stores = await getEtsyStores(user.id);
+        if (!accessToken || !stores?.length) throw new Error("Etsy mağaza bilgileri alınamadı.");
+        const shopId = stores[0].shop_id;
+
+        // 3. Etsy'de ürün taslağını oluştur
+        const createdListing = await createEtsyListing(accessToken, shopId, listingData);
+        const listingId = createdListing.listing_id;
+
+        // 4. Medyaları yükle
+        await uploadFilesToEtsy(accessToken, shopId, listingId, imageFiles, videoFile);
+        
+        // 5. Gerekliyse ürünü aktif hale getir
+        if (listingData.state === 'active') {
+            await activateEtsyListing(accessToken, shopId, listingId);
+        }
+
+        return NextResponse.json({ success: true, message: `Ürün (ID: ${listingId}) başarıyla oluşturuldu.` });
+
+    } catch (error) {
+        console.error("Etsy ürün oluşturma hatası:", error);
+        return NextResponse.json({ success: false, message: (error as Error).message }, { status: 500 });
+    }
 } 

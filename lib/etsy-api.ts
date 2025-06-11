@@ -8,6 +8,48 @@ import { Database } from "@/types/database.types";
 // Mock data importları geçici olarak kaldırıldı
 // Gerekirse burada yeniden implement edilebilir
 
+// Aynı kullanıcı için birden fazla token varsa en son olanı dışındakileri temizle
+async function cleanupDuplicateTokens(userId: string): Promise<void> {
+  try {
+    console.log("Cleaning up duplicate tokens for user:", userId);
+    
+    // En son oluşturulan token dışındaki tüm token kayıtlarını al
+    const { data: tokens, error } = await supabaseAdmin
+      .from("etsy_tokens")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching tokens for cleanup:", error);
+      return;
+    }
+    
+    if (tokens && tokens.length > 1) {
+      console.log(`Found ${tokens.length} tokens for user, keeping the newest one and deleting ${tokens.length - 1} older ones`);
+      
+      // İlk token (en yeni) dışındakileri silmek için ID'leri topla
+      const tokensToDelete = tokens.slice(1).map(token => token.id);
+      
+      // Eski tokenları sil
+      const { error: deleteError } = await supabaseAdmin
+        .from("etsy_tokens")
+        .delete()
+        .in("id", tokensToDelete);
+      
+      if (deleteError) {
+        console.error("Error deleting duplicate tokens:", deleteError);
+      } else {
+        console.log(`Successfully deleted ${tokensToDelete.length} duplicate tokens`);
+      }
+    } else {
+      console.log("No duplicate tokens found for user");
+    }
+  } catch (error) {
+    console.error("Error in cleanupDuplicateTokens:", error);
+  }
+}
+
 // Geçici mock fonksiyonlar
 function generateMockListings(limit = 10, shopId = 1) {
   return {

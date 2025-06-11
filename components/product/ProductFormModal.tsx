@@ -52,6 +52,9 @@ const DIGITAL_PRINTS_TAXONOMY_ID = 2078;
 // Default materials - API'de sabit değerler gönderildiği için burada kullanılmayacak
 const DEFAULT_MATERIALS = ["Cotton Canvas", "Wood Frame", "Hanger"];
 
+// Kişiselleştirme sabitleri
+const PERSONALIZATION_INSTRUCTIONS = 'To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type "NO".';
+
 // Add interface for API response
 interface CreateListingResponse {
   success: boolean;
@@ -217,10 +220,10 @@ export function ProductFormModal({
   // Additional fields to match Etsy
   const [tags, setTags] = useState(product?.tags || [])
   const [newTag, setNewTag] = useState("")
-  const [isPersonalizable, setIsPersonalizable] = useState<boolean>(true)
+  const [isPersonalizable, setIsPersonalizable] = useState(true)
   const [personalizationRequired, setPersonalizationRequired] = useState(false)
   const [personalizationInstructions, setPersonalizationInstructions] = useState(
-    "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
+    'Phone Number for Delivery'
   )
   const [primaryColor, setPrimaryColor] = useState(product?.primary_color || "")
   const [secondaryColor, setSecondaryColor] = useState(product?.secondary_color || "")
@@ -280,9 +283,7 @@ export function ProductFormModal({
       setNewTag("");
       setIsPersonalizable(true);
       setPersonalizationRequired(false);
-      setPersonalizationInstructions(
-        "To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type \"NO\"."
-      );
+      setPersonalizationInstructions(PERSONALIZATION_INSTRUCTIONS);
       setPrimaryColor(product?.primary_color || "");
       setSecondaryColor(product?.secondary_color || "");
       setWidth(product?.width || 0);
@@ -431,34 +432,31 @@ export function ProductFormModal({
     // 1. Fiyat Validasyonu
     let isPriceValid = false;
     if (hasVariations) {
-      // Varyasyonlar varsa, en az bir aktif varyasyonun fiyatı 0.20'den büyük olmalı
-      isPriceValid = variations.some(v => v.is_active && v.price >= 0.20);
+        isPriceValid = variations.some(v => v.is_active && v.price >= 0.20);
     } else {
-      // Varyasyon yoksa, ana fiyat 0.20'den büyük olmalı
-      isPriceValid = price >= 0.20;
+        isPriceValid = price >= 0.20;
     }
 
     if (!isPriceValid) {
-      toast({
-        variant: "destructive",
-        title: "Geçersiz Fiyat",
-        description: "Lütfen en az bir ürün veya varyasyon için 0.20 USD'den yüksek bir fiyat girin.",
-      });
-      return; // Gönderimi durdur
+        toast({
+            variant: "destructive",
+            title: "Geçersiz Fiyat",
+            description: "Lütfen en az bir ürün veya varyasyon için 0.20 USD'den yüksek bir fiyat girin.",
+        });
+        return;
     }
 
     // 2. Diğer Validasyonlar
     if (!title || !shippingProfileId || productImages.length === 0) {
-      toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
-      return;
+        toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
+        return;
     }
-    
+
     setSubmitting(true);
-    
+
     try {
         const formData = new FormData();
 
-        // ⭐️⭐️⭐️ HATAYI ÇÖZECEK GÜNCELLEME BURADA ⭐️⭐️⭐️
         const listingData = {
             // Formdan gelen dinamik değerler
             title,
@@ -466,22 +464,24 @@ export function ProductFormModal({
             price,
             shipping_profile_id: Number(shippingProfileId),
             tags,
-            is_personalizable: isPersonalizable,
-            personalization_required: personalizationRequired,
-            personalization_instructions: personalizationInstructions,
             has_variations: hasVariations,
-            variations: hasVariations ? variations.filter((v:any) => v.is_active) : [],
+            variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
             state: state,
             shop_section_id: Number(selectedShopSection) || undefined,
             
-            // --- 👇 EKSİK OLAN SABİT DEĞERLER 👇 ---
-            quantity: 4, // Etsy için sabit bir stok miktarı
-            taxonomy_id: taxonomyId, // Seçilen kategori ID'si
+            // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
+            is_personalizable: true,
+            personalization_is_required: false,
+            personalization_instructions: PERSONALIZATION_INSTRUCTIONS,
+            personalization_char_count_max: 256, // <-- Etsy için kritik alan
+
+            // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
+            quantity: 999,
+            taxonomy_id: taxonomyId,
             who_made: "i_did",
             when_made: "made_to_order",
             is_supply: false,
         };
-        // ⭐️⭐️⭐️ DÜZELTME SONU ⭐️⭐️⭐️
         
         formData.append('listingData', JSON.stringify(listingData));
         productImages.forEach(image => formData.append('imageFiles', image.file));
@@ -1017,47 +1017,50 @@ export function ProductFormModal({
 
           <Separator />
 
-          {/* Kişiselleştirme Ayarları */}
+          {/* Kişiselleştirme Ayarları (Sabit ve Değiştirilemez) */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Kişiselleştirme</h3>
-            <div className="space-y-4">
+            <div className="p-4 border rounded-md bg-slate-50 space-y-4">
+              {/* Kişiselleştirme Her Zaman Aktif ve Değiştirilemez */}
               <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="isPersonalizable" 
+                <Checkbox
+                  id="isPersonalizable"
                   checked={true}
-                  onCheckedChange={() => {}}
-                  disabled
+                  disabled={true}
                 />
-                <Label htmlFor="isPersonalizable" className="font-normal">
-                  Bu ürün kişiselleştirilebilir
-                </Label>
+                <label
+                  htmlFor="isPersonalizable"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Bu ürün kişiselleştirilebilir (Her zaman aktif)
+                </label>
               </div>
-              <div className="space-y-4 pl-6">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="personalizationRequired" 
-                    checked={false}
-                    onCheckedChange={() => {}}
-                    disabled
-                  />
-                  <Label htmlFor="personalizationRequired" className="font-normal">
-                    Kişiselleştirme zorunlu olsun
-                  </Label>
-                </div>
-                <div>
-                  <Label htmlFor="personalizationInstructions" className="mb-2 block">
-                    Kişiselleştirme Talimatları
-                  </Label>
-                  <Textarea
-                    id="personalizationInstructions"
-                    value={personalizationInstructions}
-                    onChange={() => {}}
-                    disabled
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Karakter sınırı: {personalizationInstructions.length}/256
-                  </p>
-                </div>
+              {/* Kişiselleştirme Her Zaman İsteğe Bağlı ve Değiştirilemez */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="personalizationRequired"
+                  checked={false}
+                  disabled={true}
+                />
+                <label
+                  htmlFor="personalizationRequired"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Kişiselleştirme zorunlu olsun (Her zaman isteğe bağlı)
+                </label>
+              </div>
+              {/* Talimat Metni Sabit ve Değiştirilemez */}
+              <div>
+                <Label htmlFor="personalizationInstructions" className="peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Alıcı için talimatlar (Sabit Metin)
+                </Label>
+                <Textarea
+                  id="personalizationInstructions"
+                  value={PERSONALIZATION_INSTRUCTIONS}
+                  readOnly={true}
+                  className="mt-1 bg-gray-100 cursor-not-allowed"
+                  rows={3}
+                />
               </div>
             </div>
           </div>

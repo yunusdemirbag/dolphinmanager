@@ -2075,6 +2075,20 @@ export async function createDraftListing(accessToken: string, shopId: number, da
     
     console.log("[ETSY_API] Etsy'ye gönderilen son istek gövdesi:", Object.fromEntries(body.entries()));
 
+    // Kişiselleştirme alanları (varsa ekle)
+    if (typeof data.is_personalizable !== 'undefined') {
+        body.append('is_personalizable', data.is_personalizable ? 'true' : 'false');
+    }
+    if (typeof data.personalization_is_required !== 'undefined') {
+        body.append('personalization_is_required', data.personalization_is_required ? 'true' : 'false');
+    }
+    if (typeof data.personalization_instructions === 'string') {
+        body.append('personalization_instructions', data.personalization_instructions);
+    }
+    if (typeof data.personalization_char_count_max !== 'undefined') {
+        body.append('personalization_char_count_max', data.personalization_char_count_max.toString());
+    }
+
     const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings`, {
         method: 'POST',
         headers: {

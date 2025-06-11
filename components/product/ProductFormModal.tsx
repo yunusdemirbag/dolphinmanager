@@ -321,6 +321,13 @@ export function ProductFormModal({
     };
   }, [isOpen, product]);
 
+  // Kargo profili varsayılanı: Yeni ürün eklerken ilk profili otomatik seç
+  useEffect(() => {
+    if (isOpen && !product && shippingProfiles.length > 0) {
+      setShippingProfileId(shippingProfiles[0].shipping_profile_id.toString());
+    }
+  }, [isOpen, product, shippingProfiles]);
+
   // Form değişikliklerini kontrol et
   const hasUnsavedChanges = () => {
     if (!product) {

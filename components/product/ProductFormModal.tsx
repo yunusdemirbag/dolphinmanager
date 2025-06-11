@@ -53,7 +53,7 @@ const DIGITAL_PRINTS_TAXONOMY_ID = 2078;
 const DEFAULT_MATERIALS = ["Cotton Canvas", "Wood Frame", "Hanger"];
 
 // Kişiselleştirme sabitleri
-const PERSONALIZATION_INSTRUCTIONS = 'To help ensure a smooth delivery, would you like to provide a contact phone number for the courier? If not, simply type "NO".';
+const PERSONALIZATION_INSTRUCTIONS = 'Phone Number for Delivery';
 
 // Add interface for API response
 interface CreateListingResponse {

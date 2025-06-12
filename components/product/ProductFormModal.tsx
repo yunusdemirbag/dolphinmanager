@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/table"
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
 import { useRouter } from "next/navigation"
-import { ProductMediaSection, MediaFile } from './ProductMediaSection';
+import { ProductMediaSection } from './ProductMediaSection';
 
 // Sabit kategori ID'leri
 const WALL_DECOR_TAXONOMY_ID = 1027;
@@ -200,6 +200,14 @@ const DraggableImage = ({
   );
 };
 
+// MediaFile interface'ini güncelliyorum
+export interface MediaFile {
+  file: File;
+  preview: string;
+  uploading: boolean;
+  error?: string;
+}
+
 export function ProductFormModal({
   isOpen,
   onClose,
@@ -244,6 +252,10 @@ export function ProductFormModal({
   const [submitting, setSubmitting] = useState(false)
 
   const router = useRouter()
+
+  // --- BAŞLIK OTO-ÜRETİMİ STATE ---
+  const [autoTitleLoading, setAutoTitleLoading] = useState(false);
+  const [autoTitleUsed, setAutoTitleUsed] = useState(false);
 
   // Dükkan bölümlerini API'den çekmek için useEffect
   useEffect(() => {
@@ -304,8 +316,8 @@ export function ProductFormModal({
 
       if (product?.images?.length) {
         setProductImages(product.images.map(img => ({
-          file: new File([], img.url_fullxfull || ''), // Gerçek dosya değil, sadece placeholder
-          preview: img.url_fullxfull || '',
+          file: new File([], img.url || ''),
+          preview: img.url || '',
           uploading: false
         })));
       }
@@ -328,23 +340,36 @@ export function ProductFormModal({
     }
   }, [isOpen, product, shippingProfiles]);
 
-  // Form değişikliklerini kontrol et
-  const hasUnsavedChanges = () => {
-    if (!product) {
-      return title !== "" || description !== "" || price !== 0 || quantity !== 4 || 
-             shippingProfileId !== "" || tags.length > 0 || productImages.length > 0
+  // Modal her açıldığında başlık ve autoTitleUsed state'lerini sıfırla
+  useEffect(() => {
+    if (isOpen) {
+      setTitle("");
+      setAutoTitleUsed(false);
     }
-    return false
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
-  // Modal kapatma işlemi
+  // hasUnsavedChanges fonksiyonunu güncelle
+  const hasUnsavedChanges = () => {
+    return (
+      title !== "" ||
+      description !== "" ||
+      price !== 0 ||
+      quantity !== 4 ||
+      shippingProfileId !== "" ||
+      tags.length > 0 ||
+      productImages.length > 0
+    );
+  };
+
+  // Modal kapatılırken değişiklik varsa onay sor
   const handleCloseModal = () => {
     if (hasUnsavedChanges()) {
-      setShowUnsavedChangesDialog(true)
+      setShowUnsavedChangesDialog(true);
     } else {
-      onClose()
+      onClose();
     }
-  }
+  };
 
   // Tag ekleme
   const handleAddTag = () => {
@@ -433,6 +458,46 @@ export function ProductFormModal({
     newVariations[index] = variationToUpdate;
     setVariations(newVariations);
   };
+
+  // --- GÖRSEL YÜKLENDİKTEN VE MODAL AÇILDIKTAN SONRA BAŞLIK OLUŞTURMA ---
+  useEffect(() => {
+    // Modal açıkken ve başlık boşsa ve görsel varsa tetikle
+    if (isOpen && productImages.length > 0 && !title && !autoTitleUsed) {
+      const generateTitle = async () => {
+        setAutoTitleLoading(true);
+        try {
+          const formData = new FormData();
+          formData.append("image", productImages[0].file);
+          const res = await fetch("/api/ai/generate-etsy-title", {
+            method: "POST",
+            body: formData,
+          });
+          const text = await res.text();
+          // Markdown code block içinden başlığı ayıkla
+          const match = text.match(/```markdown\n([\s\S]*?)\n```/);
+          const generatedTitle = match ? match[1].trim() : text.trim();
+          if (generatedTitle && !title) {
+            setTitle(generatedTitle);
+            setAutoTitleUsed(true);
+          }
+        } catch (e) {
+          toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
+        } finally {
+          setAutoTitleLoading(false);
+        }
+      };
+      generateTitle();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productImages, isOpen]);
+
+  // Modal her açıldığında, başlık boşsa ve görsel varsa autoTitleUsed'u sıfırla ki analiz tekrar tetiklensin
+  useEffect(() => {
+    if (isOpen && productImages.length > 0 && !title) {
+      setAutoTitleUsed(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Form verilerini handle eden fonksiyon
   const handleSubmit = async (state: "draft" | "active") => {
@@ -689,18 +754,11 @@ export function ProductFormModal({
       open={isOpen}
       onOpenChange={(isOpen) => {
         if (!isOpen) {
-          // Form kapatılıyor
+          handleCloseModal();
+        } else {
           setTitle("");
-          setDescription("");
-          setPrice(0);
-          setQuantity(4);
-          setVideoFile(null);
-          setHasVariations(true);
-          setVariations(predefinedVariations);
-          setProductImages([]);
-          setSelectedShopSection("0");
+          setAutoTitleUsed(false);
         }
-        onClose();
       }}
     >
       <DialogTrigger asChild>
@@ -733,9 +791,15 @@ export function ProductFormModal({
                 <Input
                   id="title"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    setAutoTitleUsed(false); // Kullanıcı elle değiştirirse tekrar otomatik doldurma yapmasın
+                  }}
                   placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
                 />
+                {autoTitleLoading && (
+                  <div className="text-xs text-blue-500 mt-1">Görselden başlık üretiliyor...</div>
+                )}
               </div>
 
               <div>

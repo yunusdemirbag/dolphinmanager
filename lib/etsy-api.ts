@@ -2224,80 +2224,179 @@ export async function addInventoryWithVariations(accessToken: string, listingId:
     console.log(`✅ ID'si ${listingId} olan ürünün envanteri başarıyla ayarlandı.`);
 }
 
-export async function uploadFilesToEtsy(accessToken: string, shopId: number, listingId: number, images: File[], video: File | null) {
+export async function uploadFilesToEtsy(
+    accessToken: string,
+    shopId: number,
+    listingId: number,
+    images: File[],
+    video: File | null,
+    onProgress?: (current: number, total: number) => void
+) {
     console.log(`[ETSY_API] Starting media upload for listing ${listingId}`);
     console.log(`[ETSY_API] Found ${images.length} images and ${video ? '1 video' : 'no video'} to upload`);
 
-    const uploadPromises = [];
+    const imageIdResults: (number|null)[] = [];
+    const maxFileSize = 20 * 1024 * 1024; // 20MB limit
+    const maxRetries = 3;
 
-    // Her resim için ayrı bir YÜKLEME isteği oluştur
+    // SIRA SIRA YÜKLEME
     for (let i = 0; i < images.length; i++) {
         const image = images[i];
-        console.log(`[ETSY_API] Preparing to upload image ${i + 1}/${images.length}: ${image.name}`);
-        
-        const formData = new FormData();
-        formData.append('image', image);
-        formData.append('rank', (i + 1).toString());
+        let success = false;
+        let retryCount = 0;
 
-        const promise = fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID! },
-            body: formData,
-        }).then(async res => {
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error(`[ETSY_API] ❌ Failed to upload image ${image.name}:`, {
-                    status: res.status,
-                    statusText: res.statusText,
-                    error: errorText
+        // Dosya boyutu kontrolü
+        if (image.size > maxFileSize) {
+            console.error(`[ETSY_API] ❌ Image ${image.name} too large: ${(image.size / 1024 / 1024).toFixed(2)}MB (max 20MB)`);
+            imageIdResults[i] = null;
+            onProgress?.(i + 1, images.length);
+            continue;
+        }
+        // Dosya tipi kontrolü
+        if (!image.type.startsWith('image/')) {
+            console.error(`[ETSY_API] ❌ Invalid file type for ${image.name}: ${image.type}`);
+            imageIdResults[i] = null;
+            onProgress?.(i + 1, images.length);
+            continue;
+        }
+
+        while (retryCount < maxRetries && !success) {
+            try {
+                console.log(`[ETSY_API] Uploading image ${i + 1}/${images.length}: ${image.name} (${(image.size / 1024 / 1024).toFixed(2)}MB)`);
+                const formData = new FormData();
+                formData.append('image', image);
+                formData.append('rank', (i + 1).toString());
+
+                // Timeout ile istek gönder
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 saniye timeout
+
+                const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'x-api-key': ETSY_CLIENT_ID!
+                    },
+                    body: formData,
+                    signal: controller.signal
                 });
-                return null;
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[ETSY_API] ❌ Failed to upload image ${image.name}:`, {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: errorText
+                    });
+
+                    // Rate limit hatası ise bekle ve tekrar dene
+                    if (response.status === 429) {
+                        console.log('[ETSY_API] ⏳ Rate limited, waiting 2 seconds...');
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        retryCount++;
+                        continue;
+                    } else {
+                        retryCount = maxRetries; // Diğer hatalarda tekrar deneme
+                        imageIdResults[i] = null;
+                        break;
+                    }
+                }
+
+                const data = await response.json();
+                const imageId = data.listing_image_id || null;
+                imageIdResults[i] = imageId;
+                console.log(`[ETSY_API] ✅ Successfully uploaded image ${image.name}, imageId: ${imageId}`);
+                success = true;
+            } catch (error) {
+                console.error(`[ETSY_API] ❌ Error uploading image ${image.name}:`, error);
+                if (error instanceof Error && error.name === 'AbortError') {
+                    console.error(`[ETSY_API] ⏰ Upload timeout for ${image.name}`);
+                }
+                retryCount++;
+                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
             }
-            console.log(`[ETSY_API] ✅ Successfully uploaded image ${image.name}`);
-            return res.json();
-        });
-        
-        uploadPromises.push(promise);
+        }
+        onProgress?.(i + 1, images.length);
+        // Her resim arasında kısa bir bekleme (rate limiting için)
+        if (i < images.length - 1) {
+            console.log('[ETSY_API] ⏳ Waiting 500ms before next upload...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
     }
 
-    // Video varsa, onun için de ayrı bir istek oluştur
+    // Video yükleme (varsa)
     if (video) {
-        console.log(`[ETSY_API] Preparing to upload video: ${video.name}`);
-        
-        const formData = new FormData();
-        formData.append('video', video);
-        formData.append('name', video.name);
-        
-        const promise = fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/videos`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID! },
-            body: formData,
-        }).then(async res => {
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error(`[ETSY_API] ❌ Failed to upload video ${video.name}:`, {
-                    status: res.status,
-                    statusText: res.statusText,
-                    error: errorText
+        try {
+            console.log(`[ETSY_API] Preparing to upload video: ${video.name} (${(video.size / 1024 / 1024).toFixed(2)}MB)`);
+            // Video boyutu kontrolü (100MB limit for videos)
+            const maxVideoSize = 100 * 1024 * 1024; // 100MB
+            if (video.size > maxVideoSize) {
+                console.error(`[ETSY_API] ❌ Video ${video.name} too large: ${(video.size / 1024 / 1024).toFixed(2)}MB (max 100MB)`);
+            } else {
+                const formData = new FormData();
+                formData.append('video', video);
+                formData.append('name', video.name);
+                const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/videos`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'x-api-key': ETSY_CLIENT_ID!
+                    },
+                    body: formData,
                 });
-                return null;
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[ETSY_API] ❌ Failed to upload video ${video.name}:`, errorText);
+                } else {
+                    console.log(`[ETSY_API] ✅ Successfully uploaded video ${video.name}`);
+                }
             }
-            console.log(`[ETSY_API] ✅ Successfully uploaded video ${video.name}`);
-            return res.json();
-        });
-        
-        uploadPromises.push(promise);
+        } catch (error) {
+            console.error(`[ETSY_API] ❌ Error uploading video:`, error);
+        }
     }
-    
-    // Tüm yüklemelerin bitmesini bekle
-    const results = await Promise.all(uploadPromises);
-    
-    // Başarısız olanları logla
-    const failedUploads = results.filter(r => r === null).length;
+
+    // Sonuçları değerlendir
+    const successfulUploads = imageIdResults.filter(id => id !== null).length;
+    const failedUploads = images.length - successfulUploads;
+    console.log(`[ETSY_API] 📊 Upload Summary: ${successfulUploads}/${images.length} images uploaded successfully`);
     if (failedUploads > 0) {
-        console.error(`[ETSY_API] ⚠️ ${failedUploads} media uploads failed`);
-    } else {
-        console.log(`[ETSY_API] ✅ All media uploads completed successfully`);
+        console.warn(`[ETSY_API] ⚠️ ${failedUploads} image uploads failed`);
+    }
+
+    // Resim sıralaması (başarılı olanlar için)
+    const orderedImageIds = imageIdResults.filter((id): id is number => !!id);
+    if (orderedImageIds.length > 1) {
+        try {
+            await reorderListingImagesFromUpload(accessToken, shopId, listingId, orderedImageIds);
+            console.log('[ETSY_API] ✅ Image order synchronized with Etsy');
+        } catch (err) {
+            console.error('[ETSY_API] ⚠️ Could not reorder images:', err);
+        }
+    }
+
+    // Eğer hiç resim yüklenmediyse hata fırlat
+    if (successfulUploads === 0) {
+        throw new Error('Hiçbir resim yüklenemedi. Lütfen dosya boyutlarını ve internet bağlantınızı kontrol edin.');
+    }
+}
+
+// uploadFilesToEtsy içinden çağrılacak yardımcı fonksiyon
+async function reorderListingImagesFromUpload(accessToken: string, shopId: number, listingId: number, imageIds: number[]) {
+    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images/reorder`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'x-api-key': ETSY_CLIENT_ID!,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ listing_image_ids: imageIds })
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText);
     }
 }
 

@@ -263,6 +263,17 @@ export function ProductFormModal({
   // Etiket üretimi için state
   const [autoTagsLoading, setAutoTagsLoading] = useState(false);
 
+  // Kullanıcı elle kategori seçerse otomatik güncellemeyi durdurmak için state
+  const [shopSectionAutoSelected, setShopSectionAutoSelected] = useState(true);
+
+  // Eğer ürün düzenleniyorsa onun bölümünü, değilse ilk bölümü seç
+  const initialSectionId = product?.shop_section_id?.toString() || shopSections[0]?.shop_section_id.toString() || '';
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedShopSection(initialSectionId);
+    }
+  }, [isOpen, initialSectionId]);
+
   // Dükkan bölümlerini API'den çekmek için useEffect
   useEffect(() => {
     if (isOpen) {
@@ -272,9 +283,6 @@ export function ProductFormModal({
           const data = await response.json();
           if (response.ok && data.sections) {
             setShopSections(data.sections);
-            // Eğer ürün düzenleniyorsa onun bölümünü, değilse ilk bölümü seç
-            const initialSectionId = product?.shop_section_id?.toString() || data.sections[0]?.shop_section_id.toString() || '';
-            setSelectedShopSection(initialSectionId);
           }
         } catch (error) { 
           console.error("Dükkan bölümleri yüklenemedi:", error);
@@ -287,7 +295,7 @@ export function ProductFormModal({
       }
       loadShopSections();
     }
-  }, [isOpen, product]);
+  }, [isOpen]);
 
   // Modified reset form useEffect
   useEffect(() => {
@@ -557,6 +565,53 @@ export function ProductFormModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title]);
+
+  // Shop section select değiştiğinde otomatik güncellemeyi kapat
+  const handleShopSectionChange = (val: string) => {
+    setSelectedShopSection(val);
+    setShopSectionAutoSelected(false);
+  };
+
+  // Başlık değiştiğinde en uygun mağaza kategorisini OpenAI ile otomatik seç
+  useEffect(() => {
+    if (!title || !shopSections.length || !shopSectionAutoSelected) return;
+
+    const fetchAICategory = async () => {
+      const categoryNames = shopSections.map(s => s.title).join(', ');
+      const prompt = `Aşağıdaki ürün başlığına en uygun mağaza kategorisini sadece aşağıdaki seçeneklerden birini seçerek döndür. Sadece kategori adını döndür.\n\nKategoriler: ${categoryNames}\n\nBaşlık: "${title}"\n\nCevap:`;
+      try {
+        const res = await fetch("/api/ai/generate-etsy-title", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+        const aiCategory = (await res.text()).trim().toLowerCase();
+        let matchedSection = shopSections.find(
+          s => s.title.trim().toLowerCase() === aiCategory
+        );
+        // Fallback: Modern/Abstract gibi genel kategori
+        if (!matchedSection) {
+          const fallbackKeywords = ["modern", "abstract", "art", "general"];
+          matchedSection = shopSections.find(s =>
+            fallbackKeywords.some(keyword =>
+              s.title.toLowerCase().includes(keyword)
+            )
+          );
+        }
+        // Hala yoksa ilk kategoriyi seç
+        if (!matchedSection && shopSections.length > 0) {
+          matchedSection = shopSections[0];
+        }
+        if (matchedSection) {
+          setSelectedShopSection(matchedSection.shop_section_id.toString());
+        }
+      } catch (e) {
+        // Hata olursa kategori değiştirme
+      }
+    };
+    fetchAICategory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, shopSections, shopSectionAutoSelected]);
 
   // Form verilerini handle eden fonksiyon
   const handleSubmit = async (state: "draft" | "active") => {
@@ -997,7 +1052,7 @@ export function ProductFormModal({
                   <Label htmlFor="shopSection">Kanvas Kategorileri</Label>
                   <Select
                     value={selectedShopSection}
-                    onValueChange={setSelectedShopSection}
+                    onValueChange={handleShopSectionChange}
                     disabled={shopSections.length === 0}
                   >
                     <SelectTrigger id="shopSection">
@@ -1092,9 +1147,6 @@ export function ProductFormModal({
                 <p className="text-sm text-gray-500 mt-1">
                   {tags.length}/13 etiket eklendi
                 </p>
-                {tags.length !== 13 && !autoTagsLoading && (
-                  <div className="text-xs text-red-500 mt-1">Uyarı: Tam olarak 13 etiket üretilmelidir. Lütfen başlığı kontrol edin veya tekrar deneyin.</div>
-                )}
               </div>
             </div>
 

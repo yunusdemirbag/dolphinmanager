@@ -12,8 +12,11 @@ export interface Product {
   tags: string[];
   images: Array<{
     url: string;
+    url_570xN?: string;
     file?: File | null;
   }>;
+  image_url?: string;
+  etsy_listing_id?: number;
   video_url?: string;
   has_variations: boolean;
   variations?: Array<{

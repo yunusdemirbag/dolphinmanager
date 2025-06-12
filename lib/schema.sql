@@ -28,4 +28,22 @@ CREATE POLICY "Authenticated users can insert images"
 ON public.etsy_images FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "Authenticated users can update their images" 
-ON public.etsy_images FOR UPDATE USING (auth.role() = 'authenticated'); 
+ON public.etsy_images FOR UPDATE USING (auth.role() = 'authenticated');
+
+-- Queue jobs tablosu
+CREATE TABLE IF NOT EXISTS queue_jobs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  progress INTEGER DEFAULT 0,
+  data JSONB NOT NULL,
+  error TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  started_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  retry_count INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_queue_jobs_user_status ON queue_jobs(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_queue_jobs_status_created ON queue_jobs(status, created_at); 

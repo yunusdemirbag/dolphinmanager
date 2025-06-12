@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import { DndProvider } from "react-dnd"
+import { HTML5Backend } from "react-dnd-html5-backend"
 import {
   Dialog,
   DialogContent,
@@ -613,6 +615,69 @@ export function ProductFormModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, shopSections, shopSectionAutoSelected]);
 
+  // Job takibi
+  const startJobTracking = (jobId: string, productTitle: string) => {
+    let attempts = 0;
+    const maxAttempts = 150; // 5 dakika (2s * 150)
+    
+    const interval = setInterval(async () => {
+      try {
+        if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          toast({ 
+            variant: "destructive",
+            title: "İşlem Zaman Aşımı", 
+            description: `"${productTitle}" için işlem zaman aşımına uğradı.` 
+          });
+          return;
+        }
+        
+        attempts++;
+        const response = await fetch(`/api/etsy/listings/job-status/${jobId}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            clearInterval(interval);
+            toast({ 
+              variant: "destructive",
+              title: "İşlem Bulunamadı", 
+              description: `"${productTitle}" için işlem bulunamadı.` 
+            });
+            return;
+          }
+          throw new Error('Job status API hatası');
+        }
+        
+        const job = await response.json();
+        
+        if (job.status === 'completed') {
+          clearInterval(interval);
+          toast({ 
+            title: "✅ Ürün Hazır!", 
+            description: `"${productTitle}" başarıyla Etsy'ye eklendi!` 
+          });
+        } else if (job.status === 'failed') {
+          clearInterval(interval);
+          toast({ 
+            variant: "destructive",
+            title: "❌ Ürün Eklenemedi", 
+            description: `"${productTitle}": ${job.error || 'Bilinmeyen hata'}` 
+          });
+        }
+        // Progress update için konsola bilgi yazdır
+        else if (job.status === 'processing') {
+          console.log(`Progress: ${job.progress}%`);
+        }
+      } catch (error) {
+        console.error('Job tracking error:', error);
+      }
+    }, 2000); // 2 saniyede bir kontrol et
+    
+    // interval'ı global olarak sakla, gerekirse temizlemek için
+    // window.__jobIntervals = window.__jobIntervals || {};
+    // window.__jobIntervals[jobId] = interval;
+  };
+
   // Form verilerini handle eden fonksiyon
   const handleSubmit = async (state: "draft" | "active") => {
     // 1. Fiyat Validasyonu
@@ -673,17 +738,28 @@ export function ProductFormModal({
         productImages.forEach(image => formData.append('imageFiles', image.file));
         if (videoFile) formData.append('videoFile', videoFile.file);
 
-        const response = await fetch('/api/etsy/listings/create', {
-            method: 'POST',
-            body: formData,
+        // Asenkron endpoint'e gönder
+        const response = await fetch('/api/etsy/listings/create-async', {
+          method: 'POST',
+          body: formData,
         });
 
         const result = await response.json();
+        
         if (!response.ok) {
-            throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
+          throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
         }
 
-        toast({ title: "Başarılı!", description: result.message });
+        // Hemen başarı mesajı göster ve modal'ı kapat
+        toast({ 
+          title: "İşlem Başlatıldı! ⚡", 
+          description: `Ürün "${title}" arka planda oluşturuluyor. Bildirim gelecek.` 
+        });
+        
+        // Background tracking başlat
+        startJobTracking(result.jobId, title);
+        
+        // Modal'ı hemen kapat - kullanıcı beklemez!
         onClose();
         router.refresh();
 
@@ -864,7 +940,7 @@ export function ProductFormModal({
   );
 
   return (
-    <>
+    <DndProvider backend={HTML5Backend}>
       <Dialog
         open={isOpen}
         onOpenChange={(isOpen) => {
@@ -1407,6 +1483,6 @@ export function ProductFormModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </DndProvider>
   );
 }

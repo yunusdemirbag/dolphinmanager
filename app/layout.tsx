@@ -2,6 +2,7 @@ import * as React from "react"
 import "./globals.css"
 import SidebarWithStoreName from "./components/SidebarWithStoreName"
 import { Toaster } from "@/components/ui/toaster"
+import { JobNotificationCenter } from "@/components/JobNotificationCenter"
 
 export const metadata = {
   title: "Dolphin Manager",
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-gray-50" suppressHydrationWarning>
         <SidebarWithStoreName />
         <main className="ml-16 md:ml-64 min-h-screen">{children}</main>
+        <JobNotificationCenter />
         <Toaster />
       </body>
     </html>

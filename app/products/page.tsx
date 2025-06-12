@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useProducts } from "@/hooks/useProducts"
-import { ProductCard } from "@/components/product/ProductCard"
+import ProductCard from "@/components/product/ProductCard"
 import { ProductFilters } from "@/components/product/ProductFilters"
 import { ProductFormModal } from "@/components/product/ProductFormModal"
 import { ProductDeleteModal } from "@/components/product/ProductDeleteModal"
@@ -297,6 +297,67 @@ export default function ProductsPage() {
       setDeletingProductId(null)
     }
   }
+
+  // Handle Create Product Action (Async Method with Job Queue)
+  const createProductAction = async (productData: Partial<Product>): Promise<{jobId?: string; success: boolean; error?: string}> => {
+    try {
+      console.log('Creating product with async method (job queue)...');
+      
+      // Formdata oluştur
+      const formData = new FormData();
+      
+      // Listing data'yı JSON'a çevir ve ekle
+      const listingData = {
+        ...productData,
+        state: 'active' // her zaman aktif olarak oluştur
+      };
+      formData.append('listingData', JSON.stringify(listingData));
+      
+      // Görselleri ekle
+      if (productData.images) {
+        for (const image of productData.images) {
+          if (image.file) {
+            formData.append('imageFiles', image.file);
+          }
+        }
+      }
+      
+      // Video varsa ekle
+      if (productData.videoFile) {
+        formData.append('videoFile', productData.videoFile);
+      }
+      
+      // API isteği yap
+      console.log('Sending request to create-async endpoint...');
+      const response = await fetch('/api/etsy/listings/create-async', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Async product creation result:', result);
+      
+      if (!result.jobId) {
+        throw new Error('Job ID alınamadı');
+      }
+      
+      return {
+        jobId: result.jobId,
+        success: true
+      };
+    } catch (error: any) {
+      console.error('Error in createProductAction:', error);
+      return {
+        success: false,
+        error: error.message || 'Ürün oluşturma işlemi başlatılamadı'
+      };
+    }
+  };
 
   // Grid Classes
   const gridClasses = {

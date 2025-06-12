@@ -2110,6 +2110,16 @@ export async function createDraftListing(accessToken: string, shopId: number, da
         console.log(`[ETSY_API] Dükkan bölümü belirtilmedi, ürün ana sayfada yer alacak.`);
     }
 
+    // --- TAGLERİ EKLE ---
+    if (Array.isArray(data.tags)) {
+        (data.tags as string[]).forEach((tag: string) => {
+            if (typeof tag === 'string' && tag.trim().length > 0) {
+                body.append('tags[]', tag.trim());
+            }
+        });
+    }
+    // ---------------------
+
     // Diğer parametreler
     const fixedMaterials = ['Cotton Canvas', 'Wood Frame', 'Hanger'];
     fixedMaterials.forEach(material => {

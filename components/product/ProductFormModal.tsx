@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw } from "lucide-react"
+import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode, ShippingProfile, EtsyProcessingProfile } from "@/types/product"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -256,6 +256,12 @@ export function ProductFormModal({
   // --- BAŞLIK OTO-ÜRETİMİ STATE ---
   const [autoTitleLoading, setAutoTitleLoading] = useState(false);
   const [autoTitleUsed, setAutoTitleUsed] = useState(false);
+
+  // Açıklama üretimi için state
+  const [autoDescriptionLoading, setAutoDescriptionLoading] = useState(false);
+
+  // Etiket üretimi için state
+  const [autoTagsLoading, setAutoTagsLoading] = useState(false);
 
   // Dükkan bölümlerini API'den çekmek için useEffect
   useEffect(() => {
@@ -498,6 +504,59 @@ export function ProductFormModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Başlık değiştiğinde açıklama otomatik üret
+  useEffect(() => {
+    if (title) {
+      setAutoDescriptionLoading(true);
+      const generateDescription = async () => {
+        const prompt = `TASK: Generate a complete, compelling, and SEO-friendly Etsy product description based on the provided product title.\n\nCRITICAL INSTRUCTIONS:\n1.  **MIMIC THE BENCHMARK:** Your entire output MUST perfectly replicate the structure, sectioning, tone, and emoji usage of the \`BENCHMARK DESCRIPTION\` provided below. This benchmark is your template for STYLE and FORMAT.\n2.  **DYNAMIC ADAPTATION:** The most crucial part is to adapt the opening hook and introductory paragraph to reflect the specific mood, subject, and style of the \`PRODUCT TITLE\`. Infuse keywords from the title into this creative section.\n3.  **MAINTAIN ALL SECTIONS:** Ensure every section from the benchmark (\`Why You'll Love It:\`, \`✅\` bullet points, \`📦 Shipped with Care\`, etc.) is present in your final output.\n\n---\n\n### BENCHMARK DESCRIPTION (THIS IS THE STYLE YOU MUST FOLLOW)\n\n🌟 Transform Your Walls with Timeless Canvas Art! 🖼️✨\n\nBring a fresh touch of elegance to your interior with this premium-quality canvas wall print. Whether it's your living room, bedroom, or workspace — this piece adds warmth, depth, and artistic charm to any setting.\n\nWhy You'll Love It:\n\n✅ Top-Tier Quality – Printed on durable canvas with rich, high-resolution colors designed to stay vibrant for years.\n✅ Ready to Hang – Comes pre-installed with hardware, so you can hang it right out of the box.\n✅ Seamless Fit – Perfectly complements modern, bohemian, minimalist, and cozy classic interiors.\n✅ Clean, Gallery Look – Neatly stretched with a flawless edge wrap for a professional, finished look.\n✅ Customizable Options – Need a specific color or size? We're happy to tailor it to your needs!\n\n📦 Shipped with Care – Professionally packed and shipped quickly via trusted carriers like DHL, UPS, or FedEx.\n\n💬 **Looking for a custom order? Please send us a message via Etsy, and let's design something unique just for you!**\n\n🎁 Ideal as a thoughtful gift or an eye-catching feature in your home — order now and bring beauty to your walls!\n\n---\n\n### INPUT DATA\n\n**PRODUCT TITLE:** ${title}\n\n---\n\n### OUTPUT\n\nGenerate the full description based on the instructions.`;
+        try {
+          const res = await fetch("/api/ai/generate-etsy-title", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt }),
+          });
+          const text = await res.text();
+          setDescription(text.trim());
+        } catch (e) {
+          toast({ variant: "destructive", title: "Açıklama üretilemedi", description: "Başlığa göre açıklama oluşturulamadı." });
+        } finally {
+          setAutoDescriptionLoading(false);
+        }
+      };
+      generateDescription();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title]);
+
+  // Başlık değiştiğinde otomatik etiket üret
+  useEffect(() => {
+    if (title) {
+      setAutoTagsLoading(true);
+      const generateTags = async () => {
+        const prompt = `TASK: Generate a hyper-optimized list of 13 Etsy tags for a physical canvas wall art print, based on the provided product title.\n\nYOUR EXPERT ROLE:\nYou are an elite Etsy SEO and keyword research specialist. Your mission is to analyze the given product title and generate a list of high-value, high-traffic tags that potential buyers are actively searching for on both Etsy and Google. Your thinking process must be multi-faceted.\n\nYOUR STRATEGY (How you will think):\n1.  **Core & Long-Tail:** Extract the primary subject and style. Combine them into specific, long-tail keywords (e.g., \"minimalist line art,\" \"black lion canvas\").\n2.  **Broader Categories:** Identify the wider art categories this fits into (e.g., \"abstract wall art,\" \"modern home decor\").\n3.  **Aesthetic & Vibe:** Capture the mood and aesthetic (e.g., \"moody office decor,\" \"regal wall art,\" \"dark academia art\").\n4.  **Placement & Room:** Suggest where it could be hung (e.g., \"living room art,\" \"office wall decor,\" \"above bed art\").\n5.  **Audience & Gifting:** Think about who would buy this and for what occasion (e.g., \"gift for him,\" \"new home gift,\" \"boss gift\").\n\nCRITICAL RULES (NON-NEGOTIABLE):\n1.  **Exactly 13 tags.** No more, no less.\n2.  **Max 20 characters per tag,** including spaces. (e.g., 'large wall art' is 15 chars).\n3.  **Format:** All lowercase, English.\n4.  **Relevance:** All tags must be directly relevant to the title and suitable for a physical canvas print. DO NOT use words like \"digital\" or \"download\".\n\n---\n\n### INPUT DATA\n\n**PRODUCT TITLE:** ${title}\n\n---\n\n### OUTPUT FORMAT\nProvide ONLY the 13 comma-separated tags in a single line. Do not number them or use any other formatting.`;
+        try {
+          const res = await fetch("/api/ai/generate-etsy-title", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt }),
+          });
+          const text = await res.text();
+          // Tagleri satır sonu, fazla boşluk ve virgül ile ayırıp 13'e tamamla
+          let tags = text.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
+          if (tags.length > 13) tags = tags.slice(0, 13);
+          setTags(tags);
+        } catch (e) {
+          toast({ variant: "destructive", title: "Etiket üretilemedi", description: "Başlığa göre etiket oluşturulamadı." });
+        } finally {
+          setAutoTagsLoading(false);
+        }
+      };
+      generateTags();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title]);
 
   // Form verilerini handle eden fonksiyon
   const handleSubmit = async (state: "draft" | "active") => {
@@ -747,215 +806,278 @@ export function ProductFormModal({
         </div>
       )}
     </div>
-  )
+  );
 
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          handleCloseModal();
-        } else {
-          setTitle("");
-          setAutoTitleUsed(false);
-        }
-      }}
-    >
-      <DialogTrigger asChild>
-        {/* DialogTrigger content */}
-      </DialogTrigger>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}
-          </DialogTitle>
-          <DialogDescription>
-            {product ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            handleCloseModal();
+          } else {
+            setTitle("");
+            setAutoTitleUsed(false);
+          }
+        }}
+      >
+        <DialogTrigger asChild>
+          {/* DialogTrigger content */}
+        </DialogTrigger>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}
+            </DialogTitle>
+            <DialogDescription>
+              {product ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Resim Bölümü */}
-          <ImageSection />
+          <div className="space-y-6">
+            {/* Resim Bölümü */}
+            <ImageSection />
 
-          <Separator />
-          
-          {/* Temel Bilgiler Bölümü */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Temel Bilgiler</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <Label htmlFor="title" className="block mb-1">
-                  Başlık <span className="text-red-500">*</span>
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => {
-                      setTitle(e.target.value);
-                      setAutoTitleUsed(false); // Kullanıcı elle değiştirirse tekrar otomatik doldurma yapmasın
-                    }}
-                    placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="border border-gray-300 hover:bg-gray-100 rounded-md"
-                    title="Yeni Başlık İste"
-                    disabled={autoTitleLoading || productImages.length === 0}
-                    onClick={async () => {
-                      if (productImages.length === 0) return;
-                      setAutoTitleLoading(true);
-                      try {
-                        const formData = new FormData();
-                        formData.append("image", productImages[0].file);
-                        const res = await fetch("/api/ai/generate-etsy-title", {
-                          method: "POST",
-                          body: formData,
-                        });
-                        const text = await res.text();
-                        const match = text.match(/```markdown\n([\s\S]*?)\n```/);
-                        const generatedTitle = match ? match[1].trim() : text.trim();
-                        if (generatedTitle) {
-                          setTitle(generatedTitle);
-                          setAutoTitleUsed(true);
+            <Separator />
+            
+            {/* Temel Bilgiler Bölümü */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Temel Bilgiler</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label htmlFor="title" className="block mb-1">
+                    Başlık <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="title"
+                      value={title}
+                      onChange={(e) => {
+                        setTitle(e.target.value);
+                        setAutoTitleUsed(false); // Kullanıcı elle değiştirirse tekrar otomatik doldurma yapmasın
+                      }}
+                      placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="border border-gray-300 hover:bg-gray-100 rounded-md"
+                      title="Yeni Başlık İste"
+                      disabled={autoTitleLoading || productImages.length === 0}
+                      onClick={async () => {
+                        if (productImages.length === 0) return;
+                        setAutoTitleLoading(true);
+                        try {
+                          const formData = new FormData();
+                          formData.append("image", productImages[0].file);
+                          const res = await fetch("/api/ai/generate-etsy-title", {
+                            method: "POST",
+                            body: formData,
+                          });
+                          const text = await res.text();
+                          const match = text.match(/```markdown\n([\s\S]*?)\n```/);
+                          const generatedTitle = match ? match[1].trim() : text.trim();
+                          if (generatedTitle) {
+                            setTitle(generatedTitle);
+                            setAutoTitleUsed(true);
+                          }
+                        } catch (e) {
+                          toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
+                        } finally {
+                          setAutoTitleLoading(false);
                         }
-                      } catch (e) {
-                        toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
-                      } finally {
-                        setAutoTitleLoading(false);
-                      }
-                    }}
-                  >
-                    {autoTitleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                  </Button>
-                  <span className="text-xs text-gray-500 ml-1">Yeni Başlık İste</span>
+                      }}
+                    >
+                      {autoTitleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    </Button>
+                    <span className="text-xs text-gray-500 ml-1">Yeni Başlık İste</span>
+                  </div>
+                  {autoTitleLoading && (
+                    <div className="text-xs text-blue-500 mt-1">Görselden başlık üretiliyor...</div>
+                  )}
                 </div>
-                {autoTitleLoading && (
-                  <div className="text-xs text-blue-500 mt-1">Görselden başlık üretiliyor...</div>
-                )}
-              </div>
 
-              <div>
-                <Label htmlFor="price" className="block mb-1">
-                  Fiyat <span className="text-red-500">*</span>
-                </Label>
-                <div className="flex items-center">
-                  <span className="mr-2">$</span>
+                <div>
+                  <Label htmlFor="price" className="block mb-1">
+                    Fiyat <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="flex items-center">
+                    <span className="mr-2">$</span>
+                    <Input
+                      id="price"
+                      type="number"
+                      value={price}
+                      onChange={(e) => setPrice(parseFloat(e.target.value))}
+                      disabled={hasVariations}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="quantity" className="block mb-1">
+                    Adet / Stok Miktarı <span className="text-red-500">*</span>
+                  </Label>
                   <Input
-                    id="price"
+                    id="quantity"
                     type="number"
-                    value={price}
-                    onChange={(e) => setPrice(parseFloat(e.target.value))}
-                    disabled={hasVariations}
+                    value={quantity}
+                    disabled
+                    className="w-full"
                   />
                 </div>
-              </div>
 
-              <div>
-                <Label htmlFor="quantity" className="block mb-1">
-                  Adet / Stok Miktarı <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={quantity}
-                  disabled
-                  className="w-full"
-                />
-              </div>
+                <div className="col-span-2">
+                  <Label htmlFor="description" className="block mb-1">
+                    Açıklama <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="min-h-[100px]"
+                      placeholder="Ürününüzün detaylı açıklamasını girin"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="border border-gray-300 hover:bg-gray-100 rounded-md"
+                      title="Yeni Açıklama İste"
+                      disabled={autoDescriptionLoading || !title}
+                      onClick={async () => {
+                        if (!title) return;
+                        setAutoDescriptionLoading(true);
+                        const prompt = `TASK: Generate a complete, compelling, and SEO-friendly Etsy product description based on the provided product title.\n\nCRITICAL INSTRUCTIONS:\n1.  **MIMIC THE BENCHMARK:** Your entire output MUST perfectly replicate the structure, sectioning, tone, and emoji usage of the \`BENCHMARK DESCRIPTION\` provided below. This benchmark is your template for STYLE and FORMAT.\n2.  **DYNAMIC ADAPTATION:** The most crucial part is to adapt the opening hook and introductory paragraph to reflect the specific mood, subject, and style of the \`PRODUCT TITLE\`. Infuse keywords from the title into this creative section.\n3.  **MAINTAIN ALL SECTIONS:** Ensure every section from the benchmark (\`Why You'll Love It:\`, \`✅\` bullet points, \`📦 Shipped with Care\`, etc.) is present in your final output.\n\n---\n\n### BENCHMARK DESCRIPTION (THIS IS THE STYLE YOU MUST FOLLOW)\n\n🌟 Transform Your Walls with Timeless Canvas Art! 🖼️✨\n\nBring a fresh touch of elegance to your interior with this premium-quality canvas wall print. Whether it's your living room, bedroom, or workspace — this piece adds warmth, depth, and artistic charm to any setting.\n\nWhy You'll Love It:\n\n✅ Top-Tier Quality – Printed on durable canvas with rich, high-resolution colors designed to stay vibrant for years.\n✅ Ready to Hang – Comes pre-installed with hardware, so you can hang it right out of the box.\n✅ Seamless Fit – Perfectly complements modern, bohemian, minimalist, and cozy classic interiors.\n✅ Clean, Gallery Look – Neatly stretched with a flawless edge wrap for a professional, finished look.\n✅ Customizable Options – Need a specific color or size? We're happy to tailor it to your needs!\n\n📦 Shipped with Care – Professionally packed and shipped quickly via trusted carriers like DHL, UPS, or FedEx.\n\n💬 **Looking for a custom order? Please send us a message via Etsy, and let's design something unique just for you!**\n\n🎁 Ideal as a thoughtful gift or an eye-catching feature in your home — order now and bring beauty to your walls!\n\n---\n\n### INPUT DATA\n\n**PRODUCT TITLE:** ${title}\n\n---\n\n### OUTPUT\n\nGenerate the full description based on the instructions.`;
+                        try {
+                          const res = await fetch("/api/ai/generate-etsy-title", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ prompt }),
+                          });
+                          const text = await res.text();
+                          setDescription(text.trim());
+                        } catch (e) {
+                          toast({ variant: "destructive", title: "Açıklama üretilemedi", description: "Başlığa göre açıklama oluşturulamadı." });
+                        } finally {
+                          setAutoDescriptionLoading(false);
+                        }
+                      }}
+                    >
+                      {autoDescriptionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                    </Button>
+                    <span className="text-xs text-gray-500 ml-1">Yeni Açıklama İste</span>
+                  </div>
+                  {autoDescriptionLoading && (
+                    <div className="text-xs text-blue-500 mt-1">Başlığa göre açıklama üretiliyor...</div>
+                  )}
+                </div>
 
-              <div className="col-span-2">
-                <Label htmlFor="description" className="block mb-1">
-                  Açıklama <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[100px]"
-                  placeholder="Ürününüzün detaylı açıklamasını girin"
-                />
-              </div>
-
-              {/* Kategori seçimi */}
-              <div className="col-span-2">
-                <Label htmlFor="category" className="block mb-1">Kategori *</Label>
-                <Select
-                  value={taxonomyId ? taxonomyId.toString() : WALL_DECOR_TAXONOMY_ID.toString()}
-                  onValueChange={(val) => setTaxonomyId(Number(val))}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue>{taxonomyId === DIGITAL_PRINTS_TAXONOMY_ID ? "Digital Prints" : "Wall Decor"}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={WALL_DECOR_TAXONOMY_ID.toString()}>Wall Decor</SelectItem>
-                    <SelectItem value={DIGITAL_PRINTS_TAXONOMY_ID.toString()}>Digital Prints</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Shop Section seçimi */}
-              <div className="col-span-2">
-                <Label htmlFor="shopSection">Kanvas Kategorileri</Label>
-                <Select
-                  value={selectedShopSection}
-                  onValueChange={setSelectedShopSection}
-                  disabled={shopSections.length === 0}
-                >
-                  <SelectTrigger id="shopSection">
-                    <SelectValue placeholder="Bir kategori seçin..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {shopSections.map(section => (
-                      <SelectItem 
-                        key={section.shop_section_id} 
-                        value={section.shop_section_id.toString()}
-                      >
-                        {section.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Kategori seçimi */}
+                <div className="col-span-2">
+                  <Label htmlFor="category" className="block mb-1">Kategori *</Label>
+                  <Select
+                    value={taxonomyId ? taxonomyId.toString() : WALL_DECOR_TAXONOMY_ID.toString()}
+                    onValueChange={(val) => setTaxonomyId(Number(val))}
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>{taxonomyId === DIGITAL_PRINTS_TAXONOMY_ID ? "Digital Prints" : "Wall Decor"}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={WALL_DECOR_TAXONOMY_ID.toString()}>Wall Decor</SelectItem>
+                      <SelectItem value={DIGITAL_PRINTS_TAXONOMY_ID.toString()}>Digital Prints</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Shop Section seçimi */}
+                <div className="col-span-2">
+                  <Label htmlFor="shopSection">Kanvas Kategorileri</Label>
+                  <Select
+                    value={selectedShopSection}
+                    onValueChange={setSelectedShopSection}
+                    disabled={shopSections.length === 0}
+                  >
+                    <SelectTrigger id="shopSection">
+                      <SelectValue placeholder="Bir kategori seçin..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {shopSections.map(section => (
+                        <SelectItem 
+                          key={section.shop_section_id} 
+                          value={section.shop_section_id.toString()}
+                        >
+                          {section.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
-          </div>
 
-          <Separator />
+            <Separator />
 
-          {/* Etiketler ve Malzemeler */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Etiketler & Malzemeler</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <Label className="block mb-2">
-                  Etiketler <span className="text-gray-500 text-sm">(0-13)</span>
-                </Label>
-                <div className="flex items-center mb-2">
-                  <Input
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddTag();
-                      }
-                    }}
-                    className="mr-2"
-                  />
-                  <Button 
-                    type="button" 
-                    onClick={handleAddTag}
-                    disabled={tags.length >= 13 || !newTag.trim()}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Ekle
-                  </Button>
+            {/* Etiketler ve Malzemeler */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Etiketler & Malzemeler</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label className="block mb-2">
+                    Etiketler <span className="text-gray-500 text-sm">(0-13)</span>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
+                      className="mr-2"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="border border-gray-300 hover:bg-gray-100 rounded-md"
+                      title="Yeni Etiket İste"
+                      disabled={autoTagsLoading || !title}
+                      onClick={async () => {
+                        if (!title) return;
+                        setAutoTagsLoading(true);
+                        const prompt = `TASK: Generate a hyper-optimized list of 13 Etsy tags for a physical canvas wall art print, based on the provided product title.\n\nYOUR EXPERT ROLE:\nYou are an elite Etsy SEO and keyword research specialist. Your mission is to analyze the given product title and generate a list of high-value, high-traffic tags that potential buyers are actively searching for on both Etsy and Google. Your thinking process must be multi-faceted.\n\nYOUR STRATEGY (How you will think):\n1.  **Core & Long-Tail:** Extract the primary subject and style. Combine them into specific, long-tail keywords (e.g., \"minimalist line art,\" \"black lion canvas\").\n2.  **Broader Categories:** Identify the wider art categories this fits into (e.g., \"abstract wall art,\" \"modern home decor\").\n3.  **Aesthetic & Vibe:** Capture the mood and aesthetic (e.g., \"moody office decor,\" \"regal wall art,\" \"dark academia art\").\n4.  **Placement & Room:** Suggest where it could be hung (e.g., \"living room art,\" \"office wall decor,\" \"above bed art\").\n5.  **Audience & Gifting:** Think about who would buy this and for what occasion (e.g., \"gift for him,\" \"new home gift,\" \"boss gift\").\n\nCRITICAL RULES (NON-NEGOTIABLE):\n1.  **Exactly 13 tags.** No more, no less.\n2.  **Max 20 characters per tag,** including spaces. (e.g., 'large wall art' is 15 chars).\n3.  **Format:** All lowercase, English.\n4.  **Relevance:** All tags must be directly relevant to the title and suitable for a physical canvas print. DO NOT use words like \"digital\" or \"download\".\n\n---\n\n### INPUT DATA\n\n**PRODUCT TITLE:** ${title}\n\n---\n\n### OUTPUT FORMAT\nProvide ONLY the 13 comma-separated tags in a single line. Do not number them or use any other formatting.`;
+                        try {
+                          const res = await fetch("/api/ai/generate-etsy-title", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ prompt }),
+                          });
+                          const text = await res.text();
+                          // Tagleri satır sonu, fazla boşluk ve virgül ile ayırıp 13'e tamamla
+                          let tags = text.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
+                          if (tags.length > 13) tags = tags.slice(0, 13);
+                          setTags(tags);
+                        } catch (e) {
+                          toast({ variant: "destructive", title: "Etiket üretilemedi", description: "Başlığa göre etiket oluşturulamadı." });
+                        } finally {
+                          setAutoTagsLoading(false);
+                        }
+                      }}
+                    >
+                      {autoTagsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TagIcon className="w-4 h-4" />}
+                    </Button>
+                    <span className="text-xs text-gray-500 ml-1">Yeni Etiket İste</span>
+                  </div>
+                  {autoTagsLoading && (
+                    <div className="text-xs text-blue-500 mt-1">Başlığa göre etiketler üretiliyor...</div>
+                  )}
                 </div>
+
                 <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
                   {tags.map((tag, index) => (
                     <Badge key={index} className="px-3 py-1 flex items-center gap-1">
@@ -970,245 +1092,249 @@ export function ProductFormModal({
                 <p className="text-sm text-gray-500 mt-1">
                   {tags.length}/13 etiket eklendi
                 </p>
+                {tags.length !== 13 && !autoTagsLoading && (
+                  <div className="text-xs text-red-500 mt-1">Uyarı: Tam olarak 13 etiket üretilmelidir. Lütfen başlığı kontrol edin veya tekrar deneyin.</div>
+                )}
               </div>
+            </div>
 
-              {/* Malzemeler kısmı kaldırıldı - API'de sabit değerler kullanılıyor */}
-              <div>
-                <Label className="block mb-2">
-                  Malzemeler
-                </Label>
-                <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded border border-gray-200">
-                  <p>Bu ürün için kullanılan malzemeler:</p>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {DEFAULT_MATERIALS.map((material, i) => (
-                      <Badge key={i} variant="secondary" className="px-3 py-1">
-                        {material}
-                      </Badge>
-                    ))}
+            <Separator />
+
+            {/* Malzemeler kısmı kaldırıldı - API'de sabit değerler kullanılıyor */}
+            <div>
+              <Label className="block mb-2">
+                Malzemeler
+              </Label>
+              <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded border border-gray-200">
+                <p>Bu ürün için kullanılan malzemeler:</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {DEFAULT_MATERIALS.map((material, i) => (
+                    <Badge key={i} variant="secondary" className="px-3 py-1">
+                      {material}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Kargo ve İşlem Profilleri */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Kargo & İşlem Profilleri</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="shipping" className="block mb-1">
+                    Kargo Profili <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={shippingProfileId}
+                    onValueChange={setShippingProfileId}
+                    disabled={loadingShippingProfiles || shippingProfiles.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={
+                        loadingShippingProfiles
+                          ? "Kargo profilleri yükleniyor..."
+                          : shippingProfiles.length === 0
+                          ? "Kargo profili bulunamadı"
+                          : "Kargo profili seçin"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {shippingProfiles.map((profile) => (
+                        <SelectItem
+                          key={profile.shipping_profile_id}
+                          value={profile.shipping_profile_id.toString()}
+                        >
+                          {profile.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Fiziksel Özellikler */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Fiziksel Özellikler</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="primaryColor" className="block mb-1">
+                    Ana Renk
+                  </Label>
+                  <Input
+                    id="primaryColor"
+                    type="text"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    placeholder="Örn: Mavi"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="secondaryColor" className="block mb-1">
+                    İkincil Renk
+                  </Label>
+                  <Input
+                    id="secondaryColor"
+                    type="text"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    placeholder="Örn: Beyaz"
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <Label className="block mb-2">
+                    Boyutlar
+                  </Label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center flex-grow">
+                      <Label htmlFor="width" className="mr-2 whitespace-nowrap">Genişlik:</Label>
+                      <Input
+                        id="width"
+                        type="number"
+                        value={width || ""}
+                        onChange={(e) => setWidth(parseFloat(e.target.value) || 0)}
+                        className="mr-2"
+                      />
+                      <Select value={widthUnit} onValueChange={setWidthUnit}>
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Birim" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cm">cm</SelectItem>
+                          <SelectItem value="mm">mm</SelectItem>
+                          <SelectItem value="m">m</SelectItem>
+                          <SelectItem value="in">inç</SelectItem>
+                          <SelectItem value="ft">ft</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <span className="mx-2">×</span>
+                    <div className="flex items-center flex-grow">
+                      <Label htmlFor="height" className="mr-2 whitespace-nowrap">Yükseklik:</Label>
+                      <Input
+                        id="height"
+                        type="number"
+                        value={height || ""}
+                        onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
+                        className="mr-2"
+                      />
+                      <Select value={heightUnit} onValueChange={setHeightUnit}>
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Birim" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cm">cm</SelectItem>
+                          <SelectItem value="mm">mm</SelectItem>
+                          <SelectItem value="m">m</SelectItem>
+                          <SelectItem value="in">inç</SelectItem>
+                          <SelectItem value="ft">ft</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+            
+            {/* Varyasyonlar */}
+            <VariationsSection />
+
+            <Separator />
+
+            {/* Kişiselleştirme Ayarları (Sabit ve Değiştirilemez) */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Kişiselleştirme</h3>
+              <div className="p-4 border rounded-md bg-slate-50 space-y-4">
+                {/* Kişiselleştirme Her Zaman Aktif ve Değiştirilemez */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isPersonalizable"
+                    checked={true}
+                    disabled={true}
+                  />
+                  <label
+                    htmlFor="isPersonalizable"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Bu ürün kişiselleştirilebilir (Her zaman aktif)
+                  </label>
+                </div>
+                {/* Kişiselleştirme Her Zaman İsteğe Bağlı ve Değiştirilemez */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="personalizationRequired"
+                    checked={false}
+                    disabled={true}
+                  />
+                  <label
+                    htmlFor="personalizationRequired"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Kişiselleştirme zorunlu olsun (Her zaman isteğe bağlı)
+                  </label>
+                </div>
+                {/* Talimat Metni Sabit ve Değiştirilemez */}
+                <div>
+                  <Label htmlFor="personalizationInstructions" className="peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Alıcı için talimatlar (Sabit Metin)
+                  </Label>
+                  <Textarea
+                    id="personalizationInstructions"
+                    value={PERSONALIZATION_INSTRUCTIONS}
+                    readOnly={true}
+                    className="mt-1 bg-gray-100 cursor-not-allowed"
+                    rows={3}
+                  />
                 </div>
               </div>
             </div>
           </div>
 
-          <Separator />
-
-          {/* Kargo ve İşlem Profilleri */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Kargo & İşlem Profilleri</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="shipping" className="block mb-1">
-                  Kargo Profili <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={shippingProfileId}
-                  onValueChange={setShippingProfileId}
-                  disabled={loadingShippingProfiles || shippingProfiles.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={
-                      loadingShippingProfiles
-                        ? "Kargo profilleri yükleniyor..."
-                        : shippingProfiles.length === 0
-                        ? "Kargo profili bulunamadı"
-                        : "Kargo profili seçin"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {shippingProfiles.map((profile) => (
-                      <SelectItem
-                        key={profile.shipping_profile_id}
-                        value={profile.shipping_profile_id.toString()}
-                      >
-                        {profile.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <DialogFooter className="flex justify-between mt-6">
+            <div>
+              <Button variant="outline" onClick={handleCloseModal}>İptal</Button>
             </div>
-          </div>
-
-          <Separator />
-
-          {/* Fiziksel Özellikler */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Fiziksel Özellikler</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="primaryColor" className="block mb-1">
-                  Ana Renk
-                </Label>
-                <Input
-                  id="primaryColor"
-                  type="text"
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  placeholder="Örn: Mavi"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="secondaryColor" className="block mb-1">
-                  İkincil Renk
-                </Label>
-                <Input
-                  id="secondaryColor"
-                  type="text"
-                  value={secondaryColor}
-                  onChange={(e) => setSecondaryColor(e.target.value)}
-                  placeholder="Örn: Beyaz"
-                />
-              </div>
-              
-              <div className="col-span-2">
-                <Label className="block mb-2">
-                  Boyutlar
-                </Label>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center flex-grow">
-                    <Label htmlFor="width" className="mr-2 whitespace-nowrap">Genişlik:</Label>
-                    <Input
-                      id="width"
-                      type="number"
-                      value={width || ""}
-                      onChange={(e) => setWidth(parseFloat(e.target.value) || 0)}
-                      className="mr-2"
-                    />
-                    <Select value={widthUnit} onValueChange={setWidthUnit}>
-                      <SelectTrigger className="w-24">
-                        <SelectValue placeholder="Birim" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cm">cm</SelectItem>
-                        <SelectItem value="mm">mm</SelectItem>
-                        <SelectItem value="m">m</SelectItem>
-                        <SelectItem value="in">inç</SelectItem>
-                        <SelectItem value="ft">ft</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <span className="mx-2">×</span>
-                  <div className="flex items-center flex-grow">
-                    <Label htmlFor="height" className="mr-2 whitespace-nowrap">Yükseklik:</Label>
-                    <Input
-                      id="height"
-                      type="number"
-                      value={height || ""}
-                      onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
-                      className="mr-2"
-                    />
-                    <Select value={heightUnit} onValueChange={setHeightUnit}>
-                      <SelectTrigger className="w-24">
-                        <SelectValue placeholder="Birim" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cm">cm</SelectItem>
-                        <SelectItem value="mm">mm</SelectItem>
-                        <SelectItem value="m">m</SelectItem>
-                        <SelectItem value="in">inç</SelectItem>
-                        <SelectItem value="ft">ft</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="secondary" 
+                onClick={() => handleSubmit("draft")} 
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Taslak Kaydediliyor...
+                  </>
+                ) : (
+                  "Taslak Olarak Kaydet"
+                )}
+              </Button>
+              <Button 
+                onClick={() => handleSubmit("active")} 
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Yayınlanıyor...
+                  </>
+                ) : (
+                  "Yayınla"
+                )}
+              </Button>
             </div>
-          </div>
-
-          <Separator />
-          
-          {/* Varyasyonlar */}
-          <VariationsSection />
-
-          <Separator />
-
-          {/* Kişiselleştirme Ayarları (Sabit ve Değiştirilemez) */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Kişiselleştirme</h3>
-            <div className="p-4 border rounded-md bg-slate-50 space-y-4">
-              {/* Kişiselleştirme Her Zaman Aktif ve Değiştirilemez */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="isPersonalizable"
-                  checked={true}
-                  disabled={true}
-                />
-                <label
-                  htmlFor="isPersonalizable"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Bu ürün kişiselleştirilebilir (Her zaman aktif)
-                </label>
-              </div>
-              {/* Kişiselleştirme Her Zaman İsteğe Bağlı ve Değiştirilemez */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="personalizationRequired"
-                  checked={false}
-                  disabled={true}
-                />
-                <label
-                  htmlFor="personalizationRequired"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Kişiselleştirme zorunlu olsun (Her zaman isteğe bağlı)
-                </label>
-              </div>
-              {/* Talimat Metni Sabit ve Değiştirilemez */}
-              <div>
-                <Label htmlFor="personalizationInstructions" className="peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Alıcı için talimatlar (Sabit Metin)
-                </Label>
-                <Textarea
-                  id="personalizationInstructions"
-                  value={PERSONALIZATION_INSTRUCTIONS}
-                  readOnly={true}
-                  className="mt-1 bg-gray-100 cursor-not-allowed"
-                  rows={3}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter className="flex justify-between mt-6">
-          <div>
-            <Button variant="outline" onClick={handleCloseModal}>İptal</Button>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="secondary" 
-              onClick={() => handleSubmit("draft")} 
-              disabled={submitting}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Taslak Kaydediliyor...
-                </>
-              ) : (
-                "Taslak Olarak Kaydet"
-              )}
-            </Button>
-            <Button 
-              variant="secondary" 
-              onClick={() => handleSubmit("active")} 
-              disabled={submitting}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Yayınlanıyor...
-                </>
-              ) : (
-                "Yayınla"
-              )}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showUnsavedChangesDialog} onOpenChange={setShowUnsavedChangesDialog}>
         <AlertDialogContent>
@@ -1229,6 +1355,6 @@ export function ProductFormModal({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
-  )
-} 
+    </>
+  );
+}

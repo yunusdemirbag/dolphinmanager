@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical } from "lucide-react"
+import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode, ShippingProfile, EtsyProcessingProfile } from "@/types/product"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -788,15 +788,51 @@ export function ProductFormModal({
                 <Label htmlFor="title" className="block mb-1">
                   Başlık <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => {
-                    setTitle(e.target.value);
-                    setAutoTitleUsed(false); // Kullanıcı elle değiştirirse tekrar otomatik doldurma yapmasın
-                  }}
-                  placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      setAutoTitleUsed(false); // Kullanıcı elle değiştirirse tekrar otomatik doldurma yapmasın
+                    }}
+                    placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="border border-gray-300 hover:bg-gray-100 rounded-md"
+                    title="Yeni Başlık İste"
+                    disabled={autoTitleLoading || productImages.length === 0}
+                    onClick={async () => {
+                      if (productImages.length === 0) return;
+                      setAutoTitleLoading(true);
+                      try {
+                        const formData = new FormData();
+                        formData.append("image", productImages[0].file);
+                        const res = await fetch("/api/ai/generate-etsy-title", {
+                          method: "POST",
+                          body: formData,
+                        });
+                        const text = await res.text();
+                        const match = text.match(/```markdown\n([\s\S]*?)\n```/);
+                        const generatedTitle = match ? match[1].trim() : text.trim();
+                        if (generatedTitle) {
+                          setTitle(generatedTitle);
+                          setAutoTitleUsed(true);
+                        }
+                      } catch (e) {
+                        toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
+                      } finally {
+                        setAutoTitleLoading(false);
+                      }
+                    }}
+                  >
+                    {autoTitleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  </Button>
+                  <span className="text-xs text-gray-500 ml-1">Yeni Başlık İste</span>
+                </div>
                 {autoTitleLoading && (
                   <div className="text-xs text-blue-500 mt-1">Görselden başlık üretiliyor...</div>
                 )}

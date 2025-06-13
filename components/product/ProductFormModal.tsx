@@ -30,7 +30,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { useDrag, useDrop } from 'react-dnd';
 import { Switch } from "@/components/ui/switch"
 import {
@@ -42,8 +42,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
+import { createClientSupabase } from "@/lib/supabase";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import { descriptionPrompt, tagsPrompt, categoryPrompt } from "@/lib/prompts";
 
 // Sabit kategori ID'leri
 const WALL_DECOR_TAXONOMY_ID = 1027;
@@ -360,7 +364,6 @@ export function ProductFormModal({
       setTitle("");
       setAutoTitleUsed(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // hasUnsavedChanges fonksiyonunu güncelle
@@ -502,7 +505,6 @@ export function ProductFormModal({
       };
       generateTitle();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productImages, isOpen]);
 
   // Modal her açıldığında, başlık boşsa ve görsel varsa autoTitleUsed'u sıfırla ki analiz tekrar tetiklensin
@@ -510,7 +512,6 @@ export function ProductFormModal({
     if (isOpen && productImages.length > 0 && !title) {
       setAutoTitleUsed(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Başlık değiştiğinde açıklama otomatik üret
@@ -518,7 +519,8 @@ export function ProductFormModal({
     if (title) {
       setAutoDescriptionLoading(true);
       const generateDescription = async () => {
-        const prompt = `TASK: Generate a complete, compelling, and SEO-friendly Etsy product description based on the provided product title.\n\nCRITICAL INSTRUCTIONS:\n1.  **MIMIC THE BENCHMARK:** Your entire output MUST perfectly replicate the structure, sectioning, tone, and emoji usage of the \`BENCHMARK DESCRIPTION\` provided below. This benchmark is your template for STYLE and FORMAT.\n2.  **DYNAMIC ADAPTATION:** The most crucial part is to adapt the opening hook and introductory paragraph to reflect the specific mood, subject, and style of the \`PRODUCT TITLE\`. Infuse keywords from the title into this creative section.\n3.  **MAINTAIN ALL SECTIONS:** Ensure every section from the benchmark (\`Why You'll Love It:\`, \`✅\` bullet points, \`📦 Shipped with Care\`, etc.) is present in your final output.\n\n---\n\n### BENCHMARK DESCRIPTION (THIS IS THE STYLE YOU MUST FOLLOW)\n\n🌟 Transform Your Walls with Timeless Canvas Art! 🖼️✨\n\nBring a fresh touch of elegance to your interior with this premium-quality canvas wall print. Whether it's your living room, bedroom, or workspace — this piece adds warmth, depth, and artistic charm to any setting.\n\nWhy You'll Love It:\n\n✅ Top-Tier Quality – Printed on durable canvas with rich, high-resolution colors designed to stay vibrant for years.\n✅ Ready to Hang – Comes pre-installed with hardware, so you can hang it right out of the box.\n✅ Seamless Fit – Perfectly complements modern, bohemian, minimalist, and cozy classic interiors.\n✅ Clean, Gallery Look – Neatly stretched with a flawless edge wrap for a professional, finished look.\n✅ Customizable Options – Need a specific color or size? We're happy to tailor it to your needs!\n\n📦 Shipped with Care – Professionally packed and shipped quickly via trusted carriers like DHL, UPS, or FedEx.\n\n💬 **Looking for a custom order? Please send us a message via Etsy, and let's design something unique just for you!**\n\n🎁 Ideal as a thoughtful gift or an eye-catching feature in your home — order now and bring beauty to your walls!\n\n---\n\n### INPUT DATA\n\n**PRODUCT TITLE:** ${title}\n\n---\n\n### OUTPUT\n\nGenerate the full description based on the instructions.`;
+        // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
+        const prompt = descriptionPrompt.prompt.replace("${title}", title);
         try {
           const res = await fetch("/api/ai/generate-etsy-title", {
             method: "POST",
@@ -535,7 +537,6 @@ export function ProductFormModal({
       };
       generateDescription();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title]);
 
   // Başlık değiştiğinde otomatik etiket üret
@@ -543,7 +544,8 @@ export function ProductFormModal({
     if (title) {
       setAutoTagsLoading(true);
       const generateTags = async () => {
-        const prompt = `TASK: Generate a hyper-optimized list of 13 Etsy tags for a physical canvas wall art print, based on the provided product title.\n\nYOUR EXPERT ROLE:\nYou are an elite Etsy SEO and keyword research specialist. Your mission is to analyze the given product title and generate a list of high-value, high-traffic tags that potential buyers are actively searching for on both Etsy and Google. Your thinking process must be multi-faceted.\n\nYOUR STRATEGY (How you will think):\n1.  **Core & Long-Tail:** Extract the primary subject and style. Combine them into specific, long-tail keywords (e.g., \"minimalist line art,\" \"black lion canvas\").\n2.  **Broader Categories:** Identify the wider art categories this fits into (e.g., \"abstract wall art,\" \"modern home decor\").\n3.  **Aesthetic & Vibe:** Capture the mood and aesthetic (e.g., \"moody office decor,\" \"regal wall art,\" \"dark academia art\").\n4.  **Placement & Room:** Suggest where it could be hung (e.g., \"living room art,\" \"office wall decor,\" \"above bed art\").\n5.  **Audience & Gifting:** Think about who would buy this and for what occasion (e.g., \"gift for him,\" \"new home gift,\" \"boss gift\").\n\nCRITICAL RULES (NON-NEGOTIABLE):\n1.  **Exactly 13 tags.** No more, no less.\n2.  **Max 20 characters per tag,** including spaces. (e.g., 'large wall art' is 15 chars).\n3.  **Format:** All lowercase, English.\n4.  **Relevance:** All tags must be directly relevant to the title and suitable for a physical canvas print. DO NOT use words like \"digital\" or \"download\".\n\n---\n\n### INPUT DATA\n\n**PRODUCT TITLE:** ${title}\n\n---\n\n### OUTPUT FORMAT\nProvide ONLY the 13 comma-separated tags in a single line. Do not number them or use any other formatting.`;
+        // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
+        const prompt = tagsPrompt.prompt.replace("${title}", title);
         try {
           const res = await fetch("/api/ai/generate-etsy-title", {
             method: "POST",
@@ -563,7 +565,6 @@ export function ProductFormModal({
       };
       generateTags();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
@@ -578,7 +579,10 @@ export function ProductFormModal({
 
     const fetchAICategory = async () => {
       const categoryNames = shopSections.map(s => s.title).join(', ');
-      const prompt = `Aşağıdaki ürün başlığına en uygun mağaza kategorisini sadece aşağıdaki seçeneklerden birini seçerek döndür. Sadece kategori adını döndür.\n\nKategoriler: ${categoryNames}\n\nBaşlık: "${title}"\n\nCevap:`;
+      // Prompt'u lib/prompts.ts'den al ve değişkenleri yerleştir
+      const prompt = categoryPrompt.prompt
+        .replace("${categoryNames}", categoryNames)
+        .replace("${title}", title);
       try {
         const res = await fetch("/api/ai/generate-etsy-title", {
           method: "POST",
@@ -610,7 +614,6 @@ export function ProductFormModal({
       }
     };
     fetchAICategory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, shopSections, shopSectionAutoSelected]);
 
   // Form verilerini handle eden fonksiyon
@@ -1004,7 +1007,8 @@ export function ProductFormModal({
                       onClick={async () => {
                         if (!title) return;
                         setAutoDescriptionLoading(true);
-                        const prompt = `TASK: Generate a complete, compelling, and SEO-friendly Etsy product description based on the provided product title.\n\nCRITICAL INSTRUCTIONS:\n1.  **MIMIC THE BENCHMARK:** Your entire output MUST perfectly replicate the structure, sectioning, tone, and emoji usage of the \`BENCHMARK DESCRIPTION\` provided below. This benchmark is your template for STYLE and FORMAT.\n2.  **DYNAMIC ADAPTATION:** The most crucial part is to adapt the opening hook and introductory paragraph to reflect the specific mood, subject, and style of the \`PRODUCT TITLE\`. Infuse keywords from the title into this creative section.\n3.  **MAINTAIN ALL SECTIONS:** Ensure every section from the benchmark (\`Why You'll Love It:\`, \`✅\` bullet points, \`📦 Shipped with Care\`, etc.) is present in your final output.\n\n---\n\n### BENCHMARK DESCRIPTION (THIS IS THE STYLE YOU MUST FOLLOW)\n\n🌟 Transform Your Walls with Timeless Canvas Art! 🖼️✨\n\nBring a fresh touch of elegance to your interior with this premium-quality canvas wall print. Whether it's your living room, bedroom, or workspace — this piece adds warmth, depth, and artistic charm to any setting.\n\nWhy You'll Love It:\n\n✅ Top-Tier Quality – Printed on durable canvas with rich, high-resolution colors designed to stay vibrant for years.\n✅ Ready to Hang – Comes pre-installed with hardware, so you can hang it right out of the box.\n✅ Seamless Fit – Perfectly complements modern, bohemian, minimalist, and cozy classic interiors.\n✅ Clean, Gallery Look – Neatly stretched with a flawless edge wrap for a professional, finished look.\n✅ Customizable Options – Need a specific color or size? We're happy to tailor it to your needs!\n\n📦 Shipped with Care – Professionally packed and shipped quickly via trusted carriers like DHL, UPS, or FedEx.\n\n💬 **Looking for a custom order? Please send us a message via Etsy, and let's design something unique just for you!**\n\n🎁 Ideal as a thoughtful gift or an eye-catching feature in your home — order now and bring beauty to your walls!\n\n---\n\n### INPUT DATA\n\n**PRODUCT TITLE:** ${title}\n\n---\n\n### OUTPUT\n\nGenerate the full description based on the instructions.`;
+                        // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
+                        const prompt = descriptionPrompt.prompt.replace("${title}", title);
                         try {
                           const res = await fetch("/api/ai/generate-etsy-title", {
                             method: "POST",
@@ -1105,7 +1109,8 @@ export function ProductFormModal({
                       onClick={async () => {
                         if (!title) return;
                         setAutoTagsLoading(true);
-                        const prompt = `TASK: Generate a hyper-optimized list of 13 Etsy tags for a physical canvas wall art print, based on the provided product title.\n\nYOUR EXPERT ROLE:\nYou are an elite Etsy SEO and keyword research specialist. Your mission is to analyze the given product title and generate a list of high-value, high-traffic tags that potential buyers are actively searching for on both Etsy and Google. Your thinking process must be multi-faceted.\n\nYOUR STRATEGY (How you will think):\n1.  **Core & Long-Tail:** Extract the primary subject and style. Combine them into specific, long-tail keywords (e.g., \"minimalist line art,\" \"black lion canvas\").\n2.  **Broader Categories:** Identify the wider art categories this fits into (e.g., \"abstract wall art,\" \"modern home decor\").\n3.  **Aesthetic & Vibe:** Capture the mood and aesthetic (e.g., \"moody office decor,\" \"regal wall art,\" \"dark academia art\").\n4.  **Placement & Room:** Suggest where it could be hung (e.g., \"living room art,\" \"office wall decor,\" \"above bed art\").\n5.  **Audience & Gifting:** Think about who would buy this and for what occasion (e.g., \"gift for him,\" \"new home gift,\" \"boss gift\").\n\nCRITICAL RULES (NON-NEGOTIABLE):\n1.  **Exactly 13 tags.** No more, no less.\n2.  **Max 20 characters per tag,** including spaces. (e.g., 'large wall art' is 15 chars).\n3.  **Format:** All lowercase, English.\n4.  **Relevance:** All tags must be directly relevant to the title and suitable for a physical canvas print. DO NOT use words like \"digital\" or \"download\".\n\n---\n\n### INPUT DATA\n\n**PRODUCT TITLE:** ${title}\n\n---\n\n### OUTPUT FORMAT\nProvide ONLY the 13 comma-separated tags in a single line. Do not number them or use any other formatting.`;
+                        // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
+                        const prompt = tagsPrompt.prompt.replace("${title}", title);
                         try {
                           const res = await fetch("/api/ai/generate-etsy-title", {
                             method: "POST",

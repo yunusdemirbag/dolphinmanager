@@ -47,9 +47,24 @@ import { predefinedVariations } from '@/lib/etsy-variation-presets';
 import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
 import { createClientSupabase } from "@/lib/supabase";
-import { DndProvider } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
 import { descriptionPrompt, tagsPrompt, categoryPrompt } from "@/lib/prompts";
+
+// Debounce fonksiyonu
+const useDebounce = <T,>(value: T, delay: number): T => {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
 
 // Sabit kategori ID'leri
 const WALL_DECOR_TAXONOMY_ID = 1027;
@@ -368,6 +383,9 @@ export function ProductFormModal({
     }
   }, [isOpen]);
 
+  // Başlık değişimini debounce ile geciktir
+  const debouncedTitle = useDebounce(title, 5000); // 5 saniye debounce
+
   // hasUnsavedChanges fonksiyonunu güncelle
   const hasUnsavedChanges = () => {
     return (
@@ -516,13 +534,13 @@ export function ProductFormModal({
     }
   }, [isOpen]);
 
-  // Başlık değiştiğinde açıklama otomatik üret
+  // Başlık değiştiğinde açıklama otomatik üret (debounce ile)
   useEffect(() => {
-    if (title) {
+    if (debouncedTitle) {
       setAutoDescriptionLoading(true);
       const generateDescription = async () => {
         // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
-        const prompt = descriptionPrompt.prompt.replace("${title}", title);
+        const prompt = descriptionPrompt.prompt.replace("${title}", debouncedTitle);
         try {
           const res = await fetch("/api/ai/generate-etsy-title", {
             method: "POST",
@@ -539,15 +557,15 @@ export function ProductFormModal({
       };
       generateDescription();
     }
-  }, [title]);
+  }, [debouncedTitle]);
 
-  // Başlık değiştiğinde otomatik etiket üret
+  // Başlık değiştiğinde otomatik etiket üret (debounce ile)
   useEffect(() => {
-    if (title) {
+    if (debouncedTitle) {
       setAutoTagsLoading(true);
       const generateTags = async () => {
         // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
-        const prompt = tagsPrompt.prompt.replace("${title}", title);
+        const prompt = tagsPrompt.prompt.replace("${title}", debouncedTitle);
         try {
           const res = await fetch("/api/ai/generate-etsy-title", {
             method: "POST",
@@ -567,7 +585,7 @@ export function ProductFormModal({
       };
       generateTags();
     }
-  }, [title]);
+  }, [debouncedTitle]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -577,14 +595,14 @@ export function ProductFormModal({
 
   // Başlık değiştiğinde en uygun mağaza kategorisini OpenAI ile otomatik seç
   useEffect(() => {
-    if (!title || !shopSections.length || !shopSectionAutoSelected) return;
+    if (!debouncedTitle || !shopSections.length || !shopSectionAutoSelected) return;
 
     const fetchAICategory = async () => {
       const categoryNames = shopSections.map(s => s.title).join(', ');
       // Prompt'u lib/prompts.ts'den al ve değişkenleri yerleştir
       const prompt = categoryPrompt.prompt
         .replace("${categoryNames}", categoryNames)
-        .replace("${title}", title);
+        .replace("${title}", debouncedTitle);
       try {
         const res = await fetch("/api/ai/generate-etsy-title", {
           method: "POST",
@@ -616,7 +634,7 @@ export function ProductFormModal({
       }
     };
     fetchAICategory();
-  }, [title, shopSections, shopSectionAutoSelected]);
+  }, [debouncedTitle, shopSections, shopSectionAutoSelected]);
 
   // Job takibi
   const startJobTracking = (jobId: string, productTitle: string) => {

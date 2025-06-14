@@ -2225,187 +2225,127 @@ export async function addInventoryWithVariations(accessToken: string, listingId:
 }
 
 export async function uploadFilesToEtsy(
-    accessToken: string,
-    shopId: number,
-    listingId: number,
-    images: File[],
-    video: File | null,
-    onProgress?: (current: number, total: number) => void
-) {
-    console.log(`[ETSY_API] Starting media upload for listing ${listingId}`);
-    console.log(`[ETSY_API] Found ${images.length} images and ${video ? '1 video' : 'no video'} to upload`);
-
-    const imageIdResults: (number|null)[] = [];
-    const maxFileSize = 20 * 1024 * 1024; // 20MB limit
+  accessToken: string,
+  shopId: string,
+  listingId: string,
+  images: File[],
+  video?: File
+): Promise<{ success: boolean; error?: string }> {
+  try {
     const maxRetries = 3;
+    let retryCount = 0;
+    let success = false;
 
-    // Optimize: Paralel yükleme - aynı anda 2 resim yükleme
-    const batchSize = 2; // Aynı anda kaç resim yüklenecek
-    const batches = Math.ceil(images.length / batchSize);
-    
-    for (let i = 0; i < batches; i++) {
-        const start = i * batchSize;
-        const end = Math.min(start + batchSize, images.length);
-        const batch = images.slice(start, end);
-        
-        // Her batch için paralel yükleme
-        const batchPromises = batch.map(async (image, batchIndex) => {
-            const imageIndex = start + batchIndex;
-            let success = false;
-            let retryCount = 0;
+    // Resimleri sırayla yükle
+    for (const image of images) {
+      retryCount = 0;
+      success = false;
 
-            // Dosya boyutu kontrolü
-            if (image.size > maxFileSize) {
-                console.error(`[ETSY_API] ❌ Image ${image.name} too large: ${(image.size / 1024 / 1024).toFixed(2)}MB (max 20MB)`);
-                imageIdResults[imageIndex] = null;
-                onProgress?.(imageIndex + 1, images.length);
-                return;
-            }
-            // Dosya tipi kontrolü
-            if (!image.type.startsWith('image/')) {
-                console.error(`[ETSY_API] ❌ Invalid file type for ${image.name}: ${image.type}`);
-                imageIdResults[imageIndex] = null;
-                onProgress?.(imageIndex + 1, images.length);
-                return;
-            }
-
-            while (retryCount < maxRetries && !success) {
-                try {
-                    console.log(`[ETSY_API] Uploading image ${imageIndex + 1}/${images.length}: ${image.name} (${(image.size / 1024 / 1024).toFixed(2)}MB)`);
-                    const formData = new FormData();
-                    formData.append('image', image);
-                    formData.append('rank', (imageIndex + 1).toString());
-
-                    // Timeout ile istek gönder
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 saniye timeout
-
-                    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'x-api-key': ETSY_CLIENT_ID!
-                        },
-                        body: formData,
-                        signal: controller.signal
-                    });
-
-                    clearTimeout(timeoutId);
-
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error(`[ETSY_API] ❌ Failed to upload image ${image.name}:`, {
-                            status: response.status,
-                            statusText: response.statusText,
-                            error: errorText
-                        });
-
-                        // Rate limit hatası ise bekle ve tekrar dene
-                        if (response.status === 429) {
-                            console.log('[ETSY_API] ⏳ Rate limited, waiting 1 second...');
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                            retryCount++;
-                            continue;
-                        } else {
-                            retryCount = maxRetries; // Diğer hatalarda tekrar deneme
-                            imageIdResults[imageIndex] = null;
-                            break;
-                        }
-                    }
-
-                    const data = await response.json();
-                    const imageId = data.listing_image_id || null;
-                    imageIdResults[imageIndex] = imageId;
-                    console.log(`[ETSY_API] ✅ Successfully uploaded image ${image.name}, imageId: ${imageId}`);
-                    success = true;
-                } catch (error) {
-                    console.error(`[ETSY_API] ❌ Error uploading image ${image.name}:`, error);
-                    if (error instanceof Error && error.name === 'AbortError') {
-                        console.error(`[ETSY_API] ⏰ Upload timeout for ${image.name}`);
-                    }
-                    retryCount++;
-                    await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-                }
-            }
-            onProgress?.(imageIndex + 1, images.length);
-        });
-        
-        // Batch içindeki tüm yüklemelerin tamamlanmasını bekle
-        await Promise.all(batchPromises);
-    }
-
-    // Video yükleme (varsa)
-    if (video) {
+      while (retryCount < maxRetries && !success) {
         try {
-            console.log(`[ETSY_API] Preparing to upload video: ${video.name} (${(video.size / 1024 / 1024).toFixed(2)}MB)`);
-            // Video boyutu kontrolü (100MB limit for videos)
-            const maxVideoSize = 100 * 1024 * 1024; // 100MB
-            if (video.size > maxVideoSize) {
-                console.error(`[ETSY_API] ❌ Video ${video.name} too large: ${(video.size / 1024 / 1024).toFixed(2)}MB (max 100MB)`);
-            } else {
-                const formData = new FormData();
-                formData.append('video', video);
-                formData.append('name', video.name);
-                const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/videos`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'x-api-key': ETSY_CLIENT_ID!
-                    },
-                    body: formData,
-                });
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`[ETSY_API] ❌ Failed to upload video ${video.name}:`, errorText);
-                } else {
-                    console.log(`[ETSY_API] ✅ Successfully uploaded video ${video.name}`);
-                }
+          const formData = new FormData();
+          formData.append("image", image);
+
+          const response = await fetch(
+            `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listingId}/images`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: formData,
             }
+          );
+
+          if (response.status === 429) {
+            console.log("Rate limit aşıldı, 5 saniye bekleniyor...");
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+            retryCount++;
+            continue;
+          }
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(
+              `Resim yükleme hatası: ${errorData.error || response.statusText}`
+            );
+          }
+
+          // Resim yüklendikten sonra 5 saniye bekle
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          success = true;
         } catch (error) {
-            console.error(`[ETSY_API] ❌ Error uploading video:`, error);
+          console.error(`Resim yükleme hatası (Deneme ${retryCount + 1}):`, error);
+          retryCount++;
+          if (retryCount < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
         }
+      }
+
+      if (!success) {
+        throw new Error(`Resim yüklenemedi: ${image.name}`);
+      }
     }
 
-    // Sonuçları değerlendir
-    const successfulUploads = imageIdResults.filter(id => id !== null).length;
-    const failedUploads = images.length - successfulUploads;
-    console.log(`[ETSY_API] 📊 Upload Summary: ${successfulUploads}/${images.length} images uploaded successfully`);
-    if (failedUploads > 0) {
-        console.warn(`[ETSY_API] ⚠️ ${failedUploads} image uploads failed`);
-    }
+    // Video varsa yükle
+    if (video) {
+      retryCount = 0;
+      success = false;
 
-    // Resim sıralaması (başarılı olanlar için)
-    const orderedImageIds = imageIdResults.filter((id): id is number => !!id);
-    if (orderedImageIds.length > 1) {
+      while (retryCount < maxRetries && !success) {
         try {
-            await reorderListingImagesFromUpload(accessToken, shopId, listingId, orderedImageIds);
-            console.log('[ETSY_API] ✅ Image order synchronized with Etsy');
-        } catch (err) {
-            console.error('[ETSY_API] ⚠️ Could not reorder images:', err);
+          const formData = new FormData();
+          formData.append("video", video);
+
+          const response = await fetch(
+            `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listingId}/videos`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: formData,
+            }
+          );
+
+          if (response.status === 429) {
+            console.log("Rate limit aşıldı, 5 saniye bekleniyor...");
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+            retryCount++;
+            continue;
+          }
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(
+              `Video yükleme hatası: ${errorData.error || response.statusText}`
+            );
+          }
+
+          success = true;
+        } catch (error) {
+          console.error(`Video yükleme hatası (Deneme ${retryCount + 1}):`, error);
+          retryCount++;
+          if (retryCount < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
         }
+      }
+
+      if (!success) {
+        throw new Error("Video yüklenemedi");
+      }
     }
 
-    // Eğer hiç resim yüklenmediyse hata fırlat
-    if (successfulUploads === 0) {
-        throw new Error('Hiçbir resim yüklenemedi. Lütfen dosya boyutlarını ve internet bağlantınızı kontrol edin.');
-    }
-}
-
-// uploadFilesToEtsy içinden çağrılacak yardımcı fonksiyon
-async function reorderListingImagesFromUpload(accessToken: string, shopId: number, listingId: number, imageIds: number[]) {
-    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images/reorder`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'x-api-key': ETSY_CLIENT_ID!,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ listing_image_ids: imageIds })
-    });
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText);
-    }
+    return { success: true };
+  } catch (error) {
+    console.error("Dosya yükleme hatası:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Bilinmeyen hata",
+    };
+  }
 }
 
 export async function activateEtsyListing(accessToken: string, shopId: number, listingId: number) {

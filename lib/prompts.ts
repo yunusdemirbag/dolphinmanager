@@ -14,8 +14,8 @@ export const titlePrompt: PromptConfig = {
   id: "title-prompt",
   name: "Başlık Oluşturma Promptu",
   description: "Görsel yüklendiğinde ürün başlığı oluşturmak için kullanılan prompt",
-  prompt: "TASK: Generate a single, SEO-optimized, high-conversion Etsy product title for a physical canvas wall art print based on the provided analysis.",
-  defaultPrompt: "TASK: Generate a single, SEO-optimized, high-conversion Etsy product title for a physical canvas wall art print based on the provided analysis."
+  prompt: "GÖREV: Aşağıdaki görseli analiz et ve sadece bu görsele uygun, SEO uyumlu, yüksek dönüşüm sağlayacak tek bir Etsy ürün başlığı üret. Sadece başlığı döndür. Başlıkta marka, ölçü, fiyat veya gereksiz kelimeler olmasın.",
+  defaultPrompt: "GÖREV: Aşağıdaki görseli analiz et ve sadece bu görsele uygun, SEO uyumlu, yüksek dönüşüm sağlayacak tek bir Etsy ürün başlığı üret. Sadece başlığı döndür. Başlıkta marka, ölçü, fiyat veya gereksiz kelimeler olmasın."
 };
 
 // Açıklama oluşturma promptu

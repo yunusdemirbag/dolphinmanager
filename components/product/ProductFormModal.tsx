@@ -177,9 +177,11 @@ const DraggableImage = ({
   drag(drop(ref));
   
   // Prepare the image source - use proxy for Etsy static URLs
-  const imageSource = image.preview.includes('etsystatic.com') 
-    ? `/api/etsy/image-proxy?url=${encodeURIComponent(image.preview)}`
-    : image.preview;
+  const imageSource = image.preview ? (
+    image.preview.includes('etsystatic.com') 
+      ? `/api/etsy/image-proxy?url=${encodeURIComponent(image.preview)}`
+      : image.preview
+  ) : null;
   
   return (
     <div
@@ -189,11 +191,17 @@ const DraggableImage = ({
       }`}
       style={{ opacity: isDragging ? 0.5 : 1 }}
     >
-      <img
-        src={imageSource}
-        alt={`Ürün resmi ${index + 1}`}
-        className="w-full aspect-square object-cover"
-      />
+      {imageSource ? (
+        <img
+          src={imageSource}
+          alt={`Ürün resmi ${index + 1}`}
+          className="w-full aspect-square object-cover"
+        />
+      ) : (
+        <div className="w-full aspect-square bg-gray-200 flex items-center justify-center">
+          <span className="text-gray-500 text-sm">Görsel yüklenemedi</span>
+        </div>
+      )}
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
       <button
         type="button"

@@ -373,7 +373,7 @@ export function ProductFormModal({
   }, [isOpen]);
 
   // Başlık değişimini debounce ile geciktir
-  const debouncedTitle = useDebounce(title, 3000); // 3 saniye debounce
+  const debouncedTitle = useDebounce(title, 1000); // 1 saniye debounce
 
   // hasUnsavedChanges fonksiyonunu güncelle
   const hasUnsavedChanges = () => {
@@ -861,42 +861,6 @@ export function ProductFormModal({
         </div>
       </div>
 
-      {/* VİDEO ÖNİZLEME KARTI */}
-      {videoFile && (
-        <div className="relative group border border-gray-100 rounded-lg overflow-hidden shadow-sm">
-          <video
-            src={videoFile.preview}
-            controls={!videoFile.uploading}
-            className="w-full h-auto max-h-52 object-contain bg-gray-50"
-            controlsList="nodownload nofullscreen"
-            preload="metadata"
-          />
-          {videoFile.uploading && (
-            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white">
-              <Loader2 className="w-6 h-6 animate-spin" />
-              <p className="mt-2 text-xs">Yükleniyor...</p>
-            </div>
-          )}
-          {videoFile.error && (
-            <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-red-500 text-white text-xs text-center">
-              {videoFile.error}
-            </div>
-          )}
-          {!videoFile.uploading && (
-            <button
-              type="button"
-              onClick={() => {
-                URL.revokeObjectURL(videoFile.preview);
-                setVideoFile(null);
-              }}
-              className="absolute top-2 right-2 z-10 p-1 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
-            >
-              <X className="w-4 h-4 text-white" />
-            </button>
-          )}
-        </div>
-      )}
-
       {/* SÜRÜKLE-BIRAK ALANI VE RESİM LİSTESİ */}
       <div
         className={`border rounded-lg transition-all ${
@@ -953,6 +917,34 @@ export function ProductFormModal({
                 onRemove={handleRemoveImage}
               />
             ))}
+            {videoFile && (
+              <div className="relative group rounded-md overflow-hidden border border-gray-100 shadow-sm aspect-square flex items-center justify-center bg-gray-50">
+                <video
+                  src={videoFile.preview}
+                  controls={!videoFile.uploading}
+                  className="w-full h-full object-cover"
+                  controlsList="nodownload nofullscreen"
+                  preload="metadata"
+                />
+                {!videoFile.uploading && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      URL.revokeObjectURL(videoFile.preview);
+                      setVideoFile(null);
+                    }}
+                    className="absolute top-2 right-2 z-10 p-1 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-white" />
+                  </button>
+                )}
+                {videoFile.uploading && (
+                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                )}
+              </div>
+            )}
             {productImages.length < 10 && (
               <div className="flex flex-col gap-2">
                 <button
@@ -1046,6 +1038,23 @@ export function ProductFormModal({
       )}
     </div>
   );
+
+  // AI açıklama/etiket fetch fonksiyonunu güncelle
+  async function fetchAIResult(url: string, options: RequestInit) {
+    const response = await fetch(url, options);
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      // JSON parse hatası varsa, muhtemelen HTML döndü
+      const text = await response.text();
+      throw new Error(text || 'API yanıtı okunamadı');
+    }
+    if (!response.ok) {
+      throw new Error(data.error || 'Bilinmeyen API hatası');
+    }
+    return data;
+  }
 
   return (
     <DndProvider backend={HTML5Backend}>

@@ -2099,7 +2099,10 @@ export async function createDraftListing(accessToken: string, shopId: number, da
     body.append('who_made', 'i_did');
     body.append('when_made', 'made_to_order');
     body.append('taxonomy_id', data.taxonomy_id ? data.taxonomy_id.toString() : '1366'); // Varsayılan Wall Decor
-    body.append('renewal_option', 'automatic'); // Otomatik yenileme seçeneği
+    
+    // Her zaman otomatik yenileme seçeneği kullan
+    body.append('renewal_option', 'automatic');
+    console.log('[ETSY_API] Yenileme seçeneği: automatic');
     
     // Shop Section ID'yi sadece geçerliyse ekle
     const sectionId = Number(data.shop_section_id);

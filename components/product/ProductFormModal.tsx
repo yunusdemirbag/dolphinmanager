@@ -48,6 +48,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
 import { createClientSupabase } from "@/lib/supabase";
 import { descriptionPrompt, tagsPrompt, categoryPrompt } from "@/lib/prompts";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
+import { ChevronDown } from "lucide-react"
 
 // Debounce fonksiyonu
 const useDebounce = <T,>(value: T, delay: number): T => {
@@ -915,57 +917,65 @@ export function ProductFormModal({
   // Modified varyasyonlar section in the UI
   const VariationsSection = () => (
     <div className="space-y-4">
-      <h3 className="text-lg font-medium">Varyasyonlar</h3>
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id="hasVariations"
-          checked={hasVariations}
-          onCheckedChange={checked => setHasVariations(Boolean(checked))}
-        />
-        <label
-          htmlFor="hasVariations"
-          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-        >
-          Varyasyonlar var
-        </label>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">Varyasyonlar</h3>
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="hasVariations"
+            checked={hasVariations}
+            onCheckedChange={checked => setHasVariations(Boolean(checked))}
+          />
+          <label
+            htmlFor="hasVariations"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Varyasyonlar var
+          </label>
+        </div>
       </div>
 
       {hasVariations && (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[250px]">Size</TableHead>
-                <TableHead>Pattern</TableHead>
-                <TableHead className="w-[120px]">Fiyat</TableHead>
-                <TableHead className="w-[80px]">Görünür</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {variations.map((variation, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium">{variation.size}</TableCell>
-                  <TableCell>{variation.pattern}</TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={variation.price === 0 ? '' : variation.price}
-                      placeholder="Fiyat"
-                      onChange={(e) => handleVariationChange(index, 'price', e.target.value)}
-                      className="h-8"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={variation.is_active}
-                      onCheckedChange={(checked) => handleVariationChange(index, 'is_active', checked)}
-                    />
-                  </TableCell>
+        <Collapsible className="border rounded-md p-2">
+          <CollapsibleTrigger className="flex w-full items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+            <span className="text-sm font-medium">Varyasyon Detayları</span>
+            <ChevronDown className="h-4 w-4" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[250px]">Size</TableHead>
+                  <TableHead>Pattern</TableHead>
+                  <TableHead className="w-[120px]">Fiyat</TableHead>
+                  <TableHead className="w-[80px]">Görünür</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {variations.map((variation, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{variation.size}</TableCell>
+                    <TableCell>{variation.pattern}</TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={variation.price === 0 ? '' : variation.price}
+                        placeholder="Fiyat"
+                        onChange={(e) => handleVariationChange(index, 'price', e.target.value)}
+                        className="h-8"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={variation.is_active}
+                        onCheckedChange={(checked) => handleVariationChange(index, 'is_active', checked)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </div>
   );

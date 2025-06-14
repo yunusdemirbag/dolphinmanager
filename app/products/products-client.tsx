@@ -30,7 +30,6 @@ export function useProductsClient() {
         // Önce mağaza bilgilerini al
         const storeResponse = await fetch('/api/etsy/stores', {
           headers: { 'Cache-Control': 'no-cache' },
-          // 8 saniye timeout (Etsy API bazen yavaş olabilir)
           signal: AbortSignal.timeout(8000)
         });
         
@@ -76,69 +75,35 @@ export function useProductsClient() {
           const defaultProfile = {
             shipping_profile_id: 0,
             title: 'Varsayılan Kargo Profili',
-            user_id: 0,
             min_processing_days: 1,
             max_processing_days: 3,
-            processing_days_display_label: '1-3 gün',
             origin_country_iso: 'TR',
-            is_deleted: false,
-            shipping_carrier_id: 0,
-            mail_class: 'Standard',
-            min_delivery_days: 3,
-            max_delivery_days: 7,
             destination_country_iso: 'TR',
             destination_region: 'local',
-            primary_cost: {
-              amount: 0,
-              divisor: 100,
-              currency_code: 'USD'
-            },
-            secondary_cost: {
-              amount: 0,
-              divisor: 100,
-              currency_code: 'USD'
-            }
+            primary_cost: 0,
+            secondary_cost: 0,
+            processing_time_unit: 'days'
           };
           setShippingProfiles([defaultProfile]);
         } else {
           setShippingProfiles(profilesData.profiles);
         }
-      } catch (shippingError) {
-        console.error('Kargo profilleri yüklenirken hata:', shippingError);
-        
-        // Varsayılan kargo profili oluştur
+      } catch (profilesError) {
+        console.error('Kargo profilleri yüklenirken hata:', profilesError);
+        // Hata durumunda varsayılan profil ekle
         const defaultProfile = {
           shipping_profile_id: 0,
           title: 'Varsayılan Kargo Profili',
-          user_id: 0,
           min_processing_days: 1,
           max_processing_days: 3,
-          processing_days_display_label: '1-3 gün',
           origin_country_iso: 'TR',
-          is_deleted: false,
-          shipping_carrier_id: 0,
-          mail_class: 'Standard',
-          min_delivery_days: 3,
-          max_delivery_days: 7,
           destination_country_iso: 'TR',
           destination_region: 'local',
-          primary_cost: {
-            amount: 0,
-            divisor: 100,
-            currency_code: 'USD'
-          },
-          secondary_cost: {
-            amount: 0,
-            divisor: 100,
-            currency_code: 'USD'
-          }
+          primary_cost: 0,
+          secondary_cost: 0,
+          processing_time_unit: 'days'
         };
         setShippingProfiles([defaultProfile]);
-        
-        // Toast mesajını sadece gerçek bir hata olduğunda göster (timeout değilse)
-        if (!(shippingError instanceof DOMException && shippingError.name === "AbortError")) {
-          toast.error('Kargo profilleri yüklenemedi, varsayılan ayarlar kullanılacak');
-        }
       }
       
       // İşlem profilleri
@@ -201,28 +166,14 @@ export function useProductsClient() {
         setShippingProfiles([{
           shipping_profile_id: 0,
           title: 'Varsayılan Kargo Profili',
-          user_id: 0,
           min_processing_days: 1,
           max_processing_days: 3,
-          processing_days_display_label: '1-3 gün',
           origin_country_iso: 'TR',
-          is_deleted: false,
-          shipping_carrier_id: 0,
-          mail_class: 'Standard',
-          min_delivery_days: 3,
-          max_delivery_days: 7,
           destination_country_iso: 'TR',
           destination_region: 'local',
-          primary_cost: {
-            amount: 0,
-            divisor: 100,
-            currency_code: 'USD'
-          },
-          secondary_cost: {
-            amount: 0,
-            divisor: 100,
-            currency_code: 'USD'
-          }
+          primary_cost: 0,
+          secondary_cost: 0,
+          processing_time_unit: 'days'
         }]);
       }
       

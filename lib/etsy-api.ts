@@ -5,164 +5,18 @@ import { createClient } from "@/lib/supabase/server"; // Import the server-side 
 import { cacheManager } from "./cache"
 import { fetchWithCache } from "./api-utils"
 import { Database } from "@/types/database.types";
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+
 // Mock data importları geçici olarak kaldırıldı
 // Gerekirse burada yeniden implement edilebilir
 
-// Aynı kullanıcı için birden fazla token varsa en son olanı dışındakileri temizle
-async function cleanupDuplicateTokens(userId: string): Promise<void> {
-  try {
-    console.log("Cleaning up duplicate tokens for user:", userId);
-    
-    // En son oluşturulan token dışındaki tüm token kayıtlarını al
-    const { data: tokens, error } = await supabaseAdmin
-      .from("etsy_tokens")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-    
-    if (error) {
-      console.error("Error fetching tokens for cleanup:", error);
-      return;
-    }
-    
-    if (tokens && tokens.length > 1) {
-      console.log(`Found ${tokens.length} tokens for user, keeping the newest one and deleting ${tokens.length - 1} older ones`);
-      
-      // İlk token (en yeni) dışındakileri silmek için ID'leri topla
-      const tokensToDelete = tokens.slice(1).map(token => token.id);
-      
-      // Eski tokenları sil
-      const { error: deleteError } = await supabaseAdmin
-        .from("etsy_tokens")
-        .delete()
-        .in("id", tokensToDelete);
-      
-      if (deleteError) {
-        console.error("Error deleting duplicate tokens:", deleteError);
-      } else {
-        console.log(`Successfully deleted ${tokensToDelete.length} duplicate tokens`);
-      }
-    } else {
-      console.log("No duplicate tokens found for user");
-    }
-  } catch (error) {
-    console.error("Error in cleanupDuplicateTokens:", error);
-  }
-}
-
-// Geçici mock fonksiyonlar
-function generateMockListings(limit = 10, shopId = 1) {
-  return {
-    listings: Array(limit).fill(null).map((_, i) => ({
-      listing_id: i + 1,
-      shop_id: shopId,
-      title: `Mock Listing ${i + 1}`,
-      state: "active" as "active" | "inactive" | "draft",
-      price: { amount: 1000, divisor: 100, currency_code: "USD" },
-      tags: [],
-      images: [],
-      user_id: 1,
-      description: "Mock description",
-      url: "https://example.com",
-      quantity: 10
-    })),
-    count: limit
-  };
-}
-
-function generateMockReceipts(limit = 10, shopId = 1) {
-  return {
-    receipts: Array(limit).fill(null).map((_, i) => ({
-      receipt_id: i + 1,
-      shop_id: shopId,
-      receipt_type: 0,
-      seller_user_id: 1,
-      seller_email: "seller@example.com",
-      buyer_user_id: 100 + i,
-      buyer_email: "buyer@example.com",
-      name: "Mock Buyer",
-      first_line: "123 Main St",
-      second_line: "",
-      city: "Anytown",
-      state: "CA",
-      zip: "12345",
-      formatted_address: "123 Main St, Anytown, CA 12345",
-      country_iso: "US",
-      payment_method: "credit_card",
-      payment_email: "buyer@example.com",
-      message_from_seller: "",
-      message_from_buyer: "",
-      message_from_payment: "",
-      is_paid: true,
-      is_shipped: false,
-      create_timestamp: Date.now() / 1000 - 86400 * i,
-      update_timestamp: Date.now() / 1000,
-      grandtotal: { amount: 1500, divisor: 100, currency_code: "USD" },
-      subtotal: { amount: 1000, divisor: 100, currency_code: "USD" },
-      total_price: { amount: 1000, divisor: 100, currency_code: "USD" },
-      total_shipping_cost: { amount: 500, divisor: 100, currency_code: "USD" },
-      total_tax_cost: { amount: 0, divisor: 100, currency_code: "USD" },
-      total_vat_cost: { amount: 0, divisor: 100, currency_code: "USD" },
-      discount_amt: { amount: 0, divisor: 100, currency_code: "USD" },
-      gift_wrap_price: { amount: 0, divisor: 100, currency_code: "USD" }
-    })),
-    count: limit
-  };
-}
-
-function generateMockPayments(limit = 10, shopId = 1) {
-  return {
-    payments: Array(limit).fill(null).map((_, i) => ({
-      payment_id: i + 1,
-      buyer_user_id: 100 + i,
-      shop_id: shopId,
-      receipt_id: i + 1,
-      amount_gross: { amount: 1500, divisor: 100, currency_code: "USD" },
-      amount_fees: { amount: 150, divisor: 100, currency_code: "USD" },
-      amount_net: { amount: 1350, divisor: 100, currency_code: "USD" },
-      posted_gross: { amount: 1500, divisor: 100, currency_code: "USD" },
-      posted_fees: { amount: 150, divisor: 100, currency_code: "USD" },
-      posted_net: { amount: 1350, divisor: 100, currency_code: "USD" },
-      adjusted_gross: { amount: 0, divisor: 100, currency_code: "USD" },
-      adjusted_fees: { amount: 0, divisor: 100, currency_code: "USD" },
-      adjusted_net: { amount: 0, divisor: 100, currency_code: "USD" },
-      currency: "USD",
-      shop_currency: "USD",
-      buyer_currency: "USD",
-      shipping_user_id: 100 + i,
-      shipping_address_id: 200 + i,
-      billing_address_id: 200 + i,
-      status: "paid",
-      shipped_timestamp: 0,
-      create_timestamp: Date.now() / 1000 - 86400 * i,
-      update_timestamp: Date.now() / 1000
-    })),
-    count: limit
-  };
-}
-
-function generateMockLedgerEntries(limit = 10, shopId = 1) {
-  return {
-    entries: Array(limit).fill(null).map((_, i) => ({
-      entry_id: i + 1,
-      ledger_id: 1,
-      sequence_number: i,
-      amount: { amount: i % 2 === 0 ? 1500 : -150, divisor: 100, currency_code: "USD" },
-      currency: "USD",
-      description: i % 2 === 0 ? "Payment" : "Fee",
-      balance: { amount: 10000 - (i * 100), divisor: 100, currency_code: "USD" },
-      create_date: Date.now() / 1000 - 86400 * i
-    })),
-    count: limit
-  };
-}
-
-// Etsy API v3 endpoints
-const ETSY_API_BASE = "https://api.etsy.com/v3"
+// Etsy API sabitleri
+const ETSY_API_BASE = "https://openapi.etsy.com/v3"
 const ETSY_OAUTH_BASE = "https://www.etsy.com/oauth"
 
 const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
 const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || ""
+const ETSY_CLIENT_SECRET = process.env.ETSY_CLIENT_SECRET || ""
 // Tüm gerekli izinleri içeren scope'lar
 const ETSY_SCOPE = process.env.ETSY_SCOPE || "email_r shops_r shops_w listings_r listings_w listings_d transactions_r transactions_w profile_r address_r address_w billing_r cart_r cart_w"
 
@@ -801,167 +655,241 @@ export function toggleCachedDataOnlyMode(useOnlyCachedData: boolean): void {
   console.log(`API mode set to: ${shouldUseOnlyCachedData ? 'Cached data only (using database/cache)' : 'Allow fresh API calls'}`);
 }
 
+// Önbellek için sabitler
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 saat (milisaniye cinsinden)
+const CACHE_ENABLED = true; // Önbelleği etkinleştir/devre dışı bırak
+
+// Veritabanından önbelleklenmiş verileri almak için yardımcı fonksiyon
+async function getCachedData(userId: string, type: string, shopId?: number): Promise<any | null> {
+  try {
+    if (!CACHE_ENABLED) return null;
+    
+    console.log(`Checking cache for ${type} data for user ${userId}${shopId ? ` and shop ${shopId}` : ''}...`);
+    
+    const supabase = await createClient();
+    const query = supabase
+      .from('etsy_cache')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('data_type', type);
+    
+    if (shopId) {
+      query.eq('shop_id', shopId);
+    }
+    
+    const { data, error } = await query.single();
+    
+    if (error) {
+      console.log(`No cached ${type} data found:`, error);
+      return null;
+    }
+    
+    // Önbellek süresini kontrol et
+    const lastUpdated = new Date(data.updated_at).getTime();
+    const now = new Date().getTime();
+    
+    if (now - lastUpdated > CACHE_DURATION) {
+      console.log(`Cached ${type} data is expired (${Math.round((now - lastUpdated) / (60 * 60 * 1000))} hours old)`);
+      return null;
+    }
+    
+    console.log(`Using cached ${type} data from ${new Date(data.updated_at).toLocaleString()}`);
+    return data.data;
+  } catch (error) {
+    console.error(`Error getting cached ${type} data:`, error);
+    return null;
+  }
+}
+
+// Veritabanında veri önbelleklemek için yardımcı fonksiyon
+async function setCachedData(userId: string, type: string, data: any, shopId?: number): Promise<void> {
+  try {
+    if (!CACHE_ENABLED) return;
+    
+    console.log(`Caching ${type} data for user ${userId}${shopId ? ` and shop ${shopId}` : ''}...`);
+    
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from('etsy_cache')
+      .upsert({
+        user_id: userId,
+        shop_id: shopId || null,
+        data_type: type,
+        data: data,
+        updated_at: new Date().toISOString()
+      });
+    
+    if (error) {
+      console.error(`Error caching ${type} data:`, error);
+    } else {
+      console.log(`Successfully cached ${type} data`);
+    }
+  } catch (error) {
+    console.error(`Error setting cached ${type} data:`, error);
+  }
+}
+
 // getEtsyStores fonksiyonunu güncelle
 export async function getEtsyStores(userId: string, skipCache = false): Promise<EtsyStore[]> {
   try {
-    console.log("=== getEtsyStores called for userId:", userId, "===");
-
-    // Mevcut token'ı kontrol et
+    console.log(`=== getEtsyStores called for userId: ${userId} ===`);
+    
+    // Önce önbellekten kontrol et (skipCache true değilse)
+    if (!skipCache) {
+      const cachedStores = await getCachedData(userId, 'stores');
+      if (cachedStores) {
+        console.log(`Using ${cachedStores.length} cached stores`);
+        return cachedStores;
+      }
+    } else {
+      console.log('Skipping cache for stores as requested');
+    }
+    
+    console.log(`Getting valid access token for user: ${userId}`);
     const accessToken = await getValidAccessToken(userId);
+    
     if (!accessToken) {
-      console.error("No valid access token for getEtsyStores - user needs to connect Etsy account");
+      console.log('No valid access token found');
+      throw new Error('RECONNECT_REQUIRED');
+    }
+    
+    console.log('Fetching Etsy User ID using access token...');
+    
+    // Etsy API'ye istek göndererek kullanıcının Etsy User ID'sini al
+    // OAuth 2.0'da user ID token payload'ında genellikle bulunmaz,
+    // bunun yerine /users/me endpoint'i kullanılır.
+    console.log("Fetching Etsy User ID using access token...");
+    const userMeResponse = await fetch(`${ETSY_API_BASE}/application/users/me`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID
+      }
+    });
+
+    if (!userMeResponse.ok) {
+      const errorText = await userMeResponse.text().catch(() => userMeResponse.statusText);
+      console.error(`Error fetching Etsy user details (me endpoint): ${userMeResponse.status} - ${errorText}`);
+
+      if (userMeResponse.status === 401 || userMeResponse.status === 403) {
+        // Token geçersiz veya yetersiz izinler - yeniden bağlantı gerekli
+        throw new Error('RECONNECT_REQUIRED');
+      }
+
+      // Diğer hatalar
       return [];
     }
 
+    const userDetails: any = await userMeResponse.json();
+    const etsyUserId = userDetails?.user_id;
+
+    if (!etsyUserId) {
+      console.error("Could not fetch Etsy User ID from /users/me endpoint response:", userDetails);
+      return [];
+    }
+
+    console.log("Fetched Etsy User ID:", etsyUserId);
+    console.log("Fetching shops for Etsy User ID:", etsyUserId);
+
+    // Etsy API'ye istek gönder - kullanıcının mağazalarını al
+    const response = await fetch(`${ETSY_API_BASE}/application/users/${etsyUserId}/shops`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': ETSY_CLIENT_ID
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => response.statusText);
+      console.error(`Error fetching Etsy shops: ${response.status} - ${errorText}`);
+
+      if (response.status === 401 || response.status === 403) {
+        // Token geçersiz veya yetersiz izinler - yeniden bağlantı gerekli
+        throw new Error('RECONNECT_REQUIRED');
+      }
+
+      // Diğer hatalar
+      return [];
+    }
+
+    // API yanıtını al
+    const responseText = await response.text();
+    console.log("Raw API response from shops endpoint (first 300 chars):", responseText.substring(0, 300) + "...");
+
+    // API yanıtını parse et
+    let shopObj: any;
     try {
-      // Etsy API'ye istek göndererek kullanıcının Etsy User ID'sini al
-      // OAuth 2.0'da user ID token payload'ında genellikle bulunmaz,
-      // bunun yerine /users/me endpoint'i kullanılır.
-      console.log("Fetching Etsy User ID using access token...");
-      const userMeResponse = await fetch(`${ETSY_API_BASE}/application/users/me`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_CLIENT_ID
-        }
-      });
-
-      if (!userMeResponse.ok) {
-        const errorText = await userMeResponse.text().catch(() => userMeResponse.statusText);
-        console.error(`Error fetching Etsy user details (me endpoint): ${userMeResponse.status} - ${errorText}`);
-
-        if (userMeResponse.status === 401 || userMeResponse.status === 403) {
-          // Token geçersiz veya yetersiz izinler - yeniden bağlantı gerekli
-          throw new Error('RECONNECT_REQUIRED');
-        }
-
-        // Diğer hatalar
-        return [];
-      }
-
-      const userDetails: any = await userMeResponse.json();
-      const etsyUserId = userDetails?.user_id;
-
-      if (!etsyUserId) {
-        console.error("Could not fetch Etsy User ID from /users/me endpoint response:", userDetails);
-        return [];
-      }
-
-      console.log("Fetched Etsy User ID:", etsyUserId);
-      console.log("Fetching shops for Etsy User ID:", etsyUserId);
-
-      // Etsy API'ye istek gönder - kullanıcının mağazalarını al
-      const response = await fetch(`${ETSY_API_BASE}/application/users/${etsyUserId}/shops`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'x-api-key': ETSY_CLIENT_ID
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => response.statusText);
-        console.error(`Error fetching Etsy shops: ${response.status} - ${errorText}`);
-
-        if (response.status === 401 || response.status === 403) {
-          // Token geçersiz veya yetersiz izinler - yeniden bağlantı gerekli
-          throw new Error('RECONNECT_REQUIRED');
-        }
-
-        // Diğer hatalar
-        return [];
-      }
-
-      // API yanıtını al
-      const responseText = await response.text();
-      console.log("Raw API response from shops endpoint (first 300 chars):", responseText.substring(0, 300) + "...");
-
-      // API yanıtını parse et
-      let shopObj: any;
-      try {
-        shopObj = JSON.parse(responseText);
-      } catch (e) {
-        console.error("Error parsing Etsy shops response:", e);
-        return [];
-      }
-
-      // API yanıtı yapısını kontrol et ve mağazaları işle
-      let shops: EtsyStore[] = [];
-
-      // Etsy API v3 shops endpoint'i genellikle 'results' içinde bir dizi döndürür
-      if (shopObj && Array.isArray(shopObj.results)) {
-          shops = shopObj.results.map((shop: any) => ({
-              shop_id: shop.shop_id,
-              shop_name: shop.shop_name,
-              title: shop.title,
-              announcement: shop.announcement,
-              currency_code: shop.currency_code,
-              is_vacation: shop.is_vacation,
-              listing_active_count: shop.listing_active_count,
-              num_favorers: shop.num_favorers,
-              url: shop.url,
-              image_url_760x100: shop.image_url_760x100,
-              review_count: shop.review_count,
-              review_average: shop.review_average,
-              is_active: true, // API'den gelen mağaza aktif kabul edilebilir
-              last_synced_at: new Date().toISOString(),
-              avatar_url: shop.avatar_url || null
-          }));
-          console.log(`Found ${shops.length} shops in results array.`);
-
-      } else if (shopObj && shopObj.shop_id) {
-        // Nadiren, belki tek mağaza doğrudan nesne olarak dönebilir?
-        console.warn("Received single shop object instead of results array:", shopObj);
-         shops = [{
-              shop_id: shopObj.shop_id,
-              shop_name: shopObj.shop_name,
-              title: shopObj.title,
-              announcement: shopObj.announcement,
-              currency_code: shopObj.currency_code,
-              is_vacation: shopObj.is_vacation,
-              listing_active_count: shopObj.listing_active_count,
-              num_favorers: shopObj.num_favorers,
-              url: shopObj.url,
-              image_url_760x100: shopObj.image_url_760x100,
-              review_count: shopObj.review_count,
-              review_average: shopObj.review_average,
-              is_active: true,
-              last_synced_at: new Date().toISOString(),
-              avatar_url: shopObj.avatar_url || null
-         }];
-         console.log("Processed single shop object.");
-
-      } else {
-        console.error("Unexpected API response structure for shops:", shopObj);
-        return []; // Beklenmedik yanıt formatı
-      }
-
-      console.log(`Successfully fetched ${shops.length} Etsy stores.`);
-      return shops;
-
-    } catch (error) {
-      // RECONNECT_REQUIRED hatasını yeniden fırlat
-      if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
-        console.error("RECONNECT_REQUIRED error during getEtsyStores");
-        throw error; // Ana fonksiyona hatayı bildir
-      }
-
-      console.error("Error in getEtsyStores API call:", error);
+      shopObj = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Error parsing Etsy shops response:", e);
       return [];
     }
+
+    // API yanıtı yapısını kontrol et ve mağazaları işle
+    let shops: EtsyStore[] = [];
+
+    // Etsy API v3 shops endpoint'i genellikle 'results' içinde bir dizi döndürür
+    if (shopObj && Array.isArray(shopObj.results)) {
+        shops = shopObj.results.map((shop: any) => ({
+            shop_id: shop.shop_id,
+            shop_name: shop.shop_name,
+            title: shop.title,
+            announcement: shop.announcement,
+            currency_code: shop.currency_code,
+            is_vacation: shop.is_vacation,
+            listing_active_count: shop.listing_active_count,
+            num_favorers: shop.num_favorers,
+            url: shop.url,
+            image_url_760x100: shop.image_url_760x100,
+            review_count: shop.review_count,
+            review_average: shop.review_average,
+            is_active: true, // API'den gelen mağaza aktif kabul edilebilir
+            last_synced_at: new Date().toISOString(),
+            avatar_url: shop.avatar_url || null
+        }));
+        console.log(`Found ${shops.length} shops in results array.`);
+
+    } else if (shopObj && shopObj.shop_id) {
+      // Nadiren, belki tek mağaza doğrudan nesne olarak dönebilir?
+      console.warn("Received single shop object instead of results array:", shopObj);
+       shops = [{
+            shop_id: shopObj.shop_id,
+            shop_name: shopObj.shop_name,
+            title: shopObj.title,
+            announcement: shopObj.announcement,
+            currency_code: shopObj.currency_code,
+            is_vacation: shopObj.is_vacation,
+            listing_active_count: shopObj.listing_active_count,
+            num_favorers: shopObj.num_favorers,
+            url: shopObj.url,
+            image_url_760x100: shopObj.image_url_760x100,
+            review_count: shopObj.review_count,
+            review_average: shopObj.review_average,
+            is_active: true,
+            last_synced_at: new Date().toISOString(),
+            avatar_url: shopObj.avatar_url || null
+       }];
+       console.log("Processed single shop object.");
+
+    } else {
+      console.error("Unexpected API response structure for shops:", shopObj);
+      return []; // Beklenmedik yanıt formatı
+    }
+
+    console.log(`Successfully fetched ${shops.length} Etsy stores.`);
+    
+    // Mağazaları önbelleğe al
+    await setCachedData(userId, 'stores', shops);
+    
+    return shops;
 
   } catch (error) {
-    console.error("Top-level error in getEtsyStores:", error);
-
-     // RECONNECT_REQUIRED hatasını yakala ve işle
+    // RECONNECT_REQUIRED hatasını yeniden fırlat
     if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
-      console.warn("Etsy connection requires reconnection.");
-       // Burada kullanıcıyı yeniden bağlantı akışına yönlendirecek bir işaret veya hata döndürebilirsiniz.
-       // Örneğin, boş dizi döndürüp UI'da mesaj gösterebilirsiniz.
-       // Veya özel bir hata objesi fırlatabilirsiniz.
-       // Şu an için boş dizi döndürüyorum.
-       return [];
+      console.error("RECONNECT_REQUIRED error during getEtsyStores");
+      throw error; // Ana fonksiyona hatayı bildir
     }
 
-    // Diğer hatalarda boş dizi döndür
+    console.error("Error in getEtsyStores API call:", error);
     return [];
   }
 }
@@ -1647,6 +1575,13 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
   try {
     console.log(`Fetching shipping profiles for user ${userId} and shop ${shopId}...`);
     
+    // Önce önbellekten kontrol et
+    const cachedProfiles = await getCachedData(userId, 'shipping_profiles', shopId);
+    if (cachedProfiles) {
+      console.log(`Using ${cachedProfiles.length} cached shipping profiles`);
+      return cachedProfiles;
+    }
+    
     const accessToken = await getValidAccessToken(userId);
     
     if (!accessToken) {
@@ -1725,6 +1660,10 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
     }));
 
     console.log(`Successfully fetched ${profiles.length} shipping profiles`);
+    
+    // Profilleri önbelleğe al
+    await setCachedData(userId, 'shipping_profiles', profiles, shopId);
+    
     return profiles;
   } catch (error) {
     console.error('Error in getShippingProfiles:', error);
@@ -1743,6 +1682,13 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
 export async function getProcessingProfiles(userId: string, shopId: number): Promise<EtsyProcessingProfile[]> {
   try {
     console.log(`Fetching processing profiles for user ${userId} and shop ${shopId}...`);
+    
+    // Önce önbellekten kontrol et
+    const cachedProfiles = await getCachedData(userId, 'processing_profiles', shopId);
+    if (cachedProfiles) {
+      console.log(`Using ${cachedProfiles.length} cached processing profiles`);
+      return cachedProfiles;
+    }
     
     const accessToken = await getValidAccessToken(userId);
     
@@ -1806,6 +1752,10 @@ export async function getProcessingProfiles(userId: string, shopId: number): Pro
     }));
 
     console.log(`Successfully fetched ${profiles.length} processing profiles`);
+    
+    // Profilleri önbelleğe al
+    await setCachedData(userId, 'processing_profiles', profiles, shopId);
+    
     return profiles;
   } catch (error) {
     console.error('Error in getProcessingProfiles:', error);
@@ -2477,4 +2427,155 @@ export async function getShopSections(accessToken: string, shopId: number): Prom
     }
     const data = await response.json();
     return data.results || [];
+}
+
+// Aynı kullanıcı için birden fazla token varsa en son olanı dışındakileri temizle
+async function cleanupDuplicateTokens(userId: string): Promise<void> {
+  try {
+    console.log("Cleaning up duplicate tokens for user:", userId);
+    
+    const supabase = await createClient();
+    
+    // En son oluşturulan token dışındaki tüm token kayıtlarını al
+    const { data: tokens, error } = await supabase
+      .from("etsy_tokens")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching tokens for cleanup:", error);
+      return;
+    }
+    
+    if (tokens && tokens.length > 1) {
+      console.log(`Found ${tokens.length} tokens for user, keeping the newest one and deleting ${tokens.length - 1} older ones`);
+      
+      // İlk token (en yeni) dışındakileri silmek için ID'leri topla
+      const tokensToDelete = tokens.slice(1).map(token => token.id);
+      
+      // Eski tokenları sil
+      const { error: deleteError } = await supabase
+        .from("etsy_tokens")
+        .delete()
+        .in("id", tokensToDelete);
+      
+      if (deleteError) {
+        console.error("Error deleting duplicate tokens:", deleteError);
+      } else {
+        console.log(`Successfully deleted ${tokensToDelete.length} duplicate tokens`);
+      }
+    } else {
+      console.log("No duplicate tokens found for user");
+    }
+  } catch (error) {
+    console.error("Error in cleanupDuplicateTokens:", error);
+  }
+}
+
+// Geçici mock fonksiyonlar
+function generateMockListings(limit = 10, shopId = 1) {
+  return {
+    listings: Array(limit).fill(null).map((_, i) => ({
+      listing_id: i + 1,
+      shop_id: shopId,
+      title: `Mock Listing ${i + 1}`,
+      state: "active" as "active" | "inactive" | "draft",
+      price: { amount: 1000, divisor: 100, currency_code: "USD" },
+      tags: [],
+      images: [],
+      user_id: 1,
+      description: "Mock description",
+      url: "https://example.com",
+      quantity: 10
+    })),
+    count: limit
+  };
+}
+
+function generateMockReceipts(limit = 10, shopId = 1) {
+  return {
+    receipts: Array(limit).fill(null).map((_, i) => ({
+      receipt_id: i + 1,
+      shop_id: shopId,
+      receipt_type: 0,
+      seller_user_id: 1,
+      seller_email: "seller@example.com",
+      buyer_user_id: 100 + i,
+      buyer_email: "buyer@example.com",
+      name: "Mock Buyer",
+      first_line: "123 Main St",
+      second_line: "",
+      city: "Anytown",
+      state: "CA",
+      zip: "12345",
+      formatted_address: "123 Main St, Anytown, CA 12345",
+      country_iso: "US",
+      payment_method: "credit_card",
+      payment_email: "buyer@example.com",
+      message_from_seller: "",
+      message_from_buyer: "",
+      message_from_payment: "",
+      is_paid: true,
+      is_shipped: false,
+      create_timestamp: Date.now() / 1000 - 86400 * i,
+      update_timestamp: Date.now() / 1000,
+      grandtotal: { amount: 1500, divisor: 100, currency_code: "USD" },
+      subtotal: { amount: 1000, divisor: 100, currency_code: "USD" },
+      total_price: { amount: 1000, divisor: 100, currency_code: "USD" },
+      total_shipping_cost: { amount: 500, divisor: 100, currency_code: "USD" },
+      total_tax_cost: { amount: 0, divisor: 100, currency_code: "USD" },
+      total_vat_cost: { amount: 0, divisor: 100, currency_code: "USD" },
+      discount_amt: { amount: 0, divisor: 100, currency_code: "USD" },
+      gift_wrap_price: { amount: 0, divisor: 100, currency_code: "USD" }
+    })),
+    count: limit
+  };
+}
+
+function generateMockPayments(limit = 10, shopId = 1) {
+  return {
+    payments: Array(limit).fill(null).map((_, i) => ({
+      payment_id: i + 1,
+      buyer_user_id: 100 + i,
+      shop_id: shopId,
+      receipt_id: i + 1,
+      amount_gross: { amount: 1500, divisor: 100, currency_code: "USD" },
+      amount_fees: { amount: 150, divisor: 100, currency_code: "USD" },
+      amount_net: { amount: 1350, divisor: 100, currency_code: "USD" },
+      posted_gross: { amount: 1500, divisor: 100, currency_code: "USD" },
+      posted_fees: { amount: 150, divisor: 100, currency_code: "USD" },
+      posted_net: { amount: 1350, divisor: 100, currency_code: "USD" },
+      adjusted_gross: { amount: 0, divisor: 100, currency_code: "USD" },
+      adjusted_fees: { amount: 0, divisor: 100, currency_code: "USD" },
+      adjusted_net: { amount: 0, divisor: 100, currency_code: "USD" },
+      currency: "USD",
+      shop_currency: "USD",
+      buyer_currency: "USD",
+      shipping_user_id: 100 + i,
+      shipping_address_id: 200 + i,
+      billing_address_id: 200 + i,
+      status: "paid",
+      shipped_timestamp: 0,
+      create_timestamp: Date.now() / 1000 - 86400 * i,
+      update_timestamp: Date.now() / 1000
+    })),
+    count: limit
+  };
+}
+
+function generateMockLedgerEntries(limit = 10, shopId = 1) {
+  return {
+    entries: Array(limit).fill(null).map((_, i) => ({
+      entry_id: i + 1,
+      ledger_id: 1,
+      sequence_number: i,
+      amount: { amount: i % 2 === 0 ? 1500 : -150, divisor: 100, currency_code: "USD" },
+      currency: "USD",
+      description: i % 2 === 0 ? "Payment" : "Fee",
+      balance: { amount: 10000 - (i * 100), divisor: 100, currency_code: "USD" },
+      create_date: Date.now() / 1000 - 86400 * i
+    })),
+    count: limit
+  };
 }

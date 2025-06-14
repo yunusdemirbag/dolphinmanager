@@ -100,8 +100,7 @@ export function RateLimitIndicator() {
       <div className="space-y-2">
         <Progress 
           value={rateLimit.percentage} 
-          className="h-2 bg-gray-100"
-          indicatorClassName={getColor()}
+          className={`h-2 bg-gray-100 ${getColor()}`}
         />
         
         <div className="flex justify-between text-xs">

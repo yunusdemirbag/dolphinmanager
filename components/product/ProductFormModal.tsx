@@ -1183,7 +1183,13 @@ export function ProductFormModal({
                             body: JSON.stringify({ prompt: descPrompt }),
                           });
                           const descText = await descRes.text();
-                          setDescription(descText.trim());
+                          // Segmentli açıklamayı insan okunabilir formata çevir
+                          const segments = descText.trim().split('|||').map(s => s.trim());
+                          let formattedDesc = descText.trim();
+                          if (segments.length === 3) {
+                            formattedDesc = `**${segments[0]}**\n\n_Stil: ${segments[1]}_\n\n_${segments[2]}_`;
+                          }
+                          setDescription(formattedDesc);
                           
                           // Etiket üret
                           const tagPrompt = tagsPrompt.prompt.replace("${title}", title);

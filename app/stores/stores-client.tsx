@@ -360,7 +360,7 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   const handleDisconnectStore = async () => {
     setReconnecting(true)
     try {
-      const storeToDisconnect = stores?.[0]?.shop_id;
+      const storeToDisconnect = currentStore?.shop_id;
       if (!storeToDisconnect) {
         alert('Bağlantı kesilecek mağaza bulunamadı');
         return;
@@ -380,10 +380,8 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
       }
       if (response.ok) {
         setEtsyConnected(false)
-        setStores([])
+        setStores(stores.filter(s => s.shop_id !== storeToDisconnect))
         alert('✅ Etsy bağlantısı başarıyla kesildi!')
-        
-        // Sayfayı yenile
         setTimeout(() => loadStores(), 1000)
       } else {
         const errorData = await response.json()
@@ -655,6 +653,19 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {stores.map((store) => (
               <Card key={store.shop_id} className="relative">
+                {/* Disconnect Button - sağ üst köşe */}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute top-2 right-2 z-10 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                  title="Bağlantıyı Kes"
+                  onClick={() => {
+                    setCurrentStore(store);
+                    setDisconnectDialogOpen(true);
+                  }}
+                >
+                  <Unlink className="w-5 h-5" />
+                </Button>
                 <CardContent className="flex items-center">
                   <div className="relative w-20 h-20 rounded-full overflow-hidden mr-4 bg-gray-200 flex items-center justify-center">
                     {store.avatar_url || store.image_url_760x100 ? (

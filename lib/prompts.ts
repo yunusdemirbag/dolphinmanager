@@ -18,13 +18,48 @@ export const titlePrompt: PromptConfig = {
   defaultPrompt: "Analyze the uploaded image in detail and generate ONLY a single, complete, SEO-optimized Etsy product title between 110-135 characters. Do not use incomplete phrases or ellipses (...). Do not include any explanations or additional text."
 };
 
-// Description generation prompt
+// Description generation prompt – Optimized & Benchmark-Aligned (Full Version)
 export const descriptionPrompt: PromptConfig = {
-  id: "description-prompt",
-  name: "Description Generation Prompt",
-  description: "Prompt used to generate an automatic description based on the product title (${title} variable is added).",
-  prompt: "You are an expert Etsy Copywriter and SEO Specialist. Write ONE compelling, emotionally resonant, and SEO-rich product description for a physical canvas wall art print with the title: \"${title}\".\n\nPRINCIPLES:\n1. Start with an emotional hook that captures the essence of the title (e.g., for 'Moody Art', start with 'Step into a world of dreams...').\n2. Naturally weave in keywords from the title throughout the description.\n3. Translate features into tangible benefits (e.g., 'Archival inks' becomes 'ensuring the colors will resist fading for decades').\n4. For the 'Seamless Fit' bullet point, suggest 3-4 relevant interior design styles based on the title (e.g., for 'Ethnic Art', suggest 'bohemian, eclectic, maximalist').\n\nSTRUCTURE (Follow this benchmark exactly):\n🌟 **Transform Your Space with an Artwork that Speaks to You** 🖼️✨\n\nImmerse your home in the [Insert Mood/Style Adjective from Title] energy of this exquisite canvas print. Inspired by the captivating theme of \"${title}\", this piece isn't just decor; it's a conversation starter, a mood-setter, and the artistic focal point your living room, bedroom, or office has been waiting for.\n\n**Why This Canvas Will Transform Your Space:**\n\n✅ **Museum-Grade & Built to Last:** We use only the finest artist-grade canvas and archival, fade-resistant inks. This ensures your art remains as vibrant and breathtaking as the day you bought it, destined to become a timeless feature of your home.\n\n✅ **Gallery-Wrapped for a Flawless Look:** Each piece is professionally stretched over a sturdy, 1.25\" deep solid pine wood frame. The gallery-wrapped edges create a clean, three-dimensional look that is ready to hang right out of the box—no extra framing required.\n\n✅ **A Seamless Interior Fit:** The unique style of this piece perfectly complements a range of interiors, including [List 3-4 relevant interior styles based on the title's style] aesthetics, making it a versatile choice for any discerning decorator.\n\n✅ **Art-Secure Packaging & Shipping:** Your new artwork is a precious investment. We meticulously wrap it in protective materials and ship it in a robust, custom-made box to ensure it arrives at your doorstep in pristine condition, tracked and insured.\n\n💬 **Have a Custom Vision?** We believe in making art personal. If you have a special request for size, color adjustments, or a unique design, please send us a message. Let's collaborate to create the perfect piece for you.\n\n🎁 **The Ultimate Gift for Art Lovers:** Whether for a housewarming, wedding, anniversary, or just to treat yourself, this canvas is a memorable and sophisticated gift.\n\nDon't just decorate—inspire. Click **Add to Cart** now and bring this stunning piece of art into your life!\n\nFINAL INSTRUCTION: Return ONLY the description text, starting with the headline. Do not include any other text.",
-  defaultPrompt: "Generate a captivating, SEO-optimized Etsy product description for a physical canvas wall art print with this title: \"${title}\". Return only the description, do not add any other text."
+  id: "description-prompt-optimized-final",
+  name: "Optimized Description Generator",
+  description:
+    "Generates a compelling product description based on the product title (${title} variable is added).",
+  prompt: `You are an expert Etsy Copywriter and SEO Specialist. Your task is to write ONE compelling, emotionally resonant, and SEO-rich product description for a physical canvas wall art print with the title: "\${title}".
+
+**MISSION:**
+Populate the template below in full. Dynamically analyze the provided title to fill every bracketed section \`[...]\` with creative, relevant content.
+
+**CORE PRINCIPLES:**
+1. **Emotional Hook:** The opening phrase in \`[Insert core feeling/adjective]\` MUST capture the primary mood of the title (e.g., "serene energy", "vibrant pulse", "moody atmosphere").
+2. **Keyword Integration:** Seamlessly weave important keywords from the title (subject, style, color cues) throughout the description.
+3. **Benefit-Driven Language:** Translate features into tangible benefits (e.g., "archival inks" → "vibrant, fade-resistant colors that last for decades").
+4. **Dynamic Style Matching:** In the \`[List 3-4 relevant interior styles]\` section, list interior design styles that clearly align with the title's vibe.
+
+**STRUCTURE (Follow exactly — do NOT rename bullets):**
+
+🌟 **Transform Your Space with an Artwork that Speaks to You** 🖼️✨
+
+Immerse your home in the **[Insert core feeling/adjective]** of this exquisite canvas print. Inspired by the captivating theme of "**\${title}**", this piece isn't just decor; it's a conversation starter, a mood-setter, and the artistic focal point your living room, bedroom, or office has been waiting for.
+
+**Why This Canvas Will Transform Your Space:**
+
+✅ **Museum-Grade & Built to Last:** We use only the finest artist-grade canvas and archival, fade-resistant inks, ensuring your art remains as vibrant and breathtaking as the day you bought it—destined to become a timeless feature of your home.
+
+✅ **Gallery-Wrapped for a Flawless Look:** Each piece is professionally stretched over a sturdy 1.25" deep solid pine wood frame. The gallery-wrapped edges create a clean, three-dimensional look that is ready to hang right out of the box—no extra framing required.
+
+✅ **A Seamless Fit:** The unique style of this piece perfectly complements a range of interiors, including **[List 3-4 relevant interior styles]** aesthetics, making it a versatile choice for any discerning decorator.
+
+✅ **Art-Secure Packaging & Shipping:** Your new artwork is a precious investment. We meticulously wrap it in protective materials and ship it in a robust, custom-made box to ensure it arrives at your doorstep in pristine condition—tracked and insured.
+
+💬 **Have a Custom Vision?** We believe in making art personal. If you have a special request for size, color adjustments, or a unique design, please send us a message. Let's collaborate to create the perfect piece for you.
+
+🎁 **The Ultimate Gift for Art Lovers:** Whether for a housewarming, wedding, anniversary, or simply to treat yourself, this canvas is a memorable and sophisticated gift.
+
+Don't just decorate—**inspire**. Click **Add to Cart** now and bring this stunning piece of art into your life!
+
+**FINAL INSTRUCTION (CRITICAL):**
+Return **ONLY** the completed description text, starting with the headline emoji. Do **NOT** include any other text, JSON, or explanations.`,
+  defaultPrompt: `Generate a captivating, SEO-optimized Etsy product description for a physical canvas wall art print with this title: "\${title}". Follow the template and principles provided in the main prompt. Return only the final description text, starting with the headline emoji. No JSON, no explanations.`
 };
 
 // Tags generation prompt

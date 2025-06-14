@@ -394,7 +394,7 @@ export function ProductFormModal({
   }, [isOpen]);
 
   // Başlık değişimini debounce ile geciktir
-  const debouncedTitle = useDebounce(title, 5000); // 5 saniye debounce
+  const debouncedTitle = useDebounce(title, 3000); // 3 saniye debounce
 
   // hasUnsavedChanges fonksiyonunu güncelle
   const hasUnsavedChanges = () => {

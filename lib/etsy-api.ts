@@ -2047,6 +2047,28 @@ export async function reorderListingImages(
   }
 }
 
+// Etsy'nin kabul ettiği geçerli renk kodları
+export const ETSY_VALID_COLORS = [
+  'beige',
+  'black', 
+  'blue',
+  'brown',
+  'clear',
+  'copper',
+  'gold',
+  'gray',
+  'green',
+  'orange',
+  'pink',
+  'purple',
+  'red',
+  'silver',
+  'white',
+  'yellow'
+] as const;
+
+export type EtsyColor = typeof ETSY_VALID_COLORS[number];
+
 // Create a draft listing on Etsy
 export async function createDraftListing(accessToken: string, shopId: number, data: any): Promise<any> {
     const body = new URLSearchParams();
@@ -2128,6 +2150,28 @@ export async function createDraftListing(accessToken: string, shopId: number, da
     fixedMaterials.forEach(material => {
         body.append('materials[]', material);
     });
+    
+    // --- RENK BİLGİLERİNİ EKLE ---
+    if (data.primary_color) {
+        const primaryColor = data.primary_color.toLowerCase();
+        if (ETSY_VALID_COLORS.includes(primaryColor as EtsyColor)) {
+            body.append('primary_color', primaryColor);
+            console.log(`[ETSY_API] ✅ Ana renk eklendi: ${primaryColor}`);
+        } else {
+            console.warn(`[ETSY_API] ⚠️ Geçersiz ana renk: ${primaryColor} - Etsy tarafından kabul edilmiyor`);
+        }
+    }
+    
+    if (data.secondary_color) {
+        const secondaryColor = data.secondary_color.toLowerCase();
+        if (ETSY_VALID_COLORS.includes(secondaryColor as EtsyColor)) {
+            body.append('secondary_color', secondaryColor);
+            console.log(`[ETSY_API] ✅ İkincil renk eklendi: ${secondaryColor}`);
+        } else {
+            console.warn(`[ETSY_API] ⚠️ Geçersiz ikincil renk: ${secondaryColor} - Etsy tarafından kabul edilmiyor`);
+        }
+    }
+    // ---------------------------
     
     console.log("[ETSY_API] Etsy'ye gönderilen son istek gövdesi:", Object.fromEntries(body.entries()));
 

@@ -1,7 +1,84 @@
 import { NextRequest, NextResponse } from "next/server"
 import { titlePrompt, descriptionPrompt, tagsPrompt, categoryPrompt } from "@/lib/prompts"
+import { ETSY_VALID_COLORS, EtsyColor } from "@/lib/etsy-api"
 
 export const runtime = "edge"
+
+// Tespit edilen rengi Etsy'nin kabul ettiği renk formatına dönüştürür
+function convertToEtsyColor(detectedColor: string): EtsyColor | null {
+  const colorMap: Record<string, EtsyColor> = {
+    // Pembe tonları
+    'pink': 'pink',
+    'rose': 'pink',
+    'magenta': 'pink',
+    'fuchsia': 'pink',
+    'salmon': 'pink',
+    'coral': 'pink',
+    
+    // Mavi tonları  
+    'blue': 'blue',
+    'navy': 'blue',
+    'cyan': 'blue',
+    'turquoise': 'blue',
+    'teal': 'blue',
+    'aqua': 'blue',
+    
+    // Yeşil tonları
+    'green': 'green',
+    'lime': 'green',
+    'olive': 'green',
+    'emerald': 'green',
+    'mint': 'green',
+    
+    // Sarı tonları
+    'yellow': 'yellow',
+    'amber': 'yellow',
+    'cream': 'beige',
+    'ivory': 'beige',
+    
+    // Kırmızı tonları
+    'red': 'red',
+    'crimson': 'red',
+    'burgundy': 'red',
+    'maroon': 'red',
+    'cherry': 'red',
+    
+    // Mor tonları
+    'purple': 'purple',
+    'violet': 'purple',
+    'lavender': 'purple',
+    'indigo': 'purple',
+    'plum': 'purple',
+    
+    // Turuncu tonları
+    'orange': 'orange',
+    'peach': 'orange',
+    'apricot': 'orange',
+    'tangerine': 'orange',
+    
+    // Nötr renkler
+    'black': 'black',
+    'white': 'white',
+    'gray': 'gray',
+    'grey': 'gray',
+    'brown': 'brown',
+    'tan': 'brown',
+    'beige': 'beige',
+    'khaki': 'beige',
+    
+    // Metalik
+    'silver': 'silver',
+    'gold': 'gold',
+    'copper': 'copper',
+    
+    // Şeffaf
+    'clear': 'clear',
+    'transparent': 'clear'
+  };
+  
+  const lowerColor = detectedColor.toLowerCase();
+  return colorMap[lowerColor] || null;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -100,10 +177,53 @@ export async function POST(req: NextRequest) {
     const colorData = await colorResponse.json();
     const colorResult = colorData.choices?.[0]?.message?.content || "{}";
     
+    // Renk analizi sonuçlarını işle
+    let colorInfo;
+    try {
+      colorInfo = JSON.parse(colorResult);
+    } catch (e) {
+      console.error("Renk analizi JSON parse hatası:", e);
+      colorInfo = { primaryColor: "", secondaryColor: "" };
+    }
+    
+    // Tespit edilen renkleri Etsy'nin kabul ettiği formata dönüştür
+    const primaryColorTurkish = colorInfo.primaryColor || "";
+    const secondaryColorTurkish = colorInfo.secondaryColor || "";
+    
+    // Türkçe renk isimlerini İngilizce'ye çevir
+    const colorTranslation: Record<string, string> = {
+      'mavi': 'blue',
+      'kırmızı': 'red',
+      'yeşil': 'green',
+      'siyah': 'black',
+      'beyaz': 'white',
+      'gri': 'gray',
+      'mor': 'purple',
+      'turuncu': 'orange',
+      'sarı': 'yellow',
+      'pembe': 'pink',
+      'kahverengi': 'brown',
+      'bej': 'beige',
+      'altın': 'gold',
+      'gümüş': 'silver',
+      'bakır': 'copper',
+      'şeffaf': 'clear'
+    };
+    
+    // Türkçe renk isimlerini İngilizce'ye çevir ve Etsy formatına dönüştür
+    const primaryColorEnglish = colorTranslation[primaryColorTurkish.toLowerCase()] || primaryColorTurkish;
+    const secondaryColorEnglish = colorTranslation[secondaryColorTurkish.toLowerCase()] || secondaryColorTurkish;
+    
+    const etsyPrimaryColor = convertToEtsyColor(primaryColorEnglish) || 'blue'; // Varsayılan mavi
+    const etsySecondaryColor = convertToEtsyColor(secondaryColorEnglish) || 'white'; // Varsayılan beyaz
+    
     // Sonuçları birleştir
     const combinedResult = {
       title: titleResult,
-      colors: JSON.parse(colorResult)
+      colors: {
+        primaryColor: etsyPrimaryColor,
+        secondaryColor: etsySecondaryColor
+      }
     };
     
     return NextResponse.json(combinedResult, { status: 200 });

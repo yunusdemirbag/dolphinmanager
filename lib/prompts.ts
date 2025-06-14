@@ -1,51 +1,51 @@
-// Etsy ürün başlık, açıklama ve etiket oluşturma promptları
-// Bu dosya OpenAI API için kullanılan promptları içerir ve ayarlar sayfasından düzenlenebilir
+// Etsy product title, description and tag generation prompts
+// This file contains prompts used for OpenAI API and can be edited from settings page
 
 export interface PromptConfig {
   id: string;
   name: string;
   description: string;
   prompt: string;
-  defaultPrompt: string; // Orijinal prompt (reset için)
+  defaultPrompt: string; // Original prompt (for reset)
 }
 
-// Başlık oluşturma promptu
+// Title generation prompt
 export const titlePrompt: PromptConfig = {
   id: "title-prompt",
-  name: "Başlık Oluşturma Promptu",
-  description: "Görsel yüklendiğinde ürün başlığı oluşturmak için kullanılan prompt",
-  prompt: "Yüklenen görseli detaylı analiz et ve SADECE bu görsele uygun, SEO uyumlu bir Etsy ürün başlığı üret. Başlık dışında hiçbir açıklama veya ek metin yazma. Başlıkta marka, ölçü, fiyat veya gereksiz kelimeler olmasın.",
-  defaultPrompt: "GÖREV: Aşağıdaki görseli analiz et ve sadece bu görsele uygun, SEO uyumlu, yüksek dönüşüm sağlayacak tek bir Etsy ürün başlığı üret. Sadece başlığı döndür. Başlıkta marka, ölçü, fiyat veya gereksiz kelimeler olmasın."
+  name: "Title Generation Prompt",
+  description: "Prompt used to generate product title when an image is uploaded",
+  prompt: "Analyze the uploaded image in detail and generate ONLY a single SEO-optimized Etsy product title suitable for this specific image. Do not include any explanations or additional text. Do not include brand, dimensions, price or unnecessary words in the title.",
+  defaultPrompt: "Analyze the uploaded image in detail and generate ONLY a single SEO-optimized Etsy product title suitable for this specific image. Do not include any explanations or additional text. Do not include brand, dimensions, price or unnecessary words in the title."
 };
 
-// Açıklama oluşturma promptu
+// Description generation prompt
 export const descriptionPrompt: PromptConfig = {
   id: "description-prompt",
-  name: "Açıklama Oluşturma Promptu",
-  description: "Ürün başlığına göre otomatik açıklama oluşturmak için kullanılan prompt (${title} değişkeni ile başlık eklenir)",
-  prompt: "Bu başlığa sahip bir tuval duvar sanatı baskısı için SEO uyumlu, çekici bir Etsy ürün açıklaması oluştur: \"${title}\". Sadece açıklamayı döndür, başka hiçbir metin ekleme.",
-  defaultPrompt: "TASK: Generate a captivating, SEO-optimized Etsy product description for a physical canvas wall art print based on the provided product title."
+  name: "Description Generation Prompt",
+  description: "Prompt used to generate automatic description based on product title (${title} variable is added)",
+  prompt: "Generate a captivating, SEO-optimized Etsy product description for a physical canvas wall art print with this title: \"${title}\". Return only the description, do not add any other text.",
+  defaultPrompt: "Generate a captivating, SEO-optimized Etsy product description for a physical canvas wall art print with this title: \"${title}\". Return only the description, do not add any other text."
 };
 
-// Etiket oluşturma promptu
+// Tags generation prompt
 export const tagsPrompt: PromptConfig = {
   id: "tags-prompt",
-  name: "Etiket Oluşturma Promptu",
-  description: "Ürün başlığına göre etiket oluşturmak için kullanılan prompt (${title} değişkeni ile başlık eklenir)",
-  prompt: "Bu başlığa sahip bir tuval duvar sanatı baskısı için tam olarak 13 adet Etsy etiketi oluştur: \"${title}\". Her etiket en fazla 19 karakter olmalı, tümü küçük harfli İngilizce olmalı. Etiketleri virgülle ayırarak tek satırda döndür. Başka hiçbir metin veya açıklama ekleme.",
-  defaultPrompt: "TASK: Generate a hyper-optimized list of 13 Etsy tags for a physical canvas wall art print, based on the provided product title."
+  name: "Tags Generation Prompt",
+  description: "Prompt used to generate tags based on product title (${title} variable is added)",
+  prompt: "Generate exactly 13 Etsy tags for a physical canvas wall art print with this title: \"${title}\". Each tag must be maximum 19 characters, all lowercase English. Return tags as a comma-separated single line. Do not add any other text or explanations.",
+  defaultPrompt: "Generate exactly 13 Etsy tags for a physical canvas wall art print with this title: \"${title}\". Each tag must be maximum 19 characters, all lowercase English. Return tags as a comma-separated single line. Do not add any other text or explanations."
 };
 
-// Kategori seçme promptu
+// Category selection prompt
 export const categoryPrompt: PromptConfig = {
   id: "category-prompt",
-  name: "Kategori Seçme Promptu",
-  description: "Ürün başlığına göre mağaza kategorisi seçmek için kullanılan prompt (${title} ve ${categoryNames} değişkenleri eklenir)",
-  prompt: "Aşağıdaki ürün başlığına en uygun mağaza kategorisini sadece aşağıdaki seçeneklerden birini seçerek döndür. Sadece kategori adını döndür, başka hiçbir metin yazma: ${categoryNames}",
-  defaultPrompt: "Aşağıdaki ürün başlığına en uygun mağaza kategorisini sadece aşağıdaki seçeneklerden birini seçerek döndür. Sadece kategori adını döndür."
+  name: "Category Selection Prompt",
+  description: "Prompt used to select store category based on product title (${title} and ${categoryNames} variables are added)",
+  prompt: "Select the most appropriate store category for this product title from the following options only. Return only the category name, do not write any other text: ${categoryNames}",
+  defaultPrompt: "Select the most appropriate store category for this product title from the following options only. Return only the category name, do not write any other text: ${categoryNames}"
 };
 
-// Tüm promptları içeren koleksiyon
+// Collection of all prompts
 export const prompts: PromptConfig[] = [
   titlePrompt,
   descriptionPrompt,
@@ -53,12 +53,12 @@ export const prompts: PromptConfig[] = [
   categoryPrompt
 ];
 
-// ID'ye göre prompt getirme fonksiyonu
+// Function to get prompt by ID
 export function getPromptById(id: string): PromptConfig | undefined {
   return prompts.find(p => p.id === id);
 }
 
-// Prompt güncelleme fonksiyonu
+// Function to update prompt
 export function updatePrompt(id: string, newPrompt: string): void {
   const promptIndex = prompts.findIndex(p => p.id === id);
   if (promptIndex !== -1) {
@@ -66,7 +66,7 @@ export function updatePrompt(id: string, newPrompt: string): void {
   }
 }
 
-// Prompt sıfırlama fonksiyonu
+// Function to reset prompt
 export function resetPrompt(id: string): void {
   const promptIndex = prompts.findIndex(p => p.id === id);
   if (promptIndex !== -1) {

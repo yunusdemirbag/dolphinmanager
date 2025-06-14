@@ -1,8 +1,29 @@
 import { NextRequest, NextResponse } from "next/server"
 import { titlePrompt, descriptionPrompt, tagsPrompt, categoryPrompt } from "@/lib/prompts"
 import { ETSY_VALID_COLORS, EtsyColor } from "@/lib/etsy-api"
+import { supabaseAdmin } from "@/lib/supabase"
+import { getUser } from "@/lib/auth"
 
 export const runtime = "edge"
+
+// API istek loglarını veritabanına kaydetmek için yardımcı fonksiyon
+async function logApiRequest(endpoint: string, userId: string | null, success: boolean, durationMs: number, details?: any) {
+  try {
+    await supabaseAdmin
+      .from("api_logs")
+      .insert({
+        endpoint,
+        user_id: userId,
+        timestamp: new Date().toISOString(),
+        success,
+        duration_ms: durationMs,
+        details
+      });
+    console.log(`API log kaydedildi: ${endpoint}, başarı: ${success}, süre: ${durationMs}ms`);
+  } catch (error) {
+    console.error("API log kaydederken hata:", error);
+  }
+}
 
 // Tespit edilen rengi Etsy'nin kabul ettiği renk formatına dönüştürür
 function convertToEtsyColor(detectedColor: string): EtsyColor | null {
@@ -22,6 +43,9 @@ function convertToEtsyColor(detectedColor: string): EtsyColor | null {
     'turquoise': 'blue',
     'teal': 'blue',
     'aqua': 'blue',
+    'azure': 'blue',
+    'cerulean': 'blue',
+    'indigo': 'blue',
     
     // Yeşil tonları
     'green': 'green',
@@ -29,59 +53,98 @@ function convertToEtsyColor(detectedColor: string): EtsyColor | null {
     'olive': 'green',
     'emerald': 'green',
     'mint': 'green',
-    
-    // Sarı tonları
-    'yellow': 'yellow',
-    'amber': 'yellow',
-    'cream': 'beige',
-    'ivory': 'beige',
+    'sage': 'green',
+    'forest': 'green',
     
     // Kırmızı tonları
     'red': 'red',
     'crimson': 'red',
-    'burgundy': 'red',
+    'scarlet': 'red',
     'maroon': 'red',
-    'cherry': 'red',
+    'ruby': 'red',
+    'burgundy': 'red',
     
     // Mor tonları
     'purple': 'purple',
     'violet': 'purple',
     'lavender': 'purple',
-    'indigo': 'purple',
+    'lilac': 'purple',
     'plum': 'purple',
+    
+    // Sarı tonları
+    'yellow': 'yellow',
+    'gold': 'gold',
+    'amber': 'yellow',
+    'mustard': 'yellow',
+    'lemon': 'yellow',
     
     // Turuncu tonları
     'orange': 'orange',
-    'peach': 'orange',
-    'apricot': 'orange',
     'tangerine': 'orange',
+    'peach': 'orange',
     
-    // Nötr renkler
-    'black': 'black',
-    'white': 'white',
-    'gray': 'gray',
-    'grey': 'gray',
+    // Kahverengi tonları
     'brown': 'brown',
+    'chocolate': 'brown',
+    'coffee': 'brown',
     'tan': 'brown',
     'beige': 'beige',
     'khaki': 'beige',
     
-    // Metalik
+    // Gri tonları
+    'gray': 'gray',
+    'grey': 'gray',
     'silver': 'silver',
-    'gold': 'gold',
-    'copper': 'copper',
+    'charcoal': 'gray',
+    'ash': 'gray',
     
-    // Şeffaf
-    'clear': 'clear',
-    'transparent': 'clear'
+    // Siyah ve beyaz
+    'black': 'black',
+    'white': 'white',
+    'ivory': 'white',
+    'cream': 'white',
+    'snow': 'white',
+    
+    // Türkçe renk isimleri
+    'mavi': 'blue',
+    'lacivert': 'blue',
+    'turkuaz': 'blue',
+    'yeşil': 'green',
+    'zümrüt': 'green',
+    'kırmızı': 'red',
+    'bordo': 'red',
+    'pembe': 'pink',
+    'mor': 'purple',
+    'sarı': 'yellow',
+    'altın': 'gold',
+    'turuncu': 'orange',
+    'kahverengi': 'brown',
+    'bej': 'beige',
+    'gri': 'gray',
+    'siyah': 'black',
+    'beyaz': 'white',
+    'gümüş': 'silver',
+    'bakır': 'copper'
   };
-  
+
   const lowerColor = detectedColor.toLowerCase();
   return colorMap[lowerColor] || null;
 }
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  let userId = null;
+  let success = false;
+  
   try {
+    // Kullanıcı kimliğini al
+    try {
+      const user = await getUser();
+      userId = user?.id || null;
+    } catch (error) {
+      console.error("Kullanıcı kimliği alınamadı:", error);
+    }
+    
     const contentType = req.headers.get("content-type") || "";
     // Açıklama üretimi için JSON body
     if (contentType.includes("application/json")) {
@@ -95,139 +158,254 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o",
+          model: "gpt-3.5-turbo",
           messages: [
-            { role: "system", content: "You are a world-class Etsy product description generator." },
-            { role: "user", content: prompt }
+            {
+              role: "system",
+              content: "You are a helpful assistant that generates product descriptions or tags for Etsy listings.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
           ],
-          max_tokens: 600,
-        })
+          temperature: 0.7,
+          max_tokens: 500,
+        }),
       });
-      const data = await response.json();
-      const result = data.choices?.[0]?.message?.content || "Açıklama üretilemedi.";
-      return new Response(result, {
-        status: 200,
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("OpenAI API error:", error);
+        
+        // Log API request with error
+        await logApiRequest(
+          "/api/ai/generate-etsy-title (JSON)", 
+          userId, 
+          false, 
+          Date.now() - startTime, 
+          { error, promptType: "JSON" }
+        );
+        
+        return NextResponse.json(
+          { error: "OpenAI API hatası" },
+          { status: response.status }
+        );
+      }
+
+      const result = await response.json();
+      const generatedText = result.choices[0].message.content.trim();
+      
+      success = true;
+      // Log successful API request
+      await logApiRequest(
+        "/api/ai/generate-etsy-title (JSON)", 
+        userId, 
+        true, 
+        Date.now() - startTime, 
+        { promptType: "JSON", promptLength: prompt.length }
+      );
+      
+      return NextResponse.json({ text: generatedText });
+    }
+
+    // Resim analizi için multipart/form-data
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+      const image = formData.get("image");
+
+      if (!image || !(image instanceof File)) {
+        // Log API request with error
+        await logApiRequest(
+          "/api/ai/generate-etsy-title (Image)", 
+          userId, 
+          false, 
+          Date.now() - startTime, 
+          { error: "Resim gerekli" }
+        );
+        
+        return NextResponse.json({ error: "Resim gerekli" }, { status: 400 });
+      }
+
+      const bytes = await image.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const base64Image = buffer.toString("base64");
+
+      const apiKey = process.env.OPENAI_API_KEY;
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4-vision-preview",
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful assistant that analyzes images and generates product titles, descriptions, and color information for Etsy listings.",
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: titlePrompt,
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/${image.type};base64,${base64Image}`,
+                  },
+                },
+              ],
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 500,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("OpenAI Vision API error:", error);
+        
+        // Log API request with error
+        await logApiRequest(
+          "/api/ai/generate-etsy-title (Image)", 
+          userId, 
+          false, 
+          Date.now() - startTime, 
+          { error, imageSize: image.size }
+        );
+        
+        return NextResponse.json(
+          { error: "OpenAI Vision API hatası" },
+          { status: response.status }
+        );
+      }
+
+      const result = await response.json();
+      const generatedText = result.choices[0].message.content.trim();
+
+      // Markdown kod bloğunu temizle
+      const cleanedText = generatedText
+        .replace(/```.*\n/g, "")
+        .replace(/```/g, "")
+        .trim();
+
+      // Renk bilgilerini çıkar
+      let title = cleanedText;
+      let primaryColor = null;
+      let secondaryColor = null;
+
+      // Renk bilgilerini çıkarmak için ek bir API çağrısı yap
+      try {
+        const colorResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4-vision-preview",
+            messages: [
+              {
+                role: "system",
+                content: "You are a helpful assistant that analyzes images to identify colors.",
+              },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: "Identify the two most dominant colors in this image. Return ONLY a JSON object with 'primaryColor' and 'secondaryColor' properties. Use simple color names like red, blue, green, etc.",
+                  },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:image/${image.type};base64,${base64Image}`,
+                    },
+                  },
+                ],
+              },
+            ],
+            temperature: 0.3,
+            max_tokens: 150,
+            response_format: { type: "json_object" }
+          }),
+        });
+
+        if (colorResponse.ok) {
+          const colorResult = await colorResponse.json();
+          const colorData = JSON.parse(colorResult.choices[0].message.content);
+          
+          // Renkleri Etsy'nin kabul ettiği formata dönüştür
+          if (colorData.primaryColor) {
+            primaryColor = convertToEtsyColor(colorData.primaryColor);
+          }
+          if (colorData.secondaryColor) {
+            secondaryColor = convertToEtsyColor(colorData.secondaryColor);
+          }
+        }
+      } catch (colorError) {
+        console.error("Renk analizi hatası:", colorError);
+      }
+
+      success = true;
+      // Log successful API request
+      await logApiRequest(
+        "/api/ai/generate-etsy-title (Image)", 
+        userId, 
+        true, 
+        Date.now() - startTime, 
+        { 
+          imageSize: image.size, 
+          primaryColor, 
+          secondaryColor 
+        }
+      );
+      
+      return NextResponse.json({ 
+        title, 
+        colors: {
+          primary: primaryColor,
+          secondary: secondaryColor
+        }
       });
     }
 
-    // Başlık ve renk analizi için görsel (multipart/form-data)
-    const formData = await req.formData()
-    const file = formData.get("image") as File
-    if (!file) {
-      return NextResponse.json({ error: "Görsel dosyası gerekli" }, { status: 400 })
-    }
-    // Görseli base64'e çevir
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Image = Buffer.from(arrayBuffer).toString("base64");
-    const mimeType = file.type || "image/png";
-    const imageData = `data:${mimeType};base64,${base64Image}`;
+    // Log API request with unsupported content type error
+    await logApiRequest(
+      "/api/ai/generate-etsy-title", 
+      userId, 
+      false, 
+      Date.now() - startTime, 
+      { error: "Desteklenmeyen content type", contentType }
+    );
     
-    // Başlık promtu
-    const titlePromptText = titlePrompt.prompt;
+    return NextResponse.json(
+      { error: "Desteklenmeyen content type" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("Generate Etsy title error:", error);
     
-    // Renk analizi promtu
-    const colorAnalysisPrompt = "Analyze this image and identify the two most dominant colors. Return your answer in the following JSON format only, without any additional text or explanation: {\"primaryColor\": \"color name\", \"secondaryColor\": \"color name\"}. Use simple, common color names in Turkish (like Mavi, Kırmızı, Yeşil, Siyah, Beyaz, Gri, Mor, Turuncu, Sarı, Pembe, Kahverengi, Bej, Altın, Gümüş, etc). The primary color should be the most dominant color in the image, and the secondary color should be the second most dominant color.";
+    // Log API request with error
+    await logApiRequest(
+      "/api/ai/generate-etsy-title", 
+      userId, 
+      false, 
+      Date.now() - startTime, 
+      { error: error instanceof Error ? error.message : String(error) }
+    );
     
-    // OpenAI Vision API'ye istek at - Başlık için
-    const apiKey = process.env.OPENAI_API_KEY;
-    const titleResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are a world-class Etsy canvas wall art title generator." },
-          { role: "user", content: [
-            { type: "text", text: titlePromptText },
-            { type: "image_url", image_url: { url: imageData } }
-          ]}
-        ],
-        max_tokens: 300,
-      })
-    });
-    const titleData = await titleResponse.json();
-    const titleResult = titleData.choices?.[0]?.message?.content || "Başlık üretilemedi.";
-    
-    // OpenAI Vision API'ye istek at - Renk analizi için
-    const colorResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are a color analysis expert." },
-          { role: "user", content: [
-            { type: "text", text: colorAnalysisPrompt },
-            { type: "image_url", image_url: { url: imageData } }
-          ]}
-        ],
-        max_tokens: 100,
-      })
-    });
-    const colorData = await colorResponse.json();
-    const colorResult = colorData.choices?.[0]?.message?.content || "{}";
-    
-    // Renk analizi sonuçlarını işle
-    let colorInfo;
-    try {
-      colorInfo = JSON.parse(colorResult);
-    } catch (e) {
-      console.error("Renk analizi JSON parse hatası:", e);
-      colorInfo = { primaryColor: "", secondaryColor: "" };
-    }
-    
-    // Tespit edilen renkleri Etsy'nin kabul ettiği formata dönüştür
-    const primaryColorTurkish = colorInfo.primaryColor || "";
-    const secondaryColorTurkish = colorInfo.secondaryColor || "";
-    
-    // Türkçe renk isimlerini İngilizce'ye çevir
-    const colorTranslation: Record<string, string> = {
-      'mavi': 'blue',
-      'kırmızı': 'red',
-      'yeşil': 'green',
-      'siyah': 'black',
-      'beyaz': 'white',
-      'gri': 'gray',
-      'mor': 'purple',
-      'turuncu': 'orange',
-      'sarı': 'yellow',
-      'pembe': 'pink',
-      'kahverengi': 'brown',
-      'bej': 'beige',
-      'altın': 'gold',
-      'gümüş': 'silver',
-      'bakır': 'copper',
-      'şeffaf': 'clear'
-    };
-    
-    // Türkçe renk isimlerini İngilizce'ye çevir ve Etsy formatına dönüştür
-    const primaryColorEnglish = colorTranslation[primaryColorTurkish.toLowerCase()] || primaryColorTurkish;
-    const secondaryColorEnglish = colorTranslation[secondaryColorTurkish.toLowerCase()] || secondaryColorTurkish;
-    
-    const etsyPrimaryColor = convertToEtsyColor(primaryColorEnglish) || 'blue'; // Varsayılan mavi
-    const etsySecondaryColor = convertToEtsyColor(secondaryColorEnglish) || 'white'; // Varsayılan beyaz
-    
-    // Sonuçları birleştir
-    const combinedResult = {
-      title: titleResult,
-      colors: {
-        primaryColor: etsyPrimaryColor,
-        secondaryColor: etsySecondaryColor
-      }
-    };
-    
-    return NextResponse.json(combinedResult, { status: 200 });
-  } catch (e) {
-    return NextResponse.json({ error: "İşlem başarısız", detail: String(e) }, { status: 500 })
+    return NextResponse.json(
+      { error: "İstek işlenirken bir hata oluştu" },
+      { status: 500 }
+    );
   }
 } 

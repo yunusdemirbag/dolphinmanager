@@ -1,5 +1,27 @@
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@/lib/supabase/server';
+import { createClientFromBrowser } from '@/lib/supabase/client';
+
+// Helper function to get the appropriate Supabase client based on context
+async function getSupabaseClient() {
+  try {
+    // Check if we're in a request context (server-side)
+    if (typeof window === 'undefined') {
+      try {
+        return await createClient();
+      } catch (error) {
+        console.error('Error creating server client, falling back to browser client:', error);
+        return createClientFromBrowser();
+      }
+    } else {
+      // We're in browser context
+      return createClientFromBrowser();
+    }
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    return createClientFromBrowser(); // Fallback to browser client
+  }
+}
 
 export interface QueueJob {
   id: string;
@@ -62,7 +84,7 @@ class QueueManager {
 
     if (this.enablePersistence) {
       try {
-        const supabase = await createClient();
+        const supabase = await getSupabaseClient();
         await supabase.from('queue_jobs').insert({
           id: job.id,
           user_id: job.userId,
@@ -102,7 +124,7 @@ class QueueManager {
     // Memory'de yoksa ve persistence açıksa, DB'den kontrol et
     if (this.enablePersistence) {
       try {
-        const supabase = await createClient();
+        const supabase = await getSupabaseClient();
         const { data, error } = await supabase
           .from('queue_jobs')
           .select('*')
@@ -179,7 +201,7 @@ class QueueManager {
     // DB'yi güncelle
     if (this.enablePersistence) {
       try {
-        const supabase = await createClient();
+        const supabase = await getSupabaseClient();
         await supabase
           .from('queue_jobs')
           .update({
@@ -224,7 +246,7 @@ class QueueManager {
       // DB'yi güncelle
       if (this.enablePersistence) {
         try {
-          const supabase = await createClient();
+          const supabase = await getSupabaseClient();
           await supabase
             .from('queue_jobs')
             .update({
@@ -278,8 +300,8 @@ class QueueManager {
       
       updateProgress(30, 'Etsy API\'ye istek hazırlanıyor');
       
-      // Gerçek API'ye istek at
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      // Gerçek API'ye istek at - Doğrudan API URL'ini kullan
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://dolphinmanager.vercel.app';
       console.log(`Using base URL: ${baseUrl} for API request`);
       
       // İsteği direk olarak /api/etsy/listings/create'e gönder (create-async'e değil)
@@ -318,7 +340,7 @@ class QueueManager {
       // Veritabanındaki işleri kontrol et
       if (this.enablePersistence) {
         try {
-          const supabase = await createClient();
+          const supabase = await getSupabaseClient();
           const { data, error } = await supabase
             .from('queue_jobs')
             .select('*')

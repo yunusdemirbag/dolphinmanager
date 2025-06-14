@@ -759,8 +759,13 @@ export function ProductFormModal({
         productImages.forEach(image => formData.append('imageFiles', image.file));
         if (videoFile) formData.append('videoFile', videoFile.file);
 
-        // Asenkron endpoint'e gönder
-        const response = await fetch('/api/etsy/listings/create-async', {
+        // Doğrudan endpoint'e gönder (asenkron yerine)
+        toast({ 
+          title: "Ürün yükleniyor...", 
+          description: "Lütfen bekleyin, ürün Etsy'e yükleniyor." 
+        });
+
+        const response = await fetch('/api/etsy/listings/create', {
           method: 'POST',
           body: formData,
         });
@@ -771,16 +776,13 @@ export function ProductFormModal({
           throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
         }
 
-        // Hemen başarı mesajı göster ve modal'ı kapat
+        // Başarı mesajı göster ve modal'ı kapat
         toast({ 
-          title: "İşlem Başlatıldı! ⚡", 
-          description: `Ürün "${title}" arka planda oluşturuluyor. Bildirim gelecek.` 
+          title: "İşlem Başarılı! ✅", 
+          description: `Ürün "${title}" başarıyla oluşturuldu.` 
         });
         
-        // Background tracking başlat
-        startJobTracking(result.jobId, title);
-        
-        // Modal'ı hemen kapat - kullanıcı beklemez!
+        // Modal'ı kapat
         onClose();
         router.refresh();
 

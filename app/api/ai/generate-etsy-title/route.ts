@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-3.5-turbo",
+          model: "gpt-4o",
           messages: [
             {
               role: "system",
@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
         { promptType: "JSON", promptLength: prompt.length }
       );
       
-      return NextResponse.json({ text: generatedText });
+      return new NextResponse(generatedText, { status: 200 });
     }
 
     // Resim analizi için multipart/form-data
@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4-vision-preview",
+          model: "gpt-4o",
           messages: [
             {
               role: "system",
@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
               content: [
                 {
                   type: "text",
-                  text: titlePrompt,
+                  text: titlePrompt.prompt,
                 },
                 {
                   type: "image_url",
@@ -311,7 +311,7 @@ export async function POST(req: NextRequest) {
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-4-vision-preview",
+            model: "gpt-4o",
             messages: [
               {
                 role: "system",

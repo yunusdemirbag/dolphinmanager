@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-3.5-turbo",
+        model: "gpt-3.5",
         messages: [
           {
             role: "system",
@@ -121,10 +121,7 @@ export async function POST(req: NextRequest) {
       { promptLength: prompt.length, tagCount: tags.length }
     );
     
-    return NextResponse.json({ 
-      tags: tags,
-      tagsString: tags.join(', ')
-    });
+    return new NextResponse(generatedText, { status: 200 });
   } catch (error) {
     console.error("Generate Etsy tags error:", error);
     

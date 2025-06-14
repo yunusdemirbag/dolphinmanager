@@ -56,10 +56,8 @@ export async function POST(req: NextRequest) {
     
     // Açıklama için prompt hazırla
     let prompt = descriptionPrompt.prompt.replace("${title}", title);
-    
     const apiKey = process.env.OPENAI_API_KEY;
-    
-    // Görsel varsa, GPT-4 Vision API kullan
+    // Görsel varsa daima gpt-3.5 kullan
     if (image) {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -68,7 +66,7 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4-vision-preview",
+          model: "gpt-3.5",
           messages: [
             {
               role: "system",
@@ -81,13 +79,13 @@ export async function POST(req: NextRequest) {
                   type: "text",
                   text: prompt,
                 },
-                {
+                image ? {
                   type: "image_url",
                   image_url: {
                     url: image,
                   },
-                },
-              ],
+                } : null,
+              ].filter(Boolean),
             },
           ],
           temperature: 0.7,
@@ -127,7 +125,7 @@ export async function POST(req: NextRequest) {
         { hasImage: true, promptLength: prompt.length }
       );
       
-      return NextResponse.json({ description: generatedText });
+      return new NextResponse(generatedText, { status: 200 });
     } 
     // Görsel yoksa, standart GPT API kullan
     else {
@@ -138,7 +136,7 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-3.5-turbo",
+          model: "gpt-3.5",
           messages: [
             {
               role: "system",
@@ -186,7 +184,7 @@ export async function POST(req: NextRequest) {
         { hasImage: false, promptLength: prompt.length }
       );
       
-      return NextResponse.json({ description: generatedText });
+      return new NextResponse(generatedText, { status: 200 });
     }
   } catch (error) {
     console.error("Generate Etsy description error:", error);

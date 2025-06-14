@@ -1011,6 +1011,7 @@ export function ProductFormModal({
                         setAutoTitleUsed(false); // Kullanıcı elle değiştirirse tekrar otomatik doldurma yapmasın
                       }}
                       placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
+                      maxLength={160} // fazlası yazılamasın diye güvenlik için 160 bırakıyorum, ama sayaç 140
                     />
                     <Button
                       type="button"
@@ -1045,7 +1046,9 @@ export function ProductFormModal({
                     >
                       {autoTitleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     </Button>
-                    <span className="text-xs text-gray-500 ml-1">Yeni Başlık İste</span>
+                    <span className="text-xs ml-2" style={{ color: title.length > 140 ? '#dc2626' : '#6b7280' }}>
+                      {title.length}/140 karakter
+                    </span>
                   </div>
                   {autoTitleLoading && (
                     <div className="text-xs text-blue-500 mt-1">Görselden başlık üretiliyor...</div>
@@ -1237,9 +1240,12 @@ export function ProductFormModal({
                 <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
                   {tags.map((tag, index) => (
                     <Badge key={index} className="px-3 py-1 flex items-center gap-1">
-                      {tag}
+                      <span>{tag}</span>
+                      <span className="ml-1 text-xs" style={{ color: tag.length > 20 ? '#dc2626' : '#6b7280' }}>
+                        ({tag.length})
+                      </span>
                       <X 
-                        className="h-3 w-3 cursor-pointer" 
+                        className="h-3 w-3 cursor-pointer ml-1" 
                         onClick={() => handleRemoveTag(tag)}
                       />
                     </Badge>

@@ -498,15 +498,25 @@ export function ProductFormModal({
             method: "POST",
             body: formData,
           });
-          const text = await res.text();
-          // Markdown code block içinden başlığı ayıkla
-          const match = text.match(/```markdown\n([\s\S]*?)\n```/);
-          const generatedTitle = match ? match[1].trim() : text.trim();
-          if (generatedTitle && !title) {
+          
+          // API'den gelen yanıtı JSON olarak işle
+          const data = await res.json();
+          
+          // Başlık bilgisini al ve ayarla
+          if (data.title) {
+            const generatedTitle = data.title.trim();
             setTitle(generatedTitle);
             setAutoTitleUsed(true);
-            // Otomatik açıklama ve etiket üretimini tetiklemesini engellemek için
-            // debouncedTitle değişikliğinin işlenmesini beklemeden doğrudan burada yapıyoruz
+          }
+          
+          // Renk bilgilerini al ve ayarla
+          if (data.colors) {
+            if (data.colors.primaryColor) {
+              setPrimaryColor(data.colors.primaryColor);
+            }
+            if (data.colors.secondaryColor) {
+              setSecondaryColor(data.colors.secondaryColor);
+            }
           }
         } catch (e) {
           toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
@@ -1073,12 +1083,25 @@ export function ProductFormModal({
                             method: "POST",
                             body: formData,
                           });
-                          const text = await res.text();
-                          const match = text.match(/```markdown\n([\s\S]*?)\n```/);
-                          const generatedTitle = match ? match[1].trim() : text.trim();
-                          if (generatedTitle) {
+                          
+                          // API'den gelen yanıtı JSON olarak işle
+                          const data = await res.json();
+                          
+                          // Başlık bilgisini al ve ayarla
+                          if (data.title) {
+                            const generatedTitle = data.title.trim();
                             setTitle(generatedTitle);
                             setAutoTitleUsed(true);
+                          }
+                          
+                          // Renk bilgilerini al ve ayarla
+                          if (data.colors) {
+                            if (data.colors.primaryColor) {
+                              setPrimaryColor(data.colors.primaryColor);
+                            }
+                            if (data.colors.secondaryColor) {
+                              setSecondaryColor(data.colors.secondaryColor);
+                            }
                           }
                         } catch (e) {
                           toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });

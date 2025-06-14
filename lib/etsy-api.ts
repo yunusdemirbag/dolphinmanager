@@ -2271,14 +2271,14 @@ export async function uploadFilesToEtsy(
             );
           }
 
-          // Resim yüklendikten sonra 5 saniye bekle
-          await new Promise((resolve) => setTimeout(resolve, 5000));
+          // Resim yüklendikten sonra 2 saniye bekle
+          await new Promise((resolve) => setTimeout(resolve, 2000));
           success = true;
         } catch (error) {
           console.error(`Resim yükleme hatası (Deneme ${retryCount + 1}):`, error);
           retryCount++;
           if (retryCount < maxRetries) {
-            await new Promise((resolve) => setTimeout(resolve, 5000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
           }
         }
       }
@@ -2328,7 +2328,7 @@ export async function uploadFilesToEtsy(
           console.error(`Video yükleme hatası (Deneme ${retryCount + 1}):`, error);
           retryCount++;
           if (retryCount < maxRetries) {
-            await new Promise((resolve) => setTimeout(resolve, 5000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
           }
         }
       }

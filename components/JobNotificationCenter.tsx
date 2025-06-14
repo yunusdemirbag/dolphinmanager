@@ -11,14 +11,44 @@ export function JobNotificationCenter() {
   const [completedJobs, setCompletedJobs] = useState<QueueJob[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lastFetchTime, setLastFetchTime] = useState(0)
+  const [isVisible, setIsVisible] = useState(false)
+  
+  // Görünürlüğü kontrol etmek için
+  useEffect(() => {
+    // Sayfa görünür olduğunda işleri çek, gizli olduğunda durdur
+    const handleVisibilityChange = () => {
+      setIsVisible(!document.hidden)
+    }
+    
+    // İlk yüklemede görünürlüğü ayarla
+    setIsVisible(!document.hidden)
+    
+    // Event listener ekle
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // Temizlik
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
   
   useEffect(() => {
     // Sayfa yüklendiğinde çalışacak
     let isMounted = true;
+    let intervalId: NodeJS.Timeout | null = null;
     
     const fetchJobs = async () => {
+      // Son çağrıdan bu yana en az 15 saniye geçmediyse çağrı yapma
+      const now = Date.now()
+      if (now - lastFetchTime < 15000) {
+        return
+      }
+      
       try {
         console.log('Fetching jobs...');
+        setLastFetchTime(now)
+        
         const response = await fetch('/api/etsy/listings/my-jobs', {
           headers: { 'Cache-Control': 'no-cache' }
         });
@@ -56,6 +86,12 @@ export function JobNotificationCenter() {
           setCompletedJobs(completed);
           setLoading(false);
           setError(null);
+          
+          // Aktif iş yoksa ve tamamlanmış işler varsa, daha az sıklıkta kontrol et
+          if (active.length === 0 && intervalId) {
+            clearInterval(intervalId);
+            intervalId = setInterval(fetchJobs, 30000); // 30 saniyede bir kontrol et
+          }
         }
       } catch (error: any) {
         console.error('Jobs fetch error:', error);
@@ -69,15 +105,19 @@ export function JobNotificationCenter() {
     // İlk yükleme
     fetchJobs();
     
-    // Belirli aralıklarla kontrol et
-    const interval = setInterval(fetchJobs, 5000); // 5 saniyede bir kontrol et
+    // Belirli aralıklarla kontrol et, ama sadece sayfa görünür olduğunda
+    if (isVisible) {
+      intervalId = setInterval(fetchJobs, 15000); // 15 saniyede bir kontrol et
+    }
     
     // Temizlik
     return () => {
-      clearInterval(interval);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
       isMounted = false;
     }
-  }, []);
+  }, [isVisible, lastFetchTime]);
   
   // Yükleme durumu veya iş yoksa gösterme
   if (loading) {

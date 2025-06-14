@@ -505,6 +505,8 @@ export function ProductFormModal({
           if (generatedTitle && !title) {
             setTitle(generatedTitle);
             setAutoTitleUsed(true);
+            // Otomatik açıklama ve etiket üretimini tetiklemesini engellemek için
+            // debouncedTitle değişikliğinin işlenmesini beklemeden doğrudan burada yapıyoruz
           }
         } catch (e) {
           toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
@@ -522,59 +524,6 @@ export function ProductFormModal({
       setAutoTitleUsed(false);
     }
   }, [isOpen]);
-
-  // Başlık değiştiğinde açıklama otomatik üret (debounce ile)
-  useEffect(() => {
-    if (debouncedTitle) {
-      setAutoDescriptionLoading(true);
-      const generateDescription = async () => {
-        // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
-        const prompt = descriptionPrompt.prompt.replace("${title}", debouncedTitle);
-        try {
-          const res = await fetch("/api/ai/generate-etsy-title", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt }),
-          });
-          const text = await res.text();
-          setDescription(text.trim());
-        } catch (e) {
-          toast({ variant: "destructive", title: "Açıklama üretilemedi", description: "Başlığa göre açıklama oluşturulamadı." });
-        } finally {
-          setAutoDescriptionLoading(false);
-        }
-      };
-      generateDescription();
-    }
-  }, [debouncedTitle]);
-
-  // Başlık değiştiğinde otomatik etiket üret (debounce ile)
-  useEffect(() => {
-    if (debouncedTitle) {
-      setAutoTagsLoading(true);
-      const generateTags = async () => {
-        // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
-        const prompt = tagsPrompt.prompt.replace("${title}", debouncedTitle);
-        try {
-          const res = await fetch("/api/ai/generate-etsy-title", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt }),
-          });
-          const text = await res.text();
-          // Tagleri satır sonu, fazla boşluk ve virgül ile ayırıp 13'e tamamla
-          let tags = text.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
-          if (tags.length > 13) tags = tags.slice(0, 13);
-          setTags(tags);
-        } catch (e) {
-          toast({ variant: "destructive", title: "Etiket üretilemedi", description: "Başlığa göre etiket oluşturulamadı." });
-        } finally {
-          setAutoTagsLoading(false);
-        }
-      };
-      generateTags();
-    }
-  }, [debouncedTitle]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -1200,26 +1149,42 @@ export function ProductFormModal({
                       onClick={async () => {
                         if (!title) return;
                         setAutoDescriptionLoading(true);
-                        // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
-                        const prompt = descriptionPrompt.prompt.replace("${title}", title);
+                        setAutoTagsLoading(true);
+                        
                         try {
-                          const res = await fetch("/api/ai/generate-etsy-title", {
+                          // Açıklama üret
+                          const descPrompt = descriptionPrompt.prompt.replace("${title}", title);
+                          const descRes = await fetch("/api/ai/generate-etsy-title", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ prompt }),
+                            body: JSON.stringify({ prompt: descPrompt }),
                           });
-                          const text = await res.text();
-                          setDescription(text.trim());
+                          const descText = await descRes.text();
+                          setDescription(descText.trim());
+                          
+                          // Etiket üret
+                          const tagPrompt = tagsPrompt.prompt.replace("${title}", title);
+                          const tagRes = await fetch("/api/ai/generate-etsy-title", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ prompt: tagPrompt }),
+                          });
+                          const tagText = await tagRes.text();
+                          // Tagleri satır sonu, fazla boşluk ve virgül ile ayırıp 13'e tamamla
+                          let tags = tagText.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
+                          if (tags.length > 13) tags = tags.slice(0, 13);
+                          setTags(tags);
                         } catch (e) {
-                          toast({ variant: "destructive", title: "Açıklama üretilemedi", description: "Başlığa göre açıklama oluşturulamadı." });
+                          toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
                         } finally {
                           setAutoDescriptionLoading(false);
+                          setAutoTagsLoading(false);
                         }
                       }}
                     >
                       {autoDescriptionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                     </Button>
-                    <span className="text-xs text-gray-500 ml-1">Yeni Açıklama İste</span>
+                    <span className="text-xs text-gray-500 ml-1">Yeni Açıklama ve Etiket İste</span>
                   </div>
                   {autoDescriptionLoading && (
                     <div className="text-xs text-blue-500 mt-1">Başlığa göre açıklama üretiliyor...</div>

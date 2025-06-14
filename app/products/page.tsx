@@ -374,7 +374,7 @@ export default function ProductsPage() {
           <div>
             <h1 className="text-2xl font-bold">Ürünler</h1>
             <p className="text-gray-500">
-              {totalCount} ürün • Son güncelleme: {lastRefresh?.toLocaleString() || 'Hiç'}
+              {totalCount} ürün
             </p>
           </div>
           <div className="flex gap-2">

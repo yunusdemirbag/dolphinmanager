@@ -6,7 +6,7 @@ import { Product } from "@/types/product";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trash, Pencil, Pin } from "lucide-react";
+import { Trash, Pencil, Pin, ExternalLink } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -45,16 +45,20 @@ const ProductCard = ({
         product.images[0] : 
         product.images[0]?.url_570xN || '') : 
       '/images/placeholder-product.jpg');
+      
+  // Etsy URL'ini güvenli bir şekilde kontrol et
+  const hasEtsyUrl = product.etsy_listing_id && product.etsy_listing_id > 0;
+  const etsyUrl = hasEtsyUrl ? `https://www.etsy.com/listing/${product.etsy_listing_id}` : '';
 
   return (
-    <Card className="overflow-hidden group h-full flex flex-col">
-      <div className="relative overflow-hidden h-48 bg-gray-100">
+    <Card className="overflow-hidden group h-full flex flex-col transition-all duration-200 hover:shadow-xl border-gray-100 hover:border-primary/20">
+      <div className="relative overflow-hidden aspect-square bg-gray-50">
         <Image
           src={getProxiedImageUrl(imageUrl)}
           alt={product.title || "Ürün görseli"}
           fill
           className={cn(
-            "object-cover transition-all group-hover:scale-105",
+            "object-cover transition-all duration-300 group-hover:scale-105",
             !imageLoaded && "scale-110 blur-sm"
           )}
           onLoad={() => setImageLoaded(true)}
@@ -66,7 +70,7 @@ const ProductCard = ({
             variant="ghost"
             size="icon"
             className={cn(
-              "absolute top-2 left-2 transition-all bg-white/70 hover:bg-white/90 h-8 w-8",
+              "absolute top-2 left-2 transition-all bg-white/70 hover:bg-white/90 h-8 w-8 rounded-full shadow-sm",
               isPinned && "text-red-500"
             )}
             onClick={() => onTogglePin(product)}
@@ -74,6 +78,19 @@ const ProductCard = ({
           >
             <Pin className={cn("h-4 w-4", isPinned && "fill-red-500")} />
           </Button>
+        )}
+        
+        {/* Etsy link */}
+        {hasEtsyUrl && (
+          <a 
+            href={etsyUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="absolute top-2 right-2 bg-white/70 hover:bg-white/90 p-2 rounded-full shadow-sm transition-all opacity-0 group-hover:opacity-100"
+            title="Etsy'de Görüntüle"
+          >
+            <ExternalLink className="h-4 w-4 text-gray-700" />
+          </a>
         )}
       </div>
       
@@ -88,14 +105,28 @@ const ProductCard = ({
           </p>
         )}
 
-        {product.etsy_listing_id && (
-          <Badge variant="outline" className="mt-2">
-            Etsy: {product.etsy_listing_id}
-          </Badge>
-        )}
+        <div className="flex flex-wrap gap-1 mt-2">
+          {/* Ürün durumu varsa göster (state alanı Product tipinde tanımlı değil, 
+              ancak API yanıtında olabilir, bu nedenle any tipiyle güvenli erişim) */}
+          {(product as any).state === "active" && (
+            <Badge variant="default" className="bg-green-500 hover:bg-green-600">Aktif</Badge>
+          )}
+          {(product as any).state === "draft" && (
+            <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">Taslak</Badge>
+          )}
+          {(product as any).state === "inactive" && (
+            <Badge variant="outline" className="text-gray-600 border-gray-300 bg-gray-50">Pasif</Badge>
+          )}
+          
+          {product.etsy_listing_id && (
+            <Badge variant="outline" className="text-xs">
+              ID: {product.etsy_listing_id}
+            </Badge>
+          )}
+        </div>
       </CardContent>
       
-      <CardFooter className="p-2 border-t bg-muted/30 gap-2 flex-wrap">
+      <CardFooter className="p-2 border-t bg-muted/20 gap-2 flex-wrap">
         {onEdit && (
           <Button
             variant="secondary"

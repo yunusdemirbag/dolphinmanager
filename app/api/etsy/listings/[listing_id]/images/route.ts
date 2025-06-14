@@ -301,7 +301,7 @@ export async function POST(
 
     // Verify upload after delay
     console.log("[IMAGE_UPLOAD_API] Waiting for Etsy to process image...");
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 15000));
 
     const verifyResponse = await fetch(
       `https://openapi.etsy.com/v3/application/listings/${listingId}/images`,

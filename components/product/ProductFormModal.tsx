@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { DndProvider } from "react-dnd"
+import { DndProvider, useDrag, useDrop } from "react-dnd"
 import { HTML5Backend } from "react-dnd-html5-backend"
 import {
   Dialog,
@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon } from "lucide-react"
+import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon, Image, Video, ChevronDown } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode, ShippingProfile, EtsyProcessingProfile } from "@/types/product"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -33,7 +33,12 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
-import { useDrag, useDrop } from 'react-dnd';
+import { useRouter, useSearchParams } from "next/navigation"
+import { ProductMediaSection } from './ProductMediaSection';
+import { createClientSupabase } from "@/lib/supabase";
+import { descriptionPrompt, tagsPrompt, categoryPrompt } from "@/lib/prompts";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
+import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
 import {
   Table,
@@ -44,12 +49,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
-import { useRouter, useSearchParams } from "next/navigation"
-import { ProductMediaSection } from './ProductMediaSection';
-import { createClientSupabase } from "@/lib/supabase";
-import { descriptionPrompt, tagsPrompt, categoryPrompt } from "@/lib/prompts";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
-import { ChevronDown } from "lucide-react"
 
 // Debounce fonksiyonu
 const useDebounce = <T,>(value: T, delay: number): T => {
@@ -97,9 +96,9 @@ interface ProductFormModalProps {
   loadingShippingProfiles: boolean
 }
 
-// Sabit item type tanımla
+// Drag and drop için item tipleri
 const ItemTypes = {
-  IMAGE: 'image'
+  IMAGE: 'IMAGE',
 };
 
 // Sürüklenebilir resim bileşeni
@@ -117,7 +116,7 @@ const DraggableImage = ({
   const ref = useRef<HTMLDivElement>(null);
   
   const [{ isDragging }, drag] = useDrag({
-    type: ItemTypes.IMAGE,
+    type: 'IMAGE',
     item: { index },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
@@ -125,53 +124,20 @@ const DraggableImage = ({
   });
   
   const [, drop] = useDrop({
-    accept: ItemTypes.IMAGE,
-    hover: (item: { index: number }, monitor) => {
+    accept: 'IMAGE',
+    hover(item: { index: number }, monitor) {
       if (!ref.current) {
         return;
       }
-      
       const dragIndex = item.index;
       const hoverIndex = index;
       
-      // Kendi üzerine düşürmeyi önle
       if (dragIndex === hoverIndex) {
         return;
       }
       
-      // Sürüklenen elemanın ekrandaki dikdörtgenini hesapla
-      const hoverBoundingRect = ref.current.getBoundingClientRect();
-      
-      // Dikdörtgenin ortasını bul
-      const hoverMiddleX = (hoverBoundingRect.right - hoverBoundingRect.left) / 2;
-      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
-      
-      // Fare konumunu al
-      const clientOffset = monitor.getClientOffset();
-      
-      if (!clientOffset) {
-        return;
-      }
-      
-      // Fare konumunun hover elemanına göre pozisyonunu hesapla
-      const hoverClientX = clientOffset.x - hoverBoundingRect.left;
-      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
-      
-      // Sadece fare ortanın solunda iken ve sola hareket ediyorsa
-      // veya fare ortanın sağında iken ve sağa hareket ediyorsa taşı
-      const isDraggingLeft = dragIndex > hoverIndex && hoverClientX > hoverMiddleX;
-      const isDraggingRight = dragIndex < hoverIndex && hoverClientX < hoverMiddleX;
-      const isDraggingUp = dragIndex > hoverIndex && hoverClientY > hoverMiddleY;
-      const isDraggingDown = dragIndex < hoverIndex && hoverClientY < hoverMiddleY;
-      
-      // Sadece mouse'un hareket ettiği yöne doğru işlem yap
-      if (isDraggingLeft || isDraggingRight || isDraggingUp || isDraggingDown) {
-        // Resmin yerini değiştir
-        moveImage(dragIndex, hoverIndex);
-        
-        // item'ın index'ini güncelle
-        item.index = hoverIndex;
-      }
+      moveImage(dragIndex, hoverIndex);
+      item.index = hoverIndex;
     },
   });
   
@@ -188,44 +154,57 @@ const DraggableImage = ({
   return (
     <div
       ref={ref}
-      className={`relative group rounded-lg overflow-hidden border cursor-grab active:cursor-grabbing ${
-        index === 0 ? "ring-2 ring-primary border-primary" : "border-gray-200"
-      }`}
-      style={{ opacity: isDragging ? 0.5 : 1 }}
+      className={`relative group rounded-md overflow-hidden border ${
+        index === 0 ? "ring-1 ring-primary border-primary" : "border-gray-100"
+      } shadow-sm transition-all ${isDragging ? "opacity-50" : "opacity-100"}`}
+      style={{ aspectRatio: "1/1" }}
     >
       {imageSource ? (
         <img
           src={imageSource}
           alt={`Ürün resmi ${index + 1}`}
-          className="w-full aspect-square object-cover"
+          className="w-full h-full object-cover"
         />
       ) : (
-        <div className="w-full aspect-square bg-gray-200 flex items-center justify-center">
-          <span className="text-gray-500 text-sm">Görsel yüklenemedi</span>
+        <div className="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400 text-xs">
+          Görsel yüklenemedi
         </div>
       )}
-      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-      <button
-        type="button"
-        onClick={() => onRemove(index)}
-        className="absolute top-2 right-2 p-1 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
-      >
-        <X className="w-4 h-4 text-gray-700" />
-      </button>
-      {index === 0 && (
-        <div className="absolute bottom-2 left-2 px-2 py-1 bg-primary text-white text-xs rounded">
-          Ana Görsel
-        </div>
-      )}
+      
       {image.uploading && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 text-white animate-spin" />
+          <Loader2 className="w-5 h-5 text-white animate-spin" />
         </div>
       )}
+      
       {image.error && (
-        <div className="absolute bottom-2 right-2 px-2 py-1 bg-red-500 text-white text-xs rounded">
+        <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-red-500 text-white text-xs text-center">
           Hata
         </div>
+      )}
+      
+      {!image.uploading && (
+        <>
+          {index === 0 && (
+            <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-primary rounded text-white text-[10px] font-medium">
+              Ana
+            </div>
+          )}
+          
+          <button
+            type="button"
+            onClick={() => onRemove(index)}
+            className="absolute top-2 right-2 p-1 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+          >
+            <X className="w-3 h-3 text-white" />
+          </button>
+          
+          <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          
+          <div className="absolute bottom-1 right-1 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripVertical className="w-4 h-4 text-white drop-shadow-md" />
+          </div>
+        </>
       )}
     </div>
   );
@@ -806,87 +785,165 @@ export function ProductFormModal({
   // Resim bölümü
   const ImageSection = () => (
     <div className="space-y-4">
+      {/* Gizli dosya input'ları */}
+      <input
+        type="file"
+        id="image-upload"
+        className="hidden"
+        accept="image/*"
+        multiple
+        onChange={(e) => {
+          if (e.target.files) {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+              if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const newImage = {
+                    file,
+                    preview: reader.result as string,
+                    uploading: false
+                  };
+                  setProductImages(prev => [...prev, newImage]);
+                };
+                reader.readAsDataURL(file);
+              }
+            });
+          }
+          // Reset input value so the same file can be selected again
+          e.target.value = '';
+        }}
+      />
+      <input
+        type="file"
+        id="video-upload"
+        className="hidden"
+        accept="video/*"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            if (file.type.startsWith('video/')) {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                setVideoFile({
+                  file,
+                  preview: URL.createObjectURL(file),
+                  uploading: false
+                });
+              };
+              reader.readAsDataURL(file);
+            }
+          }
+          // Reset input value so the same file can be selected again
+          e.target.value = '';
+        }}
+      />
+
       {/* BAŞLIK VE RESİM/VIDEO SAYACI */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Medya</h3>
-        <div className="text-sm text-gray-500">
-          {productImages.length}/10 resim, {videoFile ? 1 : 0}/1 video
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-base font-medium text-gray-700">Medya Dosyaları</h3>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center text-xs text-gray-500">
+            <Image className="w-3.5 h-3.5 mr-1 text-gray-400" />
+            <span>{productImages.length}/10</span>
+          </div>
+          {videoFile ? (
+            <div className="flex items-center text-xs text-gray-500">
+              <Video className="w-3.5 h-3.5 mr-1 text-gray-400" />
+              <span>1/1</span>
+            </div>
+          ) : (
+            <div className="flex items-center text-xs text-gray-400">
+              <Video className="w-3.5 h-3.5 mr-1 opacity-50" />
+              <span>0/1</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* VİDEO ÖNİZLEME KARTI */}
       {videoFile && (
-        <div className="mt-4 space-y-2">
-          <h4 className="text-md font-medium text-gray-700">Video</h4>
-          <div className="relative group rounded-lg overflow-hidden border p-2 bg-slate-50">
-            <video
-              src={videoFile.preview}
-              controls={!videoFile.uploading}
-              className="w-full rounded-md max-h-64 aspect-video object-cover"
-            />
-            {videoFile.uploading && (
-              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white">
-                <Loader2 className="w-8 h-8 animate-spin" />
-                <p className="mt-2 text-sm">Video Etsy'e yükleniyor...</p>
-              </div>
-            )}
-            {videoFile.error && (
-              <div className="absolute bottom-2 left-2 right-2 px-2 py-1 bg-red-500 text-white text-xs rounded text-center">
-                {videoFile.error}
-              </div>
-            )}
-            {!videoFile.uploading && (
-              <button
-                type="button"
-                onClick={() => {
-                  URL.revokeObjectURL(videoFile.preview);
-                  setVideoFile(null);
-                }}
-                className="absolute top-2 right-2 z-10 p-1 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
-              >
-                <X className="w-4 h-4 text-gray-700" />
-              </button>
-            )}
-          </div>
+        <div className="relative group border border-gray-100 rounded-lg overflow-hidden shadow-sm">
+          <video
+            src={videoFile.preview}
+            controls={!videoFile.uploading}
+            className="w-full h-auto max-h-52 object-contain bg-gray-50"
+            controlsList="nodownload nofullscreen"
+            preload="metadata"
+          />
+          {videoFile.uploading && (
+            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <p className="mt-2 text-xs">Yükleniyor...</p>
+            </div>
+          )}
+          {videoFile.error && (
+            <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-red-500 text-white text-xs text-center">
+              {videoFile.error}
+            </div>
+          )}
+          {!videoFile.uploading && (
+            <button
+              type="button"
+              onClick={() => {
+                URL.revokeObjectURL(videoFile.preview);
+                setVideoFile(null);
+              }}
+              className="absolute top-2 right-2 z-10 p-1 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+            >
+              <X className="w-4 h-4 text-white" />
+            </button>
+          )}
         </div>
       )}
 
       {/* SÜRÜKLE-BIRAK ALANI VE RESİM LİSTESİ */}
       <div
-        className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
-          productImages.length === 0 && !videoFile ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50"
+        className={`border rounded-lg transition-all ${
+          productImages.length === 0 && !videoFile 
+            ? "border-dashed border-gray-300 bg-gray-50/50 hover:border-primary/40 hover:bg-gray-50" 
+            : "border-gray-100 shadow-sm"
         }`}
         onDrop={handleImageDrop}
         onDragOver={e => e.preventDefault()}
-        onDragEnter={e => {
-          e.preventDefault();
-        }}
-        onDragLeave={e => {
-          e.preventDefault();
-        }}
+        onDragEnter={e => e.preventDefault()}
+        onDragLeave={e => e.preventDefault()}
       >
         {productImages.length === 0 && !videoFile ? (
-          <div className="text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <Upload className="w-6 h-6 text-primary" />
+          <div className="text-center py-8 px-4">
+            <div className="mx-auto w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+              <Upload className="w-5 h-5 text-gray-500" />
             </div>
-            <p className="text-sm font-medium mb-1">Medya dosyalarını buraya sürükleyin</p>
-            <p className="text-sm text-gray-500 mb-4">veya</p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                // Implement file input for image selection
-              }}
-            >
-              Bilgisayardan Seçin
-            </Button>
-            <p className="text-xs text-gray-500 mt-4">
-              PNG, JPG, GIF veya MP4/QuickTime video • Resim başına max. 20MB
+            <p className="text-sm font-medium text-gray-700">Dosyaları buraya sürükleyin</p>
+            <p className="text-xs text-gray-500 mb-3">veya</p>
+            <div className="flex gap-2 justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => document.getElementById('image-upload')?.click()}
+              >
+                <Image className="w-3.5 h-3.5 mr-1.5" />
+                Resim Seç
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => document.getElementById('video-upload')?.click()}
+              >
+                <Video className="w-3.5 h-3.5 mr-1.5" />
+                Video Seç
+              </Button>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              PNG, JPG, GIF, MP4 • Max. 20MB
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-3">
             {productImages.map((image, index) => (
               <DraggableImage
                 key={`${index}-${image.preview}`}
@@ -897,16 +954,26 @@ export function ProductFormModal({
               />
             ))}
             {productImages.length < 10 && (
-              <button
-                type="button"
-                onClick={() => {
-                  // Implement file input for image selection
-                }}
-                className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-primary/50 transition-colors"
-              >
-                <Upload className="w-6 h-6 text-gray-400 mb-2" />
-                <span className="text-sm text-gray-500">Medya Ekle</span>
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('image-upload')?.click()}
+                  className="flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-lg p-3 h-full min-h-[100px] hover:bg-gray-50 hover:border-primary/40 transition-colors"
+                >
+                  <Image className="w-5 h-5 text-gray-400 mb-1" />
+                  <span className="text-xs text-gray-500">Resim</span>
+                </button>
+                {!videoFile && (
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('video-upload')?.click()}
+                    className="flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-lg p-3 hover:bg-gray-50 hover:border-primary/40 transition-colors"
+                  >
+                    <Video className="w-5 h-5 text-gray-400 mb-1" />
+                    <span className="text-xs text-gray-500">Video</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

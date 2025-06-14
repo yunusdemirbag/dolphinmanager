@@ -26,7 +26,7 @@ async function getSupabaseClient() {
 export interface QueueJob {
   id: string;
   userId: string;
-  type: 'CREATE_LISTING';
+  type: 'CREATE_LISTING' | 'BATCH_UPLOAD_LISTINGS';
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number; // 0-100
   data: any;
@@ -40,11 +40,13 @@ export interface QueueJob {
 class QueueManager {
   private jobs: Map<string, QueueJob> = new Map();
   private processing: Set<string> = new Set();
-  private maxConcurrent = 2; // Aynı anda en fazla 2 iş
+  private maxConcurrent = 3; // Aynı anda en fazla 3 iş
   private maxRetries = 3;
   private processingInterval: NodeJS.Timeout | null = null;
   private isProcessing = false;
   public enablePersistence = true; // Veritabanı kalıcılığı varsayılan olarak aktif
+  private batchSize = 5; // Bir batch'te kaç ürün işleneceği
+  private batchDelay = 2000; // Her batch arası bekleme süresi (ms)
 
   constructor() {
     // Background işleme başlat
@@ -138,7 +140,7 @@ class QueueManager {
           const job: QueueJob = {
             id: data.id,
             userId: data.user_id,
-            type: data.type as 'CREATE_LISTING',
+            type: data.type as 'CREATE_LISTING' | 'BATCH_UPLOAD_LISTINGS',
             status: data.status as 'pending' | 'processing' | 'completed' | 'failed',
             progress: data.progress,
             data: data.data,
@@ -219,6 +221,8 @@ class QueueManager {
       // Job tipine göre işle
       if (job.type === 'CREATE_LISTING') {
         await this.processCreateListing(job);
+      } else if (job.type === 'BATCH_UPLOAD_LISTINGS') {
+        await this.processBatchUploadListings(job);
       }
       
       // Başarıyla tamamlandı
@@ -334,6 +338,162 @@ class QueueManager {
     }
   }
 
+  // Yeni: Toplu ürün yükleme işlemi
+  private async processBatchUploadListings(job: QueueJob): Promise<void> {
+    const { products } = job.data;
+    
+    if (!Array.isArray(products) || products.length === 0) {
+      throw new Error('Ürün listesi boş veya geçersiz');
+    }
+    
+    const totalProducts = products.length;
+    console.log(`[BATCH_UPLOAD] ${totalProducts} ürün işlenecek`);
+    
+    // İlerleme durumunu ayarla
+    const updateProgress = (progress: number, message?: string) => {
+      job.progress = progress;
+      if (message) {
+        console.log(`Job ${job.id}: ${message} (${progress}%)`);
+      }
+      job.data.currentStatus = message || '';
+      this.jobs.set(job.id, { ...job });
+    };
+    
+    updateProgress(5, 'Ürünler işleniyor...');
+    
+    // Sonuçları sakla
+    const results = {
+      success: [] as any[],
+      failed: [] as any[],
+      total: totalProducts,
+      completed: 0
+    };
+    job.data.results = results;
+    
+    // Ürünleri batch'lere böl
+    const batches = [];
+    for (let i = 0; i < totalProducts; i += this.batchSize) {
+      batches.push(products.slice(i, i + this.batchSize));
+    }
+    
+    const totalBatches = batches.length;
+    console.log(`[BATCH_UPLOAD] ${totalBatches} batch oluşturuldu`);
+    
+    // Her batch'i işle
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const batch = batches[batchIndex];
+      updateProgress(
+        Math.floor((batchIndex / totalBatches) * 80) + 5,
+        `Batch ${batchIndex + 1}/${totalBatches} işleniyor...`
+      );
+      
+      console.log(`[BATCH_UPLOAD] Batch ${batchIndex + 1}/${totalBatches} başlatılıyor (${batch.length} ürün)`);
+      
+      // Batch içindeki ürünleri paralel olarak işle
+      const batchResults = await Promise.allSettled(
+        batch.map(async (product: any) => {
+          try {
+            const formData = new FormData();
+            
+            // Ürün verisini ekle
+            formData.append('listingData', JSON.stringify(product.listingData));
+            
+            // Dosyaları ekle
+            if (product.files && product.files.imageFiles) {
+              for (const imageFile of product.files.imageFiles) {
+                formData.append('imageFiles', imageFile);
+              }
+            }
+            
+            if (product.files && product.files.videoFile) {
+              formData.append('videoFile', product.files.videoFile);
+            }
+            
+            // Etsy API'ye istek at
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://dolphinmanager.vercel.app';
+            const response = await fetch(`${baseUrl}/api/etsy/listings/create`, {
+              method: 'POST',
+              body: formData,
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || `API hatası: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Başarılı sonucu kaydet
+            results.success.push({
+              title: product.listingData.title,
+              listingId: result.listingId,
+              result
+            });
+            
+            return {
+              success: true,
+              title: product.listingData.title,
+              listingId: result.listingId
+            };
+          } catch (error: any) {
+            console.error(`Ürün yükleme hatası (${product.listingData?.title || 'Bilinmeyen'})`, error);
+            
+            // Hata sonucunu kaydet
+            results.failed.push({
+              title: product.listingData?.title || 'Bilinmeyen',
+              error: error.message || 'Bilinmeyen hata'
+            });
+            
+            return {
+              success: false,
+              title: product.listingData?.title || 'Bilinmeyen',
+              error: error.message || 'Bilinmeyen hata'
+            };
+          } finally {
+            // Tamamlanan ürün sayısını artır
+            results.completed++;
+            
+            // İlerleme durumunu güncelle
+            const progress = Math.floor((results.completed / totalProducts) * 80) + 5;
+            job.progress = progress;
+            job.data.results = results;
+            this.jobs.set(job.id, { ...job });
+          }
+        })
+      );
+      
+      console.log(`[BATCH_UPLOAD] Batch ${batchIndex + 1}/${totalBatches} tamamlandı:`, 
+        batchResults.filter(r => r.status === 'fulfilled').length, 'başarılı,',
+        batchResults.filter(r => r.status === 'rejected').length, 'başarısız');
+      
+      // Rate limit'e takılmamak için batch'ler arası bekle (son batch hariç)
+      if (batchIndex < totalBatches - 1) {
+        updateProgress(
+          Math.floor((batchIndex / totalBatches) * 80) + 5,
+          `Rate limit için bekleniyor (${this.batchDelay/1000} saniye)...`
+        );
+        
+        await new Promise(resolve => setTimeout(resolve, this.batchDelay));
+      }
+    }
+    
+    // Özet bilgileri güncelle
+    const successCount = results.success.length;
+    const failedCount = results.failed.length;
+    
+    updateProgress(100, `İşlem tamamlandı: ${successCount} başarılı, ${failedCount} başarısız`);
+    
+    // Özet bilgileri job datasına ekle
+    job.data.summary = {
+      successCount,
+      failedCount,
+      totalCount: totalProducts,
+      completedAt: new Date().toISOString()
+    };
+    
+    console.log(`[BATCH_UPLOAD] Toplu yükleme tamamlandı: ${successCount} başarılı, ${failedCount} başarısız`);
+  }
+
   // Kullanıcının tüm işlerini getir
   public async getUserJobs(userId: string): Promise<QueueJob[]> {
     try {
@@ -354,7 +514,7 @@ class QueueManager {
             const dbJobs = data.map(item => ({
               id: item.id,
               userId: item.user_id,
-              type: item.type as 'CREATE_LISTING',
+              type: item.type as 'CREATE_LISTING' | 'BATCH_UPLOAD_LISTINGS',
               status: item.status as 'pending' | 'processing' | 'completed' | 'failed',
               progress: item.progress,
               data: item.data,

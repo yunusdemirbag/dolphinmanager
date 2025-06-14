@@ -2239,8 +2239,8 @@ export async function uploadFilesToEtsy(
     const maxFileSize = 20 * 1024 * 1024; // 20MB limit
     const maxRetries = 3;
 
-    // Optimize: Paralel yükleme - aynı anda 3 resim yükleme
-    const batchSize = 3; // Aynı anda kaç resim yüklenecek
+    // Optimize: Paralel yükleme - aynı anda 2 resim yükleme
+    const batchSize = 2; // Aynı anda kaç resim yüklenecek
     const batches = Math.ceil(images.length / batchSize);
     
     for (let i = 0; i < batches; i++) {

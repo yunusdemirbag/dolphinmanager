@@ -14,7 +14,7 @@ export const titlePrompt: PromptConfig = {
   id: "title-prompt",
   name: "Başlık Oluşturma Promptu",
   description: "Görsel yüklendiğinde ürün başlığı oluşturmak için kullanılan prompt",
-  prompt: "GÖREV: Aşağıdaki görseli analiz et ve sadece bu görsele uygun, SEO uyumlu, yüksek dönüşüm sağlayacak tek bir Etsy ürün başlığı üret. Sadece başlığı döndür. Başlıkta marka, ölçü, fiyat veya gereksiz kelimeler olmasın.",
+  prompt: "Yüklenen görseli detaylı analiz et ve SADECE bu görsele uygun, SEO uyumlu bir Etsy ürün başlığı üret. Başlık dışında hiçbir açıklama veya ek metin yazma. Başlıkta marka, ölçü, fiyat veya gereksiz kelimeler olmasın.",
   defaultPrompt: "GÖREV: Aşağıdaki görseli analiz et ve sadece bu görsele uygun, SEO uyumlu, yüksek dönüşüm sağlayacak tek bir Etsy ürün başlığı üret. Sadece başlığı döndür. Başlıkta marka, ölçü, fiyat veya gereksiz kelimeler olmasın."
 };
 
@@ -23,7 +23,7 @@ export const descriptionPrompt: PromptConfig = {
   id: "description-prompt",
   name: "Açıklama Oluşturma Promptu",
   description: "Ürün başlığına göre otomatik açıklama oluşturmak için kullanılan prompt (${title} değişkeni ile başlık eklenir)",
-  prompt: "TASK: Generate a captivating, SEO-optimized Etsy product description for a physical canvas wall art print based on the provided product title.",
+  prompt: "Bu başlığa sahip bir tuval duvar sanatı baskısı için SEO uyumlu, çekici bir Etsy ürün açıklaması oluştur: \"${title}\". Sadece açıklamayı döndür, başka hiçbir metin ekleme.",
   defaultPrompt: "TASK: Generate a captivating, SEO-optimized Etsy product description for a physical canvas wall art print based on the provided product title."
 };
 
@@ -32,7 +32,7 @@ export const tagsPrompt: PromptConfig = {
   id: "tags-prompt",
   name: "Etiket Oluşturma Promptu",
   description: "Ürün başlığına göre etiket oluşturmak için kullanılan prompt (${title} değişkeni ile başlık eklenir)",
-  prompt: "TASK: Generate a hyper-optimized list of 13 Etsy tags for a physical canvas wall art print, based on the provided product title.",
+  prompt: "Bu başlığa sahip bir tuval duvar sanatı baskısı için tam olarak 13 adet Etsy etiketi oluştur: \"${title}\". Her etiket en fazla 19 karakter olmalı, tümü küçük harfli İngilizce olmalı. Etiketleri virgülle ayırarak tek satırda döndür. Başka hiçbir metin veya açıklama ekleme.",
   defaultPrompt: "TASK: Generate a hyper-optimized list of 13 Etsy tags for a physical canvas wall art print, based on the provided product title."
 };
 
@@ -41,7 +41,7 @@ export const categoryPrompt: PromptConfig = {
   id: "category-prompt",
   name: "Kategori Seçme Promptu",
   description: "Ürün başlığına göre mağaza kategorisi seçmek için kullanılan prompt (${title} ve ${categoryNames} değişkenleri eklenir)",
-  prompt: "Aşağıdaki ürün başlığına en uygun mağaza kategorisini sadece aşağıdaki seçeneklerden birini seçerek döndür. Sadece kategori adını döndür.",
+  prompt: "Aşağıdaki ürün başlığına en uygun mağaza kategorisini sadece aşağıdaki seçeneklerden birini seçerek döndür. Sadece kategori adını döndür, başka hiçbir metin yazma: ${categoryNames}",
   defaultPrompt: "Aşağıdaki ürün başlığına en uygun mağaza kategorisini sadece aşağıdaki seçeneklerden birini seçerek döndür. Sadece kategori adını döndür."
 };
 

@@ -52,7 +52,6 @@ import {
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
-import { prompts, updatePrompt, resetPrompt, PromptConfig } from "@/lib/prompts"
 
 interface ShopSettings {
   shop_id: number
@@ -104,8 +103,6 @@ export default function SettingsPage() {
   const [showShippingModal, setShowShippingModal] = useState(false)
   const [showSectionModal, setShowSectionModal] = useState(false)
   const [newSectionTitle, setNewSectionTitle] = useState("")
-  const [promptsState, setPromptsState] = useState<PromptConfig[]>([])
-  const [editingPromptId, setEditingPromptId] = useState<string | null>(null)
   const [shippingForm, setShippingForm] = useState<CreateShippingForm>({
     title: "",
     origin_country_iso: "TR",
@@ -118,7 +115,6 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings()
-    setPromptsState([...prompts])
   }, [])
 
   const loadSettings = async () => {
@@ -273,35 +269,6 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSavePrompt = (id: string, newPrompt: string) => {
-    setSaving(true)
-    try {
-      updatePrompt(id, newPrompt)
-      setPromptsState([...prompts])
-      alert("✅ Prompt başarıyla güncellendi!")
-    } catch (error) {
-      console.error("Save prompt error:", error)
-      alert("❌ Prompt kaydedilirken hata oluştu!")
-    } finally {
-      setSaving(false)
-      setEditingPromptId(null)
-    }
-  }
-
-  const handleResetPrompt = (id: string) => {
-    setSaving(true)
-    try {
-      resetPrompt(id)
-      setPromptsState([...prompts])
-      alert("✅ Prompt varsayılan değerine sıfırlandı!")
-    } catch (error) {
-      console.error("Reset prompt error:", error)
-      alert("❌ Prompt sıfırlanırken hata oluştu!")
-    } finally {
-      setSaving(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -325,11 +292,10 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="shop" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="shop">Mağaza</TabsTrigger>
             <TabsTrigger value="shipping">Kargo</TabsTrigger>
             <TabsTrigger value="sections">Bölümler</TabsTrigger>
-            <TabsTrigger value="prompts">Promptlar</TabsTrigger>
             <TabsTrigger value="account">Hesap</TabsTrigger>
           </TabsList>
 
@@ -727,99 +693,6 @@ export default function SettingsPage() {
                     ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Prompts Settings */}
-          <TabsContent value="prompts" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Settings className="h-5 w-5 text-blue-600 mr-2" />
-                  AI Promptları
-                </CardTitle>
-                <CardDescription>
-                  OpenAI API için kullanılan promptları düzenleyin
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {promptsState.map((prompt) => (
-                  <div key={prompt.id} className="border rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-lg">{prompt.name}</h3>
-                        <p className="text-sm text-gray-600">{prompt.description}</p>
-                        {prompt.description.includes('${title}') && (
-                          <p className="text-xs text-blue-600 mt-1">Not: Bu prompt ürün başlığını kullanır</p>
-                        )}
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setEditingPromptId(editingPromptId === prompt.id ? null : prompt.id)}
-                        >
-                          {editingPromptId === prompt.id ? "İptal" : "Düzenle"}
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="text-orange-600"
-                          onClick={() => handleResetPrompt(prompt.id)}
-                        >
-                          Sıfırla
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {editingPromptId === prompt.id ? (
-                      <div className="space-y-3">
-                        <Textarea
-                          value={prompt.prompt}
-                          onChange={(e) => {
-                            const updatedPrompts = promptsState.map(p => 
-                              p.id === prompt.id ? { ...p, prompt: e.target.value } : p
-                            )
-                            setPromptsState(updatedPrompts)
-                          }}
-                          rows={10}
-                          className="font-mono text-sm"
-                        />
-                        <div className="flex justify-end space-x-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {
-                              setPromptsState([...prompts])
-                              setEditingPromptId(null)
-                            }}
-                          >
-                            İptal
-                          </Button>
-                          <Button 
-                            size="sm"
-                            onClick={() => handleSavePrompt(prompt.id, prompt.prompt)}
-                            disabled={saving}
-                          >
-                            {saving ? (
-                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4 mr-2" />
-                            )}
-                            {saving ? "Kaydediliyor..." : "Kaydet"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-gray-50 p-3 rounded border text-sm font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
-                        {prompt.prompt.length > 200 
-                          ? prompt.prompt.substring(0, 200) + "..." 
-                          : prompt.prompt}
-                      </div>
-                    )}
-                  </div>
-                ))}
               </CardContent>
             </Card>
           </TabsContent>

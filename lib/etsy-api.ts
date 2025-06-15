@@ -2318,8 +2318,8 @@ export async function uploadFilesToEtsy(
         onProgress?.(i + 1, images.length);
         // Her resim arasında kısa bir bekleme (rate limiting için)
         if (i < images.length - 1) {
-            console.log('[ETSY_API] ⏳ Waiting 500ms before next upload...');
-            await new Promise(resolve => setTimeout(resolve, 500));
+            console.log('[ETSY_API] ⏳ Waiting 200ms before next upload...');
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
     }
 

@@ -2160,65 +2160,80 @@ export async function createDraftListing(accessToken: string, shopId: number, da
 }
 
 // ⭐️⭐️⭐️ BU SEFER KESİN ÇALIŞACAK addInventoryWithVariations ⭐️⭐️⭐️
-export async function addInventoryWithVariations(accessToken: string, listingId: number, variations: any[]): Promise<void> {
-    console.log(`[ETSY_API] Envanter ve Varyasyonlar ekleniyor: Listing ID ${listingId}`);
+export async function addInventoryWithVariations(accessToken: string, listingId: number, variations: any[]) {
+    try {
+        // Tüm olası varyasyon kombinasyonlarını oluştur
+        const allVariations = [];
+        const sizes = [...new Set(variations.map(v => v.size))];
+        const patterns = ['Roll', 'Standard Canvas', 'White Frame', 'Gold Frame', 'Silver Frame', 'Black Frame'];
+        const MAX_PRICE = 50000; // Etsy'nin maksimum fiyat limiti
 
-    // 1. Benzersiz boyut ve desenleri al
-    const uniqueSizes = Array.from(new Set(variations.map(v => v.size)));
-    const uniquePatterns = Array.from(new Set(variations.map(v => v.pattern)));
-    console.log(`[ETSY_API] Bulunan Benzersiz Değerler: ${uniqueSizes.length} boyut, ${uniquePatterns.length} desen`);
+        for (const size of sizes) {
+            for (const pattern of patterns) {
+                // Mevcut varyasyondan fiyatı bul
+                const existingVariation = variations.find(v => v.size === size && v.pattern === pattern);
+                let price = existingVariation ? existingVariation.price : 0;
+                const isEnabled = existingVariation ? existingVariation.is_active : false;
 
-    // 2. Aktif olan varyasyonları kolayca bulmak için bir harita oluştur.
-    const activeCombos = new Map(variations.filter(v => v.is_active).map(v => [`${v.size}|${v.pattern}`, v]));
+                // Fiyatı kontrol et
+                if (price > MAX_PRICE) {
+                    console.warn(`[ETSY_API] ⚠️ Fiyat ${price}$ maksimum limiti aşıyor. ${MAX_PRICE}$ olarak ayarlanıyor.`);
+                    price = MAX_PRICE;
+                }
 
-    const products = [];
-
-    // 3. TÜM olası kombinasyonlar için döngü kur.
-    for (const size of uniqueSizes) {
-        for (const pattern of uniquePatterns) {
-            const comboKey = `${size}|${pattern}`;
-            const activeVariation = activeCombos.get(comboKey);
-
-            products.push({
-                property_values: [
-                    { property_id: 513, property_name: "Size", scale_id: null, values: [size] },
-                    { property_id: 514, property_name: "Pattern", scale_id: null, values: [pattern] }
-                ],
-                offerings: [{
-                    // Eğer kombinasyon aktifse kendi fiyatını, değilse 0 kullan
-                    price: activeVariation ? Number(activeVariation.price) : 0,
-                    quantity: 4,
-                    is_enabled: !!activeVariation // Aktif kombinasyon haritasında varsa true, yoksa false
-                }]
-            });
+                allVariations.push({
+                    property_values: [
+                        {
+                            property_id: 513,
+                            property_name: "Size",
+                            values: [size]
+                        },
+                        {
+                            property_id: 514,
+                            property_name: "Pattern",
+                            values: [pattern]
+                        }
+                    ],
+                    offerings: [
+                        {
+                            price: price,
+                            quantity: 4,
+                            is_enabled: isEnabled
+                        }
+                    ]
+                });
+            }
         }
+
+        console.log('[ETSY_API] Varyasyonlar gönderiliyor:', JSON.stringify(allVariations, null, 2));
+
+        // Tüm varyasyonları tek seferde gönder
+        const response = await fetch(`${ETSY_API_BASE}/application/listings/${listingId}/inventory`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'x-api-key': ETSY_CLIENT_ID!,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                products: allVariations,
+                price_on_property: [513, 514],
+                quantity_on_property: [],
+                sku_on_property: []
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error response from Etsy API (add inventory):', errorText);
+            throw new Error(errorText);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error in addInventoryWithVariations:', error);
+        throw error;
     }
-    
-    // 4. Envanter verisini oluştur
-    const inventoryData = {
-        products: products,
-        price_on_property: [513, 514], // Fiyatı artık hem boyut hem desen etkileyebilir
-        quantity_on_property: [],
-        sku_on_property: []
-    };
-    
-    console.log(`[ETSY_API] /inventory'ye gönderilecek ${products.length} adet ürün kombinasyonu hazırlandı.`);
-    console.log('[ETSY_API] Envanter verisi:', JSON.stringify(inventoryData, null, 2));
-
-    // 5. Etsy'ye gönder
-    const response = await fetch(`${ETSY_API_BASE}/application/listings/${listingId}/inventory`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'x-api-key': ETSY_CLIENT_ID, 'Content-Type': 'application/json' },
-        body: JSON.stringify(inventoryData),
-    });
-
-    if (!response.ok) {
-        const errorBody = await response.text();
-        console.error(`❌ ETSY ENVANTER HATASI (Status: ${response.status}):`, errorBody);
-        throw new Error(`Envanter ayarlanamadı: ${errorBody}`);
-    }
-
-    console.log(`✅ ID'si ${listingId} olan ürünün envanteri başarıyla ayarlandı.`);
 }
 
 export async function uploadFilesToEtsy(
@@ -2242,7 +2257,7 @@ export async function uploadFilesToEtsy(
         let success = false;
         let retryCount = 0;
 
-        // Dosya boyutu kontrolü
+        // Dosya boyutu kontrolü - hızlı kontrol
         if (image.size > maxFileSize) {
             console.error(`[ETSY_API] ❌ Image ${image.name} too large: ${(image.size / 1024 / 1024).toFixed(2)}MB (max 20MB)`);
             imageIdResults[i] = null;
@@ -2266,7 +2281,7 @@ export async function uploadFilesToEtsy(
 
                 // Timeout ile istek gönder
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 saniye timeout
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye timeout
 
                 const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images`, {
                     method: 'POST',
@@ -2312,14 +2327,15 @@ export async function uploadFilesToEtsy(
                     console.error(`[ETSY_API] ⏰ Upload timeout for ${image.name}`);
                 }
                 retryCount++;
-                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                // Retry bekleme süresini kısalt
+                await new Promise(resolve => setTimeout(resolve, 300 * retryCount));
             }
         }
         onProgress?.(i + 1, images.length);
         // Her resim arasında kısa bir bekleme (rate limiting için)
         if (i < images.length - 1) {
             console.log('[ETSY_API] ⏳ Waiting 200ms before next upload...');
-            await new Promise(resolve => setTimeout(resolve, 200));
+            await new Promise(resolve => setTimeout(resolve, 150));
         }
     }
 
@@ -2382,18 +2398,32 @@ export async function uploadFilesToEtsy(
 
 // uploadFilesToEtsy içinden çağrılacak yardımcı fonksiyon
 async function reorderListingImagesFromUpload(accessToken: string, shopId: number, listingId: number, imageIds: number[]) {
-    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images/reorder`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'x-api-key': ETSY_CLIENT_ID!,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ listing_image_ids: imageIds })
-    });
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText);
+    try {
+        console.log(`[ETSY_API] Resimleri yeniden sıralama: ${imageIds.join(', ')}`);
+        
+        const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images/reorder`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'x-api-key': ETSY_CLIENT_ID!,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                listing_image_ids: imageIds
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn('[ETSY_API] ⚠️ Resim sıralama hatası:', errorText);
+            // Hata durumunda sessizce devam et
+            return;
+        }
+
+        console.log('[ETSY_API] ✅ Resimler başarıyla sıralandı');
+    } catch (error) {
+        console.warn('[ETSY_API] ⚠️ Resim sıralama hatası:', error);
+        // Hata durumunda sessizce devam et
     }
 }
 

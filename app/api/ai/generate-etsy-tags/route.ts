@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that generates SEO-optimized tags for Etsy listings.",
+          content: "You are a helpful assistant that generates SEO-optimized tags for Etsy listings. Each tag must be 20 characters or less.",
         },
         {
           role: "user",
@@ -102,27 +102,48 @@ export async function POST(req: NextRequest) {
     const generatedText = response.choices[0].message.content.trim();
     
     // Etiketleri temizle ve dizi haline getir
-    const tags: string[] = generatedText
-      .replace(/^"|"$/g, '') // Başta ve sonda tırnak işaretlerini kaldır
+    let tags: string[] = generatedText
+      .replace(/^\"|\"$/g, '') // Başta ve sonda tırnak işaretlerini kaldır
       .split(',')
       .map((tag: string) => tag.trim())
       .filter((tag: string) => tag.length > 0 && tag.length <= 20); // 20 karakterden uzun etiketleri filtrele
 
-    if (tags.length !== 13) {
-      // Log API request with error
-      await logApiRequest(
-        "/api/ai/generate-etsy-tags", 
-        userId, 
-        false, 
-        Date.now() - startTime, 
-        { error: `Geçerli uzunlukta 13 tag üretilemedi. Üretilen tag sayısı: ${tags.length}` }
-      );
-      return NextResponse.json(
-        { error: `Geçerli uzunlukta 13 tag üretilemedi. Lütfen başlığı değiştirin veya tekrar deneyin.`, tags },
-        { status: 400 }
-      );
-    }
+    // Eğer 20 karakterden uzun etiketler varsa, yeni etiketler üret
+    if (tags.length < 13) {
+      console.log("20 karakterden uzun etiketler filtrelendi, yeni etiketler üretiliyor...");
+      
+      const remainingCount = 13 - tags.length;
+      const additionalTagsResponse = await openai.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: `You are a helpful assistant that generates SEO-optimized tags for Etsy listings. Generate EXACTLY ${remainingCount} new tags, each MUST BE 20 characters or less. Return only comma-separated tags, no numbering or formatting.`,
+          },
+          {
+            role: "user",
+            content: `Generate ${remainingCount} new SEO-optimized tags for this Etsy listing title: "${title}". Current tags are: ${tags.join(", ")}. New tags must be different from existing ones and each tag must be 20 characters or less.`,
+          },
+        ],
+        model: "gpt-3.5-turbo",
+        temperature: 0.7,
+        max_tokens: 300,
+      });
 
+      if (additionalTagsResponse.choices[0].message?.content) {
+        const additionalTags = additionalTagsResponse.choices[0].message.content
+          .replace(/^\"|\"$/g, '')
+          .split(',')
+          .map((tag: string) => tag.trim())
+          .filter((tag: string) => 
+            tag.length > 0 && 
+            tag.length <= 20 && 
+            !tags.includes(tag)
+          );
+
+        tags = [...tags, ...additionalTags].slice(0, 13);
+      }
+    }
+    
     success = true;
     // Log successful API request
     await logApiRequest(
@@ -133,7 +154,7 @@ export async function POST(req: NextRequest) {
       { promptLength: prompt.length, tagCount: tags.length }
     );
     
-    return NextResponse.json({ tags }, { status: 200 });
+    return new NextResponse(tags.join(", "), { status: 200 });
   } catch (error) {
     console.error("Generate Etsy tags error:", error);
     

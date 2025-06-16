@@ -59,135 +59,55 @@ export async function POST(req: NextRequest) {
     let prompt = descriptionPrompt.prompt.replace("${title}", title);
     const apiKey = process.env.OPENAI_API_KEY;
     const openai = new OpenAI({ apiKey });
-    // Görsel varsa daima gpt-3.5 kullan
-    if (image) {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+    
+    const response = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that generates detailed product descriptions for Etsy listings.",
         },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [
-            {
-              role: "system",
-              content: "You are a helpful assistant that generates detailed product descriptions for Etsy listings.",
-            },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: prompt,
-                },
-                image ? {
-                  type: "image_url",
-                  image_url: {
-                    url: image,
-                  },
-                } : null,
-              ].filter(Boolean),
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 800,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        console.error("OpenAI Vision API error:", error);
-        
-        // Log API request with error
-        await logApiRequest(
-          "/api/ai/generate-etsy-description (Vision)", 
-          userId, 
-          false, 
-          Date.now() - startTime, 
-          { error, hasImage: true }
-        );
-        
-        return NextResponse.json(
-          { error: "OpenAI Vision API hatası" },
-          { status: response.status }
-        );
-      }
-
-      const result = await response.json();
-      const generatedText = result.choices[0].message.content.trim();
-      
-      success = true;
-      // Log successful API request
-      await logApiRequest(
-        "/api/ai/generate-etsy-description (Vision)", 
-        userId, 
-        true, 
-        Date.now() - startTime, 
-        { hasImage: true, promptLength: prompt.length }
-      );
-      
-      return new NextResponse(generatedText, { status: 200 });
-    } 
-    // Görsel yoksa, standart GPT API kullan
-    else {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+        {
+          role: "user",
+          content: prompt,
         },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [
-            {
-              role: "system",
-              content: "You are a helpful assistant that generates detailed product descriptions for Etsy listings.",
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 800,
-        }),
-      });
+      ],
+      model: "gpt-3.5-turbo",
+      temperature: 0.7,
+      max_tokens: 800,
+    });
 
-      if (!response.ok) {
-        const error = await response.text();
-        console.error("OpenAI API error:", error);
-        
-        // Log API request with error
-        await logApiRequest(
-          "/api/ai/generate-etsy-description", 
-          userId, 
-          false, 
-          Date.now() - startTime, 
-          { error, hasImage: false }
-        );
-        
-        return NextResponse.json(
-          { error: "OpenAI API hatası" },
-          { status: response.status }
-        );
-      }
-
-      const result = await response.json();
-      const generatedText = result.choices[0].message.content.trim();
+    if (!response.choices[0].message?.content) {
+      const error = "OpenAI API hatası: Yanıt içeriği boş";
+      console.error("OpenAI API error:", error);
       
-      success = true;
-      // Log successful API request
+      // Log API request with error
       await logApiRequest(
         "/api/ai/generate-etsy-description", 
         userId, 
-        true, 
+        false, 
         Date.now() - startTime, 
-        { hasImage: false, promptLength: prompt.length }
+        { error }
       );
       
-      return new NextResponse(generatedText, { status: 200 });
+      return NextResponse.json(
+        { error: error },
+        { status: 500 }
+      );
     }
+
+    const generatedText = response.choices[0].message.content.trim();
+    
+    success = true;
+    // Log successful API request
+    await logApiRequest(
+      "/api/ai/generate-etsy-description", 
+      userId, 
+      true, 
+      Date.now() - startTime, 
+      { hasImage: false, promptLength: prompt.length }
+    );
+    
+    return new NextResponse(generatedText, { status: 200 });
   } catch (error) {
     console.error("Generate Etsy description error:", error);
     

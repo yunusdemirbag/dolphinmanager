@@ -103,11 +103,26 @@ export async function POST(req: NextRequest) {
     
     // Etiketleri temizle ve dizi haline getir
     const tags: string[] = generatedText
-      .replace(/^\"|\"$/g, '') // Başta ve sonda tırnak işaretlerini kaldır
+      .replace(/^"|"$/g, '') // Başta ve sonda tırnak işaretlerini kaldır
       .split(',')
       .map((tag: string) => tag.trim())
       .filter((tag: string) => tag.length > 0 && tag.length <= 20); // 20 karakterden uzun etiketleri filtrele
-    
+
+    if (tags.length !== 13) {
+      // Log API request with error
+      await logApiRequest(
+        "/api/ai/generate-etsy-tags", 
+        userId, 
+        false, 
+        Date.now() - startTime, 
+        { error: `Geçerli uzunlukta 13 tag üretilemedi. Üretilen tag sayısı: ${tags.length}` }
+      );
+      return NextResponse.json(
+        { error: `Geçerli uzunlukta 13 tag üretilemedi. Lütfen başlığı değiştirin veya tekrar deneyin.`, tags },
+        { status: 400 }
+      );
+    }
+
     success = true;
     // Log successful API request
     await logApiRequest(
@@ -118,7 +133,7 @@ export async function POST(req: NextRequest) {
       { promptLength: prompt.length, tagCount: tags.length }
     );
     
-    return new NextResponse(generatedText, { status: 200 });
+    return NextResponse.json({ tags }, { status: 200 });
   } catch (error) {
     console.error("Generate Etsy tags error:", error);
     

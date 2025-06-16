@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, X, Image as ImageIcon, Upload } from "lucide-react"
+import { Loader2, Plus, X, Image as ImageIcon, Upload, RefreshCw, Wand2 } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode, ShippingProfile, EtsyProcessingProfile } from "@/types/product"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -115,6 +115,10 @@ export function ProductFormModal({
   const [productImages, setProductImages] = useState<MediaFile[]>([])
   const [videoFile, setVideoFile] = useState<MediaFile | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  
+  // Focus keyword state
+  const [focusKeyword, setFocusKeyword] = useState("")
+  const [focusLoading, setFocusLoading] = useState(false)
 
   const router = useRouter()
 
@@ -332,10 +336,10 @@ export function ProductFormModal({
             is_personalizable: true,
             personalization_is_required: false,
             personalization_instructions: PERSONALIZATION_INSTRUCTIONS,
-            personalization_char_count_max: 256, // <-- Etsy için kritik alan
+            personalization_char_count_max: 256,
 
             // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
-            quantity: 999,
+            quantity: 4, // Sabit değer
             taxonomy_id: taxonomyId,
             who_made: "i_did",
             when_made: "made_to_order",
@@ -356,22 +360,43 @@ export function ProductFormModal({
             formData.append('videoFile', videoFile.file);
         }
 
+        // İlerleme durumunu takip et
+        let uploadProgress = 0;
         const response = await fetch('/api/etsy/listings/create', {
             method: 'POST',
             body: formData,
         });
 
-        const result = await response.json();
         if (!response.ok) {
-            throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Ürün oluşturulurken bir hata oluştu');
         }
 
-        toast({ title: "Başarılı!", description: result.message });
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Ürün oluşturulurken bir hata oluştu');
+        }
+
+        // Başarılı yanıt
+        toast({
+            title: "Başarılı",
+            description: "Ürün başarıyla Etsy'ye yüklendi.",
+            variant: "success",
+            duration: 5000
+        });
+
         onClose();
-        router.refresh();
+        window.location.reload();
 
     } catch (error) {
-        toast({ variant: "destructive", title: 'İşlem Başarısız', description: (error as Error).message });
+        console.error('Error creating listing:', error);
+        toast({
+            title: "Hata",
+            description: error instanceof Error ? error.message : "Ürün oluşturulurken bir hata oluştu",
+            variant: "destructive",
+            duration: 5000
+        });
     } finally {
         setSubmitting(false);
     }
@@ -435,29 +460,91 @@ export function ProductFormModal({
     </div>
   )
 
+  // Handle focus keyword title generation
+  const handleFocusedTitleGeneration = async () => {
+    if (!productImages.length || !productImages[0].file || !focusKeyword.trim()) {
+      toast({ 
+        variant: "destructive", 
+        title: "Hata", 
+        description: "Başlık üretmek için bir resim ve focus kelimesi gereklidir." 
+      });
+      return;
+    }
+
+    setFocusLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", productImages[0].file);
+      formData.append("focusKeyword", focusKeyword.trim());
+      
+      const res = await fetch("/api/ai/generate-focused-title", {
+        method: "POST",
+        body: formData,
+      });
+      
+      const data = await res.json();
+      
+      if (data.title) {
+        const generatedTitle = data.title.trim();
+        setTitle(generatedTitle);
+      }
+      
+      // Set color information if available
+      if (data.colors) {
+        if (data.colors.primaryColor) {
+          setPrimaryColor(data.colors.primaryColor);
+        }
+        if (data.colors.secondaryColor) {
+          setSecondaryColor(data.colors.secondaryColor);
+        }
+      }
+    } catch (e) {
+      toast({ 
+        variant: "destructive", 
+        title: "Başlık üretilemedi", 
+        description: "Focus kelimesi ile başlık oluşturulamadı." 
+      });
+    } finally {
+      setFocusLoading(false);
+    }
+  };
+
   return (
     <Dialog
       open={isOpen}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          // Form kapatılıyor
-          setTitle("");
-          setDescription("");
-          setPrice(0);
-          setQuantity(4);
-          setVideoFile(null);
-          setHasVariations(true);
-          setVariations(predefinedVariations);
-          setProductImages([]);
-          setSelectedShopSection("0");
+      onOpenChange={(open) => {
+        if (!open) {
+          handleCloseModal()
         }
-        onClose();
       }}
     >
       <DialogTrigger asChild>
         {/* DialogTrigger content */}
       </DialogTrigger>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        {/* TEST FOCUS ALANI - EN ÜSTTE */}
+        <div className="p-4 mb-4 border-4 border-pink-500 bg-pink-100 rounded-lg">
+          <Label htmlFor="focusKeywordTest" className="block text-lg font-bold text-pink-700 mb-2">TEST FOCUS ALANI</Label>
+          <div className="flex gap-2">
+            <Input
+              id="focusKeywordTest"
+              value={focusKeyword}
+              onChange={(e) => setFocusKeyword(e.target.value)}
+              placeholder="Buraya yazınca kesin görünmeli!"
+              className="w-64"
+            />
+            <Button
+              type="button"
+              onClick={handleFocusedTitleGeneration}
+              disabled={focusLoading || !focusKeyword.trim() || !productImages.length || !productImages[0].file}
+              size="icon"
+              variant="outline"
+              title="Focus kelimesi ile başlık oluştur"
+            >
+              {focusLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
         <DialogHeader>
           <DialogTitle>
             {product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}
@@ -473,15 +560,61 @@ export function ProductFormModal({
             <h3 className="text-lg font-medium">Temel Bilgiler</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="col-span-2">
-                <Label htmlFor="title" className="block mb-1">
-                  Başlık <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
-                />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Label htmlFor="title" className="block mb-2">
+                      Başlık <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
+                      className="flex-1"
+                    />
+                  </div>
+                  <div className="flex flex-col items-start gap-1">
+                    <Label htmlFor="focusKeyword" className="text-xs font-medium text-blue-700">Focus</Label>
+                    <div className="flex gap-1">
+                      <Input
+                        id="focusKeyword"
+                        value={focusKeyword}
+                        onChange={(e) => setFocusKeyword(e.target.value)}
+                        placeholder="Örn: Red Dress Woman"
+                        className="w-32"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleFocusedTitleGeneration}
+                        disabled={focusLoading || !focusKeyword.trim() || !productImages.length || !productImages[0].file}
+                        size="icon"
+                        variant="outline"
+                        title="Focus kelimesi ile başlık oluştur"
+                      >
+                        {focusLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Başlık yardımcı bilgiler */}
+                <div className="flex flex-wrap justify-between items-center text-xs text-gray-500 mt-1">
+                  <div>
+                    {focusLoading && (
+                      <span className="text-blue-600 font-medium">
+                        🤖 Focus kelimesi "{focusKeyword}" ile AI başlık üretiliyor...
+                      </span>
+                    )}
+                    {(!productImages.length || !productImages[0].file) && focusKeyword.trim() && (
+                      <span className="text-orange-600">
+                        ⚠️ AI başlık üretmek için önce bir resim yüklemeniz gerekiyor
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ color: title.length > 140 ? '#dc2626' : '#6b7280' }}>
+                    {title.length}/140 karakter
+                  </span>
+                </div>
               </div>
 
               <div>

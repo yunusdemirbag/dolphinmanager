@@ -36,7 +36,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
 import { createClientSupabase } from "@/lib/supabase";
-import { descriptionPrompt, tagsPrompt, categoryPrompt, titlePrompt } from "@/lib/prompts";
+import { descriptionPrompt, tagsPrompt, categoryPrompt, titlePrompt, generateTitleWithFocus } from "@/lib/openai-yonetim";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
@@ -312,7 +312,9 @@ export function ProductFormModal({
   useEffect(() => {
     if (isOpen) {
       setTitle(product?.title || "");
-      setDescription(product?.description || "");
+      // Her form açılışında rastgele bir açıklama seç
+      const randomDescription = generateRandomDescription();
+      setDescription(randomDescription);
       setPrice(product?.price?.amount || 0);
       setQuantity(4);
       setShippingProfileId(product?.shipping_profile_id?.toString() || "");
@@ -478,9 +480,16 @@ export function ProductFormModal({
     setVariations(newVariations);
   };
 
-  // --- GÖRSEL YÜKLENDİKTEN VE MODAL AÇILDIKTAN SONRA BAŞLIK OLUŞTURMA ---
+  // productImages değiştiğinde autoTitleUsed'u sıfırla
   useEffect(() => {
-    if (productImages.length > 0 && !title && !autoTitleUsed) {
+    setAutoTitleUsed(false);
+  }, [productImages]);
+
+  const [userEditedTitle, setUserEditedTitle] = useState(false);
+
+  // Resim yüklendiğinde başlık üret
+  useEffect(() => {
+    if (isOpen && productImages.length > 0 && !title && !autoTitleUsed && !userEditedTitle) {
       const generateTitle = async () => {
         setAutoTitleLoading(true);
         try {
@@ -492,12 +501,9 @@ export function ProductFormModal({
           });
           const data = await res.json();
           if (data.title) {
-            setTitle(data.title.trim());
+            const generatedTitle = data.title.trim();
+            setTitle(generatedTitle);
             setAutoTitleUsed(true);
-          }
-          if (data.colors) {
-            if (data.colors.primaryColor) setPrimaryColor(data.colors.primaryColor);
-            if (data.colors.secondaryColor) setSecondaryColor(data.colors.secondaryColor);
           }
         } catch (e) {
           toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
@@ -506,10 +512,8 @@ export function ProductFormModal({
         }
       };
       generateTitle();
-    } else if (productImages.length === 0 && autoTitleUsed) {
-      setAutoTitleUsed(false);
     }
-  }, [productImages, autoTitleUsed]);
+  }, [productImages, isOpen, title, autoTitleUsed, userEditedTitle]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -628,92 +632,104 @@ export function ProductFormModal({
     // 1. Fiyat Validasyonu
     let isPriceValid = false;
     if (hasVariations) {
-        isPriceValid = variations.some(v => v.is_active && v.price >= 0.20);
+      isPriceValid = variations.some(v => v.is_active && v.price >= 0.20);
     } else {
-        isPriceValid = price >= 0.20;
+      isPriceValid = price >= 0.20;
     }
 
     if (!isPriceValid) {
-        toast({
-            variant: "destructive",
-            title: "Geçersiz Fiyat",
-            description: "Lütfen en az bir ürün veya varyasyon için 0.20 USD'den yüksek bir fiyat girin.",
-        });
-        return;
+      toast({
+        variant: "destructive",
+        title: "Geçersiz Fiyat",
+        description: "Lütfen en az bir ürün veya varyasyon için 0.20 USD'den yüksek bir fiyat girin.",
+      });
+      return;
     }
 
     // 2. Diğer Validasyonlar
     if (!title || !shippingProfileId || productImages.length === 0) {
-        toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
-        return;
+      toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
+      return;
     }
 
     setSubmitting(true);
+    
+    // İşlem başlangıç zamanı
+    const startTime = Date.now();
 
     try {
-        const formData = new FormData();
+      // Başlangıç toast mesajı
+      toast({ 
+        title: "🚀 Ürün yükleniyor...", 
+        description: "Lütfen bekleyin, ürün Etsy'e yükleniyor." 
+      });
+      
+      const formData = new FormData();
 
-        const listingData = {
-            // Formdan gelen dinamik değerler
-            title,
-            description,
-            price,
-            shipping_profile_id: Number(shippingProfileId),
-            tags,
-            has_variations: hasVariations,
-            variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
-            state: state,
-            shop_section_id: Number(selectedShopSection) || undefined,
-            
-            // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
-            is_personalizable: true,
-            personalization_is_required: false,
-            personalization_instructions: PERSONALIZATION_INSTRUCTIONS,
-            personalization_char_count_max: 256, // <-- Etsy için kritik alan
-
-            // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
-            quantity: 999,
-            taxonomy_id: taxonomyId,
-            who_made: "i_did",
-            when_made: "made_to_order",
-            is_supply: false,
-        };
+      const listingData = {
+        // Formdan gelen dinamik değerler
+        title,
+        description,
+        price,
+        shipping_profile_id: Number(shippingProfileId),
+        tags,
+        has_variations: hasVariations,
+        variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
+        state: state,
+        shop_section_id: Number(selectedShopSection) || undefined,
         
-        formData.append('listingData', JSON.stringify(listingData));
-        productImages.forEach(image => formData.append('imageFiles', image.file));
-        if (videoFile) formData.append('videoFile', videoFile.file);
+        // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
+        is_personalizable: true,
+        personalization_is_required: false,
+        personalization_instructions: PERSONALIZATION_INSTRUCTIONS,
+        personalization_char_count_max: 256, // <-- Etsy için kritik alan
 
-        // Doğrudan endpoint'e gönder (asenkron yerine)
-        toast({ 
-          title: "Ürün yükleniyor...", 
-          description: "Lütfen bekleyin, ürün Etsy'e yükleniyor." 
-        });
+        // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
+        quantity: 999,
+        taxonomy_id: taxonomyId,
+        who_made: "i_did",
+        when_made: "made_to_order",
+        is_supply: false,
+      };
+      
+      formData.append('listingData', JSON.stringify(listingData));
+      productImages.forEach(image => formData.append('imageFiles', image.file));
+      if (videoFile) formData.append('videoFile', videoFile.file);
 
-        const response = await fetch('/api/etsy/listings/create', {
-          method: 'POST',
-          body: formData,
-        });
+      const response = await fetch('/api/etsy/listings/create', {
+        method: 'POST',
+        body: formData,
+      });
 
-        const result = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
-        }
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
+      }
 
-        // Başarı mesajı göster ve modal'ı kapat
-        toast({ 
-          title: "İşlem Başarılı! ✅", 
-          description: `Ürün "${title}" başarıyla oluşturuldu.` 
-        });
-        
-        // Modal'ı kapat
-        onClose();
-        router.refresh();
+      // İşlem süresini hesapla
+      const endTime = Date.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(1);
 
-    } catch (error) {
-        toast({ variant: "destructive", title: 'İşlem Başarısız', description: (error as Error).message });
+      // Başarı mesajı göster ve modal'ı kapat
+      toast({ 
+        title: "✅ İşlem Başarılı!", 
+        description: `"${title}" ürünü ${duration} saniyede yüklendi.` 
+      });
+
+      // Modal'ı kapat
+      onClose();
+      router.refresh();
+
+    } catch (error: any) {
+      console.error('Ürün oluşturma hatası:', error);
+      toast({ 
+        variant: "destructive", 
+        title: "❌ Hata Oluştu", 
+        description: error.message || "Ürün oluşturulurken bir hata oluştu." 
+      });
     } finally {
-        setSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -974,40 +990,108 @@ export function ProductFormModal({
     </div>
   );
 
-  // AI açıklama/etiket fetch fonksiyonunu güncelle
-  async function fetchAIResult(url: string, options: RequestInit) {
-    const response = await fetch(url, options);
-    let data;
-    try {
-      data = await response.json();
-    } catch (e) {
-      // JSON parse hatası varsa, muhtemelen HTML döndü
-      const text = await response.text();
-      throw new Error(text || 'API yanıtı okunamadı');
-    }
-    if (!response.ok) {
-      throw new Error(data.error || 'Bilinmeyen API hatası');
-    }
-    return data;
-  }
+  // Sabit açıklama bölümleri
+  const descriptionParts = {
+    headers: [
+      "🌟 Personalized Artwork & Fast Shipping 🌟",
+      "🌟 Customize Your Canvas with Confidence 🌟",
+      "🌟 Made Just for You – Fast & Safe Delivery 🌟",
+      "🌟 Custom Orders Made Simple 🌟",
+      "🌟 Let's Create Something Unique – Delivered Safely 🌟"
+    ],
+    intros: [
+      `🎨 Want a custom size or have a personal image in mind?
+We're here to make it happen! Send us a message to get started on your one-of-a-kind canvas. We'll walk you through the process with care and precision. 💌`,
 
-  const [titleTimeout, setTitleTimeout] = useState<NodeJS.Timeout | null>(null);
+      `🖼️ Whether you're interested in a specific size or a personalized design, we've got you covered. Just drop us a message, and we'll create a piece tailored to your style.`,
 
-  // Açıklama ve etiket üretimi için fetch isteklerinde model: 'gpt-3.5-turbo' parametresi ekle
+      `💡 Looking to personalize your wall art? We offer custom sizing and design printing! Send us a message, and we'll help you bring your idea to life with a custom order.`,
+
+      `🖌️ Want a different size or your own image turned into canvas art?
+It's easy! Message us anytime and we'll guide you through creating your personalized piece.`,
+
+      `🎨 If you need a custom size or want your own image on canvas, we're here to help. Just send us a message, and we'll take care of everything from design to delivery.`
+    ],
+    shippingTitles: [
+      "📦 Delivery with Protection",
+      "🚛 Secure Shipping You Can Count On",
+      "📦 Careful Packaging – Express Shipping",
+      "📦 We Pack with Care – You Receive with Confidence",
+      "🚛 Handled with Care, Delivered with Speed"
+    ],
+    shippingDetails: [
+      `Your artwork is handled with the highest level of care:
+✔️ Wrapped in protective film
+✔️ Cushioned with bubble wrap
+✔️ Secured in a durable shipping box`,
+
+      `✔️ Triple-layer packaging: cling film + bubble wrap + sturdy box
+✔️ Safe transit guaranteed
+✔️ Premium carriers like DHL, FedEx & UPS
+✔️ Tracking details provided as soon as it ships
+✔️ Delivered in 3–5 working days`,
+
+      `Every canvas is:
+✔️ Wrapped tightly in plastic
+✔️ Surrounded by bubble wrap for protection
+✔️ Packed in thick cardboard for safe travel`,
+
+      `✔️ First layer: cling wrap for moisture protection
+✔️ Second layer: bubble wrap for shock absorption
+✔️ Final layer: sturdy box for secure delivery`,
+
+      `✔️ Each canvas is carefully wrapped in film
+✔️ Protected with a thick layer of bubble wrap
+✔️ Shipped inside a strong, protective box`
+    ],
+    deliveryInfo: [
+      `🚚 Shipped with express couriers (FedEx, UPS, or DHL)
+🔍 Tracking number always included
+⏱️ Delivery time: 3–5 business days`,
+
+      `✔️ Premium carriers like DHL, FedEx & UPS
+✔️ Tracking details provided as soon as it ships
+✔️ Delivered in 3–5 working days
+
+Your satisfaction and the safety of your artwork are our top priorities!`,
+
+      `🚀 Express delivery via trusted carriers (UPS, FedEx, DHL)
+📬 You'll get tracking as soon as it ships
+⏳ Average delivery time: 3 to 5 business days`,
+
+      `📦 Shipped using FedEx, DHL, or UPS
+🕒 Estimated delivery: 3–5 business days
+🔎 Tracking info always provided`,
+
+      `📦 Sent with premium express couriers
+📬 Tracking code provided on shipment
+🕓 Delivery window: 3 to 5 business days`
+    ]
+  };
+
+  // Rastgele bir açıklama oluştur
+  const generateRandomDescription = () => {
+    const randomIndex = Math.floor(Math.random() * 5);
+    return `${descriptionParts.headers[randomIndex]}
+
+${descriptionParts.intros[randomIndex]}
+
+━━━━━━━━━━━━━━━━━━
+
+${descriptionParts.shippingTitles[randomIndex]}
+
+${descriptionParts.shippingDetails[randomIndex]}
+
+${descriptionParts.deliveryInfo[randomIndex]}`;
+  };
+
+  // Açıklama üretme fonksiyonunu güncelle
   const generateDescriptionAndTags = async () => {
     if (!title) return;
     try {
       setAutoDescriptionLoading(true);
       setAutoTagsLoading(true);
-      // Açıklama üret
-      const descPrompt = descriptionPrompt.prompt.replace("${title}", title);
-      const descRes = await fetch("/api/ai/generate-etsy-description", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: descPrompt, title, model: "gpt-3.5-turbo" }),
-      });
-      const descText = await descRes.text();
-      setDescription(descText.trim());
+      
       // Etiket üret
       const tagPrompt = tagsPrompt.prompt.replace("${title}", title);
       const tagRes = await fetch("/api/ai/generate-etsy-tags", {
@@ -1015,10 +1099,12 @@ export function ProductFormModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: tagPrompt, title, model: "gpt-3.5-turbo" }),
       });
-      const tagText = await tagRes.text();
-      let tags = tagText.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
-      if (tags.length > 13) tags = tags.slice(0, 13);
-      setTags(tags);
+      const tagData = await tagRes.json();
+      if (tagData.tags && Array.isArray(tagData.tags)) {
+        setTags(tagData.tags.slice(0, 13));
+      } else if (tagData.error) {
+        toast({ variant: "destructive", title: tagData.error });
+      }
     } catch (e) {
       toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
     } finally {
@@ -1030,6 +1116,7 @@ export function ProductFormModal({
   // Başlık değişikliklerini yönet
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
+    setUserEditedTitle(true);
   };
 
   // Başlığın yanındaki buton için ayrı bir fonksiyon
@@ -1062,23 +1149,53 @@ export function ProductFormModal({
   };
 
   const [focusTitleLoading, setFocusTitleLoading] = useState(false);
+  const [focusStatus, setFocusStatus] = useState<string | null>(null);
 
-  // generateTitle fonksiyonunu focus alanı için koru
-  const generateTitle = async (inputText: string) => {
-    if (!inputText.trim() || productImages.length === 0) return;
-    try {
-      setFocusTitleLoading(true);
-      const combinedPrompt = `${inputText} ${titlePrompt.prompt} bu kelimeyi dikkate alarak başlık oluştur.`;
-      const res = await fetch("/api/ai/generate-etsy-title", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: combinedPrompt, model: "gpt-4o" }),
+  // Yeni focus başlık üretici fonksiyon
+  const handleFocusTitle = async () => {
+    if (!titleInput.trim() || productImages.length === 0 || !productImages[0].file) {
+      toast({
+        variant: "destructive",
+        title: "Eksik Bilgi", 
+        description: "Lütfen focus kelimesi girin ve en az bir resim yükleyin."
       });
-      if (!res.ok) throw new Error("Başlık oluşturulamadı");
-      const text = await res.text();
-      setTitle(text.trim());
-    } catch (e) {
-      toast({ variant: "destructive", title: "Başlık oluşturulamadı" });
+      return;
+    }
+
+    setTitle("");
+    setUserEditedTitle(true);
+    setFocusStatus("Focus başlık üretiliyor...");
+    setFocusTitleLoading(true);
+
+    try {
+      const file = productImages[0].file;
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("focusKeyword", titleInput.trim());
+      formData.append("requestType", "focus");
+
+      const response = await fetch("/api/ai/generate-etsy-title", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      
+      if (data.title) {
+        setTitle(data.title.trim());
+        setFocusStatus("Başarılı!");
+        setAutoTitleUsed(true);
+      } else {
+        throw new Error("Başlık üretilemedi");
+      }
+
+    } catch (error) {
+      setFocusStatus("Hata oluştu");
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: "Focus başlık oluşturulamadı"
+      });
     } finally {
       setFocusTitleLoading(false);
     }
@@ -1096,6 +1213,16 @@ export function ProductFormModal({
       setAutoTitleUsed(false); // Sadece bir kez tetiklensin
     }
   }, [title, autoTitleUsed]);
+
+  // Modal açıldığında autoTitleUsed'u sıfırla
+  useEffect(() => {
+    if (isOpen) setAutoTitleUsed(false);
+  }, [isOpen]);
+
+  // Modal açıldığında userEditedTitle'ı sıfırla
+  useEffect(() => {
+    if (isOpen) setUserEditedTitle(false);
+  }, [isOpen]);
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -1169,6 +1296,9 @@ export function ProductFormModal({
                       )}
                     </Button>
                   </div>
+                  {autoTitleLoading && (
+                    <div className="text-xs text-blue-500 mt-1">Yeni başlık üretiliyor...</div>
+                  )}
                   {/* Focus alanı ve buton için generateTitle fonksiyonu kullanılacak */}
                   <div className="flex gap-2 mt-2">
                     <Input
@@ -1181,10 +1311,7 @@ export function ProductFormModal({
                       type="button"
                       variant="outline"
                       size="icon"
-                      onClick={() => {
-                        if (!titleInput.trim() || productImages.length === 0) return;
-                        generateTitle(titleInput);
-                      }}
+                      onClick={handleFocusTitle}
                       disabled={focusTitleLoading || !titleInput.trim() || productImages.length === 0}
                     >
                       {focusTitleLoading ? (
@@ -1194,8 +1321,8 @@ export function ProductFormModal({
                       )}
                     </Button>
                   </div>
-                  {autoTitleLoading && productImages.length > 0 && (
-                    <p className="text-sm text-muted-foreground">Başlık oluşturuluyor...</p>
+                  {focusStatus && (
+                    <p className="text-sm text-muted-foreground">{focusStatus}</p>
                   )}
                 </div>
 
@@ -1232,30 +1359,39 @@ export function ProductFormModal({
                   <Label htmlFor="description" className="block mb-1">
                     Açıklama <span className="text-red-500">*</span>
                   </Label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex-1 flex gap-2 items-center">
                     <Textarea
                       id="description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className="min-h-[100px]"
-                      placeholder="Ürününüzün detaylı açıklamasını girin"
+                      placeholder="Ürün açıklaması"
+                      className="min-h-[150px]"
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="border border-gray-300 hover:bg-gray-100 rounded-md"
-                      title="Yeni Açıklama İste"
-                      disabled={autoDescriptionLoading || !title}
-                      onClick={generateDescriptionAndTags}
-                    >
-                      {autoDescriptionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                    </Button>
-                    <span className="text-xs text-gray-500 ml-1">Yeni Açıklama ve Etiket İste</span>
+                    <div className="flex flex-col items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="border border-gray-300 hover:bg-gray-100 rounded-md"
+                        title="Rastgele Açıklama İste"
+                        disabled={autoDescriptionLoading}
+                        onClick={() => {
+                          try {
+                            setAutoDescriptionLoading(true);
+                            const randomDescription = generateRandomDescription();
+                            setDescription(randomDescription);
+                          } catch (e) {
+                            toast({ variant: "destructive", title: "Açıklama oluşturulamadı" });
+                          } finally {
+                            setAutoDescriptionLoading(false);
+                          }
+                        }}
+                      >
+                        {autoDescriptionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                      </Button>
+                      <span className="text-xs text-gray-500">Rastgele Açıklama İste</span>
+                    </div>
                   </div>
-                  {autoDescriptionLoading && (
-                    <div className="text-xs text-blue-500 mt-1">Başlığa göre açıklama üretiliyor...</div>
-                  )}
                 </div>
 
                 {/* Kategori seçimi */}
@@ -1331,7 +1467,27 @@ export function ProductFormModal({
                       className="border border-gray-300 hover:bg-gray-100 rounded-md"
                       title="Yeni Etiket İste"
                       disabled={autoTagsLoading || !title}
-                      onClick={generateDescriptionAndTags}
+                      onClick={async () => {
+                        if (!title) return;
+                        try {
+                          setAutoTagsLoading(true);
+                          const res = await fetch("/api/ai/generate-etsy-tags", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ title }),
+                          });
+                          const data = await res.json();
+                          if (data.tags && Array.isArray(data.tags)) {
+                            setTags(data.tags);
+                          } else if (data.error) {
+                            toast({ variant: "destructive", title: data.error });
+                          }
+                        } catch (e) {
+                          toast({ variant: "destructive", title: "Etiketler oluşturulamadı" });
+                        } finally {
+                          setAutoTagsLoading(false);
+                        }
+                      }}
                     >
                       {autoTagsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TagIcon className="w-4 h-4" />}
                     </Button>

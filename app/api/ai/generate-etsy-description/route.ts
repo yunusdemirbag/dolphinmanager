@@ -1,29 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { descriptionPrompt } from "@/lib/prompts"
+import { descriptionPrompt } from "@/lib/openai-yonetim"
 import { supabaseAdmin } from "@/lib/supabase"
 import { getUser } from "@/lib/auth"
-import { OpenAI } from "openai"
+import { generateDescription } from "@/lib/openai-yonetim"
 
 export const runtime = "edge"
-
-// API istek loglarını veritabanına kaydetmek için yardımcı fonksiyon
-async function logApiRequest(endpoint: string, userId: string | null, success: boolean, durationMs: number, details?: any) {
-  try {
-    await supabaseAdmin
-      .from("api_logs")
-      .insert({
-        endpoint,
-        user_id: userId,
-        timestamp: new Date().toISOString(),
-        success,
-        duration_ms: durationMs,
-        details
-      });
-    console.log(`API log kaydedildi: ${endpoint}, başarı: ${success}, süre: ${durationMs}ms`);
-  } catch (error) {
-    console.error("API log kaydederken hata:", error);
-  }
-}
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
@@ -43,82 +24,30 @@ export async function POST(req: NextRequest) {
     const { title, image } = body;
     
     if (!title) {
-      // Log API request with error
-      await logApiRequest(
-        "/api/ai/generate-etsy-description", 
-        userId, 
-        false, 
-        Date.now() - startTime, 
-        { error: "Başlık gerekli" }
-      );
-      
       return NextResponse.json({ error: "Başlık gerekli" }, { status: 400 });
     }
     
-    // Açıklama için prompt hazırla
-    let prompt = descriptionPrompt.prompt.replace("${title}", title);
-    const apiKey = process.env.OPENAI_API_KEY;
-    const openai = new OpenAI({ apiKey });
-    
-    const response = await openai.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that generates detailed product descriptions for Etsy listings.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      model: "gpt-3.5-turbo",
-      temperature: 0.7,
-      max_tokens: 800,
-    });
-
-    if (!response.choices[0].message?.content) {
-      const error = "OpenAI API hatası: Yanıt içeriği boş";
+    try {
+      // Açıklama üretimi için merkezi fonksiyonu kullan
+      const generatedText = await generateDescription({
+        title,
+        image,
+        customPrompt: descriptionPrompt.prompt
+      });
+      
+      success = true;
+      
+      return new NextResponse(generatedText, { status: 200 });
+    } catch (error) {
       console.error("OpenAI API error:", error);
       
-      // Log API request with error
-      await logApiRequest(
-        "/api/ai/generate-etsy-description", 
-        userId, 
-        false, 
-        Date.now() - startTime, 
-        { error }
-      );
-      
       return NextResponse.json(
-        { error: error },
+        { error: "OpenAI API hatası" },
         { status: 500 }
       );
     }
-
-    const generatedText = response.choices[0].message.content.trim();
-    
-    success = true;
-    // Log successful API request
-    await logApiRequest(
-      "/api/ai/generate-etsy-description", 
-      userId, 
-      true, 
-      Date.now() - startTime, 
-      { hasImage: false, promptLength: prompt.length }
-    );
-    
-    return new NextResponse(generatedText, { status: 200 });
   } catch (error) {
     console.error("Generate Etsy description error:", error);
-    
-    // Log API request with error
-    await logApiRequest(
-      "/api/ai/generate-etsy-description", 
-      userId, 
-      false, 
-      Date.now() - startTime, 
-      { error: error instanceof Error ? error.message : String(error) }
-    );
     
     return NextResponse.json(
       { error: "İstek işlenirken bir hata oluştu" },

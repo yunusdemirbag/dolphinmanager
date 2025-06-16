@@ -10,8 +10,12 @@ import {
 } from "@/lib/etsy-api"
 
 export async function POST(request: NextRequest) {
+  // İşlem süresini ölçmek için başlangıç zamanını kaydet
+  const startTime = Date.now();
+  let productTitle = ""; // Ürün başlığını saklamak için değişken
+  
   try {
-    console.log('[API] Starting Etsy listing creation process');
+    console.log('🚀 [ETSYapi] Ürün yükleme işlemi başladı...');
     
     // 1. Kullanıcıyı doğrula
     const supabase = await createClient()
@@ -91,6 +95,8 @@ export async function POST(request: NextRequest) {
     }
     
     const listingData = JSON.parse(listingDataJSON)
+    productTitle = listingData.title; // Ürün başlığını kaydet
+    console.log(`📝 [ETSYapi] Ürün hazırlanıyor: "${productTitle}"`);
     console.log('[API] Parsed listing data:', {
       title: listingData.title,
       price: listingData.price,
@@ -98,7 +104,7 @@ export async function POST(request: NextRequest) {
     })
 
     // 5. Draft listing oluştur
-    console.log('[API] Creating draft listing...')
+    console.log('📋 [ETSYapi] Taslak ürün oluşturuluyor...')
     const draftListing = await createDraftListing(accessToken, shopId, listingData)
     
     if (!draftListing.listing_id) {
@@ -106,29 +112,38 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Medya dosyalarını yükle
-    console.log('[API] Uploading media files...')
+    console.log(`🖼️ [ETSYapi] ${imageFiles.length} adet medya dosyası yükleniyor...`)
     await uploadFilesToEtsy(accessToken, shopId, draftListing.listing_id, imageFiles, videoFile)
 
     // 7. Varyasyonlar varsa ekle
     if (listingData.variations?.length > 0) {
-      console.log('[API] Adding variations...')
+      console.log('🔄 [ETSYapi] Varyasyonlar ekleniyor...')
       await addInventoryWithVariations(accessToken, draftListing.listing_id, listingData.variations)
     }
 
     // 8. Eğer active olarak işaretlendiyse, listing'i aktifleştir
     if (listingData.state === 'active') {
-      console.log('[API] Activating listing...')
+      console.log('✅ [ETSYapi] Ürün aktifleştiriliyor...')
       await activateEtsyListing(accessToken, shopId, draftListing.listing_id)
     }
 
-    console.log('[API] Listing creation completed successfully')
+    // İşlem süresini hesapla
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000; // saniye cinsinden
+    
+    console.log(`✨ [ETSYapi] Ürün yükleme işlemi tamamlandı! "${productTitle}" - Süre: ${duration.toFixed(2)} saniye`);
+    
     return NextResponse.json({ 
       success: true, 
       listingId: draftListing.listing_id,
       message: 'Ürün başarıyla oluşturuldu'
     })
   } catch (error: any) {
-    console.error('[API] Error creating listing:', error)
+    // İşlem süresini hesapla (hata durumunda da)
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000; // saniye cinsinden
+    
+    console.error(`❌ [ETSYapi] Ürün yükleme HATASI (${duration.toFixed(2)} saniye): ${error.message}`)
     
     // Özel hata mesajları
     if (error.message === 'RECONNECT_REQUIRED') {

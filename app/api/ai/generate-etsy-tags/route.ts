@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { tagsPrompt } from "@/lib/prompts"
 import { supabaseAdmin } from "@/lib/supabase"
 import { getUser } from "@/lib/auth"
+import { OpenAI } from "openai"
 
 export const runtime = "edge"
 
@@ -59,31 +60,28 @@ export async function POST(req: NextRequest) {
     
     const apiKey = process.env.OPENAI_API_KEY;
     
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful assistant that generates SEO-optimized tags for Etsy listings.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 300,
-      }),
+    const openai = new OpenAI({
+      apiKey: apiKey,
     });
 
-    if (!response.ok) {
-      const error = await response.text();
+    const response = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that generates SEO-optimized tags for Etsy listings.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      model: "gpt-3.5-turbo",
+      temperature: 0.7,
+      max_tokens: 300,
+    });
+
+    if (!response.choices[0].message?.content) {
+      const error = "OpenAI API hatası: Yanıt içeriği boş";
       console.error("OpenAI API error:", error);
       
       // Log API request with error
@@ -96,13 +94,12 @@ export async function POST(req: NextRequest) {
       );
       
       return NextResponse.json(
-        { error: "OpenAI API hatası" },
-        { status: response.status }
+        { error: error },
+        { status: 500 }
       );
     }
 
-    const result = await response.json();
-    const generatedText = result.choices[0].message.content.trim();
+    const generatedText = response.choices[0].message.content.trim();
     
     // Etiketleri temizle ve dizi haline getir
     const tags: string[] = generatedText

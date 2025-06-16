@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { descriptionPrompt } from "@/lib/prompts"
 import { supabaseAdmin } from "@/lib/supabase"
 import { getUser } from "@/lib/auth"
+import { OpenAI } from "openai"
 
 export const runtime = "edge"
 
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
     // Açıklama için prompt hazırla
     let prompt = descriptionPrompt.prompt.replace("${title}", title);
     const apiKey = process.env.OPENAI_API_KEY;
+    const openai = new OpenAI({ apiKey });
     // Görsel varsa daima gpt-3.5 kullan
     if (image) {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -66,7 +68,7 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-3.5",
+          model: "gpt-3.5-turbo",
           messages: [
             {
               role: "system",
@@ -136,7 +138,7 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-3.5",
+          model: "gpt-3.5-turbo",
           messages: [
             {
               role: "system",

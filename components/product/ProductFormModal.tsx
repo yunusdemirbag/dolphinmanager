@@ -1113,10 +1113,14 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     }
   };
 
-  // Başlık değişikliklerini yönet
+  // Başlık değişikliğini kontrol eden fonksiyonu güncelle
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTitle(e.target.value);
-    setUserEditedTitle(true);
+    let newTitle = e.target.value;
+    
+    // Başlığın başındaki ve sonundaki özel karakterleri temizle
+    newTitle = newTitle.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '');
+    
+    setTitle(newTitle);
   };
 
   // Başlığın yanındaki buton için ayrı bir fonksiyon
@@ -1274,12 +1278,8 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                       maxLength={160}
                     />
                     {/* Karakter sayacı */}
-                    <span
-                      className={`ml-2 text-xs font-mono ${title.length > 140 ? 'text-red-500' : 'text-gray-400'}`}
-                      title="Başlık karakter sayısı"
-                      style={{ minWidth: 48, textAlign: 'right' }}
-                    >
-                      {title.length}/140
+                    <span className={`text-xs ${title.length > 140 ? 'text-red-500 font-medium' : 'text-gray-500'}`}>
+                      {title.length}/140 {title.length > 140 && `(+${title.length - 140})`}
                     </span>
                     <Button
                       type="button"

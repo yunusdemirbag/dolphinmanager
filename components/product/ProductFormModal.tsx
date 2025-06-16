@@ -365,14 +365,6 @@ export function ProductFormModal({
     }
   }, [isOpen, product, shippingProfiles]);
 
-  // Modal her açıldığında başlık ve autoTitleUsed state'lerini sıfırla
-  useEffect(() => {
-    if (isOpen) {
-      setTitle("");
-      setAutoTitleUsed(false);
-    }
-  }, [isOpen]);
-
   // Başlık değişimini debounce ile geciktir
   const debouncedTitle = useDebounce(title, 1000); // 1 saniye debounce
 
@@ -488,8 +480,8 @@ export function ProductFormModal({
 
   // --- GÖRSEL YÜKLENDİKTEN VE MODAL AÇILDIKTAN SONRA BAŞLIK OLUŞTURMA ---
   useEffect(() => {
-    // Modal açıkken ve başlık boşsa ve görsel varsa tetikle
-    if (isOpen && productImages.length > 0 && !title && !autoTitleUsed) {
+    // Sadece productImages değiştiğinde ve başlık boşsa tetikle
+    if (productImages.length > 0 && !title && !autoTitleUsed) {
       const generateTitle = async () => {
         setAutoTitleLoading(true);
         try {
@@ -499,25 +491,15 @@ export function ProductFormModal({
             method: "POST",
             body: formData,
           });
-          
-          // API'den gelen yanıtı JSON olarak işle
           const data = await res.json();
-          
-          // Başlık bilgisini al ve ayarla
           if (data.title) {
             const generatedTitle = data.title.trim();
             setTitle(generatedTitle);
             setAutoTitleUsed(true);
           }
-          
-          // Renk bilgilerini al ve ayarla
           if (data.colors) {
-            if (data.colors.primaryColor) {
-              setPrimaryColor(data.colors.primaryColor);
-            }
-            if (data.colors.secondaryColor) {
-              setSecondaryColor(data.colors.secondaryColor);
-            }
+            if (data.colors.primaryColor) setPrimaryColor(data.colors.primaryColor);
+            if (data.colors.secondaryColor) setSecondaryColor(data.colors.secondaryColor);
           }
         } catch (e) {
           toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
@@ -527,14 +509,7 @@ export function ProductFormModal({
       };
       generateTitle();
     }
-  }, [productImages, isOpen]);
-
-  // Modal her açıldığında, başlık boşsa ve görsel varsa autoTitleUsed'u sıfırla ki analiz tekrar tetiklensin
-  useEffect(() => {
-    if (isOpen && productImages.length > 0 && !title) {
-      setAutoTitleUsed(false);
-    }
-  }, [isOpen]);
+  }, [productImages]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -1018,7 +993,7 @@ export function ProductFormModal({
 
   const [titleTimeout, setTitleTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Açıklama ve etiket üretimi için fetch isteklerinde model: 'gpt-3.5' parametresi ekle
+  // Açıklama ve etiket üretimi için fetch isteklerinde model: 'gpt-3.5-turbo' parametresi ekle
   const generateDescriptionAndTags = async () => {
     if (!title) return;
     try {
@@ -1029,7 +1004,7 @@ export function ProductFormModal({
       const descRes = await fetch("/api/ai/generate-etsy-description", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: descPrompt, model: "gpt-3.5" }),
+        body: JSON.stringify({ prompt: descPrompt, title, model: "gpt-3.5-turbo" }),
       });
       const descText = await descRes.text();
       setDescription(descText.trim());
@@ -1038,7 +1013,7 @@ export function ProductFormModal({
       const tagRes = await fetch("/api/ai/generate-etsy-tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: tagPrompt, model: "gpt-3.5" }),
+        body: JSON.stringify({ prompt: tagPrompt, title, model: "gpt-3.5-turbo" }),
       });
       const tagText = await tagRes.text();
       let tags = tagText.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
@@ -1059,18 +1034,26 @@ export function ProductFormModal({
 
   // Başlığın yanındaki buton için ayrı bir fonksiyon
   const generateTitleOnly = async () => {
-    if (!titlePrompt.prompt || productImages.length === 0) return;
+    if (!productImages.length || !productImages[0].file) return;
     try {
       setAutoTitleLoading(true);
-      const combinedPrompt = `${titlePrompt.prompt} Etsy için yeni bir başlık oluştur.`;
+      const formData = new FormData();
+      formData.append("image", productImages[0].file);
       const res = await fetch("/api/ai/generate-etsy-title", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: combinedPrompt, model: "gpt-4o" }),
+        body: formData,
       });
       if (!res.ok) throw new Error("Başlık oluşturulamadı");
-      const text = await res.text();
-      setTitle(text.trim());
+      // API'den dönen yanıtı JSON olarak işle
+      const data = await res.json();
+      if (data.title) {
+        setTitle(data.title.trim());
+        setAutoTitleUsed(true);
+      } else {
+        const text = data?.text || "";
+        setTitle(text.trim());
+        setAutoTitleUsed(true);
+      }
     } catch (e) {
       toast({ variant: "destructive", title: "Başlık oluşturulamadı" });
     } finally {
@@ -1105,6 +1088,14 @@ export function ProductFormModal({
   useEffect(() => {
     setTitleInput("");
   }, [isOpen]); // 'isOpen' formun açık/kapalı durumunu belirten state olmalı
+
+  // Başlık otomatik üretildiyse, başlık değiştiğinde açıklama ve etiket üretimini tetikle
+  useEffect(() => {
+    if (autoTitleUsed && title) {
+      generateDescriptionAndTags();
+      setAutoTitleUsed(false); // Sadece bir kez tetiklensin
+    }
+  }, [title, autoTitleUsed]);
 
   return (
     <DndProvider backend={HTML5Backend}>

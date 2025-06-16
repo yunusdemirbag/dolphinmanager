@@ -36,7 +36,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
 import { createClientSupabase } from "@/lib/supabase";
-import { descriptionPrompt, tagsPrompt, categoryPrompt, titlePrompt, generateTitleWithFocus } from "@/lib/openai-yonetim";
+import { categoryPrompt, tagsPrompt, titlePrompt, generateTitleWithFocus, selectCategory } from "@/lib/openai-yonetim";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
@@ -274,8 +274,8 @@ export function ProductFormModal({
   // Etiket üretimi için state
   const [autoTagsLoading, setAutoTagsLoading] = useState(false);
 
-  // Kullanıcı elle kategori seçerse otomatik güncellemeyi durdurmak için state
-  const [shopSectionAutoSelected, setShopSectionAutoSelected] = useState(true);
+  // Otomatik kategori seçimi için state
+  const [shopSectionAutoSelected, setShopSectionAutoSelected] = useState(true)
 
   // Eğer ürün düzenleniyorsa onun bölümünü, değilse ilk bölümü seç
   const initialSectionId = product?.shop_section_id?.toString() || shopSections[0]?.shop_section_id.toString() || '';
@@ -518,51 +518,85 @@ export function ProductFormModal({
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
     setSelectedShopSection(val);
-    setShopSectionAutoSelected(false);
+    setShopSectionAutoSelected(false); // Manuel seçim yapıldığında otomatiği kapat
+    console.log('Manuel kategori seçimi:', val);
   };
 
   // Başlık değiştiğinde en uygun mağaza kategorisini OpenAI ile otomatik seç
   useEffect(() => {
-    if (!debouncedTitle || !shopSections.length || !shopSectionAutoSelected) return;
-
-    const fetchAICategory = async () => {
-      const categoryNames = shopSections.map(s => s.title).join(', ');
-      // Prompt'u lib/prompts.ts'den al ve değişkenleri yerleştir
-      const prompt = categoryPrompt.prompt
-        .replace("${categoryNames}", categoryNames)
-        .replace("${title}", debouncedTitle);
+    // Sadece başlık varsa ve shop section'lar yüklenmişse ve otomatik seçim aktifse
+    if (!title || !shopSections.length || !shopSectionAutoSelected) return;
+    
+    // Debounce için 1 saniye bekle
+    const timer = setTimeout(async () => {
       try {
-        const res = await fetch("/api/ai/generate-etsy-title", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt }),
+        console.log('Otomatik kategori seçimi başlatılıyor:', title);
+        const categoryNames = shopSections.map(s => s.title);
+        
+        // OpenAI API'ya kategori seçimi için istek
+        const response = await fetch('/api/ai/select-category', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            title, 
+            categoryNames 
+          })
         });
-        const aiCategory = (await res.text()).trim().toLowerCase();
-        let matchedSection = shopSections.find(
-          s => s.title.trim().toLowerCase() === aiCategory
-        );
-        // Fallback: Modern/Abstract gibi genel kategori
-        if (!matchedSection) {
-          const fallbackKeywords = ["modern", "abstract", "art", "general"];
-          matchedSection = shopSections.find(s =>
-            fallbackKeywords.some(keyword =>
-              s.title.toLowerCase().includes(keyword)
-            )
+        
+        if (response.ok) {
+          const aiCategory = (await response.text()).trim().toLowerCase();
+          console.log('AI kategori yanıtı:', aiCategory);
+          
+          // Tam eşleşme ara
+          let matchedSection = shopSections.find(
+            s => s.title.trim().toLowerCase() === aiCategory
           );
+          
+          // Kısmi eşleşme ara (fallback)
+          if (!matchedSection) {
+            matchedSection = shopSections.find(s =>
+              s.title.toLowerCase().includes(aiCategory) ||
+              aiCategory.includes(s.title.toLowerCase())
+            );
+          }
+          
+          // Varsayılan kategoriler için fallback
+          if (!matchedSection) {
+            const fallbackKeywords = ["modern", "abstract", "art", "animal"];
+            matchedSection = shopSections.find(s =>
+              fallbackKeywords.some(keyword =>
+                s.title.toLowerCase().includes(keyword)
+              )
+            );
+          }
+          
+          // Son çare: ilk kategoriyi seç
+          if (!matchedSection && shopSections.length > 0) {
+            matchedSection = shopSections[0];
+          }
+          
+          if (matchedSection) {
+            console.log('Kategori seçildi:', matchedSection.title);
+            setSelectedShopSection(matchedSection.shop_section_id.toString());
+          }
+        } else {
+          console.error('Kategori seçimi API hatası:', response.status);
         }
-        // Hala yoksa ilk kategoriyi seç
-        if (!matchedSection && shopSections.length > 0) {
-          matchedSection = shopSections[0];
-        }
-        if (matchedSection) {
-          setSelectedShopSection(matchedSection.shop_section_id.toString());
-        }
-      } catch (e) {
-        // Hata olursa kategori değiştirme
+      } catch (error) {
+        console.error('Kategori seçimi hatası:', error);
       }
-    };
-    fetchAICategory();
-  }, [debouncedTitle, shopSections, shopSectionAutoSelected]);
+    }, 1000); // 1 saniye debounce
+    
+    return () => clearTimeout(timer);
+  }, [title, shopSections, shopSectionAutoSelected]); // Tüm dependency'leri ekle
+
+  // Form açıldığında otomatik seçimi aktif et
+  useEffect(() => {
+    if (isOpen) {
+      setShopSectionAutoSelected(true);
+      console.log('Form açıldı, otomatik kategori seçimi aktif');
+    }
+  }, [isOpen]);
 
   // Job takibi
   const startJobTracking = (jobId: string, productTitle: string) => {
@@ -1121,6 +1155,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     newTitle = newTitle.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '');
     
     setTitle(newTitle);
+    autoSelectCanvasCategory(newTitle);
   };
 
   // Başlığın yanındaki buton için ayrı bir fonksiyon
@@ -1227,6 +1262,51 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   useEffect(() => {
     if (isOpen) setUserEditedTitle(false);
   }, [isOpen]);
+
+  // Kanvas kategorileri (örnek)
+  const CANVAS_CATEGORIES = [
+    "Abstract",
+    "Love Art",
+    "Flowers Art",
+    "Landscape Art",
+    "Animal Art",
+    "Mark Rothko Art Print",
+    "Modern Art",
+    "Surreal Canvas Art",
+    "Erotic Art Canvas",
+    "Banksy & Graffiti Art",
+    "Music & Dance Art"
+  ];
+
+  // Kategori otomatik seçimi fonksiyonu
+  const autoSelectCanvasCategory = async (title: string) => {
+    if (!title) return;
+    try {
+      // OpenAI API'ya fetch ile istek at
+      const response = await fetch('/api/ai/select-category', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, categoryNames: CANVAS_CATEGORIES })
+      });
+      const category = (await response.text()).trim();
+      console.log('AI kategori yanıtı:', category);
+      if (category && CANVAS_CATEGORIES.includes(category)) {
+        setSelectedShopSection(category);
+      } else {
+        console.warn('AI dönen kategori listede yok:', category);
+      }
+    } catch (e) {
+      console.error('Kategori seçimi hatası:', e);
+    }
+  };
+
+  // Resim yüklendiğinde de otomatik kategori seç (örnek olarak ilk resim yüklendiğinde tetiklenebilir)
+  useEffect(() => {
+    if (productImages.length > 0 && title) {
+      autoSelectCanvasCategory(title);
+    }
+    // eslint-disable-next-line
+  }, [productImages]);
 
   return (
     <DndProvider backend={HTML5Backend}>

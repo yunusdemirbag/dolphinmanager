@@ -480,8 +480,7 @@ export function ProductFormModal({
 
   // --- GÖRSEL YÜKLENDİKTEN VE MODAL AÇILDIKTAN SONRA BAŞLIK OLUŞTURMA ---
   useEffect(() => {
-    // Sadece productImages değiştiğinde ve başlık boşsa tetikle
-    if (productImages.length > 0 && !title && !autoTitleUsed) {
+    if (isOpen && productImages.length > 0 && !title && !autoTitleUsed) {
       const generateTitle = async () => {
         setAutoTitleLoading(true);
         try {
@@ -509,7 +508,7 @@ export function ProductFormModal({
       };
       generateTitle();
     }
-  }, [productImages]);
+  }, [productImages, isOpen, title, autoTitleUsed]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -1096,6 +1095,11 @@ export function ProductFormModal({
       setAutoTitleUsed(false); // Sadece bir kez tetiklensin
     }
   }, [title, autoTitleUsed]);
+
+  // Modal açıldığında autoTitleUsed'u sıfırla
+  useEffect(() => {
+    if (isOpen) setAutoTitleUsed(false);
+  }, [isOpen]);
 
   return (
     <DndProvider backend={HTML5Backend}>

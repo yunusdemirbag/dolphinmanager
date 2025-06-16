@@ -480,7 +480,7 @@ export function ProductFormModal({
 
   // --- GÖRSEL YÜKLENDİKTEN VE MODAL AÇILDIKTAN SONRA BAŞLIK OLUŞTURMA ---
   useEffect(() => {
-    if (isOpen && productImages.length > 0 && !title && !autoTitleUsed) {
+    if (productImages.length > 0 && !title && !autoTitleUsed) {
       const generateTitle = async () => {
         setAutoTitleLoading(true);
         try {
@@ -492,8 +492,7 @@ export function ProductFormModal({
           });
           const data = await res.json();
           if (data.title) {
-            const generatedTitle = data.title.trim();
-            setTitle(generatedTitle);
+            setTitle(data.title.trim());
             setAutoTitleUsed(true);
           }
           if (data.colors) {
@@ -507,8 +506,10 @@ export function ProductFormModal({
         }
       };
       generateTitle();
+    } else if (productImages.length === 0 && autoTitleUsed) {
+      setAutoTitleUsed(false);
     }
-  }, [productImages, isOpen, title, autoTitleUsed]);
+  }, [productImages, autoTitleUsed]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -1095,11 +1096,6 @@ export function ProductFormModal({
       setAutoTitleUsed(false); // Sadece bir kez tetiklensin
     }
   }, [title, autoTitleUsed]);
-
-  // Modal açıldığında autoTitleUsed'u sıfırla
-  useEffect(() => {
-    if (isOpen) setAutoTitleUsed(false);
-  }, [isOpen]);
 
   return (
     <DndProvider backend={HTML5Backend}>

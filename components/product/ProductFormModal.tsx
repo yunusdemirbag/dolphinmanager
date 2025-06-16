@@ -1018,51 +1018,39 @@ export function ProductFormModal({
 
   const [titleTimeout, setTitleTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Başlık değiştiğinde hemen açıklama ve etiketleri oluştur
-  useEffect(() => {
-    const generateContent = async () => {
-      if (title && title.length > 0) {
-        try {
-          setAutoDescriptionLoading(true);
-          setAutoTagsLoading(true);
-          
-          // Açıklama üret
-          const descPrompt = descriptionPrompt.prompt.replace("${title}", title);
-          const descRes = await fetch("/api/ai/generate-etsy-title", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: descPrompt }),
-          });
-          const descText = await descRes.text();
-          const segments = descText.split('|||').map(s => s.trim());
-          let formattedDesc = descText.trim();
-          if (segments.length === 3) {
-            formattedDesc = `**${segments[0]}**\n\n_Stil: ${segments[1]}_\n\n_${segments[2]}_`;
-          }
-          setDescription(formattedDesc);
-          
-          // Etiket üret
-          const tagPrompt = tagsPrompt.prompt.replace("${title}", title);
-          const tagRes = await fetch("/api/ai/generate-etsy-title", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: tagPrompt }),
-          });
-          const tagText = await tagRes.text();
-          let tags = tagText.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
-          if (tags.length > 13) tags = tags.slice(0, 13);
-          setTags(tags);
-        } catch (e) {
-          toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
-        } finally {
-          setAutoDescriptionLoading(false);
-          setAutoTagsLoading(false);
-        }
-      }
-    };
-
-    generateContent();
-  }, [title]); // title değiştiğinde çalışacak
+  // Açıklama ve etiket üretimi için fetch isteklerinde model: 'gpt-3.5' parametresi ekle
+  const generateDescriptionAndTags = async () => {
+    if (!title) return;
+    try {
+      setAutoDescriptionLoading(true);
+      setAutoTagsLoading(true);
+      // Açıklama üret
+      const descPrompt = descriptionPrompt.prompt.replace("${title}", title);
+      const descRes = await fetch("/api/ai/generate-etsy-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: descPrompt, model: "gpt-3.5" }),
+      });
+      const descText = await descRes.text();
+      setDescription(descText.trim());
+      // Etiket üret
+      const tagPrompt = tagsPrompt.prompt.replace("${title}", title);
+      const tagRes = await fetch("/api/ai/generate-etsy-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: tagPrompt, model: "gpt-3.5" }),
+      });
+      const tagText = await tagRes.text();
+      let tags = tagText.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
+      if (tags.length > 13) tags = tags.slice(0, 13);
+      setTags(tags);
+    } catch (e) {
+      toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
+    } finally {
+      setAutoDescriptionLoading(false);
+      setAutoTagsLoading(false);
+    }
+  };
 
   // Başlık değişikliklerini yönet
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1071,57 +1059,52 @@ export function ProductFormModal({
 
   // Başlığın yanındaki buton için ayrı bir fonksiyon
   const generateTitleOnly = async () => {
-    if (!titlePrompt.prompt) return;
+    if (!titlePrompt.prompt || productImages.length === 0) return;
     try {
       setAutoTitleLoading(true);
-      // Sadece başlık promptunu kullan
       const combinedPrompt = `${titlePrompt.prompt} Etsy için yeni bir başlık oluştur.`;
-      console.log("Başlık üretim promptu (sadece başlık):", combinedPrompt); // DEBUG
       const res = await fetch("/api/ai/generate-etsy-title", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: combinedPrompt }),
+        body: JSON.stringify({ prompt: combinedPrompt, model: "gpt-4o" }),
       });
       if (!res.ok) throw new Error("Başlık oluşturulamadı");
       const text = await res.text();
       setTitle(text.trim());
     } catch (e) {
-      toast({ 
-        variant: "destructive", 
-        title: "Başlık oluşturulamadı", 
-        description: "Lütfen tekrar deneyin." 
-      });
+      toast({ variant: "destructive", title: "Başlık oluşturulamadı" });
     } finally {
       setAutoTitleLoading(false);
     }
   };
 
+  const [focusTitleLoading, setFocusTitleLoading] = useState(false);
+
   // generateTitle fonksiyonunu focus alanı için koru
   const generateTitle = async (inputText: string) => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || productImages.length === 0) return;
     try {
-      setAutoTitleLoading(true);
-      // Focus alanı + başlık promptu + bu kelimeyi dikkate alarak başlık oluştur
+      setFocusTitleLoading(true);
       const combinedPrompt = `${inputText} ${titlePrompt.prompt} bu kelimeyi dikkate alarak başlık oluştur.`;
-      console.log("Başlık üretim promptu:", combinedPrompt); // DEBUG
       const res = await fetch("/api/ai/generate-etsy-title", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: combinedPrompt }),
+        body: JSON.stringify({ prompt: combinedPrompt, model: "gpt-4o" }),
       });
       if (!res.ok) throw new Error("Başlık oluşturulamadı");
       const text = await res.text();
       setTitle(text.trim());
     } catch (e) {
-      toast({ 
-        variant: "destructive", 
-        title: "Başlık oluşturulamadı", 
-        description: "Lütfen tekrar deneyin." 
-      });
+      toast({ variant: "destructive", title: "Başlık oluşturulamadı" });
     } finally {
-      setAutoTitleLoading(false);
+      setFocusTitleLoading(false);
     }
   };
+
+  // Form açıldığında focus alanını temizle
+  useEffect(() => {
+    setTitleInput("");
+  }, [isOpen]); // 'isOpen' formun açık/kapalı durumunu belirten state olmalı
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -1186,7 +1169,7 @@ export function ProductFormModal({
                       size="icon"
                       onClick={generateTitleOnly}
                       title="Başlığı Değiştir"
-                      disabled={autoTitleLoading}
+                      disabled={autoTitleLoading || productImages.length === 0}
                     >
                       {autoTitleLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -1200,7 +1183,6 @@ export function ProductFormModal({
                     <Input
                       value={titleInput}
                       onChange={(e) => setTitleInput(e.target.value)}
-                      onBlur={() => generateTitle(titleInput)}
                       placeholder="Başlık için anahtar kelimeler (Focus)"
                       className="w-64"
                     />
@@ -1208,17 +1190,20 @@ export function ProductFormModal({
                       type="button"
                       variant="outline"
                       size="icon"
-                      onClick={() => generateTitle(titleInput)}
-                      disabled={autoTitleLoading || !titleInput.trim()}
+                      onClick={() => {
+                        if (!titleInput.trim() || productImages.length === 0) return;
+                        generateTitle(titleInput);
+                      }}
+                      disabled={focusTitleLoading || !titleInput.trim() || productImages.length === 0}
                     >
-                      {autoTitleLoading ? (
+                      {focusTitleLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Wand2 className="h-4 w-4" />
                       )}
                     </Button>
                   </div>
-                  {autoTitleLoading && (
+                  {autoTitleLoading && productImages.length > 0 && (
                     <p className="text-sm text-muted-foreground">Başlık oluşturuluyor...</p>
                   )}
                 </div>
@@ -1271,47 +1256,7 @@ export function ProductFormModal({
                       className="border border-gray-300 hover:bg-gray-100 rounded-md"
                       title="Yeni Açıklama İste"
                       disabled={autoDescriptionLoading || !title}
-                      onClick={async () => {
-                        if (!title) return;
-                        setAutoDescriptionLoading(true);
-                        setAutoTagsLoading(true);
-                        
-                        try {
-                          // Açıklama üret
-                          const descPrompt = descriptionPrompt.prompt.replace("${title}", title);
-                          const descRes = await fetch("/api/ai/generate-etsy-title", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ prompt: descPrompt }),
-                          });
-                          const descText = await descRes.text();
-                          // Segmentli açıklamayı insan okunabilir formata çevir
-                          const segments = descText.trim().split('|||').map(s => s.trim());
-                          let formattedDesc = descText.trim();
-                          if (segments.length === 3) {
-                            formattedDesc = `**${segments[0]}**\n\n_Stil: ${segments[1]}_\n\n_${segments[2]}_`;
-                          }
-                          setDescription(formattedDesc);
-                          
-                          // Etiket üret
-                          const tagPrompt = tagsPrompt.prompt.replace("${title}", title);
-                          const tagRes = await fetch("/api/ai/generate-etsy-title", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ prompt: tagPrompt }),
-                          });
-                          const tagText = await tagRes.text();
-                          // Tagleri satır sonu, fazla boşluk ve virgül ile ayırıp 13'e tamamla
-                          let tags = tagText.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
-                          if (tags.length > 13) tags = tags.slice(0, 13);
-                          setTags(tags);
-                        } catch (e) {
-                          toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
-                        } finally {
-                          setAutoDescriptionLoading(false);
-                          setAutoTagsLoading(false);
-                        }
-                      }}
+                      onClick={generateDescriptionAndTags}
                     >
                       {autoDescriptionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                     </Button>
@@ -1395,28 +1340,7 @@ export function ProductFormModal({
                       className="border border-gray-300 hover:bg-gray-100 rounded-md"
                       title="Yeni Etiket İste"
                       disabled={autoTagsLoading || !title}
-                      onClick={async () => {
-                        if (!title) return;
-                        setAutoTagsLoading(true);
-                        // Prompt'u lib/prompts.ts'den al ve title değişkenini yerleştir
-                        const prompt = tagsPrompt.prompt.replace("${title}", title);
-                        try {
-                          const res = await fetch("/api/ai/generate-etsy-title", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ prompt }),
-                          });
-                          const text = await res.text();
-                          // Tagleri satır sonu, fazla boşluk ve virgül ile ayırıp 13'e tamamla
-                          let tags = text.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
-                          if (tags.length > 13) tags = tags.slice(0, 13);
-                          setTags(tags);
-                        } catch (e) {
-                          toast({ variant: "destructive", title: "Etiket üretilemedi", description: "Başlığa göre etiket oluşturulamadı." });
-                        } finally {
-                          setAutoTagsLoading(false);
-                        }
-                      }}
+                      onClick={generateDescriptionAndTags}
                     >
                       {autoTagsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TagIcon className="w-4 h-4" />}
                     </Button>

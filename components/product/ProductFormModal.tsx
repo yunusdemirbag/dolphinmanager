@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon, Image, Video, ChevronDown } from "lucide-react"
+import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon, Image, Video, ChevronDown, Wand2 } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode, ShippingProfile, EtsyProcessingProfile } from "@/types/product"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -36,7 +36,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
 import { createClientSupabase } from "@/lib/supabase";
-import { descriptionPrompt, tagsPrompt, categoryPrompt } from "@/lib/prompts";
+import { descriptionPrompt, tagsPrompt, categoryPrompt, titlePrompt } from "@/lib/prompts";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
@@ -228,6 +228,7 @@ export function ProductFormModal({
   const { toast } = useToast()
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false)
   const [title, setTitle] = useState(product?.title || "")
+  const [titleInput, setTitleInput] = useState("")
   const [description, setDescription] = useState(product?.description || "")
   const [price, setPrice] = useState(product?.price?.amount || 0)
   const [quantity, setQuantity] = useState(4)
@@ -236,7 +237,7 @@ export function ProductFormModal({
   )
 
   // Additional fields to match Etsy
-  const [tags, setTags] = useState(product?.tags || [])
+  const [tags, setTags] = useState<string[]>(product?.tags || [])
   const [newTag, setNewTag] = useState("")
   const [isPersonalizable, setIsPersonalizable] = useState(true)
   const [personalizationRequired, setPersonalizationRequired] = useState(false)
@@ -1015,6 +1016,113 @@ export function ProductFormModal({
     return data;
   }
 
+  const [titleTimeout, setTitleTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Başlık değiştiğinde hemen açıklama ve etiketleri oluştur
+  useEffect(() => {
+    const generateContent = async () => {
+      if (title && title.length > 0) {
+        try {
+          setAutoDescriptionLoading(true);
+          setAutoTagsLoading(true);
+          
+          // Açıklama üret
+          const descPrompt = descriptionPrompt.prompt.replace("${title}", title);
+          const descRes = await fetch("/api/ai/generate-etsy-title", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: descPrompt }),
+          });
+          const descText = await descRes.text();
+          const segments = descText.split('|||').map(s => s.trim());
+          let formattedDesc = descText.trim();
+          if (segments.length === 3) {
+            formattedDesc = `**${segments[0]}**\n\n_Stil: ${segments[1]}_\n\n_${segments[2]}_`;
+          }
+          setDescription(formattedDesc);
+          
+          // Etiket üret
+          const tagPrompt = tagsPrompt.prompt.replace("${title}", title);
+          const tagRes = await fetch("/api/ai/generate-etsy-title", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: tagPrompt }),
+          });
+          const tagText = await tagRes.text();
+          let tags = tagText.replace(/\n/g, "").split(",").map(t => t.trim()).filter(Boolean);
+          if (tags.length > 13) tags = tags.slice(0, 13);
+          setTags(tags);
+        } catch (e) {
+          toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
+        } finally {
+          setAutoDescriptionLoading(false);
+          setAutoTagsLoading(false);
+        }
+      }
+    };
+
+    generateContent();
+  }, [title]); // title değiştiğinde çalışacak
+
+  // Başlık değişikliklerini yönet
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTitle(e.target.value);
+  };
+
+  // Başlığın yanındaki buton için ayrı bir fonksiyon
+  const generateTitleOnly = async () => {
+    if (!titlePrompt.prompt) return;
+    try {
+      setAutoTitleLoading(true);
+      // Sadece başlık promptunu kullan
+      const combinedPrompt = `${titlePrompt.prompt} Etsy için yeni bir başlık oluştur.`;
+      console.log("Başlık üretim promptu (sadece başlık):", combinedPrompt); // DEBUG
+      const res = await fetch("/api/ai/generate-etsy-title", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: combinedPrompt }),
+      });
+      if (!res.ok) throw new Error("Başlık oluşturulamadı");
+      const text = await res.text();
+      setTitle(text.trim());
+    } catch (e) {
+      toast({ 
+        variant: "destructive", 
+        title: "Başlık oluşturulamadı", 
+        description: "Lütfen tekrar deneyin." 
+      });
+    } finally {
+      setAutoTitleLoading(false);
+    }
+  };
+
+  // generateTitle fonksiyonunu focus alanı için koru
+  const generateTitle = async (inputText: string) => {
+    if (!inputText.trim()) return;
+    try {
+      setAutoTitleLoading(true);
+      // Focus alanı + başlık promptu + bu kelimeyi dikkate alarak başlık oluştur
+      const combinedPrompt = `${inputText} ${titlePrompt.prompt} bu kelimeyi dikkate alarak başlık oluştur.`;
+      console.log("Başlık üretim promptu:", combinedPrompt); // DEBUG
+      const res = await fetch("/api/ai/generate-etsy-title", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: combinedPrompt }),
+      });
+      if (!res.ok) throw new Error("Başlık oluşturulamadı");
+      const text = await res.text();
+      setTitle(text.trim());
+    } catch (e) {
+      toast({ 
+        variant: "destructive", 
+        title: "Başlık oluşturulamadı", 
+        description: "Lütfen tekrar deneyin." 
+      });
+    } finally {
+      setAutoTitleLoading(false);
+    }
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <Dialog
@@ -1055,69 +1163,63 @@ export function ProductFormModal({
                   <Label htmlFor="title" className="block mb-1">
                     Başlık <span className="text-red-500">*</span>
                   </Label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex-1 flex gap-2 items-center">
                     <Input
                       id="title"
                       value={title}
-                      onChange={(e) => {
-                        setTitle(e.target.value);
-                        setAutoTitleUsed(false); // Kullanıcı elle değiştirirse tekrar otomatik doldurma yapmasın
-                      }}
-                      placeholder="Ürününüzün başlığını girin (SEO için anahtar kelimeler ekleyin)"
-                      maxLength={160} // fazlası yazılamasın diye güvenlik için 160 bırakıyorum, ama sayaç 140
+                      onChange={handleTitleChange}
+                      placeholder="Ürün başlığı"
+                      className="flex-1"
+                      maxLength={160}
+                    />
+                    {/* Karakter sayacı */}
+                    <span
+                      className={`ml-2 text-xs font-mono ${title.length > 140 ? 'text-red-500' : 'text-gray-400'}`}
+                      title="Başlık karakter sayısı"
+                      style={{ minWidth: 48, textAlign: 'right' }}
+                    >
+                      {title.length}/140
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={generateTitleOnly}
+                      title="Başlığı Değiştir"
+                      disabled={autoTitleLoading}
+                    >
+                      {autoTitleLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {/* Focus alanı ve buton için generateTitle fonksiyonu kullanılacak */}
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      value={titleInput}
+                      onChange={(e) => setTitleInput(e.target.value)}
+                      onBlur={() => generateTitle(titleInput)}
+                      placeholder="Başlık için anahtar kelimeler (Focus)"
+                      className="w-64"
                     />
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
-                      className="border border-gray-300 hover:bg-gray-100 rounded-md"
-                      title="Yeni Başlık İste"
-                      disabled={autoTitleLoading || productImages.length === 0}
-                      onClick={async () => {
-                        if (productImages.length === 0) return;
-                        setAutoTitleLoading(true);
-                        try {
-                          const formData = new FormData();
-                          formData.append("image", productImages[0].file);
-                          const res = await fetch("/api/ai/generate-etsy-title", {
-                            method: "POST",
-                            body: formData,
-                          });
-                          
-                          // API'den gelen yanıtı JSON olarak işle
-                          const data = await res.json();
-                          
-                          // Başlık bilgisini al ve ayarla
-                          if (data.title) {
-                            const generatedTitle = data.title.trim();
-                            setTitle(generatedTitle);
-                            setAutoTitleUsed(true);
-                          }
-                          
-                          // Renk bilgilerini al ve ayarla
-                          if (data.colors) {
-                            if (data.colors.primaryColor) {
-                              setPrimaryColor(data.colors.primaryColor);
-                            }
-                            if (data.colors.secondaryColor) {
-                              setSecondaryColor(data.colors.secondaryColor);
-                            }
-                          }
-                        } catch (e) {
-                          toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
-                        } finally {
-                          setAutoTitleLoading(false);
-                        }
-                      }}
+                      onClick={() => generateTitle(titleInput)}
+                      disabled={autoTitleLoading || !titleInput.trim()}
                     >
-                      {autoTitleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                      {autoTitleLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Wand2 className="h-4 w-4" />
+                      )}
                     </Button>
-                    <span className="text-xs ml-2" style={{ color: title.length > 140 ? '#dc2626' : '#6b7280' }}>
-                      {title.length}/140 karakter
-                    </span>
                   </div>
                   {autoTitleLoading && (
-                    <div className="text-xs text-blue-500 mt-1">Görselden başlık üretiliyor...</div>
+                    <p className="text-sm text-muted-foreground">Başlık oluşturuluyor...</p>
                   )}
                 </div>
 

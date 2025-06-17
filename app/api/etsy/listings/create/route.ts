@@ -272,6 +272,41 @@ export async function POST(request: NextRequest) {
       console.log(`   ${listingData.title}`);
       console.log(`\n⏱️ TOPLAM İŞLEM SÜRESİ: ${durationInSeconds} saniye (${duration}ms)`);
       
+      // Supabase'e yükleme bilgilerini kaydet
+      try {
+        const { data: uploadData, error: uploadError } = await supabase
+          .from('etsy_uploads')
+          .insert({
+            user_id: userId,
+            listing_id: listing_id,
+            shop_id: shopId,
+            title: listingData.title,
+            state: listingData.state || 'draft',
+            upload_duration: duration,
+            image_count: imageFiles.length,
+            video_count: videoFiles.length,
+            has_variations: listingData.has_variations,
+            variation_count: listingData.variations?.length || 0,
+            title_tokens: listingData.tokenUsage?.title_total_tokens || 0,
+            tags_tokens: listingData.tokenUsage?.tags_total_tokens || 0,
+            category_tokens: listingData.tokenUsage?.category_total_tokens || 0,
+            total_tokens: (
+              (listingData.tokenUsage?.title_total_tokens || 0) +
+              (listingData.tokenUsage?.tags_total_tokens || 0) +
+              (listingData.tokenUsage?.category_total_tokens || 0) +
+              (listingData.tokenUsage?.description_total_tokens || 0)
+            )
+          });
+          
+        if (uploadError) {
+          console.warn('⚠️ Yükleme bilgileri veritabanına kaydedilemedi:', uploadError);
+        } else {
+          console.log('✅ Yükleme bilgileri veritabanına kaydedildi');
+        }
+      } catch (dbError) {
+        console.warn('⚠️ Veritabanı kaydı sırasında hata:', dbError);
+      }
+      
       return NextResponse.json({
         success: true,
         message: 'Listing başarıyla oluşturuldu',

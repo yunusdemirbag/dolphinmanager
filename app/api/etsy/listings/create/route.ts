@@ -8,54 +8,41 @@ import {
   addInventoryWithVariations, 
   getValidAccessToken 
 } from "@/lib/etsy-api"
+import { getConnection } from "@/lib/connection"
 
 export async function POST(request: NextRequest) {
-  // İşlem süresini ölçmek için başlangıç zamanını kaydet
-  const startTime = Date.now();
-  let productTitle = ""; // Ürün başlığını saklamak için değişken
+  console.log("🚀 [ETSYapi] Ürün yükleme işlemi başladı...")
+  
+  const startTime = Date.now()
+  let productTitle = "" // Ürün başlığını saklamak için değişken
   
   try {
-    console.log('🚀 [ETSYapi] Ürün yükleme işlemi başladı...');
-    
-    // 1. Kullanıcıyı doğrula
+    // Kullanıcı bilgisini al
     const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
     
-    if (userError || !user) {
-      console.error("Create listing API auth error:", userError)
-      return NextResponse.json(
-        { error: "Unauthorized" }, 
-        { status: 401 }
-      )
+    if (!user) {
+      return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 })
     }
-
-    // 2. Access token al
-    const accessToken = await getValidAccessToken(user.id)
-    if (!accessToken) {
-      console.error('[API] No valid access token found')
-      return NextResponse.json({ error: 'Etsy bağlantısı gerekli' }, { status: 401 })
+    
+    // Bağlantı bilgilerini tek seferde al
+    const connection = await getConnection(user.id)
+    const supabaseClient = connection.supabaseClient
+    const token = connection.token
+    const stores = connection.stores
+    
+    if (!token || !stores || stores.length === 0) {
+      return NextResponse.json({ error: "Etsy bağlantısı bulunamadı" }, { status: 401 })
     }
-
-    // 3. Kullanıcının Etsy mağazasını al
-    const stores = await getEtsyStores(user.id, true) // true = önbelleği atla
-    if (!stores || stores.length === 0) {
-      console.error('[API] No Etsy stores found for user')
-      return NextResponse.json(
-        { error: "Kullanıcıya ait Etsy mağazası bulunamadı" },
-        { status: 400 }
-      )
+    
+    // Token'ın access_token içerdiğinden emin olalım
+    if (!token.access_token) {
+      return NextResponse.json({ error: "Etsy token geçersiz" }, { status: 401 })
     }
-
-    const shopId = stores[0].shop_id
-    console.log(`[API] Using shop ID: ${shopId}`)
-
-    if (!shopId || shopId <= 0) {
-      console.error('[API] Invalid shop ID:', shopId)
-      return NextResponse.json(
-        { error: "Geçersiz mağaza ID'si" },
-        { status: 400 }
-      )
-    }
+    
+    // Dükkân bilgisini al
+    const shop = stores[0]
+    console.log("[API] Using shop ID:", shop.shop_id)
     
     // 4. Form verilerini al
     const formData = await request.formData()
@@ -95,8 +82,8 @@ export async function POST(request: NextRequest) {
     }
     
     const listingData = JSON.parse(listingDataJSON)
-    productTitle = listingData.title; // Ürün başlığını kaydet
-    console.log(`📝 [ETSYapi] Ürün hazırlanıyor: "${productTitle}"`);
+    productTitle = listingData.title
+    console.log(`📝 [ETSYapi] Ürün hazırlanıyor: "${productTitle}"`)
     console.log('[API] Parsed listing data:', {
       title: listingData.title,
       price: listingData.price,
@@ -105,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     // 5. Draft listing oluştur
     console.log('📋 [ETSYapi] Taslak ürün oluşturuluyor...')
-    const draftListing = await createDraftListing(accessToken, shopId, listingData)
+    const draftListing = await createDraftListing(token.access_token, shop.shop_id, listingData)
     
     if (!draftListing.listing_id) {
       throw new Error('Draft listing oluşturulamadı')
@@ -113,25 +100,25 @@ export async function POST(request: NextRequest) {
 
     // 6. Medya dosyalarını yükle
     console.log(`🖼️ [ETSYapi] ${imageFiles.length} adet medya dosyası yükleniyor...`)
-    await uploadFilesToEtsy(accessToken, shopId, draftListing.listing_id, imageFiles, videoFile)
+    await uploadFilesToEtsy(token.access_token, shop.shop_id, draftListing.listing_id, imageFiles, videoFile)
 
     // 7. Varyasyonlar varsa ekle
     if (listingData.variations?.length > 0) {
       console.log('🔄 [ETSYapi] Varyasyonlar ekleniyor...')
-      await addInventoryWithVariations(accessToken, draftListing.listing_id, listingData.variations)
+      await addInventoryWithVariations(token.access_token, draftListing.listing_id, listingData.variations)
     }
 
     // 8. Eğer active olarak işaretlendiyse, listing'i aktifleştir
     if (listingData.state === 'active') {
       console.log('✅ [ETSYapi] Ürün aktifleştiriliyor...')
-      await activateEtsyListing(accessToken, shopId, draftListing.listing_id)
+      await activateEtsyListing(token.access_token, shop.shop_id, draftListing.listing_id)
     }
 
     // İşlem süresini hesapla
-    const endTime = Date.now();
-    const duration = (endTime - startTime) / 1000; // saniye cinsinden
+    const endTime = Date.now()
+    const duration = (endTime - startTime) / 1000 // saniye cinsinden
     
-    console.log(`✨ [ETSYapi] Ürün yükleme işlemi tamamlandı! "${productTitle}" - Süre: ${duration.toFixed(2)} saniye`);
+    console.log(`✨ [ETSYapi] Ürün yükleme işlemi tamamlandı! "${productTitle}" - Süre: ${duration.toFixed(2)} saniye`)
     
     return NextResponse.json({ 
       success: true, 
@@ -140,8 +127,8 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     // İşlem süresini hesapla (hata durumunda da)
-    const endTime = Date.now();
-    const duration = (endTime - startTime) / 1000; // saniye cinsinden
+    const endTime = Date.now()
+    const duration = (endTime - startTime) / 1000 // saniye cinsinden
     
     console.error(`❌ [ETSYapi] Ürün yükleme HATASI (${duration.toFixed(2)} saniye): ${error.message}`)
     

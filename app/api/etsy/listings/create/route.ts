@@ -274,33 +274,90 @@ export async function POST(request: NextRequest) {
       
       // Supabase'e yükleme bilgilerini kaydet
       try {
-        const { data: uploadData, error: uploadError } = await supabase
-          .from('etsy_uploads')
-          .insert({
-            user_id: userId,
-            listing_id: listing_id,
-            shop_id: shopId,
-            title: listingData.title,
-            state: listingData.state || 'draft',
-            upload_duration: duration,
-            image_count: imageFiles.length,
-            video_count: videoFiles.length,
-            has_variations: listingData.has_variations,
-            variation_count: listingData.variations?.length || 0,
-            title_tokens: listingData.tokenUsage?.title_total_tokens || 0,
-            tags_tokens: listingData.tokenUsage?.tags_total_tokens || 0,
-            tags: listingData.tags || [],
-            total_tokens: (
-              (listingData.tokenUsage?.title_total_tokens || 0) +
+        // Önce şema önbelleğini yenilemeyi dene
+        try {
+          await supabase.rpc('pg_notify', { channel: 'pgrst', payload: 'reload schema' });
+          console.log('✅ Şema önbelleği yenileme sinyali gönderildi');
+        } catch (schemaError) {
+          console.warn('⚠️ Şema önbelleği yenilenemedi:', schemaError);
+        }
+        
+        // Yükleme verilerini hazırla
+        const uploadData = {
+          user_id: userId,
+          listing_id: listing_id,
+          shop_id: shopId,
+          title: listingData.title,
+          state: listingData.state || 'draft',
+          upload_duration: duration,
+          image_count: imageFiles.length,
+          video_count: videoFiles.length,
+          has_variations: listingData.has_variations,
+          variation_count: listingData.variations?.length || 0,
+          title_tokens: listingData.tokenUsage?.title_total_tokens || 0,
+          tags_tokens: listingData.tokenUsage?.tags_total_tokens || 0,
+          tags: listingData.tags || [],
+          total_tokens: (
+            (listingData.tokenUsage?.title_total_tokens || 0) +
+            (listingData.tokenUsage?.tags_total_tokens || 0) +
+            (listingData.tokenUsage?.description_total_tokens || 0)
+          )
+        };
+        
+        console.log('📊 Yükleme verileri hazırlandı:', JSON.stringify(uploadData));
+        
+        // SQL sorgusu ile doğrudan kaydet
+        const insertQuery = `
+          INSERT INTO etsy_uploads (
+            user_id, listing_id, shop_id, title, state, upload_duration,
+            image_count, video_count, has_variations, variation_count,
+            title_tokens, tags_tokens, tags, total_tokens
+          ) VALUES (
+            '${userId}', ${listing_id}, ${shopId}, 
+            '${listingData.title.replace(/'/g, "''")}', '${listingData.state || 'draft'}', ${duration},
+            ${imageFiles.length}, ${videoFiles.length}, 
+            ${listingData.has_variations ? 'true' : 'false'}, ${listingData.variations?.length || 0},
+            ${listingData.tokenUsage?.title_total_tokens || 0}, 
+            ${listingData.tokenUsage?.tags_total_tokens || 0},
+            array[${listingData.tags ? listingData.tags.map((tag: string) => `'${tag.replace(/'/g, "''")}'`).join(',') : ''}],
+            ${(listingData.tokenUsage?.title_total_tokens || 0) +
               (listingData.tokenUsage?.tags_total_tokens || 0) +
-              (listingData.tokenUsage?.description_total_tokens || 0)
-            )
-          });
+              (listingData.tokenUsage?.description_total_tokens || 0)}
+          ) RETURNING id;
+        `;
+        
+        try {
+          const { data: sqlResult, error: sqlError } = await supabase.rpc('execute_sql', { sql_query: insertQuery });
           
-        if (uploadError) {
-          console.warn('⚠️ Yükleme bilgileri veritabanına kaydedilemedi:', uploadError);
-        } else {
-          console.log('✅ Yükleme bilgileri veritabanına kaydedildi');
+          if (sqlError) {
+            console.warn('⚠️ SQL ile yükleme bilgileri kaydedilemedi:', sqlError);
+            
+            // Standart yöntemle tekrar dene
+            const { error: uploadError } = await supabase
+              .from('etsy_uploads')
+              .insert(uploadData);
+              
+            if (uploadError) {
+              console.warn('⚠️ Yükleme bilgileri veritabanına kaydedilemedi:', uploadError);
+            } else {
+              console.log('✅ Yükleme bilgileri veritabanına kaydedildi');
+            }
+          } else {
+            console.log('✅ SQL ile yükleme bilgileri veritabanına kaydedildi:', sqlResult);
+          }
+        } catch (sqlExecError) {
+          console.warn('⚠️ SQL çalıştırma hatası:', sqlExecError);
+          
+          // Standart yöntemle tekrar dene
+          const { error: uploadError } = await supabase
+            .from('etsy_uploads')
+            .insert(uploadData);
+            
+          if (uploadError) {
+            console.warn('⚠️ Yükleme bilgileri veritabanına kaydedilemedi:', uploadError);
+          } else {
+            console.log('✅ Yükleme bilgileri veritabanına kaydedildi');
+          }
         }
       } catch (dbError) {
         console.warn('⚠️ Veritabanı kaydı sırasında hata:', dbError);

@@ -236,6 +236,45 @@ export function ProductFormModal({
     product?.shipping_profile_id?.toString() || ""
   )
 
+  // Toast bildirim sistemi
+  const [toastMessages, setToastMessages] = useState<Array<{
+    id: number;
+    message: string;
+    type: "success" | "error" | "info";
+    timestamp: number;
+  }>>([]);
+
+  // Basit toast alternatifi - güzel UI ile
+  const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
+    // Console'a yaz
+    console.log(`Toast ${type.toUpperCase()}: ${message}`);
+    
+    // Yeni toast mesajı ekle
+    const newToast = {
+      id: Date.now(),
+      message,
+      type,
+      timestamp: Date.now()
+    };
+    
+    setToastMessages(prev => [...prev, newToast]);
+    
+    // 4 saniye sonra otomatik sil
+    setTimeout(() => {
+      setToastMessages(prev => prev.filter(toast => toast.id !== newToast.id));
+    }, 4000);
+    
+    // useToast hook'unu da dene (eğer çalışıyorsa)
+    try {
+      toast({
+        title: message,
+        variant: type === "error" ? "destructive" : undefined
+      });
+    } catch (e) {
+      // Sessizce geç, kendi toast sistemimiz var
+    }
+  };
+
   // Additional fields to match Etsy
   const [tags, setTags] = useState<string[]>(product?.tags || [])
   const [newTag, setNewTag] = useState("")
@@ -1204,8 +1243,102 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     if (isOpen) setUserEditedTitle(false);
   }, [isOpen]);
 
+  // QWE tuş kombinasyonu ile taslak kaydetme
+  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      
+      setPressedKeys(prev => new Set([...prev, e.key.toLowerCase()]));
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      
+      setPressedKeys(prev => {
+        const newKeys = new Set(prev);
+        newKeys.delete(e.key.toLowerCase());
+        return newKeys;
+      });
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('keyup', handleKeyUp);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isOpen]);
+
+  // QWE kombinasyonu kontrolü
+  useEffect(() => {
+    if (pressedKeys.has('q') && pressedKeys.has('w') && pressedKeys.has('e') && isOpen) {
+      if (submitting) return;
+
+      // Basit validasyon kontrolü
+      if (!title || !shippingProfileId || productImages.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "⚠️ Eksik Bilgiler",
+          description: "QWE: Başlık, kargo profili ve en az bir resim gerekli!"
+        });
+        return;
+      }
+
+      console.log('QWE basıldı - taslak kaydediliyor...');
+      toast({
+        title: "🚀 QWE Taslak Kaydetme",
+        description: "Ürün taslak olarak kaydediliyor..."
+      });
+      
+      handleSubmit("draft");
+      setPressedKeys(new Set()); // Tuşları sıfırla
+    }
+  }, [pressedKeys, isOpen, submitting, title, shippingProfileId, productImages.length]);
+
   return (
     <DndProvider backend={HTML5Backend}>
+      {/* Custom Toast Container - Sağ üst köşede */}
+      <div className="fixed top-4 right-4 z-[9999] space-y-2 pointer-events-none">
+        {toastMessages.map((toast) => (
+          <div
+            key={toast.id}
+            className={`
+              pointer-events-auto transform transition-all duration-300 ease-in-out
+              animate-in slide-in-from-right-5 fade-in
+              max-w-sm p-4 rounded-lg shadow-lg border
+              ${toast.type === "success" ? "bg-green-50 border-green-200 text-green-800" : 
+                toast.type === "error" ? "bg-red-50 border-red-200 text-red-800" : 
+                "bg-blue-50 border-blue-200 text-blue-800"}
+            `}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                {toast.type === "success" && <span className="text-green-500">✅</span>}
+                {toast.type === "error" && <span className="text-red-500">❌</span>}
+                {toast.type === "info" && <span className="text-blue-500">ℹ️</span>}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">{toast.message}</p>
+                <p className="text-xs opacity-60 mt-1">
+                  {new Date(toast.timestamp).toLocaleTimeString()}
+                </p>
+              </div>
+              <button
+                onClick={() => setToastMessages(prev => prev.filter(t => t.id !== toast.id))}
+                className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <Dialog
         open={isOpen}
         onOpenChange={(isOpen) => {
@@ -1226,7 +1359,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
               {product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}
             </DialogTitle>
             <DialogDescription>
-              {product ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."}
+              {product ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."} • <kbd className="px-1 py-0.5 text-xs bg-gray-100 rounded">Q+W+E</kbd> ile taslak kaydet
             </DialogDescription>
           </DialogHeader>
 

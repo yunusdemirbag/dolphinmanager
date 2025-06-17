@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon, Image, Video, ChevronDown, Wand2, FolderOpen } from "lucide-react"
+import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon, Image, Video, ChevronDown, Wand2 } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode, ShippingProfile, EtsyProcessingProfile } from "@/types/product"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -302,7 +302,7 @@ export function ProductFormModal({
     }
   }, [isOpen, toast]);
 
-  // Form açıldığında otomatik klasör yükleme
+  // Form açıldığında state'leri sıfırla
   useEffect(() => {
     if (isOpen) {
       setProductImages([]);
@@ -331,10 +331,6 @@ export function ProductFormModal({
           uploading: false
         })));
       }
-      // OTOMATIK KLASÖR YÜKLEME - 500ms gecikme ile
-      setTimeout(() => {
-        loadDefaultFolder();
-      }, 500);
     }
     return () => {
       productImages.forEach(img => {
@@ -344,66 +340,6 @@ export function ProductFormModal({
       });
     };
   }, [isOpen, product]);
-
-  // Otomatik klasör yükleme fonksiyonu - SADECE BİR TANE VE EN ÜSTE ALINDI
-  const loadDefaultFolder = useCallback(() => {
-    setFolderUploading(true);
-    setFolderProgress({ current: 0, total: 0 });
-    try {
-      const savedFiles: string | null = localStorage.getItem('defaultFolderFiles');
-      if (savedFiles) {
-        const fileList: any[] = JSON.parse(savedFiles);
-        let newImages: any[] = [];
-        let newVideo: any = null;
-        for (let i = 0; i < fileList.length; i++) {
-          const fileData = fileList[i];
-          if (fileData.type.startsWith('image/')) {
-            if (newImages.length + productImages.length < 10) {
-              // DataURL'den File oluştur
-              const arr = fileData.dataUrl.split(",");
-              const mime = arr[0].match(/:(.*?);/)[1];
-              const bstr = atob(arr[1]);
-              let n = bstr.length;
-              const u8arr = new Uint8Array(n);
-              while (n--) {
-                u8arr[n] = bstr.charCodeAt(n);
-              }
-              const file = new File([u8arr], fileData.name, { type: mime });
-              newImages.push({ file, preview: fileData.dataUrl, uploading: false });
-            }
-          } else if (fileData.type.startsWith('video/') && !videoFile && !newVideo) {
-            // DataURL'den File oluştur
-            const arr = fileData.dataUrl.split(",");
-            const mime = arr[0].match(/:(.*?);/)[1];
-            const bstr = atob(arr[1]);
-            let n = bstr.length;
-            const u8arr = new Uint8Array(n);
-            while (n--) {
-              u8arr[n] = bstr.charCodeAt(n);
-            }
-            const file = new File([u8arr], fileData.name, { type: mime });
-            newVideo = { file, preview: fileData.dataUrl, uploading: false };
-          }
-        }
-        if (newImages.length > 0) setProductImages(prev => [...prev, ...newImages].slice(0, 10));
-        if (newVideo) setVideoFile(newVideo);
-        toast({ 
-          title: "✅ Varsayılan klasör yüklendi!", 
-          description: `${DEFAULT_FOLDER_PATH} klasöründen dosyalar otomatik yüklendi.` 
-        });
-      } else {
-        toast({ 
-          title: "📁 Varsayılan klasör ayarlanmadı", 
-          description: `Lütfen \"${DEFAULT_FOLDER_PATH}\" klasörünü seçin ve dosyalarınızı kaydedin.` 
-        });
-      }
-    } catch (error) {
-      console.error('Varsayılan klasör yüklenirken hata:', error);
-    } finally {
-      setFolderUploading(false);
-      setFolderProgress({ current: 0, total: 0 });
-    }
-  }, [productImages.length, videoFile, toast]);
 
   // Kargo profili varsayılanı: Yeni ürün eklerken ilk profili otomatik seç
   useEffect(() => {
@@ -449,8 +385,6 @@ export function ProductFormModal({
   const handleRemoveTag = (tagToRemove: string) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   }
-
-  // Material işlemleri kaldırıldı - API'de sabit değerler kullanılıyor
 
   // Resim yükleme işleyicileri
   const handleImageDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -777,122 +711,6 @@ export function ProductFormModal({
     }
   };
 
-  // Klasör yükleme state'i
-  const [folderUploading, setFolderUploading] = useState(false);
-  const [folderProgress, setFolderProgress] = useState({ current: 0, total: 0 });
-  
-  // macOS varsayılan klasör yolu
-  const DEFAULT_FOLDER_PATH = "~/Documents/kaynak";
-
-  
-
-  // Klasör seçme ve kaydetme işleyicisi (gelişmiş)
-  const handleFolderSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length) return;
-    
-    const files = Array.from(e.target.files);
-    const mediaFiles = files.filter(file => 
-      file.type.startsWith('image/') || file.type.startsWith('video/')
-    );
-    
-    if (mediaFiles.length === 0) {
-      toast({ 
-        variant: "destructive",
-        title: "Medya dosyası bulunamadı", 
-        description: "Seçilen klasörde resim veya video dosyası bulunamadı." 
-      });
-      return;
-    }
-
-    setFolderUploading(true);
-    setFolderProgress({ current: 0, total: mediaFiles.length });
-
-    try {
-      const savedFiles = [];
-      
-      // Resimleri işle
-      const imageFiles = mediaFiles.filter(f => f.type.startsWith('image/')).slice(0, 10 - productImages.length);
-      const videoFiles = mediaFiles.filter(f => f.type.startsWith('video/'));
-      
-      for (let i = 0; i < imageFiles.length; i++) {
-        const file = imageFiles[i];
-        setFolderProgress(prev => ({ ...prev, current: prev.current + 1 }));
-        
-        const reader = new FileReader();
-        await new Promise((resolve) => {
-          reader.onloadend = () => {
-            const dataUrl = reader.result as string;
-            const newImage = {
-              file,
-              preview: dataUrl,
-              uploading: false
-            };
-            setProductImages(prev => [...prev, newImage]);
-            
-            // LocalStorage için kaydet
-            savedFiles.push({
-              name: file.name,
-              type: file.type,
-              dataUrl: dataUrl
-            });
-            
-            resolve(void 0);
-          };
-          reader.readAsDataURL(file);
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-
-      // Video varsa işle (sadece ilkini al)
-      if (!videoFile && videoFiles.length > 0) {
-        const file = videoFiles[0];
-        setFolderProgress(prev => ({ ...prev, current: prev.current + 1 }));
-        
-        const reader = new FileReader();
-        await new Promise((resolve) => {
-          reader.onloadend = () => {
-            const dataUrl = reader.result as string;
-            setVideoFile({
-              file,
-              preview: URL.createObjectURL(file),
-              uploading: false
-            });
-            
-            // LocalStorage için kaydet
-            savedFiles.push({
-              name: file.name,
-              type: file.type,
-              dataUrl: dataUrl
-            });
-            
-            resolve(void 0);
-          };
-          reader.readAsDataURL(file);
-        });
-      }
-
-      // Dosyaları localStorage'a kaydet (varsayılan klasör olarak)
-      localStorage.setItem('defaultFolderFiles', JSON.stringify(savedFiles));
-      
-      toast({ 
-        title: "✅ Klasör varsayılan olarak ayarlandı!", 
-        description: `${imageFiles.length} resim${videoFiles.length > 0 && !videoFile ? ' ve 1 video' : ''} yüklendi ve kaynak klasör olarak kaydedildi.` 
-      });
-
-    } catch (error) {
-      toast({ 
-        variant: "destructive",
-        title: "Yükleme hatası", 
-        description: "Klasör içeriği yüklenirken bir hata oluştu." 
-      });
-    } finally {
-      setFolderUploading(false);
-      setFolderProgress({ current: 0, total: 0 });
-      e.target.value = '';
-    }
-  }, [productImages.length, videoFile, toast]);
-
   // Resim bölümü
   const ImageSection = () => (
     <div className="space-y-4">
@@ -949,64 +767,10 @@ export function ProductFormModal({
           e.target.value = '';
         }}
       />
-      
-      {/* YENİ: Klasör seçme input'u */}
-      <input
-        type="file"
-        id="folder-upload"
-        className="hidden"
-        // @ts-ignore
-        webkitdirectory
-        multiple
-        onChange={handleFolderSelect}
-      />
 
-      {/* Kaynak Dosyaları Getir için gizli klasör inputu */}
-      <input
-        type="file"
-        id="get-folder-upload"
-        className="hidden"
-        // @ts-ignore
-        webkitdirectory="true"
-        multiple
-        accept="image/*,video/*"
-        onChange={async (e) => {
-          if (!e.target.files?.length) return;
-          const files = Array.from(e.target.files);
-          const imageFiles = files.filter(f => f.type.startsWith('image/'));
-          const videoFiles = files.filter(f => f.type.startsWith('video/'));
-          // Resimler
-          if (imageFiles.length > 0) {
-            const newImages = await Promise.all(imageFiles.slice(0, 10 - productImages.length).map(async (file) => {
-              return {
-                file,
-                preview: URL.createObjectURL(file),
-                uploading: false
-              };
-            }));
-            setProductImages(prev => [...prev, ...newImages].slice(0, 10));
-          }
-          // Video (sadece ilkini al)
-          if (videoFiles.length > 0 && !videoFile) {
-            const file = videoFiles[0];
-            setVideoFile({
-              file,
-              preview: URL.createObjectURL(file),
-              uploading: false
-            });
-          }
-          e.target.value = '';
-        }}
-      />
-
-      {/* BAŞLIK VE RESİM/VIDEO SAYACI - Klasör bilgisi ile */}
+      {/* Medya Dosyaları Başlığı ve Sayaçları */}
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <h3 className="text-base font-medium text-gray-700">Medya Dosyaları</h3>
-          <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-            📁 {DEFAULT_FOLDER_PATH}
-          </span>
-        </div>
+        <h3 className="text-base font-medium text-gray-700">Medya Dosyaları</h3>
         <div className="flex items-center gap-3">
           <div className="flex items-center text-xs text-gray-500">
             <Image className="w-3.5 h-3.5 mr-1 text-gray-400" />
@@ -1026,7 +790,7 @@ export function ProductFormModal({
         </div>
       </div>
 
-      {/* SÜRÜKLE-BIRAK ALANI VE RESİM/VIDEO SAYACI */}
+      {/* SÜRÜKLE-BIRAK ALANI */}
       <div
         className={`border rounded-lg transition-all ${
           productImages.length === 0 && !videoFile 
@@ -1066,25 +830,10 @@ export function ProductFormModal({
                 <Video className="w-3.5 h-3.5 mr-1.5" />
                 Video Seç
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={() => document.getElementById('folder-upload')?.click()}
-                disabled={folderUploading}
-              >
-                {folderUploading ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                ) : (
-                  <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
-                )}
-                Kaynak Klasörü Değiştir
-              </Button>
             </div>
            
             <p className="text-xs text-gray-400 mt-3">
-              Otomatik: {DEFAULT_FOLDER_PATH} • PNG, JPG, GIF, MP4 • Max. 20MB
+              PNG, JPG, GIF, MP4 • Max. 20MB
             </p>
           </div>
         ) : (
@@ -1150,22 +899,6 @@ export function ProductFormModal({
             )}
           </div>
         )}
-      </div>
-     
-      <Separator />
-      {/* Kaynak Dosyaları Getir butonu: açıklama metni ve separatorun ALTINDA, ortaya hizalı ve her zaman görünür */}
-      <div className="flex justify-center my-4">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8"
-          onClick={() => document.getElementById('get-folder-upload')?.click()}
-          disabled={folderUploading}
-        >
-          <Upload className="w-3.5 h-3.5 mr-1.5" />
-          Kaynak Dosyaları Getir
-        </Button>
       </div>
     </div>
   );

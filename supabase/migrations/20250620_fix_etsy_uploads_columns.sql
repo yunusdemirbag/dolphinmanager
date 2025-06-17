@@ -10,6 +10,28 @@ BEGIN
     ) THEN
         -- Check if the table has the correct columns and add them if they don't exist
         
+        -- Check if image_count column exists
+        IF NOT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'etsy_uploads'
+            AND column_name = 'image_count'
+        ) THEN
+            ALTER TABLE etsy_uploads ADD COLUMN image_count INTEGER DEFAULT 0;
+            RAISE NOTICE 'Added image_count column to etsy_uploads table';
+        END IF;
+        
+        -- Check if video_count column exists
+        IF NOT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'etsy_uploads'
+            AND column_name = 'video_count'
+        ) THEN
+            ALTER TABLE etsy_uploads ADD COLUMN video_count INTEGER DEFAULT 0;
+            RAISE NOTICE 'Added video_count column to etsy_uploads table';
+        END IF;
+        
         -- Check if category_tokens column exists
         IF NOT EXISTS (
             SELECT 1
@@ -30,6 +52,28 @@ BEGIN
         ) THEN
             ALTER TABLE etsy_uploads ADD COLUMN tags TEXT[];
             RAISE NOTICE 'Added tags column to etsy_uploads table';
+        END IF;
+        
+        -- Check if has_variations column exists
+        IF NOT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'etsy_uploads'
+            AND column_name = 'has_variations'
+        ) THEN
+            ALTER TABLE etsy_uploads ADD COLUMN has_variations BOOLEAN DEFAULT false;
+            RAISE NOTICE 'Added has_variations column to etsy_uploads table';
+        END IF;
+        
+        -- Check if variation_count column exists
+        IF NOT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'etsy_uploads'
+            AND column_name = 'variation_count'
+        ) THEN
+            ALTER TABLE etsy_uploads ADD COLUMN variation_count INTEGER DEFAULT 0;
+            RAISE NOTICE 'Added variation_count column to etsy_uploads table';
         END IF;
         
         -- Check if shop_id column is the correct type (should be BIGINT)

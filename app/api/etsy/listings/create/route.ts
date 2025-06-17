@@ -293,7 +293,6 @@ export async function POST(request: NextRequest) {
             total_tokens: (
               (listingData.tokenUsage?.title_total_tokens || 0) +
               (listingData.tokenUsage?.tags_total_tokens || 0) +
-              (listingData.tokenUsage?.category_total_tokens || 0) +
               (listingData.tokenUsage?.description_total_tokens || 0)
             )
           });

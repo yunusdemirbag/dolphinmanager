@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
             variation_count: listingData.variations?.length || 0,
             title_tokens: listingData.tokenUsage?.title_total_tokens || 0,
             tags_tokens: listingData.tokenUsage?.tags_total_tokens || 0,
-            category_tokens: listingData.tokenUsage?.category_total_tokens || 0,
+            tags: listingData.tags || [],
             total_tokens: (
               (listingData.tokenUsage?.title_total_tokens || 0) +
               (listingData.tokenUsage?.tags_total_tokens || 0) +

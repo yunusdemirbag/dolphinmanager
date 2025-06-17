@@ -469,10 +469,8 @@ export function ProductFormModal({
       title !== "" ||
       description !== "" ||
       price !== 0 ||
-      quantity !== 4 ||
-      shippingProfileId !== "" ||
-      tags.length > 0 ||
-      productImages.length > 0
+      productImages.length > 0 ||
+      tags.length > 0
     );
   };
 
@@ -1238,6 +1236,9 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     }
   };
 
+  const [focusTitleLoading, setFocusTitleLoading] = useState(false);
+  const [focusStatus, setFocusStatus] = useState<string | null>(null);
+
   // Yeni focus başlık üretici fonksiyon
   const handleFocusTitle = async () => {
     if (!titleInput.trim() || productImages.length === 0 || !productImages[0].file) {
@@ -1312,9 +1313,6 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   }, [isOpen]);
 
   // QWE tuş kombinasyonu ile taslak kaydetme
-  // Bu değişkenler zaten yukarıda tanımlandı, kaldırılıyor
-  // const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
@@ -1468,11 +1466,70 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6">{/* İçerik buraya gelecek */}
+          <div className="flex-1 overflow-y-auto px-6">
+            <div className="space-y-4 py-4">
+
+            {/* Video Reminder Alert */}
+            {shouldShowVideoReminder && (
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-4 animate-in slide-in-from-top-5 fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <Video className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-blue-800 mb-1">
+                      🎬 Video Eklemeyi Unutmayın!
+                    </h4>
+                    <p className="text-sm text-blue-700 mb-3">
+                      {productImages.length} resminiz var ama video yok. Video eklemek ürününüzün satış şansını artırır!
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 border-blue-300 text-blue-700 hover:bg-blue-100"
+                        onClick={() => document.getElementById('video-upload')?.click()}
+                      >
+                        <Video className="w-4 h-4 mr-1" />
+                        Video Ekle
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-blue-600 hover:bg-blue-100"
+                        onClick={() => {
+                          // Just hide the media section, don't create new states
+                          setExpandedSections(prev => ({ ...prev, media: false }));
+                        }}
+                      >
+                        Daha Sonra
+                      </Button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="flex-shrink-0 text-blue-400 hover:text-blue-600"
+                    onClick={() => {
+                      // Just hide the media section
+                      setExpandedSections(prev => ({ ...prev, media: false }));
+                    }}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Resim Bölümü */}
             <ImageSection />
 
             <Separator />
+            
+            {/* Temel Bilgiler Bölümü */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Temel Bilgiler</h3>
             
             {/* Temel Bilgiler Bölümü */}
             <div className="space-y-4">

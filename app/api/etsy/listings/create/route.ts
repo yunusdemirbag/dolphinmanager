@@ -31,13 +31,29 @@ export async function POST(request: NextRequest) {
     const token = connection.token
     const stores = connection.stores
     
-    if (!token || !stores || stores.length === 0) {
-      return NextResponse.json({ error: "Etsy bağlantısı bulunamadı" }, { status: 401 })
+    // Daha detaylı hata mesajları
+    if (!token) {
+      console.error("[API] Etsy token bulunamadı:", { userId: user.id });
+      return NextResponse.json({ 
+        error: "Etsy bağlantısı bulunamadı. Lütfen Etsy hesabınızı bağlayın.",
+        code: "NO_ETSY_TOKEN" 
+      }, { status: 401 })
     }
     
-    // Token'ın access_token içerdiğinden emin olalım
     if (!token.access_token) {
-      return NextResponse.json({ error: "Etsy token geçersiz" }, { status: 401 })
+      console.error("[API] Etsy token içinde access_token yok:", { token });
+      return NextResponse.json({ 
+        error: "Etsy token geçersiz. Lütfen Etsy hesabınızı yeniden bağlayın.",
+        code: "INVALID_ETSY_TOKEN" 
+      }, { status: 401 })
+    }
+    
+    if (!stores || stores.length === 0) {
+      console.error("[API] Etsy mağazası bulunamadı:", { userId: user.id, token });
+      return NextResponse.json({ 
+        error: "Etsy mağazası bulunamadı. Lütfen Etsy hesabınızı kontrol edin.",
+        code: "NO_ETSY_STORE" 
+      }, { status: 401 })
     }
     
     // Dükkân bilgisini al

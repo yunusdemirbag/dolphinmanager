@@ -726,7 +726,14 @@ export function ProductFormModal({
       const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
+        // Özel hata kodlarını kontrol et
+        if (result.code === 'NO_ETSY_TOKEN' || result.code === 'INVALID_ETSY_TOKEN') {
+          throw new Error('Etsy hesabınız bağlı değil veya bağlantı süresi dolmuş. Lütfen Etsy hesabınızı yeniden bağlayın.');
+        } else if (result.code === 'NO_ETSY_STORE') {
+          throw new Error('Etsy mağazanız bulunamadı. Lütfen Etsy hesabınızı kontrol edin.');
+        } else {
+          throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
+        }
       }
 
       // İşlem süresini hesapla
@@ -745,11 +752,26 @@ export function ProductFormModal({
 
     } catch (error: any) {
       console.error('Ürün oluşturma hatası:', error);
-      toast({ 
-        variant: "destructive", 
-        title: "❌ Hata Oluştu", 
-        description: error.message || "Ürün oluşturulurken bir hata oluştu." 
-      });
+      
+      // Etsy bağlantı hatası için özel mesaj
+      if (error.message && error.message.includes('Etsy')) {
+        toast({ 
+          variant: "destructive", 
+          title: "❌ Etsy Bağlantı Hatası", 
+          description: error.message,
+          action: (
+            <Button variant="outline" size="sm" onClick={() => router.push('/settings')}>
+              Ayarlar
+            </Button>
+          )
+        });
+      } else {
+        toast({ 
+          variant: "destructive", 
+          title: "❌ Hata Oluştu", 
+          description: error.message || "Ürün oluşturulurken bir hata oluştu." 
+        });
+      }
     } finally {
       setSubmitting(false);
     }

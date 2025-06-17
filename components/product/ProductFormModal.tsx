@@ -36,7 +36,11 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
 import { createClientSupabase } from "@/lib/supabase";
-import { categoryPrompt, tagsPrompt, titlePrompt, generateTitleWithFocus, selectCategory } from "@/lib/openai-yonetim";
+// ✅ BASIT ÇÖZÜM - Sadece prompt config'leri import et
+import { 
+  titlePrompt, 
+  tagPrompt
+} from "@/lib/openai-yonetim";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
@@ -49,6 +53,203 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
+
+// ✅ HELPER FONKSIYONLAR - Client-side FileReader ile düzeltildi
+const generateTitle = async (imageFile: File): Promise<string> => {
+  console.log("🎯 BAŞLIK ÜRETİMİ BAŞLIYOR...");
+  console.log("📁 Dosya boyutu:", Math.round(imageFile.size / 1024), "KB");
+  console.log("📁 Dosya tipi:", imageFile.type);
+  
+  try {
+    // FileReader ile base64'e çevir (client-side compatible)
+    console.log("🔄 Resim base64'e çevriliyor (FileReader)...");
+    const base64Image = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // data:image/jpeg;base64,/9j/4AAQ... formatından sadece base64 kısmını al
+        const base64Data = result.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(imageFile);
+    });
+    
+    console.log("✅ Base64 dönüşümü tamamlandı, boyut:", Math.round(base64Image.length / 1024), "KB");
+    console.log("📤 Mevcut API endpoint'ine istek gönderiliyor: /api/ai/generate-all");
+    
+    const response = await fetch("/api/ai/generate-all", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        imageBase64: base64Image,
+        imageType: imageFile.type,
+        prompt: titlePrompt.prompt,
+        requestType: "title"
+      }),
+    });
+    
+    console.log("📥 API yanıtı alındı - Status:", response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ API HATASI:");
+      console.error("Status:", response.status);
+      console.error("StatusText:", response.statusText);
+      console.error("Error Body:", errorText);
+      
+      let errorMessage = "Bilinmeyen hata";
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error || errorJson.message || "API hatası";
+      } catch (e) {
+        errorMessage = errorText || "API yanıt hatası";
+      }
+      
+      throw new Error(`API Hatası (${response.status}): ${errorMessage}`);
+    }
+    
+    const data = await response.json();
+    console.log("✅ API yanıtı başarılı:", data);
+    
+    // Mevcut API'den gelen sonucu analiz et
+    const generatedTitle = data.result || data.title || data.analysis?.title;
+    
+    if (!generatedTitle) {
+      console.error("❌ API yanıtında 'title' alanı yok:", data);
+      throw new Error("API yanıtında başlık bulunamadı");
+    }
+    
+    console.log("🎉 Başlık başarıyla üretildi:", generatedTitle);
+    return generatedTitle;
+    
+  } catch (error: any) {
+    console.error("💥 BAŞLIK ÜRETİM HATASI:");
+    console.error("Error type:", typeof error);
+    console.error("Error message:", error?.message || "Bilinmeyen hata");
+    console.error("Full error:", error);
+    throw error;
+  }
+};
+
+const generateTitleWithFocus = async (imageFile: File, focusKeyword: string): Promise<string> => {
+  console.log("🎯 FOCUS BAŞLIK ÜRETİMİ BAŞLIYOR...");
+  console.log("🔑 Focus keyword:", focusKeyword);
+  
+  try {
+    // FileReader ile base64'e çevir
+    const base64Image = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64Data = result.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(imageFile);
+    });
+    
+    // Focus prompt ile birleştir
+    const focusPrompt = `Focus keyword: "${focusKeyword}"\n\n${titlePrompt.prompt}`;
+    
+    const response = await fetch("/api/ai/generate-all", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        imageBase64: base64Image,
+        imageType: imageFile.type,
+        prompt: focusPrompt,
+        requestType: "focus-title"
+      }),
+    });
+    
+    console.log("📥 Focus API yanıtı - Status:", response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ FOCUS API HATASI:", errorText);
+      throw new Error(`Focus API Hatası (${response.status}): ${errorText}`);
+    }
+    
+    const data = await response.json();
+    const generatedTitle = data.result || data.title || data.analysis?.title;
+    console.log("✅ Focus başlık üretildi:", generatedTitle);
+    return generatedTitle || "";
+    
+  } catch (error: any) {
+    console.error("💥 FOCUS BAŞLIK HATASI:", error);
+    throw error;
+  }
+};
+
+const generateTags = async (title: string, imageFile?: File): Promise<string[]> => {
+  console.log("🏷️ TAG ÜRETİMİ BAŞLIYOR...");
+  console.log("📝 Başlık:", title);
+  
+  try {
+    const response = await fetch("/api/ai/generate-etsy-tags", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        prompt: tagPrompt.prompt,
+      }),
+    });
+    
+    console.log("📥 Tags API yanıtı - Status:", response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ TAGS API HATASI:", errorText);
+      throw new Error(`Tags API Hatası (${response.status}): ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log("✅ Tag'ler üretildi:", data.tags);
+    return data.tags || [];
+    
+  } catch (error: any) {
+    console.error("💥 TAG ÜRETİM HATASI:", error);
+    throw error;
+  }
+};
+
+const selectCategory = async (title: string, categoryNames: string[]): Promise<string> => {
+  console.log("📂 KATEGORİ SEÇİMİ BAŞLIYOR...");
+  console.log("📝 Başlık:", title);
+  console.log("📋 Kategoriler:", categoryNames);
+  
+  try {
+    const response = await fetch("/api/ai/select-category", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        categoryNames,
+      }),
+    });
+    
+    console.log("📥 Category API yanıtı - Status:", response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ CATEGORY API HATASI:", errorText);
+      throw new Error(`Category API Hatası (${response.status}): ${errorText}`);
+    }
+    
+    const selectedCategory = await response.text();
+    console.log("✅ Kategori seçildi:", selectedCategory);
+    return selectedCategory.trim();
+    
+  } catch (error: any) {
+    console.error("💥 KATEGORİ SEÇİM HATASI:", error);
+    throw error;
+  }
+};
 
 // Debounce fonksiyonu
 const useDebounce = <T,>(value: T, delay: number): T => {
@@ -582,22 +783,16 @@ export function ProductFormModal({
     return raw.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '').trim();
   };
 
-  // Resim yüklendiğinde başlık üret
+  // ✅ OPTİMİZE EDİLMİŞ - Resim yüklendiğinde başlık üret
   useEffect(() => {
     if (isOpen && productImages.length > 0 && !title && !autoTitleUsed && !userEditedTitle) {
-      const generateTitle = async () => {
+      const generateAutoTitle = async () => {
         setAutoTitleLoading(true);
         try {
-          const formData = new FormData();
-          formData.append("image", productImages[0].file);
-          const res = await fetch("/api/ai/generate-etsy-title", {
-            method: "POST",
-            body: formData,
-          });
-          const data = await res.json();
-          if (data.title) {
-            const generatedTitle = cleanTitle(data.title.trim());
-            setTitle(generatedTitle);
+          const generatedTitle = await generateTitle(productImages[0].file);
+          if (generatedTitle) {
+            const cleanedTitle = cleanTitle(generatedTitle.trim());
+            setTitle(cleanedTitle);
             setAutoTitleUsed(true);
           }
         } catch (e) {
@@ -606,7 +801,7 @@ export function ProductFormModal({
           setAutoTitleLoading(false);
         }
       };
-      generateTitle();
+      generateAutoTitle();
     }
   }, [productImages, isOpen, title, autoTitleUsed, userEditedTitle]);
 
@@ -617,65 +812,49 @@ export function ProductFormModal({
     console.log('Manuel kategori seçimi:', val);
   };
 
-  // Başlık değiştiğinde en uygun mağaza kategorisini OpenAI ile otomatik seç
+  // ✅ OPTİMİZE EDİLMİŞ - Başlık değiştiğinde en uygun mağaza kategorisini otomatik seç
   useEffect(() => {
-    // Sadece başlık varsa ve shop section'lar yüklenmişse ve otomatik seçim aktifse
     if (!title || !shopSections.length || !shopSectionAutoSelected) return;
     
-    // Debounce için 1 saniye bekle
     const timer = setTimeout(async () => {
       try {
         console.log('Otomatik kategori seçimi başlatılıyor:', title);
         const categoryNames = shopSections.map(s => s.title);
         
-        // OpenAI API'ya kategori seçimi için istek
-        const response = await fetch('/api/ai/select-category', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            title, 
-            categoryNames 
-          })
-        });
+        const selectedCategory = await selectCategory(title, categoryNames);
+        console.log('AI kategori yanıtı:', selectedCategory);
         
-        if (response.ok) {
-          const aiCategory = (await response.text()).trim().toLowerCase();
-          console.log('AI kategori yanıtı:', aiCategory);
-          
-          // Tam eşleşme ara
-          let matchedSection = shopSections.find(
-            s => s.title.trim().toLowerCase() === aiCategory
+        // Tam eşleşme ara
+        let matchedSection = shopSections.find(
+          s => s.title.trim().toLowerCase() === selectedCategory.toLowerCase()
+        );
+        
+        // Kısmi eşleşme ara (fallback)
+        if (!matchedSection) {
+          matchedSection = shopSections.find(s =>
+            s.title.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+            selectedCategory.toLowerCase().includes(s.title.toLowerCase())
           );
-          
-          // Kısmi eşleşme ara (fallback)
-          if (!matchedSection) {
-            matchedSection = shopSections.find(s =>
-              s.title.toLowerCase().includes(aiCategory) ||
-              aiCategory.includes(s.title.toLowerCase())
-            );
-          }
-          
-          // Varsayılan kategoriler için fallback
-          if (!matchedSection) {
-            const fallbackKeywords = ["modern", "abstract", "art", "animal"];
-            matchedSection = shopSections.find(s =>
-              fallbackKeywords.some(keyword =>
-                s.title.toLowerCase().includes(keyword)
-              )
-            );
-          }
-          
-          // Son çare: ilk kategoriyi seç
-          if (!matchedSection && shopSections.length > 0) {
-            matchedSection = shopSections[0];
-          }
-          
-          if (matchedSection) {
-            console.log('Kategori seçildi:', matchedSection.title);
-            setSelectedShopSection(matchedSection.shop_section_id.toString());
-          }
-        } else {
-          console.error('Kategori seçimi API hatası:', response.status);
+        }
+        
+        // Varsayılan kategoriler için fallback
+        if (!matchedSection) {
+          const fallbackKeywords = ["modern", "abstract", "art", "animal"];
+          matchedSection = shopSections.find(s =>
+            fallbackKeywords.some(keyword =>
+              s.title.toLowerCase().includes(keyword)
+            )
+          );
+        }
+        
+        // Son çare: ilk kategoriyi seç
+        if (!matchedSection && shopSections.length > 0) {
+          matchedSection = shopSections[0];
+        }
+        
+        if (matchedSection) {
+          console.log('Kategori seçildi:', matchedSection.title);
+          setSelectedShopSection(matchedSection.shop_section_id.toString());
         }
       } catch (error) {
         console.error('Kategori seçimi hatası:', error);
@@ -683,7 +862,7 @@ export function ProductFormModal({
     }, 1000); // 1 saniye debounce
     
     return () => clearTimeout(timer);
-  }, [title, shopSections, shopSectionAutoSelected]); // Tüm dependency'leri ekle
+  }, [title, shopSections, shopSectionAutoSelected]);
 
   // Form açıldığında otomatik seçimi aktif et
   useEffect(() => {
@@ -820,6 +999,264 @@ export function ProductFormModal({
       setSubmitting(false);
     }
   };
+
+  // ✅ OPTİMİZE EDİLMİŞ - Başlığın yanındaki buton için ayrı bir fonksiyon
+  const generateTitleOnly = async () => {
+    if (!productImages.length || !productImages[0].file) return;
+    try {
+      setAutoTitleLoading(true);
+      const generatedTitle = await generateTitle(productImages[0].file);
+      if (generatedTitle) {
+        setTitle(cleanTitle(generatedTitle.trim()));
+        setAutoTitleUsed(true);
+      } else {
+        throw new Error("Başlık üretilemedi");
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Başlık oluşturulamadı" });
+    } finally {
+      setAutoTitleLoading(false);
+    }
+  };
+
+  // ✅ OPTİMİZE EDİLMİŞ - Focus başlık üretici fonksiyon
+  const handleFocusTitle = async () => {
+    if (!titleInput.trim() || productImages.length === 0 || !productImages[0].file) {
+      toast({
+        variant: "destructive",
+        title: "Eksik Bilgi", 
+        description: "Lütfen focus kelimesi girin ve en az bir resim yükleyin."
+      });
+      return;
+    }
+
+    setTitle("");
+    setUserEditedTitle(true);
+    setFocusStatus("Focus başlık üretiliyor...");
+    setFocusTitleLoading(true);
+
+    try {
+      const generatedTitle = await generateTitleWithFocus(productImages[0].file, titleInput.trim());
+      
+      if (generatedTitle) {
+        setTitle(cleanTitle(generatedTitle.trim()));
+        setFocusStatus("Başarılı!");
+        setAutoTitleUsed(true);
+      } else {
+        throw new Error("Başlık üretilemedi");
+      }
+
+    } catch (error) {
+      setFocusStatus("Hata oluştu");
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: "Focus başlık oluşturulamadı"
+      });
+    } finally {
+      setFocusTitleLoading(false);
+    }
+  };
+
+  // Form açıldığında focus alanını temizle
+  useEffect(() => {
+    setTitleInput("");
+  }, [isOpen]);
+
+  // ✅ OPTİMİZE EDİLMİŞ - Başlık otomatik üretildiyse, açıklama ve etiket üretimini tetikle
+  useEffect(() => {
+    if (autoTitleUsed && title) {
+      generateDescriptionAndTags();
+      setAutoTitleUsed(false); // Sadece bir kez tetiklensin
+    }
+  }, [title, autoTitleUsed]);
+
+  // Modal açıldığında autoTitleUsed'u sıfırla
+  useEffect(() => {
+    if (isOpen) setAutoTitleUsed(false);
+  }, [isOpen]);
+
+  // Modal açıldığında userEditedTitle'ı sıfırla
+  useEffect(() => {
+    if (isOpen) setUserEditedTitle(false);
+  }, [isOpen]);
+
+  // Sabit açıklama bölümleri
+  const descriptionParts = {
+    headers: [
+      "🌟 Personalized Artwork & Fast Shipping 🌟",
+      "🌟 Customize Your Canvas with Confidence 🌟",
+      "🌟 Made Just for You – Fast & Safe Delivery 🌟",
+      "🌟 Custom Orders Made Simple 🌟",
+      "🌟 Let's Create Something Unique – Delivered Safely 🌟"
+    ],
+    intros: [
+      `🎨 Want a custom size or have a personal image in mind?
+We're here to make it happen! Send us a message to get started on your one-of-a-kind canvas. We'll walk you through the process with care and precision. 💌`,
+
+      `🖼️ Whether you're interested in a specific size or a personalized design, we've got you covered. Just drop us a message, and we'll create a piece tailored to your style.`,
+
+      `💡 Looking to personalize your wall art? We offer custom sizing and design printing! Send us a message, and we'll help you bring your idea to life with a custom order.`,
+
+      `🖌️ Want a different size or your own image turned into canvas art?
+It's easy! Message us anytime and we'll guide you through creating your personalized piece.`,
+
+      `🎨 If you need a custom size or want your own image on canvas, we're here to help. Just send us a message, and we'll take care of everything from design to delivery.`
+    ],
+    shippingTitles: [
+      "📦 Delivery with Protection",
+      "🚛 Secure Shipping You Can Count On",
+      "📦 Careful Packaging – Express Shipping",
+      "📦 We Pack with Care – You Receive with Confidence",
+      "🚛 Handled with Care, Delivered with Speed"
+    ],
+    shippingDetails: [
+      `Your artwork is handled with the highest level of care:
+✔️ Wrapped in protective film
+✔️ Cushioned with bubble wrap
+✔️ Secured in a durable shipping box`,
+
+      `✔️ Triple-layer packaging: cling film + bubble wrap + sturdy box
+✔️ Safe transit guaranteed
+✔️ Premium carriers like DHL, FedEx & UPS
+✔️ Tracking details provided as soon as it ships
+✔️ Delivered in 3–5 working days`,
+
+      `Every canvas is:
+✔️ Wrapped tightly in plastic
+✔️ Surrounded by bubble wrap for protection
+✔️ Packed in thick cardboard for safe travel`,
+
+      `✔️ First layer: cling wrap for moisture protection
+✔️ Second layer: bubble wrap for shock absorption
+✔️ Final layer: sturdy box for secure delivery`,
+
+      `✔️ Each canvas is carefully wrapped in film
+✔️ Protected with a thick layer of bubble wrap
+✔️ Shipped inside a strong, protective box`
+    ],
+    deliveryInfo: [
+      `🚚 Shipped with express couriers (FedEx, UPS, or DHL)
+🔍 Tracking number always included
+⏱️ Delivery time: 3–5 business days`,
+
+      `✔️ Premium carriers like DHL, FedEx & UPS
+✔️ Tracking details provided as soon as it ships
+✔️ Delivered in 3–5 working days
+
+Your satisfaction and the safety of your artwork are our top priorities!`,
+
+      `🚀 Express delivery via trusted carriers (UPS, FedEx, DHL)
+📬 You'll get tracking as soon as it ships
+⏳ Average delivery time: 3 to 5 business days`,
+
+      `📦 Shipped using FedEx, DHL, or UPS
+🕒 Estimated delivery: 3–5 business days
+🔎 Tracking info always provided`,
+
+      `📦 Sent with premium express couriers
+📬 Tracking code provided on shipment
+🕓 Delivery window: 3 to 5 business days`
+    ]
+  };
+
+  // Rastgele bir açıklama oluştur
+  const generateRandomDescription = () => {
+    const randomIndex = Math.floor(Math.random() * 5);
+    return `${descriptionParts.headers[randomIndex]}
+
+${descriptionParts.intros[randomIndex]}
+
+━━━━━━━━━━━━━━━━━━
+
+${descriptionParts.shippingTitles[randomIndex]}
+
+${descriptionParts.shippingDetails[randomIndex]}
+
+${descriptionParts.deliveryInfo[randomIndex]}`;
+  };
+
+  // ✅ OPTİMİZE EDİLMİŞ - Açıklama ve etiket üretme fonksiyonu
+  const generateDescriptionAndTags = async () => {
+    if (!title) return;
+    try {
+      setAutoDescriptionLoading(true);
+      setAutoTagsLoading(true);
+      
+      // Etiket üret - YENİ HELPER FONKSIYON
+      const generatedTags = await generateTags(title, productImages[0]?.file);
+      if (generatedTags && Array.isArray(generatedTags)) {
+        setTags(generatedTags.slice(0, 13));
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
+    } finally {
+      setAutoDescriptionLoading(false);
+      setAutoTagsLoading(false);
+    }
+  };
+
+  // Başlık değişikliğini kontrol eden fonksiyonu güncelle
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let newTitle = e.target.value;
+    newTitle = cleanTitle(newTitle);
+    setTitle(newTitle);
+  };
+
+  // QWE tuş kombinasyonu ile taslak kaydetme
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      
+      setPressedKeys(prev => new Set([...prev, e.key.toLowerCase()]));
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+      
+      setPressedKeys(prev => {
+        const newKeys = new Set(prev);
+        newKeys.delete(e.key.toLowerCase());
+        return newKeys;
+      });
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('keyup', handleKeyUp);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isOpen]);
+
+  // QWE kombinasyonu kontrolü
+  useEffect(() => {
+    if (pressedKeys.has('q') && pressedKeys.has('w') && pressedKeys.has('e') && isOpen) {
+      if (submitting) return;
+
+      // Basit validasyon kontrolü
+      if (!title || !shippingProfileId || productImages.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "⚠️ Eksik Bilgiler",
+          description: "QWE: Başlık, kargo profili ve en az bir resim gerekli!"
+        });
+        return;
+      }
+
+      console.log('QWE basıldı - taslak kaydediliyor...');
+      toast({
+        title: "🚀 QWE Taslak Kaydetme",
+        description: "Ürün taslak olarak kaydediliyor..."
+      });
+      
+      handleSubmit("draft");
+      setPressedKeys(new Set()); // Tuşları sıfırla
+    }
+  }, [pressedKeys, isOpen, submitting, title, shippingProfileId, productImages.length]);
 
   // Resim bölümü
   const ImageSection = () => (
@@ -1079,296 +1516,6 @@ export function ProductFormModal({
     </div>
   );
 
-  // Sabit açıklama bölümleri
-  const descriptionParts = {
-    headers: [
-      "🌟 Personalized Artwork & Fast Shipping 🌟",
-      "🌟 Customize Your Canvas with Confidence 🌟",
-      "🌟 Made Just for You – Fast & Safe Delivery 🌟",
-      "🌟 Custom Orders Made Simple 🌟",
-      "🌟 Let's Create Something Unique – Delivered Safely 🌟"
-    ],
-    intros: [
-      `🎨 Want a custom size or have a personal image in mind?
-We're here to make it happen! Send us a message to get started on your one-of-a-kind canvas. We'll walk you through the process with care and precision. 💌`,
-
-      `🖼️ Whether you're interested in a specific size or a personalized design, we've got you covered. Just drop us a message, and we'll create a piece tailored to your style.`,
-
-      `💡 Looking to personalize your wall art? We offer custom sizing and design printing! Send us a message, and we'll help you bring your idea to life with a custom order.`,
-
-      `🖌️ Want a different size or your own image turned into canvas art?
-It's easy! Message us anytime and we'll guide you through creating your personalized piece.`,
-
-      `🎨 If you need a custom size or want your own image on canvas, we're here to help. Just send us a message, and we'll take care of everything from design to delivery.`
-    ],
-    shippingTitles: [
-      "📦 Delivery with Protection",
-      "🚛 Secure Shipping You Can Count On",
-      "📦 Careful Packaging – Express Shipping",
-      "📦 We Pack with Care – You Receive with Confidence",
-      "🚛 Handled with Care, Delivered with Speed"
-    ],
-    shippingDetails: [
-      `Your artwork is handled with the highest level of care:
-✔️ Wrapped in protective film
-✔️ Cushioned with bubble wrap
-✔️ Secured in a durable shipping box`,
-
-      `✔️ Triple-layer packaging: cling film + bubble wrap + sturdy box
-✔️ Safe transit guaranteed
-✔️ Premium carriers like DHL, FedEx & UPS
-✔️ Tracking details provided as soon as it ships
-✔️ Delivered in 3–5 working days`,
-
-      `Every canvas is:
-✔️ Wrapped tightly in plastic
-✔️ Surrounded by bubble wrap for protection
-✔️ Packed in thick cardboard for safe travel`,
-
-      `✔️ First layer: cling wrap for moisture protection
-✔️ Second layer: bubble wrap for shock absorption
-✔️ Final layer: sturdy box for secure delivery`,
-
-      `✔️ Each canvas is carefully wrapped in film
-✔️ Protected with a thick layer of bubble wrap
-✔️ Shipped inside a strong, protective box`
-    ],
-    deliveryInfo: [
-      `🚚 Shipped with express couriers (FedEx, UPS, or DHL)
-🔍 Tracking number always included
-⏱️ Delivery time: 3–5 business days`,
-
-      `✔️ Premium carriers like DHL, FedEx & UPS
-✔️ Tracking details provided as soon as it ships
-✔️ Delivered in 3–5 working days
-
-Your satisfaction and the safety of your artwork are our top priorities!`,
-
-      `🚀 Express delivery via trusted carriers (UPS, FedEx, DHL)
-📬 You'll get tracking as soon as it ships
-⏳ Average delivery time: 3 to 5 business days`,
-
-      `📦 Shipped using FedEx, DHL, or UPS
-🕒 Estimated delivery: 3–5 business days
-🔎 Tracking info always provided`,
-
-      `📦 Sent with premium express couriers
-📬 Tracking code provided on shipment
-🕓 Delivery window: 3 to 5 business days`
-    ]
-  };
-
-  // Rastgele bir açıklama oluştur
-  const generateRandomDescription = () => {
-    const randomIndex = Math.floor(Math.random() * 5);
-    return `${descriptionParts.headers[randomIndex]}
-
-${descriptionParts.intros[randomIndex]}
-
-━━━━━━━━━━━━━━━━━━
-
-${descriptionParts.shippingTitles[randomIndex]}
-
-${descriptionParts.shippingDetails[randomIndex]}
-
-${descriptionParts.deliveryInfo[randomIndex]}`;
-  };
-
-  // Açıklama üretme fonksiyonunu güncelle
-  const generateDescriptionAndTags = async () => {
-    if (!title) return;
-    try {
-      setAutoDescriptionLoading(true);
-      setAutoTagsLoading(true);
-      
-      // Etiket üret
-      const tagPrompt = tagsPrompt.prompt.replace("${title}", title);
-      const tagRes = await fetch("/api/ai/generate-etsy-tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: tagPrompt, title, model: "gpt-3.5-turbo" }),
-      });
-      const tagData = await tagRes.json();
-      if (tagData.tags && Array.isArray(tagData.tags)) {
-        setTags(tagData.tags.slice(0, 13));
-      } else if (tagData.error) {
-        toast({ variant: "destructive", title: tagData.error });
-      }
-    } catch (e) {
-      toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
-    } finally {
-      setAutoDescriptionLoading(false);
-      setAutoTagsLoading(false);
-    }
-  };
-
-  // Başlık değişikliğini kontrol eden fonksiyonu güncelle
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let newTitle = e.target.value;
-    newTitle = cleanTitle(newTitle);
-    setTitle(newTitle);
-  };
-
-  // Başlığın yanındaki buton için ayrı bir fonksiyon
-  const generateTitleOnly = async () => {
-    if (!productImages.length || !productImages[0].file) return;
-    try {
-      setAutoTitleLoading(true);
-      const formData = new FormData();
-      formData.append("image", productImages[0].file);
-      const res = await fetch("/api/ai/generate-etsy-title", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error("Başlık oluşturulamadı");
-      // API'den dönen yanıtı JSON olarak işle
-      const data = await res.json();
-      if (data.title) {
-        setTitle(cleanTitle(data.title.trim()));
-        setAutoTitleUsed(true);
-      } else {
-        const text = data?.text || "";
-        setTitle(cleanTitle(text.trim()));
-        setAutoTitleUsed(true);
-      }
-    } catch (e) {
-      toast({ variant: "destructive", title: "Başlık oluşturulamadı" });
-    } finally {
-      setAutoTitleLoading(false);
-    }
-  };
-
-  // Yeni focus başlık üretici fonksiyon
-  const handleFocusTitle = async () => {
-    if (!titleInput.trim() || productImages.length === 0 || !productImages[0].file) {
-      toast({
-        variant: "destructive",
-        title: "Eksik Bilgi", 
-        description: "Lütfen focus kelimesi girin ve en az bir resim yükleyin."
-      });
-      return;
-    }
-
-    setTitle("");
-    setUserEditedTitle(true);
-    setFocusStatus("Focus başlık üretiliyor...");
-    setFocusTitleLoading(true);
-
-    try {
-      const file = productImages[0].file;
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("focusKeyword", titleInput.trim());
-      formData.append("requestType", "focus");
-
-      const response = await fetch("/api/ai/generate-etsy-title", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-      
-      if (data.title) {
-        setTitle(cleanTitle(data.title.trim()));
-        setFocusStatus("Başarılı!");
-        setAutoTitleUsed(true);
-      } else {
-        throw new Error("Başlık üretilemedi");
-      }
-
-    } catch (error) {
-      setFocusStatus("Hata oluştu");
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: "Focus başlık oluşturulamadı"
-      });
-    } finally {
-      setFocusTitleLoading(false);
-    }
-  };
-
-  // Form açıldığında focus alanını temizle
-  useEffect(() => {
-    setTitleInput("");
-  }, [isOpen]);
-
-  // Başlık otomatik üretildiyse, başlık değiştiğinde açıklama ve etiket üretimini tetikle
-  useEffect(() => {
-    if (autoTitleUsed && title) {
-      generateDescriptionAndTags();
-      setAutoTitleUsed(false); // Sadece bir kez tetiklensin
-    }
-  }, [title, autoTitleUsed]);
-
-  // Modal açıldığında autoTitleUsed'u sıfırla
-  useEffect(() => {
-    if (isOpen) setAutoTitleUsed(false);
-  }, [isOpen]);
-
-  // Modal açıldığında userEditedTitle'ı sıfırla
-  useEffect(() => {
-    if (isOpen) setUserEditedTitle(false);
-  }, [isOpen]);
-
-  // QWE tuş kombinasyonu ile taslak kaydetme
-  // Bu değişkenler zaten yukarıda tanımlandı, kaldırılıyor
-  // const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
-      
-      setPressedKeys(prev => new Set([...prev, e.key.toLowerCase()]));
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (!isOpen) return;
-      
-      setPressedKeys(prev => {
-        const newKeys = new Set(prev);
-        newKeys.delete(e.key.toLowerCase());
-        return newKeys;
-      });
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      document.addEventListener('keyup', handleKeyUp);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [isOpen]);
-
-  // QWE kombinasyonu kontrolü
-  useEffect(() => {
-    if (pressedKeys.has('q') && pressedKeys.has('w') && pressedKeys.has('e') && isOpen) {
-      if (submitting) return;
-
-      // Basit validasyon kontrolü
-      if (!title || !shippingProfileId || productImages.length === 0) {
-        toast({
-          variant: "destructive",
-          title: "⚠️ Eksik Bilgiler",
-          description: "QWE: Başlık, kargo profili ve en az bir resim gerekli!"
-        });
-        return;
-      }
-
-      console.log('QWE basıldı - taslak kaydediliyor...');
-      toast({
-        title: "🚀 QWE Taslak Kaydetme",
-        description: "Ürün taslak olarak kaydediliyor..."
-      });
-      
-      handleSubmit("draft");
-      setPressedKeys(new Set()); // Tuşları sıfırla
-    }
-  }, [pressedKeys, isOpen, submitting, title, shippingProfileId, productImages.length]);
-
   return (
     <DndProvider backend={HTML5Backend}>
       {/* Custom Toast Container - Sağ üst köşede */}
@@ -1468,7 +1615,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6">{/* İçerik buraya gelecek */}
+          <div className="flex-1 overflow-y-auto px-6">
             {/* Resim Bölümü */}
             <ImageSection />
 
@@ -1686,16 +1833,9 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                         if (!title) return;
                         try {
                           setAutoTagsLoading(true);
-                          const res = await fetch("/api/ai/generate-etsy-tags", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ title }),
-                          });
-                          const data = await res.json();
-                          if (data.tags && Array.isArray(data.tags)) {
-                            setTags(data.tags);
-                          } else if (data.error) {
-                            toast({ variant: "destructive", title: data.error });
+                          const generatedTags = await generateTags(title, productImages[0]?.file);
+                          if (generatedTags && Array.isArray(generatedTags)) {
+                            setTags(generatedTags);
                           }
                         } catch (e) {
                           toast({ variant: "destructive", title: "Etiketler oluşturulamadı" });

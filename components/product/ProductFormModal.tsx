@@ -532,6 +532,12 @@ export function ProductFormModal({
 
   const [userEditedTitle, setUserEditedTitle] = useState(false);
 
+  // Yardımcı fonksiyon: Başta/sonda özel karakter/noktalama temizle
+  const cleanTitle = (raw: string) => {
+    // Başta ve sonda ! . * : , ? ; ' " - _ ( ) [ ] { } gibi karakterleri sil
+    return raw.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '').trim();
+  };
+
   // Resim yüklendiğinde başlık üret
   useEffect(() => {
     if (isOpen && productImages.length > 0 && !title && !autoTitleUsed && !userEditedTitle) {
@@ -546,7 +552,7 @@ export function ProductFormModal({
           });
           const data = await res.json();
           if (data.title) {
-            const generatedTitle = data.title.trim();
+            const generatedTitle = cleanTitle(data.title.trim());
             setTitle(generatedTitle);
             setAutoTitleUsed(true);
           }
@@ -1334,10 +1340,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   // Başlık değişikliğini kontrol eden fonksiyonu güncelle
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let newTitle = e.target.value;
-    
-    // Başlığın başındaki ve sonundaki özel karakterleri temizle
-    newTitle = newTitle.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '');
-    
+    newTitle = cleanTitle(newTitle);
     setTitle(newTitle);
   };
 
@@ -1356,11 +1359,11 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       // API'den dönen yanıtı JSON olarak işle
       const data = await res.json();
       if (data.title) {
-        setTitle(data.title.trim());
+        setTitle(cleanTitle(data.title.trim()));
         setAutoTitleUsed(true);
       } else {
         const text = data?.text || "";
-        setTitle(text.trim());
+        setTitle(cleanTitle(text.trim()));
         setAutoTitleUsed(true);
       }
     } catch (e) {
@@ -1404,7 +1407,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       const data = await response.json();
       
       if (data.title) {
-        setTitle(data.title.trim());
+        setTitle(cleanTitle(data.title.trim()));
         setFocusStatus("Başarılı!");
         setAutoTitleUsed(true);
       } else {

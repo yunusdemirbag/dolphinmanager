@@ -55,10 +55,12 @@ import {
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
 
 // ✅ HELPER FONKSIYONLAR - Client-side FileReader ile düzeltildi
-const generateTitle = async (imageFile: File): Promise<string> => {
+const generateTitle = async (imageFile: File, setTokenUsage?: any, setGenerationDurations?: any): Promise<string> => {
   console.log("🎯 BAŞLIK ÜRETİMİ BAŞLIYOR...");
   console.log("📁 Dosya boyutu:", Math.round(imageFile.size / 1024), "KB");
   console.log("📁 Dosya tipi:", imageFile.type);
+  
+  const startTime = Date.now();
   
   try {
     // FileReader ile base64'e çevir (client-side compatible)
@@ -113,6 +115,28 @@ const generateTitle = async (imageFile: File): Promise<string> => {
     
     const data = await response.json();
     console.log("✅ API yanıtı başarılı:", data);
+    
+    // Süreyi hesapla
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    // Token kullanım bilgilerini kaydet (eğer varsa)
+    if (data.usage && setTokenUsage) {
+      setTokenUsage((prev: any) => ({
+        ...prev,
+        title_prompt_tokens: data.usage.prompt_tokens,
+        title_completion_tokens: data.usage.completion_tokens,
+        title_total_tokens: data.usage.total_tokens
+      }));
+    }
+    
+    // Süreyi kaydet (eğer setGenerationDurations fonksiyonu verilmişse)
+    if (setGenerationDurations) {
+      setGenerationDurations((prev: any) => ({
+        ...prev,
+        title: duration
+      }));
+    }
     
     // Mevcut API'den gelen sonucu analiz et
     const generatedTitle = data.result || data.title || data.analysis?.title;
@@ -186,9 +210,11 @@ const generateTitleWithFocus = async (imageFile: File, focusKeyword: string): Pr
   }
 };
 
-const generateTags = async (title: string, imageFile?: File): Promise<string[]> => {
+const generateTags = async (title: string, setTokenUsage?: any, setGenerationDurations?: any, imageFile?: File): Promise<string[]> => {
   console.log("🏷️ TAG ÜRETİMİ BAŞLIYOR...");
   console.log("📝 Başlık:", title);
+  
+  const startTime = Date.now();
   
   try {
     const response = await fetch("/api/ai/generate-etsy-tags", {
@@ -200,15 +226,38 @@ const generateTags = async (title: string, imageFile?: File): Promise<string[]> 
       }),
     });
     
-    console.log("📥 Tags API yanıtı - Status:", response.status);
+    console.log("📥 Tag API yanıtı - Status:", response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("❌ TAGS API HATASI:", errorText);
-      throw new Error(`Tags API Hatası (${response.status}): ${errorText}`);
+      console.error("❌ TAG API HATASI:", errorText);
+      throw new Error(`Tag API Hatası (${response.status}): ${errorText}`);
     }
     
     const data = await response.json();
+    
+    // Süreyi hesapla
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    // Token kullanım bilgilerini kaydet (eğer varsa)
+    if (data.usage && setTokenUsage) {
+      setTokenUsage((prev: any) => ({
+        ...prev,
+        tags_prompt_tokens: data.usage.prompt_tokens,
+        tags_completion_tokens: data.usage.completion_tokens,
+        tags_total_tokens: data.usage.total_tokens
+      }));
+    }
+    
+    // Süreyi kaydet (eğer setGenerationDurations fonksiyonu verilmişse)
+    if (setGenerationDurations) {
+      setGenerationDurations((prev: any) => ({
+        ...prev,
+        tags: duration
+      }));
+    }
+    
     console.log("✅ Tag'ler üretildi:", data.tags);
     return data.tags || [];
     
@@ -218,10 +267,12 @@ const generateTags = async (title: string, imageFile?: File): Promise<string[]> 
   }
 };
 
-const selectCategory = async (title: string, categoryNames: string[]): Promise<string> => {
-  console.log("📂 KATEGORİ SEÇİMİ BAŞLIYOR...");
+const selectCategory = async (title: string, categoryNames: string[], setTokenUsage?: any, setGenerationDurations?: any): Promise<string> => {
+  console.log("🔖 KATEGORİ SEÇİMİ BAŞLIYOR...");
   console.log("📝 Başlık:", title);
-  console.log("📋 Kategoriler:", categoryNames);
+  console.log("📋 Kategori sayısı:", categoryNames.length);
+  
+  const startTime = Date.now();
   
   try {
     const response = await fetch("/api/ai/select-category", {
@@ -233,15 +284,29 @@ const selectCategory = async (title: string, categoryNames: string[]): Promise<s
       }),
     });
     
-    console.log("📥 Category API yanıtı - Status:", response.status);
+    console.log("📥 Kategori API yanıtı - Status:", response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("❌ CATEGORY API HATASI:", errorText);
-      throw new Error(`Category API Hatası (${response.status}): ${errorText}`);
+      console.error("❌ KATEGORİ API HATASI:", errorText);
+      throw new Error(`Kategori API Hatası (${response.status}): ${errorText}`);
     }
     
     const selectedCategory = await response.text();
+    
+    // Süreyi hesapla
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    // Token kullanımını direkt olarak alamıyoruz çünkü API text döndürüyor
+    // Ancak süreyi kaydedebiliriz
+    if (setGenerationDurations) {
+      setGenerationDurations((prev: any) => ({
+        ...prev,
+        category: duration
+      }));
+    }
+    
     console.log("✅ Kategori seçildi:", selectedCategory);
     return selectedCategory.trim();
     
@@ -821,7 +886,7 @@ export function ProductFormModal({
         console.log('Otomatik kategori seçimi başlatılıyor:', title);
         const categoryNames = shopSections.map(s => s.title);
         
-        const selectedCategory = await selectCategory(title, categoryNames);
+        const selectedCategory = await selectCategory(title, categoryNames, productImages[0]?.file);
         console.log('AI kategori yanıtı:', selectedCategory);
         
         // Tam eşleşme ara
@@ -909,6 +974,27 @@ export function ProductFormModal({
         description: "Lütfen bekleyin, ürün Etsy'e yükleniyor." 
       });
       
+      // Önce Etsy mağazalarını senkronize et
+      try {
+        console.log('Etsy mağazaları senkronize ediliyor...');
+        const storesResponse = await fetch('/api/etsy/stores', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!storesResponse.ok) {
+          console.warn('⚠️ Etsy mağazaları senkronize edilemedi:', await storesResponse.text());
+        } else {
+          const storesData = await storesResponse.json();
+          console.log(`✅ ${storesData.count} Etsy mağazası başarıyla senkronize edildi`);
+        }
+      } catch (storeError) {
+        console.warn('⚠️ Etsy mağaza senkronizasyonu hatası:', storeError);
+        // Hatayı göster ama işleme devam et
+      }
+      
       const formData = new FormData();
 
       const listingData = {
@@ -922,56 +1008,62 @@ export function ProductFormModal({
         variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
         state: state,
         shop_section_id: Number(selectedShopSection) || undefined,
+        category: selectedShopSection ? shopSections.find(s => s.shop_section_id.toString() === selectedShopSection)?.title : undefined,
         
         // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
-        is_personalizable: true,
-        personalization_is_required: false,
-        personalization_instructions: PERSONALIZATION_INSTRUCTIONS,
+        is_personalizable: isPersonalizable,
+        personalization_is_required: personalizationRequired,
+        personalization_instructions: personalizationInstructions,
         personalization_char_count_max: 256, // <-- Etsy için kritik alan
 
         // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
-        quantity: 999,
+        quantity: quantity || 4,
         taxonomy_id: taxonomyId,
         who_made: "i_did",
         when_made: "made_to_order",
         is_supply: false,
+        
+        // Token kullanım bilgilerini ekle
+        tokenUsage: tokenUsage,
+        
+        // Süre bilgilerini ekle
+        generationDurations: generationDurations
       };
-      
+
       formData.append('listingData', JSON.stringify(listingData));
       productImages.forEach(image => formData.append('imageFiles', image.file));
       if (videoFile) formData.append('videoFile', videoFile.file);
 
+      // Toplam işlem süresini hesapla
+      const totalUploadDuration = Date.now() - startTime;
+      
+      // Toplam süreyi de ekle
+      const updatedListingData = {
+        ...listingData,
+        totalUploadDuration
+      };
+      
+      // Güncellenen veriyi formData'ya ekle
+      formData.set('listingData', JSON.stringify(updatedListingData));
+      
       const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',
         body: formData,
       });
-
-      const result = await response.json();
       
-      if (!response.ok) {
-        // Özel hata kodlarını kontrol et
-        if (result.code === 'NO_ETSY_TOKEN' || result.code === 'INVALID_ETSY_TOKEN') {
-          throw new Error('Etsy hesabınız bağlı değil veya bağlantı süresi dolmuş. Lütfen Etsy hesabınızı yeniden bağlayın.');
-        } else if (result.code === 'NO_ETSY_STORE') {
-          throw new Error('Etsy mağazanız bulunamadı. Lütfen Etsy hesabınızı kontrol edin.');
-        } else {
-          throw new Error(result.error || 'Sunucu tarafında bilinmeyen bir hata oluştu.');
-        }
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "✅ Başarılı",
+          description: "Ürün başarıyla oluşturuldu",
+        });
+        
+        // Başarılı işlem sonrası modalı kapat
+        onClose();
+      } else {
+        throw new Error(result.error || "Ürün oluşturulamadı");
       }
-
-      // İşlem süresini hesapla
-      const endTime = Date.now();
-      const duration = ((endTime - startTime) / 1000).toFixed(1);
-
-      // Başarı mesajı göster ve modal'ı kapat
-      toast({ 
-        title: "✅ İşlem Başarılı!", 
-        description: `"${title}" ürünü ${duration} saniyede yüklendi.` 
-      });
-
-      // Modal'ı kapat
-      onClose();
-      router.refresh();
 
     } catch (error: any) {
       console.error('Ürün oluşturma hatası:', error);
@@ -1002,18 +1094,31 @@ export function ProductFormModal({
 
   // ✅ OPTİMİZE EDİLMİŞ - Başlığın yanındaki buton için ayrı bir fonksiyon
   const generateTitleOnly = async () => {
-    if (!productImages.length || !productImages[0].file) return;
+    if (!productImages[0]?.file) {
+      toast({
+        title: "Resim gerekli",
+        description: "Başlık üretmek için bir resim yüklemelisiniz",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setAutoTitleLoading(true);
+    
     try {
-      setAutoTitleLoading(true);
-      const generatedTitle = await generateTitle(productImages[0].file);
+      const generatedTitle = await generateTitle(productImages[0].file, setTokenUsage, setGenerationDurations);
       if (generatedTitle) {
         setTitle(cleanTitle(generatedTitle.trim()));
         setAutoTitleUsed(true);
       } else {
         throw new Error("Başlık üretilemedi");
       }
-    } catch (e) {
-      toast({ variant: "destructive", title: "Başlık oluşturulamadı" });
+    } catch (error: any) {
+      toast({ 
+        variant: "destructive", 
+        title: "Başlık oluşturulamadı",
+        description: error.message
+      });
     } finally {
       setAutoTitleLoading(false);
     }
@@ -1178,20 +1283,30 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
 
   // ✅ OPTİMİZE EDİLMİŞ - Açıklama ve etiket üretme fonksiyonu
   const generateDescriptionAndTags = async () => {
-    if (!title) return;
+    if (!title) {
+      toast({
+        title: "Başlık gerekli",
+        description: "Etiket üretmek için önce bir başlık girin",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
-      setAutoDescriptionLoading(true);
       setAutoTagsLoading(true);
       
       // Etiket üret - YENİ HELPER FONKSIYON
-      const generatedTags = await generateTags(title, productImages[0]?.file);
+      const generatedTags = await generateTags(title, setTokenUsage, setGenerationDurations, productImages[0]?.file);
       if (generatedTags && Array.isArray(generatedTags)) {
         setTags(generatedTags.slice(0, 13));
       }
-    } catch (e) {
-      toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
+    } catch (error: any) {
+      toast({ 
+        variant: "destructive", 
+        title: "İçerik üretilemedi", 
+        description: error.message || "Başlığa göre içerik oluşturulamadı." 
+      });
     } finally {
-      setAutoDescriptionLoading(false);
       setAutoTagsLoading(false);
     }
   };
@@ -1515,6 +1630,29 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       )}
     </div>
   );
+
+  // Token kullanım bilgilerini ve süreleri tutacak state'leri ekle
+  const [tokenUsage, setTokenUsage] = useState<{
+    title_prompt_tokens?: number;
+    title_completion_tokens?: number;
+    title_total_tokens?: number;
+    tags_prompt_tokens?: number;
+    tags_completion_tokens?: number;
+    tags_total_tokens?: number;
+    description_prompt_tokens?: number;
+    description_completion_tokens?: number;
+    description_total_tokens?: number;
+    category_prompt_tokens?: number;
+    category_completion_tokens?: number;
+    category_total_tokens?: number;
+  }>({});
+
+  const [generationDurations, setGenerationDurations] = useState<{
+    title?: number;
+    tags?: number;
+    description?: number;
+    category?: number;
+  }>({});
 
   return (
     <DndProvider backend={HTML5Backend}>

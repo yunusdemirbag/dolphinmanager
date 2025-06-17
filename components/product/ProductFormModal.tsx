@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon, Image, Video, ChevronDown, Wand2 } from "lucide-react"
+import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon, Image, Video, ChevronDown, Wand2, FolderOpen } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode, ShippingProfile, EtsyProcessingProfile } from "@/types/product"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -244,12 +244,6 @@ export function ProductFormModal({
   const [personalizationInstructions, setPersonalizationInstructions] = useState(
     'Phone Number for Delivery'
   )
-  const [primaryColor, setPrimaryColor] = useState(product?.primary_color || "")
-  const [secondaryColor, setSecondaryColor] = useState(product?.secondary_color || "")
-  const [width, setWidth] = useState(product?.width || 0)
-  const [widthUnit, setWidthUnit] = useState(product?.width_unit || "cm")
-  const [height, setHeight] = useState(product?.height || 0)
-  const [heightUnit, setHeightUnit] = useState(product?.height_unit || "cm")
   const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
   
   const [hasVariations, setHasVariations] = useState<boolean>(true);
@@ -306,13 +300,14 @@ export function ProductFormModal({
       }
       loadShopSections();
     }
-  }, [isOpen]);
+  }, [isOpen, toast]);
 
-  // Modified reset form useEffect
+  // Form açıldığında otomatik klasör yükleme
   useEffect(() => {
     if (isOpen) {
+      setProductImages([]);
+      setVideoFile(null);
       setTitle(product?.title || "");
-      // Her form açılışında rastgele bir açıklama seç
       const randomDescription = generateRandomDescription();
       setDescription(randomDescription);
       setPrice(product?.price?.amount || 0);
@@ -323,24 +318,12 @@ export function ProductFormModal({
       setIsPersonalizable(true);
       setPersonalizationRequired(false);
       setPersonalizationInstructions(PERSONALIZATION_INSTRUCTIONS);
-      setPrimaryColor(product?.primary_color || "");
-      setSecondaryColor(product?.secondary_color || "");
-      setWidth(product?.width || 0);
-      setWidthUnit(product?.width_unit || "cm");
-      setHeight(product?.height || 0);
-      setHeightUnit(product?.height_unit || "cm");
       setTaxonomyId(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
-      setProductImages([]);
-      setVideoFile(null);
-
       setHasVariations(product?.variations ? product.variations.length > 0 : true);
-      
-      // Varyasyonları resetle - her zaman aktif olarak başlat
       const initialVariations = product?.variations && product.variations.length > 0 
         ? product.variations 
         : predefinedVariations;
       setVariations(initialVariations);
-
       if (product?.images?.length) {
         setProductImages(product.images.map(img => ({
           file: new File([], img.url || ''),
@@ -348,9 +331,11 @@ export function ProductFormModal({
           uploading: false
         })));
       }
+      // OTOMATIK KLASÖR YÜKLEME - 500ms gecikme ile
+      setTimeout(() => {
+        loadDefaultFolder();
+      }, 500);
     }
-
-    // Cleanup previews on unmount
     return () => {
       productImages.forEach(img => {
         if (img.preview) {
@@ -359,6 +344,66 @@ export function ProductFormModal({
       });
     };
   }, [isOpen, product]);
+
+  // Otomatik klasör yükleme fonksiyonu - SADECE BİR TANE VE EN ÜSTE ALINDI
+  const loadDefaultFolder = useCallback(() => {
+    setFolderUploading(true);
+    setFolderProgress({ current: 0, total: 0 });
+    try {
+      const savedFiles: string | null = localStorage.getItem('defaultFolderFiles');
+      if (savedFiles) {
+        const fileList: any[] = JSON.parse(savedFiles);
+        let newImages: any[] = [];
+        let newVideo: any = null;
+        for (let i = 0; i < fileList.length; i++) {
+          const fileData = fileList[i];
+          if (fileData.type.startsWith('image/')) {
+            if (newImages.length + productImages.length < 10) {
+              // DataURL'den File oluştur
+              const arr = fileData.dataUrl.split(",");
+              const mime = arr[0].match(/:(.*?);/)[1];
+              const bstr = atob(arr[1]);
+              let n = bstr.length;
+              const u8arr = new Uint8Array(n);
+              while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+              }
+              const file = new File([u8arr], fileData.name, { type: mime });
+              newImages.push({ file, preview: fileData.dataUrl, uploading: false });
+            }
+          } else if (fileData.type.startsWith('video/') && !videoFile && !newVideo) {
+            // DataURL'den File oluştur
+            const arr = fileData.dataUrl.split(",");
+            const mime = arr[0].match(/:(.*?);/)[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+              u8arr[n] = bstr.charCodeAt(n);
+            }
+            const file = new File([u8arr], fileData.name, { type: mime });
+            newVideo = { file, preview: fileData.dataUrl, uploading: false };
+          }
+        }
+        if (newImages.length > 0) setProductImages(prev => [...prev, ...newImages].slice(0, 10));
+        if (newVideo) setVideoFile(newVideo);
+        toast({ 
+          title: "✅ Varsayılan klasör yüklendi!", 
+          description: `${DEFAULT_FOLDER_PATH} klasöründen dosyalar otomatik yüklendi.` 
+        });
+      } else {
+        toast({ 
+          title: "📁 Varsayılan klasör ayarlanmadı", 
+          description: `Lütfen \"${DEFAULT_FOLDER_PATH}\" klasörünü seçin ve dosyalarınızı kaydedin.` 
+        });
+      }
+    } catch (error) {
+      console.error('Varsayılan klasör yüklenirken hata:', error);
+    } finally {
+      setFolderUploading(false);
+      setFolderProgress({ current: 0, total: 0 });
+    }
+  }, [productImages.length, videoFile, toast]);
 
   // Kargo profili varsayılanı: Yeni ürün eklerken ilk profili otomatik seç
   useEffect(() => {
@@ -598,70 +643,7 @@ export function ProductFormModal({
     }
   }, [isOpen]);
 
-  // Job takibi
-  const startJobTracking = (jobId: string, productTitle: string) => {
-    let attempts = 0;
-    const maxAttempts = 150; // 5 dakika (2s * 150)
-    
-    const interval = setInterval(async () => {
-      try {
-        if (attempts >= maxAttempts) {
-          clearInterval(interval);
-          toast({ 
-            variant: "destructive",
-            title: "İşlem Zaman Aşımı", 
-            description: `"${productTitle}" için işlem zaman aşımına uğradı.` 
-          });
-          return;
-        }
-        
-        attempts++;
-        const response = await fetch(`/api/etsy/listings/job-status/${jobId}`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            clearInterval(interval);
-            toast({ 
-              variant: "destructive",
-              title: "İşlem Bulunamadı", 
-              description: `"${productTitle}" için işlem bulunamadı.` 
-            });
-            return;
-          }
-          throw new Error('Job status API hatası');
-        }
-        
-        const job = await response.json();
-        
-        if (job.status === 'completed') {
-          clearInterval(interval);
-          toast({ 
-            title: "✅ Ürün Hazır!", 
-            description: `"${productTitle}" başarıyla Etsy'ye eklendi!` 
-          });
-        } else if (job.status === 'failed') {
-          clearInterval(interval);
-          toast({ 
-            variant: "destructive",
-            title: "❌ Ürün Eklenemedi", 
-            description: `"${productTitle}": ${job.error || 'Bilinmeyen hata'}` 
-          });
-        }
-        // Progress update için konsola bilgi yazdır
-        else if (job.status === 'processing') {
-          console.log(`Progress: ${job.progress}%`);
-        }
-      } catch (error) {
-        console.error('Job tracking error:', error);
-      }
-    }, 2000); // 2 saniyede bir kontrol et
-    
-    // interval'ı global olarak sakla, gerekirse temizlemek için
-    // window.__jobIntervals = window.__jobIntervals || {};
-    // window.__jobIntervals[jobId] = interval;
-  };
-
-  // Form verilerini handle eden fonksiyon
+  // Form verilerini handle eden fonksiyon - FİZİKSEL ÖZELLİKLER KALDIRILDI
   const handleSubmit = async (state: "draft" | "active") => {
     // 1. Fiyat Validasyonu
     let isPriceValid = false;
@@ -767,6 +749,122 @@ export function ProductFormModal({
     }
   };
 
+  // Klasör yükleme state'i
+  const [folderUploading, setFolderUploading] = useState(false);
+  const [folderProgress, setFolderProgress] = useState({ current: 0, total: 0 });
+  
+  // macOS varsayılan klasör yolu
+  const DEFAULT_FOLDER_PATH = "~/Documents/kaynak";
+
+  
+
+  // Klasör seçme ve kaydetme işleyicisi (gelişmiş)
+  const handleFolderSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    
+    const files = Array.from(e.target.files);
+    const mediaFiles = files.filter(file => 
+      file.type.startsWith('image/') || file.type.startsWith('video/')
+    );
+    
+    if (mediaFiles.length === 0) {
+      toast({ 
+        variant: "destructive",
+        title: "Medya dosyası bulunamadı", 
+        description: "Seçilen klasörde resim veya video dosyası bulunamadı." 
+      });
+      return;
+    }
+
+    setFolderUploading(true);
+    setFolderProgress({ current: 0, total: mediaFiles.length });
+
+    try {
+      const savedFiles = [];
+      
+      // Resimleri işle
+      const imageFiles = mediaFiles.filter(f => f.type.startsWith('image/')).slice(0, 10 - productImages.length);
+      const videoFiles = mediaFiles.filter(f => f.type.startsWith('video/'));
+      
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        setFolderProgress(prev => ({ ...prev, current: prev.current + 1 }));
+        
+        const reader = new FileReader();
+        await new Promise((resolve) => {
+          reader.onloadend = () => {
+            const dataUrl = reader.result as string;
+            const newImage = {
+              file,
+              preview: dataUrl,
+              uploading: false
+            };
+            setProductImages(prev => [...prev, newImage]);
+            
+            // LocalStorage için kaydet
+            savedFiles.push({
+              name: file.name,
+              type: file.type,
+              dataUrl: dataUrl
+            });
+            
+            resolve(void 0);
+          };
+          reader.readAsDataURL(file);
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Video varsa işle (sadece ilkini al)
+      if (!videoFile && videoFiles.length > 0) {
+        const file = videoFiles[0];
+        setFolderProgress(prev => ({ ...prev, current: prev.current + 1 }));
+        
+        const reader = new FileReader();
+        await new Promise((resolve) => {
+          reader.onloadend = () => {
+            const dataUrl = reader.result as string;
+            setVideoFile({
+              file,
+              preview: URL.createObjectURL(file),
+              uploading: false
+            });
+            
+            // LocalStorage için kaydet
+            savedFiles.push({
+              name: file.name,
+              type: file.type,
+              dataUrl: dataUrl
+            });
+            
+            resolve(void 0);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // Dosyaları localStorage'a kaydet (varsayılan klasör olarak)
+      localStorage.setItem('defaultFolderFiles', JSON.stringify(savedFiles));
+      
+      toast({ 
+        title: "✅ Klasör varsayılan olarak ayarlandı!", 
+        description: `${imageFiles.length} resim${videoFiles.length > 0 && !videoFile ? ' ve 1 video' : ''} yüklendi ve kaynak klasör olarak kaydedildi.` 
+      });
+
+    } catch (error) {
+      toast({ 
+        variant: "destructive",
+        title: "Yükleme hatası", 
+        description: "Klasör içeriği yüklenirken bir hata oluştu." 
+      });
+    } finally {
+      setFolderUploading(false);
+      setFolderProgress({ current: 0, total: 0 });
+      e.target.value = '';
+    }
+  }, [productImages.length, videoFile, toast]);
+
   // Resim bölümü
   const ImageSection = () => (
     <div className="space-y-4">
@@ -823,10 +921,64 @@ export function ProductFormModal({
           e.target.value = '';
         }}
       />
+      
+      {/* YENİ: Klasör seçme input'u */}
+      <input
+        type="file"
+        id="folder-upload"
+        className="hidden"
+        // @ts-ignore
+        webkitdirectory
+        multiple
+        onChange={handleFolderSelect}
+      />
 
-      {/* BAŞLIK VE RESİM/VIDEO SAYACI */}
+      {/* Kaynak Dosyaları Getir için gizli klasör inputu */}
+      <input
+        type="file"
+        id="get-folder-upload"
+        className="hidden"
+        // @ts-ignore
+        webkitdirectory="true"
+        multiple
+        accept="image/*,video/*"
+        onChange={async (e) => {
+          if (!e.target.files?.length) return;
+          const files = Array.from(e.target.files);
+          const imageFiles = files.filter(f => f.type.startsWith('image/'));
+          const videoFiles = files.filter(f => f.type.startsWith('video/'));
+          // Resimler
+          if (imageFiles.length > 0) {
+            const newImages = await Promise.all(imageFiles.slice(0, 10 - productImages.length).map(async (file) => {
+              return {
+                file,
+                preview: URL.createObjectURL(file),
+                uploading: false
+              };
+            }));
+            setProductImages(prev => [...prev, ...newImages].slice(0, 10));
+          }
+          // Video (sadece ilkini al)
+          if (videoFiles.length > 0 && !videoFile) {
+            const file = videoFiles[0];
+            setVideoFile({
+              file,
+              preview: URL.createObjectURL(file),
+              uploading: false
+            });
+          }
+          e.target.value = '';
+        }}
+      />
+
+      {/* BAŞLIK VE RESİM/VIDEO SAYACI - Klasör bilgisi ile */}
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-base font-medium text-gray-700">Medya Dosyaları</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-medium text-gray-700">Medya Dosyaları</h3>
+          <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+            📁 {DEFAULT_FOLDER_PATH}
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center text-xs text-gray-500">
             <Image className="w-3.5 h-3.5 mr-1 text-gray-400" />
@@ -846,7 +998,7 @@ export function ProductFormModal({
         </div>
       </div>
 
-      {/* SÜRÜKLE-BIRAK ALANI VE RESİM LİSTESİ */}
+      {/* SÜRÜKLE-BIRAK ALANI VE RESİM/VIDEO SAYACI */}
       <div
         className={`border rounded-lg transition-all ${
           productImages.length === 0 && !videoFile 
@@ -865,7 +1017,7 @@ export function ProductFormModal({
             </div>
             <p className="text-sm font-medium text-gray-700">Dosyaları buraya sürükleyin</p>
             <p className="text-xs text-gray-500 mb-3">veya</p>
-            <div className="flex gap-2 justify-center">
+            <div className="flex gap-2 justify-center mb-4">
               <Button
                 type="button"
                 variant="outline"
@@ -886,9 +1038,25 @@ export function ProductFormModal({
                 <Video className="w-3.5 h-3.5 mr-1.5" />
                 Video Seç
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => document.getElementById('folder-upload')?.click()}
+                disabled={folderUploading}
+              >
+                {folderUploading ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Kaynak Klasörü Değiştir
+              </Button>
             </div>
+           
             <p className="text-xs text-gray-400 mt-3">
-              PNG, JPG, GIF, MP4 • Max. 20MB
+              Otomatik: {DEFAULT_FOLDER_PATH} • PNG, JPG, GIF, MP4 • Max. 20MB
             </p>
           </div>
         ) : (
@@ -954,6 +1122,22 @@ export function ProductFormModal({
             )}
           </div>
         )}
+      </div>
+     
+      <Separator />
+      {/* Kaynak Dosyaları Getir butonu: açıklama metni ve separatorun ALTINDA, ortaya hizalı ve her zaman görünür */}
+      <div className="flex justify-center my-4">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => document.getElementById('get-folder-upload')?.click()}
+          disabled={folderUploading}
+        >
+          <Upload className="w-3.5 h-3.5 mr-1.5" />
+          Kaynak Dosyaları Getir
+        </Button>
       </div>
     </div>
   );
@@ -1155,7 +1339,6 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     newTitle = newTitle.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '');
     
     setTitle(newTitle);
-    autoSelectCanvasCategory(newTitle);
   };
 
   // Başlığın yanındaki buton için ayrı bir fonksiyon
@@ -1243,7 +1426,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   // Form açıldığında focus alanını temizle
   useEffect(() => {
     setTitleInput("");
-  }, [isOpen]); // 'isOpen' formun açık/kapalı durumunu belirten state olmalı
+  }, [isOpen]);
 
   // Başlık otomatik üretildiyse, başlık değiştiğinde açıklama ve etiket üretimini tetikle
   useEffect(() => {
@@ -1262,51 +1445,6 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   useEffect(() => {
     if (isOpen) setUserEditedTitle(false);
   }, [isOpen]);
-
-  // Kanvas kategorileri (örnek)
-  const CANVAS_CATEGORIES = [
-    "Abstract",
-    "Love Art",
-    "Flowers Art",
-    "Landscape Art",
-    "Animal Art",
-    "Mark Rothko Art Print",
-    "Modern Art",
-    "Surreal Canvas Art",
-    "Erotic Art Canvas",
-    "Banksy & Graffiti Art",
-    "Music & Dance Art"
-  ];
-
-  // Kategori otomatik seçimi fonksiyonu
-  const autoSelectCanvasCategory = async (title: string) => {
-    if (!title) return;
-    try {
-      // OpenAI API'ya fetch ile istek at
-      const response = await fetch('/api/ai/select-category', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, categoryNames: CANVAS_CATEGORIES })
-      });
-      const category = (await response.text()).trim();
-      console.log('AI kategori yanıtı:', category);
-      if (category && CANVAS_CATEGORIES.includes(category)) {
-        setSelectedShopSection(category);
-      } else {
-        console.warn('AI dönen kategori listede yok:', category);
-      }
-    } catch (e) {
-      console.error('Kategori seçimi hatası:', e);
-    }
-  };
-
-  // Resim yüklendiğinde de otomatik kategori seç (örnek olarak ilk resim yüklendiğinde tetiklenebilir)
-  useEffect(() => {
-    if (productImages.length > 0 && title) {
-      autoSelectCanvasCategory(title);
-    }
-    // eslint-disable-next-line
-  }, [productImages]);
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -1376,10 +1514,11 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                       )}
                     </Button>
                   </div>
+                  {/* MAVİ RENK İLE LOADING MESAJI */}
                   {autoTitleLoading && (
                     <div className="text-xs text-blue-500 mt-1">Yeni başlık üretiliyor...</div>
                   )}
-                  {/* Focus alanı ve buton için generateTitle fonksiyonu kullanılacak */}
+                  {/* Focus alanı ve buton */}
                   <div className="flex gap-2 mt-2">
                     <Input
                       value={titleInput}
@@ -1569,7 +1708,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                         }
                       }}
                     >
-                      {autoTagsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TagIcon className="w-4 h-4" />}
+                      {autoTagsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TagIcon className="w-4 w-4" />}
                     </Button>
                     <span className="text-xs text-gray-500 ml-1">Yeni Etiket İste</span>
                   </div>
@@ -1600,7 +1739,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
 
             <Separator />
 
-            {/* Malzemeler kısmı kaldırıldı - API'de sabit değerler kullanılıyor */}
+            {/* Malzemeler */}
             <div>
               <Label className="block mb-2">
                 Malzemeler
@@ -1652,93 +1791,6 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Fiziksel Özellikler */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Fiziksel Özellikler</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="primaryColor" className="block mb-1">
-                    Ana Renk
-                  </Label>
-                  <Input
-                    id="primaryColor"
-                    type="text"
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    placeholder="Örn: Mavi"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="secondaryColor" className="block mb-1">
-                    İkincil Renk
-                  </Label>
-                  <Input
-                    id="secondaryColor"
-                    type="text"
-                    value={secondaryColor}
-                    onChange={(e) => setSecondaryColor(e.target.value)}
-                    placeholder="Örn: Beyaz"
-                  />
-                </div>
-                
-                <div className="col-span-2">
-                  <Label className="block mb-2">
-                    Boyutlar
-                  </Label>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center flex-grow">
-                      <Label htmlFor="width" className="mr-2 whitespace-nowrap">Genişlik:</Label>
-                      <Input
-                        id="width"
-                        type="number"
-                        value={width || ""}
-                        onChange={(e) => setWidth(parseFloat(e.target.value) || 0)}
-                        className="mr-2"
-                      />
-                      <Select value={widthUnit} onValueChange={setWidthUnit}>
-                        <SelectTrigger className="w-24">
-                          <SelectValue placeholder="Birim" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cm">cm</SelectItem>
-                          <SelectItem value="mm">mm</SelectItem>
-                          <SelectItem value="m">m</SelectItem>
-                          <SelectItem value="in">inç</SelectItem>
-                          <SelectItem value="ft">ft</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <span className="mx-2">×</span>
-                    <div className="flex items-center flex-grow">
-                      <Label htmlFor="height" className="mr-2 whitespace-nowrap">Yükseklik:</Label>
-                      <Input
-                        id="height"
-                        type="number"
-                        value={height || ""}
-                        onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
-                        className="mr-2"
-                      />
-                      <Select value={heightUnit} onValueChange={setHeightUnit}>
-                        <SelectTrigger className="w-24">
-                          <SelectValue placeholder="Birim" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cm">cm</SelectItem>
-                          <SelectItem value="mm">mm</SelectItem>
-                          <SelectItem value="m">m</SelectItem>
-                          <SelectItem value="in">inç</SelectItem>
-                          <SelectItem value="ft">ft</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

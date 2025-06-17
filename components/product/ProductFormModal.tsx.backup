@@ -469,10 +469,8 @@ export function ProductFormModal({
       title !== "" ||
       description !== "" ||
       price !== 0 ||
-      quantity !== 4 ||
-      shippingProfileId !== "" ||
-      tags.length > 0 ||
-      productImages.length > 0
+      productImages.length > 0 ||
+      tags.length > 0
     );
   };
 
@@ -1211,25 +1209,37 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
 
   // Başlığın yanındaki buton için ayrı bir fonksiyon
   const generateTitleOnly = async () => {
-    if (!productImages.length || !productImages[0].file) return;
+    if (productImages.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Eksik Bilgi",
+        description: "Lütfen en az bir resim yükleyin."
+      });
+      return;
+    }
+
+    setAutoTitleLoading(true);
+    setTitle("");
+    setUserEditedTitle(true);
+
     try {
-      setAutoTitleLoading(true);
+      const file = productImages[0].file;
       const formData = new FormData();
-      formData.append("image", productImages[0].file);
-      const res = await fetch("/api/ai/generate-etsy-title", {
+      formData.append("image", file);
+      formData.append("requestType", "title");
+
+      const response = await fetch("/api/ai/generate-etsy-title", {
         method: "POST",
         body: formData,
       });
-      if (!res.ok) throw new Error("Başlık oluşturulamadı");
-      // API'den dönen yanıtı JSON olarak işle
-      const data = await res.json();
+
+      const data = await response.json();
+      
       if (data.title) {
         setTitle(cleanTitle(data.title.trim()));
         setAutoTitleUsed(true);
       } else {
-        const text = data?.text || "";
-        setTitle(cleanTitle(text.trim()));
-        setAutoTitleUsed(true);
+        throw new Error("Başlık üretilemedi");
       }
     } catch (e) {
       toast({ variant: "destructive", title: "Başlık oluşturulamadı" });
@@ -1237,6 +1247,9 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       setAutoTitleLoading(false);
     }
   };
+
+  const [focusTitleLoading, setFocusTitleLoading] = useState(false);
+  const [focusStatus, setFocusStatus] = useState<string | null>(null);
 
   // Yeni focus başlık üretici fonksiyon
   const handleFocusTitle = async () => {
@@ -1312,9 +1325,6 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   }, [isOpen]);
 
   // QWE tuş kombinasyonu ile taslak kaydetme
-  // Bu değişkenler zaten yukarıda tanımlandı, kaldırılıyor
-  // const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
@@ -1370,7 +1380,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   }, [pressedKeys, isOpen, submitting, title, shippingProfileId, productImages.length]);
 
   return (
-    <DndProvider backend={HTML5Backend}>
+    <>
       {/* Custom Toast Container - Sağ üst köşede */}
       <div className="fixed top-4 right-4 z-[9999] space-y-2 pointer-events-none">
         {toastMessages.map((toast) => (
@@ -1423,464 +1433,519 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
           {/* DialogTrigger content */}
         </DialogTrigger>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="flex items-center justify-between">
-              <span>{product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">İlerleme:</span>
-                <div className="w-32 bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${formProgress}%` }}
-                  ></div>
+          <DndProvider backend={HTML5Backend}>
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="flex items-center justify-between">
+                <span>{product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">İlerleme:</span>
+                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${formProgress}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">{formProgress}%</span>
                 </div>
-                <span className="text-sm font-medium text-gray-700">{formProgress}%</span>
-              </div>
-            </DialogTitle>
-            <DialogDescription className="flex items-center justify-between">
-              <span>{product ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."} • <kbd className="px-1 py-0.5 text-xs bg-gray-100 rounded">Q+W+E</kbd> ile taslak kaydet</span>
-            </DialogDescription>
-          </DialogHeader>
+              </DialogTitle>
+              <DialogDescription className="flex items-center justify-between">
+                <span>{product ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."} • <kbd className="px-1 py-0.5 text-xs bg-gray-100 rounded">Q+W+E</kbd> ile taslak kaydet</span>
+              </DialogDescription>
+            </DialogHeader>
 
-          {/* Step Indicator */}
-          <div className="flex-shrink-0 px-6 py-3 border-b bg-gray-50">
-            <div className="flex items-center justify-between max-w-2xl mx-auto">
-              {steps.map((step, index) => (
-                <div key={step.id} className="flex items-center">
-                  <div className={`flex flex-col items-center ${currentStep >= step.id ? 'text-blue-600' : 'text-gray-400'}`}>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium transition-all ${
-                      currentStep >= step.id 
-                        ? 'bg-blue-100 text-blue-600 border-2 border-blue-500' 
-                        : 'bg-gray-100 text-gray-400 border-2 border-gray-300'
-                    }`}>
-                      {currentStep > step.id ? '✓' : step.icon}
+            {/* Step Indicator */}
+            <div className="flex-shrink-0 px-6 py-3 border-b bg-gray-50">
+              <div className="flex items-center justify-between max-w-2xl mx-auto">
+                {steps.map((step, index) => (
+                  <div key={step.id} className="flex items-center">
+                    <div className={`flex flex-col items-center ${currentStep >= step.id ? 'text-blue-600' : 'text-gray-400'}`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium transition-all ${
+                        currentStep >= step.id 
+                          ? 'bg-blue-100 text-blue-600 border-2 border-blue-500' 
+                          : 'bg-gray-100 text-gray-400 border-2 border-gray-300'
+                      }`}>
+                        {currentStep > step.id ? '✓' : step.icon}
+                      </div>
+                      <div className="mt-1 text-xs font-medium">{step.name}</div>
+                      <div className="text-xs text-gray-500 max-w-20 text-center">{step.description}</div>
                     </div>
-                    <div className="mt-1 text-xs font-medium">{step.name}</div>
-                    <div className="text-xs text-gray-500 max-w-20 text-center">{step.description}</div>
+                    {index < steps.length - 1 && (
+                      <div className={`w-16 h-0.5 mx-2 transition-all ${
+                        currentStep > step.id ? 'bg-blue-500' : 'bg-gray-300'
+                      }`}></div>
+                    )}
                   </div>
-                  {index < steps.length - 1 && (
-                    <div className={`w-16 h-0.5 mx-2 transition-all ${
-                      currentStep > step.id ? 'bg-blue-500' : 'bg-gray-300'
-                    }`}></div>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="flex-1 overflow-y-auto px-6">{/* İçerik buraya gelecek */}
-            {/* Resim Bölümü */}
-            <ImageSection />
-
-            <Separator />
-            
-            {/* Temel Bilgiler Bölümü */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Temel Bilgiler</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label htmlFor="title" className="block mb-1">
-                    Başlık <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="flex-1 flex gap-2 items-center">
-                    <Input
-                      id="title"
-                      value={title}
-                      onChange={handleTitleChange}
-                      placeholder="Ürün başlığı"
-                      className="flex-1"
-                      maxLength={160}
-                    />
-                    {/* Karakter sayacı */}
-                    <span className={`text-xs ${title.length > 140 ? 'text-red-500 font-medium' : 'text-gray-500'}`}>
-                      {title.length}/140 {title.length > 140 && `(+${title.length - 140})`}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={generateTitleOnly}
-                      title="Başlığı Değiştir"
-                      disabled={autoTitleLoading || productImages.length === 0}
-                    >
-                      {autoTitleLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {/* MAVİ RENK İLE LOADING MESAJI */}
-                  {autoTitleLoading && (
-                    <div className="text-xs text-blue-500 mt-1">Yeni başlık üretiliyor...</div>
-                  )}
-                  {/* Focus alanı ve buton */}
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      value={titleInput}
-                      onChange={(e) => setTitleInput(e.target.value)}
-                      placeholder="Başlık için anahtar kelimeler (Focus)"
-                      className="w-64"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={handleFocusTitle}
-                      disabled={focusTitleLoading || !titleInput.trim() || productImages.length === 0}
-                    >
-                      {focusTitleLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Wand2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {focusStatus && (
-                    <p className="text-sm text-muted-foreground">{focusStatus}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="price" className="block mb-1">
-                    Fiyat <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="flex items-center">
-                    <span className="mr-2">$</span>
-                    <Input
-                      id="price"
-                      type="number"
-                      value={price}
-                      onChange={(e) => setPrice(parseFloat(e.target.value))}
-                      disabled={hasVariations}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="quantity" className="block mb-1">
-                    Adet / Stok Miktarı <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    value={quantity}
-                    disabled
-                    className="w-full"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <Label htmlFor="description" className="block mb-1">
-                    Açıklama <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="flex-1 flex gap-2 items-center">
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Ürün açıklaması"
-                      className="min-h-[150px]"
-                    />
-                    <div className="flex flex-col items-center gap-2">
-                      <Button
+            <div className="flex-1 overflow-y-auto px-6">
+              <div className="space-y-4 py-4">
+                {/* Video Reminder Alert */}
+                {shouldShowVideoReminder && (
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-4 animate-in slide-in-from-top-5 fade-in">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0">
+                        <Video className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-blue-800 mb-1">
+                          🎬 Video Eklemeyi Unutmayın!
+                        </h4>
+                        <p className="text-sm text-blue-700 mb-3">
+                          {productImages.length} resminiz var ama video yok. Video eklemek ürününüzün satış şansını artırır!
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 border-blue-300 text-blue-700 hover:bg-blue-100"
+                            onClick={() => document.getElementById('video-upload')?.click()}
+                          >
+                            <Video className="w-4 h-4 mr-1" />
+                            Video Ekle
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 text-blue-600 hover:bg-blue-100"
+                            onClick={() => {
+                              setExpandedSections(prev => ({ ...prev, media: false }));
+                            }}
+                          >
+                            Daha Sonra
+                          </Button>
+                        </div>
+                      </div>
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="border border-gray-300 hover:bg-gray-100 rounded-md"
-                        title="Rastgele Açıklama İste"
-                        disabled={autoDescriptionLoading}
+                        className="flex-shrink-0 text-blue-400 hover:text-blue-600"
                         onClick={() => {
-                          try {
-                            setAutoDescriptionLoading(true);
-                            const randomDescription = generateRandomDescription();
-                            setDescription(randomDescription);
-                          } catch (e) {
-                            toast({ variant: "destructive", title: "Açıklama oluşturulamadı" });
-                          } finally {
-                            setAutoDescriptionLoading(false);
-                          }
+                          setExpandedSections(prev => ({ ...prev, media: false }));
                         }}
                       >
-                        {autoDescriptionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                      </Button>
-                      <span className="text-xs text-gray-500">Rastgele Açıklama İste</span>
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Resim Bölümü */}
+                <ImageSection />
+
+                <Separator />
+                
+                {/* Temel Bilgiler Bölümü */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Temel Bilgiler</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <Label htmlFor="title" className="block mb-1">
+                        Başlık <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="flex-1 flex gap-2 items-center">
+                        <Input
+                          id="title"
+                          value={title}
+                          onChange={handleTitleChange}
+                          placeholder="Ürün başlığı"
+                          className="flex-1"
+                          maxLength={160}
+                        />
+                        {/* Karakter sayacı */}
+                        <span className={`text-xs ${title.length > 140 ? 'text-red-500 font-medium' : 'text-gray-500'}`}>
+                          {title.length}/140 {title.length > 140 && `(+${title.length - 140})`}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={generateTitleOnly}
+                          title="Başlığı Değiştir"
+                          disabled={autoTitleLoading || productImages.length === 0}
+                        >
+                          {autoTitleLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      {/* MAVİ RENK İLE LOADING MESAJI */}
+                      {autoTitleLoading && (
+                        <div className="text-xs text-blue-500 mt-1">Yeni başlık üretiliyor...</div>
+                      )}
+                      {/* Focus alanı ve buton */}
+                      <div className="flex gap-2 mt-2">
+                        <Input
+                          value={titleInput}
+                          onChange={(e) => setTitleInput(e.target.value)}
+                          placeholder="Başlık için anahtar kelimeler (Focus)"
+                          className="w-64"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={handleFocusTitle}
+                          disabled={focusTitleLoading || !titleInput.trim() || productImages.length === 0}
+                        >
+                          {focusTitleLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Wand2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      {focusStatus && (
+                        <p className="text-sm text-muted-foreground">{focusStatus}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="price" className="block mb-1">
+                        Fiyat <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="flex items-center">
+                        <span className="mr-2">$</span>
+                        <Input
+                          id="price"
+                          type="number"
+                          value={price}
+                          onChange={(e) => setPrice(parseFloat(e.target.value))}
+                          disabled={hasVariations}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="quantity" className="block mb-1">
+                        Adet / Stok Miktarı <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        value={quantity}
+                        disabled
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <Label htmlFor="description" className="block mb-1">
+                        Açıklama <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="flex-1 flex gap-2 items-center">
+                        <Textarea
+                          id="description"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Ürün açıklaması"
+                          className="min-h-[150px]"
+                        />
+                        <div className="flex flex-col items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="border border-gray-300 hover:bg-gray-100 rounded-md"
+                            title="Rastgele Açıklama İste"
+                            disabled={autoDescriptionLoading}
+                            onClick={() => {
+                              try {
+                                setAutoDescriptionLoading(true);
+                                const randomDescription = generateRandomDescription();
+                                setDescription(randomDescription);
+                              } catch (e) {
+                                toast({ variant: "destructive", title: "Açıklama oluşturulamadı" });
+                              } finally {
+                                setAutoDescriptionLoading(false);
+                              }
+                            }}
+                          >
+                            {autoDescriptionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                          </Button>
+                          <span className="text-xs text-gray-500">Rastgele Açıklama İste</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Kategori seçimi */}
+                    <div className="col-span-2">
+                      <Label htmlFor="category" className="block mb-1">Kategori *</Label>
+                      <Select
+                        value={taxonomyId ? taxonomyId.toString() : WALL_DECOR_TAXONOMY_ID.toString()}
+                        onValueChange={(val) => setTaxonomyId(Number(val))}
+                        required
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue>{taxonomyId === DIGITAL_PRINTS_TAXONOMY_ID ? "Digital Prints" : "Wall Decor"}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={WALL_DECOR_TAXONOMY_ID.toString()}>Wall Decor</SelectItem>
+                          <SelectItem value={DIGITAL_PRINTS_TAXONOMY_ID.toString()}>Digital Prints</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Shop Section seçimi */}
+                    <div className="col-span-2">
+                      <Label htmlFor="shopSection">Kanvas Kategorileri</Label>
+                      <Select
+                        value={selectedShopSection}
+                        onValueChange={handleShopSectionChange}
+                        disabled={shopSections.length === 0}
+                      >
+                        <SelectTrigger id="shopSection">
+                          <SelectValue placeholder="Bir kategori seçin..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {shopSections.map(section => (
+                            <SelectItem 
+                              key={section.shop_section_id} 
+                              value={section.shop_section_id.toString()}
+                            >
+                              {section.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
 
-                {/* Kategori seçimi */}
-                <div className="col-span-2">
-                  <Label htmlFor="category" className="block mb-1">Kategori *</Label>
-                  <Select
-                    value={taxonomyId ? taxonomyId.toString() : WALL_DECOR_TAXONOMY_ID.toString()}
-                    onValueChange={(val) => setTaxonomyId(Number(val))}
-                    required
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue>{taxonomyId === DIGITAL_PRINTS_TAXONOMY_ID ? "Digital Prints" : "Wall Decor"}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={WALL_DECOR_TAXONOMY_ID.toString()}>Wall Decor</SelectItem>
-                      <SelectItem value={DIGITAL_PRINTS_TAXONOMY_ID.toString()}>Digital Prints</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Shop Section seçimi */}
-                <div className="col-span-2">
-                  <Label htmlFor="shopSection">Kanvas Kategorileri</Label>
-                  <Select
-                    value={selectedShopSection}
-                    onValueChange={handleShopSectionChange}
-                    disabled={shopSections.length === 0}
-                  >
-                    <SelectTrigger id="shopSection">
-                      <SelectValue placeholder="Bir kategori seçin..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {shopSections.map(section => (
-                        <SelectItem 
-                          key={section.shop_section_id} 
-                          value={section.shop_section_id.toString()}
+                <Separator />
+
+                {/* Etiketler ve Malzemeler */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Etiketler & Malzemeler</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label className="block mb-2">
+                        Etiketler <span className="text-gray-500 text-sm">(0-13)</span>
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={newTag}
+                          onChange={(e) => setNewTag(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddTag();
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="border border-gray-300 hover:bg-gray-100 rounded-md"
+                          title="Yeni Etiket İste"
+                          disabled={autoTagsLoading || !title}
+                          onClick={async () => {
+                            if (!title) return;
+                            try {
+                              setAutoTagsLoading(true);
+                              const res = await fetch("/api/ai/generate-etsy-tags", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ title }),
+                              });
+                              const data = await res.json();
+                              if (data.tags && Array.isArray(data.tags)) {
+                                setTags(data.tags);
+                              } else if (data.error) {
+                                toast({ variant: "destructive", title: data.error });
+                              }
+                            } catch (e) {
+                              toast({ variant: "destructive", title: "Etiketler oluşturulamadı" });
+                            } finally {
+                              setAutoTagsLoading(false);
+                            }
+                          }}
                         >
-                          {section.title}
-                        </SelectItem>
+                          {autoTagsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TagIcon className="w-4 w-4" />}
+                        </Button>
+                        <span className="text-xs text-gray-500 ml-1">Yeni Etiket İste</span>
+                      </div>
+                      {autoTagsLoading && (
+                        <div className="text-xs text-blue-500 mt-1">Başlığa göre etiketler üretiliyor...</div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
+                      {tags.map((tag, index) => (
+                        <Badge key={index} className="px-3 py-1 flex items-center gap-1">
+                          <span>{tag}</span>
+                          <span className="ml-1 text-xs" style={{ color: tag.length > 20 ? '#dc2626' : '#6b7280' }}>
+                            ({tag.length})
+                          </span>
+                          <X 
+                            className="h-3 w-3 cursor-pointer ml-1" 
+                            onClick={() => handleRemoveTag(tag)}
+                          />
+                        </Badge>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {tags.length}/13 etiket eklendi
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <Separator />
+                <Separator />
 
-            {/* Etiketler ve Malzemeler */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Etiketler & Malzemeler</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Malzemeler */}
                 <div>
                   <Label className="block mb-2">
-                    Etiketler <span className="text-gray-500 text-sm">(0-13)</span>
+                    Malzemeler
                   </Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddTag();
-                        }
-                      }}
-                      className="mr-2"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="border border-gray-300 hover:bg-gray-100 rounded-md"
-                      title="Yeni Etiket İste"
-                      disabled={autoTagsLoading || !title}
-                      onClick={async () => {
-                        if (!title) return;
-                        try {
-                          setAutoTagsLoading(true);
-                          const res = await fetch("/api/ai/generate-etsy-tags", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ title }),
-                          });
-                          const data = await res.json();
-                          if (data.tags && Array.isArray(data.tags)) {
-                            setTags(data.tags);
-                          } else if (data.error) {
-                            toast({ variant: "destructive", title: data.error });
-                          }
-                        } catch (e) {
-                          toast({ variant: "destructive", title: "Etiketler oluşturulamadı" });
-                        } finally {
-                          setAutoTagsLoading(false);
-                        }
-                      }}
-                    >
-                      {autoTagsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TagIcon className="w-4 w-4" />}
-                    </Button>
-                    <span className="text-xs text-gray-500 ml-1">Yeni Etiket İste</span>
-                  </div>
-                  {autoTagsLoading && (
-                    <div className="text-xs text-blue-500 mt-1">Başlığa göre etiketler üretiliyor...</div>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2 mt-2 min-h-[40px]">
-                  {tags.map((tag, index) => (
-                    <Badge key={index} className="px-3 py-1 flex items-center gap-1">
-                      <span>{tag}</span>
-                      <span className="ml-1 text-xs" style={{ color: tag.length > 20 ? '#dc2626' : '#6b7280' }}>
-                        ({tag.length})
-                      </span>
-                      <X 
-                        className="h-3 w-3 cursor-pointer ml-1" 
-                        onClick={() => handleRemoveTag(tag)}
-                      />
-                    </Badge>
-                  ))}
-                </div>
-                <p className="text-sm text-gray-500 mt-1">
-                  {tags.length}/13 etiket eklendi
-                </p>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Malzemeler */}
-            <div>
-              <Label className="block mb-2">
-                Malzemeler
-              </Label>
-              <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded border border-gray-200">
-                <p>Bu ürün için kullanılan malzemeler:</p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {DEFAULT_MATERIALS.map((material, i) => (
-                    <Badge key={i} variant="secondary" className="px-3 py-1">
-                      {material}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Kargo ve İşlem Profilleri */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Kargo & İşlem Profilleri</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="shipping" className="block mb-1">
-                    Kargo Profili <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={shippingProfileId}
-                    onValueChange={setShippingProfileId}
-                    disabled={loadingShippingProfiles || shippingProfiles.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={
-                        loadingShippingProfiles
-                          ? "Kargo profilleri yükleniyor..."
-                          : shippingProfiles.length === 0
-                          ? "Kargo profili bulunamadı"
-                          : "Kargo profili seçin"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {shippingProfiles.map((profile) => (
-                        <SelectItem
-                          key={profile.shipping_profile_id}
-                          value={profile.shipping_profile_id.toString()}
-                        >
-                          {profile.title}
-                        </SelectItem>
+                  <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded border border-gray-200">
+                    <p>Bu ürün için kullanılan malzemeler:</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {DEFAULT_MATERIALS.map((material, i) => (
+                        <Badge key={i} variant="secondary" className="px-3 py-1">
+                          {material}
+                        </Badge>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Kargo ve İşlem Profilleri */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Kargo & İşlem Profilleri</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="shipping" className="block mb-1">
+                        Kargo Profili <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={shippingProfileId}
+                        onValueChange={setShippingProfileId}
+                        disabled={loadingShippingProfiles || shippingProfiles.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={
+                            loadingShippingProfiles
+                              ? "Kargo profilleri yükleniyor..."
+                              : shippingProfiles.length === 0
+                              ? "Kargo profili bulunamadı"
+                              : "Kargo profili seçin"
+                          } />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {shippingProfiles.map((profile) => (
+                            <SelectItem
+                              key={profile.shipping_profile_id}
+                              value={profile.shipping_profile_id.toString()}
+                            >
+                              {profile.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+                
+                {/* Varyasyonlar */}
+                <VariationsSection />
+
+                <Separator />
+
+                {/* Kişiselleştirme Ayarları (Sabit ve Değiştirilemez) */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Kişiselleştirme</h3>
+                  <div className="p-4 border rounded-md bg-slate-50 space-y-4">
+                    {/* Kişiselleştirme Her Zaman Aktif ve Değiştirilemez */}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="isPersonalizable"
+                        checked={true}
+                        disabled={true}
+                      />
+                      <label
+                        htmlFor="isPersonalizable"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Bu ürün kişiselleştirilebilir (Her zaman aktif)
+                      </label>
+                    </div>
+                    {/* Kişiselleştirme Her Zaman İsteğe Bağlı ve Değiştirilemez */}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="personalizationRequired"
+                        checked={false}
+                        disabled={true}
+                      />
+                      <label
+                        htmlFor="personalizationRequired"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Kişiselleştirme zorunlu olsun (Her zaman isteğe bağlı)
+                      </label>
+                    </div>
+                    {/* Talimat Metni Sabit ve Değiştirilemez */}
+                    <div>
+                      <Label htmlFor="personalizationInstructions" className="peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Alıcı için talimatlar (Sabit Metin)
+                      </Label>
+                      <Textarea
+                        id="personalizationInstructions"
+                        value={PERSONALIZATION_INSTRUCTIONS}
+                        readOnly={true}
+                        className="mt-1 bg-gray-100 cursor-not-allowed"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <Separator />
-            
-            {/* Varyasyonlar */}
-            <VariationsSection />
-
-            <Separator />
-
-            {/* Kişiselleştirme Ayarları (Sabit ve Değiştirilemez) */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Kişiselleştirme</h3>
-              <div className="p-4 border rounded-md bg-slate-50 space-y-4">
-                {/* Kişiselleştirme Her Zaman Aktif ve Değiştirilemez */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="isPersonalizable"
-                    checked={true}
-                    disabled={true}
-                  />
-                  <label
-                    htmlFor="isPersonalizable"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Bu ürün kişiselleştirilebilir (Her zaman aktif)
-                  </label>
-                </div>
-                {/* Kişiselleştirme Her Zaman İsteğe Bağlı ve Değiştirilemez */}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="personalizationRequired"
-                    checked={false}
-                    disabled={true}
-                  />
-                  <label
-                    htmlFor="personalizationRequired"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Kişiselleştirme zorunlu olsun (Her zaman isteğe bağlı)
-                  </label>
-                </div>
-                {/* Talimat Metni Sabit ve Değiştirilemez */}
+              <DialogFooter className="flex justify-between mt-6">
                 <div>
-                  <Label htmlFor="personalizationInstructions" className="peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    Alıcı için talimatlar (Sabit Metin)
-                  </Label>
-                  <Textarea
-                    id="personalizationInstructions"
-                    value={PERSONALIZATION_INSTRUCTIONS}
-                    readOnly={true}
-                    className="mt-1 bg-gray-100 cursor-not-allowed"
-                    rows={3}
-                  />
+                  <Button variant="outline" onClick={handleCloseModal}>İptal</Button>
                 </div>
-              </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => handleSubmit("draft")} 
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Taslak Kaydediliyor...
+                      </>
+                    ) : (
+                      "Taslak Olarak Kaydet"
+                    )}
+                  </Button>
+                  <Button 
+                    onClick={() => handleSubmit("active")} 
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Yayınlanıyor...
+                      </>
+                    ) : (
+                      "Yayınla"
+                    )}
+                  </Button>
+                </div>
+              </DialogFooter>
             </div>
-          </div>
-
-          <DialogFooter className="flex justify-between mt-6">
-            <div>
-              <Button variant="outline" onClick={handleCloseModal}>İptal</Button>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="secondary" 
-                onClick={() => handleSubmit("draft")} 
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Taslak Kaydediliyor...
-                  </>
-                ) : (
-                  "Taslak Olarak Kaydet"
-                )}
-              </Button>
-              <Button 
-                onClick={() => handleSubmit("active")} 
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Yayınlanıyor...
-                  </>
-                ) : (
-                  "Yayınla"
-                )}
-              </Button>
-            </div>
-          </DialogFooter>
+          </DndProvider>
         </DialogContent>
       </Dialog>
 
@@ -1903,6 +1968,6 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </DndProvider>
+    </>
   );
 }

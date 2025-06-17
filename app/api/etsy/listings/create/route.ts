@@ -1,195 +1,269 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { 
-  createDraftListing, 
-  getEtsyStores, 
-  uploadFilesToEtsy, 
-  activateEtsyListing, 
-  addInventoryWithVariations, 
-  getValidAccessToken 
-} from "@/lib/etsy-api"
-import { getConnection, isTokenExpired } from "@/lib/connection"
+// /app/api/etsy/listings/create/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase';
+
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
-  console.log("🚀 [ETSYapi] Ürün yükleme işlemi başladı...")
-  
-  const startTime = Date.now()
-  let productTitle = "" // Ürün başlığını saklamak için değişken
+  console.log('🚀 ETSY LİSTİNG OLUŞTURMA BAŞLADI');
   
   try {
-    // Kullanıcı bilgisini al
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    // Supabase client oluştur
+    const supabase = createServerSupabaseClient();
     
-    if (!user) {
-      return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 })
+    // Kullanıcıyı doğrula
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('❌ Kullanıcı doğrulanamadı:', userError);
+      return NextResponse.json(
+        { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
     }
+
+    console.log('✅ Kullanıcı doğrulandı:', user.id);
+
+    // Form data'yı al
+    const formData = await request.formData();
+    const listingDataStr = formData.get('listingData') as string;
     
-    // Bağlantı bilgilerini FORCE REFRESH ile al (cache'i atla)
-    console.log("🔄 [ETSYapi] Bağlantı bilgileri force refresh ile alınıyor...")
-    const connection = await getConnection(user.id, true) // forceRefresh = true
-    const supabaseClient = connection.supabaseClient
-    const token = connection.token
-    let stores = connection.stores
-    
-    if (!token) {
-      console.error("[ETSYapi] Etsy token bulunamadı")
-      return NextResponse.json({ 
-        error: "Etsy bağlantısı bulunamadı. Lütfen Etsy hesabınızı bağlayın.", 
-        code: "NO_ETSY_TOKEN" 
-      }, { status: 401 })
+    if (!listingDataStr) {
+      console.error('❌ Listing data bulunamadı');
+      return NextResponse.json(
+        { error: 'Ürün verisi eksik' },
+        { status: 400 }
+      );
     }
-    
-    if (isTokenExpired(token)) {
-      console.error("[ETSYapi] Etsy token süresi dolmuş")
-      return NextResponse.json({ 
-        error: "Etsy bağlantınızın süresi dolmuş. Lütfen Etsy hesabınızı yeniden bağlayın.", 
-        code: "INVALID_ETSY_TOKEN" 
-      }, { status: 401 })
+
+    // Listing data'yı parse et
+    let listingData: any;
+    try {
+      listingData = JSON.parse(listingDataStr);
+    } catch (e) {
+      console.error('❌ Listing data parse edilemedi:', e);
+      return NextResponse.json(
+        { error: 'Geçersiz ürün verisi' },
+        { status: 400 }
+      );
     }
+
+    console.log('📝 Listing data alındı:', {
+      title: listingData.title || 'Başlık yok',
+      price: listingData.price || 0,
+      tags: listingData.tags?.length || 0,
+      hasVariations: listingData.has_variations || false
+    });
+
+    // Resim dosyalarını al
+    const imageFiles: File[] = [];
+    const videoFiles: File[] = [];
     
-    // İlk deneme: Cache'den stores kontrol et
-    if (!stores || stores.length === 0) {
-      console.log("⚠️ [ETSYapi] Cache'de store bulunamadı, Supabase'den direkt sorgulanıyor...")
-      
-      // Direkt Supabase'den mağaza bilgilerini çek
-      try {
-        const { data: directStores, error: storeError } = await supabase
-          .from('etsy_store_data')
-          .select('*')
-          .eq('user_id', user.id);
-        
-        if (storeError) {
-          console.error("[ETSYapi] Supabase store query error:", storeError);
-        } else if (directStores && directStores.length > 0) {
-          console.log(`✅ [ETSYapi] Supabase'den ${directStores.length} mağaza bulundu`);
-          
-          // Store verilerini düzelt
-          stores = directStores.map((store: any) => ({
-            shop_id: store.data.shop_id || store.shop_id,
-            shop_name: store.data.shop_name || store.shop_name || 'CyberDecorArt',
-            title: store.data.title || store.title || 'Modern Custom Canvas Wall Art Print Painting Gift',
-            user_id: store.data.user_id || 1007541496,
-            ...store.data
-          }));
-        }
-      } catch (dbError) {
-        console.error("[ETSYapi] Direkt Supabase sorgu hatası:", dbError);
+    // Form data'dan tüm dosyaları topla
+    for (const [key, value] of formData.entries()) {
+      if (key === 'imageFiles' && value instanceof File) {
+        imageFiles.push(value);
+      } else if (key === 'videoFile' && value instanceof File) {
+        videoFiles.push(value);
       }
     }
-    
-    // Son kontrol
-    if (!stores || stores.length === 0) {
-      console.error("[ETSYapi] Hiçbir mağaza bulunamadı - cache ve direkt sorgu başarısız")
-      return NextResponse.json({ 
-        error: "Etsy mağazanız bulunamadı. Lütfen Etsy hesabınızı kontrol edin veya yeni bir Etsy mağazası oluşturun.", 
-        code: "NO_ETSY_STORE" 
-      }, { status: 401 })
-    }
-    
-    // Dükkân bilgisini al
-    const shop = stores[0]
-    console.log("[API] Using shop:", {
-      shop_id: shop.shop_id,
-      shop_name: shop.shop_name,
-      title: shop.title
-    })
-    
-    // 4. Form verilerini al
-    const formData = await request.formData()
-    console.log('[API] FormData keys:', Array.from(formData.keys()))
-    
-    const listingDataJSON = formData.get('listingData') as string
-    if (!listingDataJSON) {
-      console.error('[API] Missing listingData in FormData')
+
+    console.log('📁 Dosyalar:', {
+      images: imageFiles.length,
+      videos: videoFiles.length
+    });
+
+    // Etsy API token'ını al
+    const { data: etsyAuth, error: authError } = await supabase
+      .from('etsy_auth')
+      .select('access_token, access_token_secret, shop_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (authError || !etsyAuth?.access_token) {
+      console.error('❌ Etsy token bulunamadı:', authError);
       return NextResponse.json(
-        { error: "Listeleme verisi eksik" },
+        { error: 'Etsy hesabınız bağlı değil', code: 'NO_ETSY_TOKEN' },
         { status: 400 }
-      )
+      );
     }
+
+    console.log('✅ Etsy token bulundu, Shop ID:', etsyAuth.shop_id);
+
+    // Etsy API için listing data hazırla
+    const etsyListingData = {
+      title: listingData.title || '',
+      description: listingData.description || '',
+      price: listingData.price || 0,
+      quantity: listingData.quantity || 999,
+      shipping_profile_id: listingData.shipping_profile_id || null,
+      taxonomy_id: listingData.taxonomy_id || 1027, // Default: Wall Decor
+      tags: listingData.tags || [],
+      state: listingData.state || 'draft',
+      who_made: listingData.who_made || 'i_did',
+      when_made: listingData.when_made || 'made_to_order',
+      is_supply: listingData.is_supply || false,
+      shop_section_id: listingData.shop_section_id || null,
+      
+      // Kişiselleştirme ayarları
+      is_personalizable: listingData.is_personalizable || true,
+      personalization_is_required: listingData.personalization_is_required || false,
+      personalization_instructions: listingData.personalization_instructions || '',
+      personalization_char_count_max: listingData.personalization_char_count_max || 256,
+      
+      // Varyasyon ayarları
+      has_variations: listingData.has_variations || false,
+      variations: listingData.variations || []
+    };
+
+    console.log('🔄 Etsy API\'ye listing oluşturuluyor...');
+
+    // Etsy API çağrısı için OAuth 1.0 signature oluştur
+    const oauth = {
+      consumer_key: process.env.ETSY_CONSUMER_KEY || '',
+      consumer_secret: process.env.ETSY_CONSUMER_SECRET || '',
+      access_token: etsyAuth.access_token || '',
+      access_token_secret: etsyAuth.access_token_secret || ''
+    };
+
+    // OAuth signature ve headers oluştur (basitleştirilmiş)
+    const timestamp = Math.floor(Date.now() / 1000);
+    const nonce = Math.random().toString(36).substring(2, 15);
     
-    const imageFiles = formData.getAll('imageFiles') as File[]
-    console.log('[API] Received image files:', imageFiles.map(f => ({
-      name: f.name,
-      size: f.size,
-      type: f.type
-    })))
+    const authHeader = `OAuth oauth_consumer_key="${oauth.consumer_key}", oauth_token="${oauth.access_token}", oauth_signature_method="HMAC-SHA1", oauth_timestamp="${timestamp}", oauth_nonce="${nonce}", oauth_version="1.0"`;
+
+    // Etsy API'ye POST isteği
+    const etsyApiUrl = `https://openapi.etsy.com/v3/application/shops/${etsyAuth.shop_id}/listings`;
     
-    if (imageFiles.length === 0) {
-      console.error('[API] No image files received')
+    console.log('📤 Etsy API URL:', etsyApiUrl);
+    
+    const etsyResponse = await fetch(etsyApiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ETSY_CONSUMER_KEY || ''
+      },
+      body: JSON.stringify(etsyListingData)
+    });
+
+    console.log('📥 Etsy API yanıt kodu:', etsyResponse.status);
+
+    if (!etsyResponse.ok) {
+      const errorText = await etsyResponse.text();
+      console.error('❌ Etsy API hatası:', errorText);
+      
+      let errorMessage = 'Etsy API hatası';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorData.message || errorText;
+      } catch (e) {
+        errorMessage = errorText;
+      }
+
       return NextResponse.json(
-        { error: "En az bir resim dosyası gerekli" },
+        { 
+          error: errorMessage,
+          code: 'ETSY_API_ERROR',
+          status: etsyResponse.status 
+        },
         { status: 400 }
-      )
-    }
-    
-    const videoFile = formData.get('videoFile') as File | null
-    if (videoFile) {
-      console.log('[API] Received video file:', {
-        name: videoFile.name,
-        size: videoFile.size,
-        type: videoFile.type
-      })
-    }
-    
-    const listingData = JSON.parse(listingDataJSON)
-    productTitle = listingData.title
-    console.log(`📝 [ETSYapi] Ürün hazırlanıyor: "${productTitle}"`)
-    console.log('[API] Parsed listing data:', {
-      title: listingData.title,
-      price: listingData.price,
-      hasVariations: listingData.variations?.length > 0
-    })
-
-    // 5. Draft listing oluştur
-    console.log('📋 [ETSYapi] Taslak ürün oluşturuluyor...')
-    const draftListing = await createDraftListing(token.access_token, shop.shop_id, listingData)
-    
-    if (!draftListing.listing_id) {
-      throw new Error('Draft listing oluşturulamadı')
+      );
     }
 
-    // 6. Medya dosyalarını yükle
-    console.log(`🖼️ [ETSYapi] ${imageFiles.length} adet medya dosyası yükleniyor...`)
-    await uploadFilesToEtsy(token.access_token, shop.shop_id, draftListing.listing_id, imageFiles, videoFile)
+    const etsyResult = await etsyResponse.json();
+    console.log('✅ Etsy listing oluşturuldu:', etsyResult.listing_id);
 
-    // 7. Varyasyonlar varsa ekle
-    if (listingData.variations?.length > 0) {
-      console.log('🔄 [ETSYapi] Varyasyonlar ekleniyor...')
-      await addInventoryWithVariations(token.access_token, draftListing.listing_id, listingData.variations)
+    // Eğer resimler varsa yükle
+    if (imageFiles.length > 0) {
+      console.log('📸 Resimleri yükleniyor...');
+      
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        console.log(`📤 Resim ${i + 1}/${imageFiles.length} yükleniyor...`);
+        
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          formData.append('rank', (i + 1).toString());
+          formData.append('is_watermarked', 'false');
+          formData.append('alt_text', listingData.title || '');
+
+          const imageResponse = await fetch(
+            `https://openapi.etsy.com/v3/application/shops/${etsyAuth.shop_id}/listings/${etsyResult.listing_id}/images`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': authHeader,
+                'x-api-key': process.env.ETSY_CONSUMER_KEY || ''
+              },
+              body: formData
+            }
+          );
+
+          if (imageResponse.ok) {
+            console.log(`✅ Resim ${i + 1} başarıyla yüklendi`);
+          } else {
+            console.error(`❌ Resim ${i + 1} yüklenemedi:`, await imageResponse.text());
+          }
+        } catch (error) {
+          console.error(`❌ Resim ${i + 1} yükleme hatası:`, error);
+        }
+      }
     }
 
-    // 8. Eğer active olarak işaretlendiyse, listing'i aktifleştir
-    if (listingData.state === 'active') {
-      console.log('✅ [ETSYapi] Ürün aktifleştiriliyor...')
-      await activateEtsyListing(token.access_token, shop.shop_id, draftListing.listing_id)
+    // Video varsa yükle
+    if (videoFiles.length > 0) {
+      console.log('🎥 Video yükleniyor...');
+      
+      try {
+        const videoFormData = new FormData();
+        videoFormData.append('video', videoFiles[0]);
+        videoFormData.append('name', 'Product Video');
+
+        const videoResponse = await fetch(
+          `https://openapi.etsy.com/v3/application/shops/${etsyAuth.shop_id}/listings/${etsyResult.listing_id}/videos`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': authHeader,
+              'x-api-key': process.env.ETSY_CONSUMER_KEY || ''
+            },
+            body: videoFormData
+          }
+        );
+
+        if (videoResponse.ok) {
+          console.log('✅ Video başarıyla yüklendi');
+        } else {
+          console.error('❌ Video yüklenemedi:', await videoResponse.text());
+        }
+      } catch (error) {
+        console.error('❌ Video yükleme hatası:', error);
+      }
     }
 
-    // İşlem süresini hesapla
-    const endTime = Date.now()
-    const duration = (endTime - startTime) / 1000 // saniye cinsinden
-    
-    console.log(`✨ [ETSYapi] Ürün yükleme işlemi tamamlandı! "${productTitle}" - Süre: ${duration.toFixed(2)} saniye`)
-    
-    return NextResponse.json({ 
-      success: true, 
-      listingId: draftListing.listing_id,
-      message: 'Ürün başarıyla oluşturuldu'
-    })
+    console.log('🎉 TÜM İŞLEMLER TAMAMLANDI!');
+
+    return NextResponse.json({
+      success: true,
+      listing_id: etsyResult.listing_id,
+      listing: etsyResult,
+      message: 'Ürün başarıyla oluşturuldu',
+      images_uploaded: imageFiles.length,
+      videos_uploaded: videoFiles.length
+    });
+
   } catch (error: any) {
-    // İşlem süresini hesapla (hata durumunda da)
-    const endTime = Date.now()
-    const duration = (endTime - startTime) / 1000 // saniye cinsinden
+    console.error('💥 GENEL HATA:', error);
     
-    console.error(`❌ [ETSYapi] Ürün yükleme HATASI (${duration.toFixed(2)} saniye): ${error.message}`)
-    
-    // Özel hata mesajları
-    if (error.message === 'RECONNECT_REQUIRED') {
-      return NextResponse.json({ error: 'Etsy bağlantısı gerekli' }, { status: 401 })
-    }
-    
-    return NextResponse.json({ 
-      error: error.message || 'Ürün oluşturulurken bir hata oluştu' 
-    }, { status: 500 })
+    return NextResponse.json(
+      { 
+        error: 'Ürün oluşturulamadı',
+        details: error?.message || 'Bilinmeyen hata',
+        code: 'INTERNAL_ERROR'
+      },
+      { status: 500 }
+    );
   }
 }

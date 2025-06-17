@@ -265,13 +265,19 @@ export async function POST(request: NextRequest) {
       // İşlem süresi
       const endTime = Date.now();
       const duration = endTime - startTime;
-      console.log(`⏱️ İşlem süresi: ${duration}ms`);
+      const durationInSeconds = (duration / 1000).toFixed(2);
+      
+      // Ürün başlığını log'a yazdır
+      console.log('\n📌 ÜRÜN BAŞLIĞI:');
+      console.log(`   ${listingData.title}`);
+      console.log(`\n⏱️ TOPLAM İŞLEM SÜRESİ: ${durationInSeconds} saniye (${duration}ms)`);
       
       return NextResponse.json({
         success: true,
         message: 'Listing başarıyla oluşturuldu',
         listing_id,
-        duration
+        duration,
+        durationInSeconds
       });
     } catch (error: any) {
       console.error('❌ Etsy API hatası:', error);

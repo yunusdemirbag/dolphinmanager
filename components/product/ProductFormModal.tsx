@@ -225,6 +225,7 @@ export function ProductFormModal({
   shippingProfiles,
   loadingShippingProfiles,
 }: ProductFormModalProps) {
+  // All useState declarations at the top
   const { toast } = useToast()
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false)
   const [title, setTitle] = useState(product?.title || "")
@@ -236,6 +237,59 @@ export function ProductFormModal({
     product?.shipping_profile_id?.toString() || ""
   )
 
+  // Additional fields to match Etsy
+  const [tags, setTags] = useState<string[]>(product?.tags || [])
+  const [newTag, setNewTag] = useState("")
+  const [isPersonalizable, setIsPersonalizable] = useState(true)
+  const [personalizationRequired, setPersonalizationRequired] = useState(false)
+  const [personalizationInstructions, setPersonalizationInstructions] = useState(
+    'Phone Number for Delivery'
+  )
+  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
+  
+  const [hasVariations, setHasVariations] = useState<boolean>(true);
+  const [variations, setVariations] = useState(product?.variations || predefinedVariations)
+  const [shopSections, setShopSections] = useState<{ shop_section_id: number; title: string }[]>([]);
+  const [selectedShopSection, setSelectedShopSection] = useState<string>('');
+  
+  // Ürün görselleri için state
+  const [productImages, setProductImages] = useState<MediaFile[]>([])
+  const [videoFile, setVideoFile] = useState<MediaFile | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  // --- BAŞLIK OTO-ÜRETİMİ STATE ---
+  const [autoTitleLoading, setAutoTitleLoading] = useState(false);
+  const [autoTitleUsed, setAutoTitleUsed] = useState(false);
+
+  // Açıklama üretimi için state
+  const [autoDescriptionLoading, setAutoDescriptionLoading] = useState(false);
+
+  // Etiket üretimi için state
+  const [autoTagsLoading, setAutoTagsLoading] = useState(false);
+
+  // Otomatik kategori seçimi için state
+  const [shopSectionAutoSelected, setShopSectionAutoSelected] = useState(true)
+
+  // QWE tuş kombinasyonu için state
+  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+  const [userEditedTitle, setUserEditedTitle] = useState(false);
+  const [focusTitleLoading, setFocusTitleLoading] = useState(false);
+  const [focusStatus, setFocusStatus] = useState<string | null>(null);
+
+  // Progress tracking
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formProgress, setFormProgress] = useState(0);
+
+  // Collapsible sections
+  const [expandedSections, setExpandedSections] = useState({
+    media: true,
+    basic: true,
+    tags: false,
+    shipping: false,
+    variations: false,
+    personalization: false
+  });
+
   // Toast bildirim sistemi
   const [toastMessages, setToastMessages] = useState<Array<{
     id: number;
@@ -243,6 +297,51 @@ export function ProductFormModal({
     type: "success" | "error" | "info";
     timestamp: number;
   }>>([]);
+
+  const router = useRouter()
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section as keyof typeof prev]
+    }));
+  };
+
+  // Form progress calculation
+  useEffect(() => {
+    let progress = 0;
+    const totalFields = 8;
+    
+    if (productImages.length > 0) progress += 1;
+    if (title.length > 10) progress += 1;
+    if (description.length > 50) progress += 1;
+    if (price > 0 || (hasVariations && variations.some(v => v.price > 0))) progress += 1;
+    if (tags.length > 3) progress += 1;
+    if (shippingProfileId) progress += 1;
+    if (selectedShopSection) progress += 1;
+    if (hasVariations && variations.some(v => v.is_active)) progress += 1;
+    
+    const percentage = Math.round((progress / totalFields) * 100);
+    setFormProgress(percentage);
+    
+    // Auto step calculation
+    if (progress <= 2) setCurrentStep(1);
+    else if (progress <= 4) setCurrentStep(2);
+    else if (progress <= 6) setCurrentStep(3);
+    else setCurrentStep(4);
+  }, [productImages, title, description, price, tags, shippingProfileId, selectedShopSection, hasVariations, variations]);
+
+  // Video reminder check
+  const shouldShowVideoReminder = productImages.length >= 3 && !videoFile;
+
+  // Validation states
+  const fieldValidation = {
+    media: productImages.length > 0 ? 'valid' : 'invalid',
+    title: title.length > 10 ? 'valid' : title.length > 0 ? 'warning' : 'invalid',
+    description: description.length > 50 ? 'valid' : description.length > 0 ? 'warning' : 'invalid',
+    price: (price > 0 || (hasVariations && variations.some(v => v.price > 0))) ? 'valid' : 'invalid',
+    tags: tags.length > 3 ? 'valid' : tags.length > 0 ? 'warning' : 'invalid'
+  };
 
   // Basit toast alternatifi - güzel UI ile
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
@@ -275,43 +374,17 @@ export function ProductFormModal({
     }
   };
 
-  // Additional fields to match Etsy
-  const [tags, setTags] = useState<string[]>(product?.tags || [])
-  const [newTag, setNewTag] = useState("")
-  const [isPersonalizable, setIsPersonalizable] = useState(true)
-  const [personalizationRequired, setPersonalizationRequired] = useState(false)
-  const [personalizationInstructions, setPersonalizationInstructions] = useState(
-    'Phone Number for Delivery'
-  )
-  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
-  
-  const [hasVariations, setHasVariations] = useState<boolean>(true);
-  const [variations, setVariations] = useState(product?.variations || predefinedVariations)
-  const [shopSections, setShopSections] = useState<{ shop_section_id: number; title: string }[]>([]);
-  const [selectedShopSection, setSelectedShopSection] = useState<string>('');
-  
-  // Ürün görselleri için state
-  const [productImages, setProductImages] = useState<MediaFile[]>([])
-  const [videoFile, setVideoFile] = useState<MediaFile | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-
-  const router = useRouter()
-
-  // --- BAŞLIK OTO-ÜRETİMİ STATE ---
-  const [autoTitleLoading, setAutoTitleLoading] = useState(false);
-  const [autoTitleUsed, setAutoTitleUsed] = useState(false);
-
-  // Açıklama üretimi için state
-  const [autoDescriptionLoading, setAutoDescriptionLoading] = useState(false);
-
-  // Etiket üretimi için state
-  const [autoTagsLoading, setAutoTagsLoading] = useState(false);
-
-  // Otomatik kategori seçimi için state
-  const [shopSectionAutoSelected, setShopSectionAutoSelected] = useState(true)
+  // Step Navigation
+  const steps = [
+    { id: 1, name: 'Medya', icon: '📸', description: 'Resim ve video yükle' },
+    { id: 2, name: 'Temel', icon: '📝', description: 'Başlık ve açıklama' },
+    { id: 3, name: 'Detay', icon: '🏷️', description: 'Etiket ve kategori' },
+    { id: 4, name: 'Tamamla', icon: '✅', description: 'Son kontroller' }
+  ];
 
   // Eğer ürün düzenleniyorsa onun bölümünü, değilse ilk bölümü seç
   const initialSectionId = product?.shop_section_id?.toString() || shopSections[0]?.shop_section_id.toString() || '';
+  
   useEffect(() => {
     if (isOpen) {
       setSelectedShopSection(initialSectionId);
@@ -502,8 +575,6 @@ export function ProductFormModal({
   useEffect(() => {
     setAutoTitleUsed(false);
   }, [productImages]);
-
-  const [userEditedTitle, setUserEditedTitle] = useState(false);
 
   // Yardımcı fonksiyon: Başta/sonda özel karakter/noktalama temizle
   const cleanTitle = (raw: string) => {
@@ -1167,9 +1238,6 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     }
   };
 
-  const [focusTitleLoading, setFocusTitleLoading] = useState(false);
-  const [focusStatus, setFocusStatus] = useState<string | null>(null);
-
   // Yeni focus başlık üretici fonksiyon
   const handleFocusTitle = async () => {
     if (!titleInput.trim() || productImages.length === 0 || !productImages[0].file) {
@@ -1244,7 +1312,8 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   }, [isOpen]);
 
   // QWE tuş kombinasyonu ile taslak kaydetme
-  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+  // Bu değişkenler zaten yukarıda tanımlandı, kaldırılıyor
+  // const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1353,17 +1422,53 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
         <DialogTrigger asChild>
           {/* DialogTrigger content */}
         </DialogTrigger>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center justify-between">
+              <span>{product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">İlerleme:</span>
+                <div className="w-32 bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${formProgress}%` }}
+                  ></div>
+                </div>
+                <span className="text-sm font-medium text-gray-700">{formProgress}%</span>
+              </div>
             </DialogTitle>
-            <DialogDescription>
-              {product ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."} • <kbd className="px-1 py-0.5 text-xs bg-gray-100 rounded">Q+W+E</kbd> ile taslak kaydet
+            <DialogDescription className="flex items-center justify-between">
+              <span>{product ? "Bu ürünün detaylarını düzenleyin." : "Yeni bir ürün ekleyin."} • <kbd className="px-1 py-0.5 text-xs bg-gray-100 rounded">Q+W+E</kbd> ile taslak kaydet</span>
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
+          {/* Step Indicator */}
+          <div className="flex-shrink-0 px-6 py-3 border-b bg-gray-50">
+            <div className="flex items-center justify-between max-w-2xl mx-auto">
+              {steps.map((step, index) => (
+                <div key={step.id} className="flex items-center">
+                  <div className={`flex flex-col items-center ${currentStep >= step.id ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-medium transition-all ${
+                      currentStep >= step.id 
+                        ? 'bg-blue-100 text-blue-600 border-2 border-blue-500' 
+                        : 'bg-gray-100 text-gray-400 border-2 border-gray-300'
+                    }`}>
+                      {currentStep > step.id ? '✓' : step.icon}
+                    </div>
+                    <div className="mt-1 text-xs font-medium">{step.name}</div>
+                    <div className="text-xs text-gray-500 max-w-20 text-center">{step.description}</div>
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className={`w-16 h-0.5 mx-2 transition-all ${
+                      currentStep > step.id ? 'bg-blue-500' : 'bg-gray-300'
+                    }`}></div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6">{/* İçerik buraya gelecek */}
             {/* Resim Bölümü */}
             <ImageSection />
 

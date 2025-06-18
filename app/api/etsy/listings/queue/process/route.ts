@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from "@/lib/supabase/server";
-import { getValidAccessToken, createEtsyListing } from "@/lib/etsy-api";
+import { getEtsyStores, createEtsyListing, uploadFilesToEtsy } from "@/lib/etsy-api";
+import { getValidAccessToken } from "@/lib/etsy-api";
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -81,6 +82,25 @@ export async function GET(request: NextRequest) {
           throw new Error("Geçerli Etsy token'ı bulunamadı");
         }
         
+        // Etsy mağazalarını getir - önbellekten al
+        const stores = await getEtsyStores(item.user_id, false);
+        if (!stores || stores.length === 0) {
+          await supabase
+            .from('etsy_uploads')
+            .update({ 
+              status: 'failed', 
+              error_message: 'Bağlı Etsy mağazası bulunamadı' 
+            })
+            .eq('id', item.id);
+          
+          results.push({
+            id: item.id,
+            status: 'failed',
+            error: 'Bağlı Etsy mağazası bulunamadı'
+          });
+          continue;
+        }
+        
         // Ürünü Etsy'ye yükle
         const productData = item.product_data;
         const result = await createEtsyListing(
@@ -158,6 +178,241 @@ export async function GET(request: NextRequest) {
         success: false, 
         message: "Kuyruk işlenirken bir hata oluştu",
         error: error.message
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    console.log("Kuyruk işleme API'sine istek geldi");
+    
+    // Supabase client oluştur
+    const supabase = await createClient();
+    
+    // Kullanıcı oturumunu kontrol et
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json(
+        { success: false, message: "Oturum açmanız gerekiyor" },
+        { status: 401 }
+      );
+    }
+    
+    // İstek gövdesini al
+    const { queueId } = await req.json();
+    
+    if (!queueId) {
+      return NextResponse.json(
+        { success: false, message: "Kuyruk ID'si gereklidir" },
+        { status: 400 }
+      );
+    }
+    
+    // Kuyruk kaydını bul
+    const { data: queueItem, error: queueError } = await supabase
+      .from('etsy_uploads')
+      .select('*')
+      .eq('id', queueId)
+      .eq('user_id', session.user.id)
+      .single();
+    
+    if (queueError || !queueItem) {
+      return NextResponse.json(
+        { success: false, message: "Kuyruk öğesi bulunamadı" },
+        { status: 404 }
+      );
+    }
+    
+    // Durumu işleniyor olarak güncelle
+    const { error: updateError } = await supabase
+      .from('etsy_uploads')
+      .update({ status: 'processing', processed_at: new Date().toISOString() })
+      .eq('id', queueId);
+    
+    if (updateError) {
+      return NextResponse.json(
+        { success: false, message: "Kuyruk durumu güncellenemedi" },
+        { status: 500 }
+      );
+    }
+    
+    // Etsy token'ı al
+    const accessToken = await getValidAccessToken(session.user.id);
+    if (!accessToken) {
+      await supabase
+        .from('etsy_uploads')
+        .update({ 
+          status: 'failed', 
+          error_message: 'Geçerli Etsy token bulunamadı' 
+        })
+        .eq('id', queueId);
+      
+      return NextResponse.json(
+        { success: false, message: "Geçerli Etsy token bulunamadı" },
+        { status: 401 }
+      );
+    }
+    
+    // Etsy mağazalarını getir - önbellekten al
+    const stores = await getEtsyStores(session.user.id, false);
+    if (!stores || stores.length === 0) {
+      await supabase
+        .from('etsy_uploads')
+        .update({ 
+          status: 'failed', 
+          error_message: 'Bağlı Etsy mağazası bulunamadı' 
+        })
+        .eq('id', queueId);
+      
+      return NextResponse.json(
+        { success: false, message: "Bağlı Etsy mağazası bulunamadı" },
+        { status: 400 }
+      );
+    }
+    
+    // Ürün verilerini al
+    const productData = queueItem.product_data;
+    
+    try {
+      // Etsy'de taslak ürün oluştur
+      console.log("Etsy'de taslak ürün oluşturuluyor...");
+      const draftListing = await createEtsyListing(accessToken, queueItem.shop_id, {
+        ...productData,
+        state: 'draft' // Önce taslak olarak oluştur
+      });
+      
+      console.log("Taslak ürün oluşturuldu:", draftListing.listing_id);
+      
+      // Listing ID'yi güncelle
+      await supabase
+        .from('etsy_uploads')
+        .update({ listing_id: draftListing.listing_id })
+        .eq('id', queueId);
+      
+      // Görselleri yükle
+      if (productData.images && productData.images.length > 0) {
+        console.log("Görseller yükleniyor...");
+        
+        // Base64 formatındaki görselleri File nesnelerine dönüştür
+        const imageFiles = productData.images.map((img: any, index: number) => {
+          // Base64 verilerini ayır
+          const matches = img.dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+          if (!matches || matches.length !== 3) {
+            throw new Error(`Geçersiz base64 formatı: ${img.dataUrl.substring(0, 20)}...`);
+          }
+          
+          const type = matches[1];
+          const base64Data = matches[2];
+          const byteCharacters = atob(base64Data);
+          const byteArrays = [];
+          
+          for (let i = 0; i < byteCharacters.length; i += 512) {
+            const slice = byteCharacters.slice(i, i + 512);
+            const byteNumbers = new Array(slice.length);
+            for (let j = 0; j < slice.length; j++) {
+              byteNumbers[j] = slice.charCodeAt(j);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            byteArrays.push(byteArray);
+          }
+          
+          const blob = new Blob(byteArrays, { type });
+          return new File([blob], `image-${index + 1}.${type.split('/')[1] || 'jpg'}`, { type });
+        });
+        
+        // Video dosyası varsa işle
+        let videoFile = null;
+        if (productData.video && productData.video.dataUrl) {
+          const videoMatches = productData.video.dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+          if (videoMatches && videoMatches.length === 3) {
+            const videoType = videoMatches[1];
+            const videoBase64 = videoMatches[2];
+            const videoBytes = atob(videoBase64);
+            const videoByteArrays = [];
+            
+            for (let i = 0; i < videoBytes.length; i += 512) {
+              const slice = videoBytes.slice(i, i + 512);
+              const byteNumbers = new Array(slice.length);
+              for (let j = 0; j < slice.length; j++) {
+                byteNumbers[j] = slice.charCodeAt(j);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              videoByteArrays.push(byteArray);
+            }
+            
+            const videoBlob = new Blob(videoByteArrays, { type: videoType });
+            videoFile = new File([videoBlob], `video.${videoType.split('/')[1] || 'mp4'}`, { type: videoType });
+          }
+        }
+        
+        // Görselleri ve videoyu Etsy'ye yükle
+        await uploadFilesToEtsy(
+          accessToken,
+          queueItem.shop_id,
+          draftListing.listing_id,
+          imageFiles,
+          videoFile
+        );
+        
+        console.log("Görseller başarıyla yüklendi");
+      }
+      
+      // Ürünü aktifleştir (eğer state active olarak belirtildiyse)
+      if (productData.state === 'active') {
+        console.log("Ürün aktifleştiriliyor...");
+        await createEtsyListing(accessToken, queueItem.shop_id, {
+          listing_id: draftListing.listing_id,
+          state: 'active'
+        });
+        console.log("Ürün aktifleştirildi");
+      }
+      
+      // Başarılı olarak işaretle
+      await supabase
+        .from('etsy_uploads')
+        .update({ 
+          status: 'completed',
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', queueId);
+      
+      return NextResponse.json({
+        success: true,
+        message: "Ürün başarıyla işlendi",
+        listing_id: draftListing.listing_id
+      });
+      
+    } catch (error) {
+      console.error("Etsy'ye yükleme hatası:", error);
+      
+      // Hata durumunu güncelle
+      await supabase
+        .from('etsy_uploads')
+        .update({ 
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        })
+        .eq('id', queueId);
+      
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: "Etsy'ye yükleme sırasında hata oluştu",
+          error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+        },
+        { status: 500 }
+      );
+    }
+    
+  } catch (error) {
+    console.error("Kuyruk işleme hatası:", error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        message: "Kuyruk işlenirken beklenmeyen bir hata oluştu",
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
       },
       { status: 500 }
     );

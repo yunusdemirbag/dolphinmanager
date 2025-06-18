@@ -23,85 +23,69 @@ export async function POST(req: NextRequest) {
     }
     console.log("Kullanıcı oturumu bulundu:", session.user.id);
 
-    // Etsy mağaza bilgilerini al
-    const stores = await getEtsyStores(session.user.id);
+    // İstek gövdesini al
+    const productData = await req.json();
+    console.log("Ürün verileri alındı:", JSON.stringify(productData).substring(0, 100) + "...");
+
+    // Etsy mağazalarını getir - skipCache=false ile önbellekten al
+    const stores = await getEtsyStores(session.user.id, false);
+    console.log("Mağaza bilgileri alındı:", stores);
+
     if (!stores || stores.length === 0) {
       console.log("Bağlı Etsy mağazası bulunamadı");
       return NextResponse.json(
         { 
           success: false, 
           message: "Bağlı Etsy mağazası bulunamadı. Lütfen önce Etsy mağazanızı bağlayın.",
-          error: "NO_ETSY_STORE" 
-        },
-        { status: 404 }
-      );
-    }
-    console.log("Etsy mağaza bilgileri alındı:", stores[0].shop_id);
-
-    // İlk mağazayı kullan
-    const store = stores[0];
-    
-    try {
-      // İstek gövdesini al
-      const productData = await req.json();
-      console.log("Alınan ürün verisi türü:", typeof productData);
-      console.log("Ürün verisi anahtarları:", Object.keys(productData));
-      
-      // Kuyruk kaydı oluştur
-      const { data: queueData, error: queueError } = await supabase
-        .from('etsy_uploads')
-        .insert({
-          user_id: session.user.id,
-          shop_id: store.shop_id,
-          product_data: productData,
-          status: 'pending',
-          scheduled_at: new Date(Date.now() + 2 * 60 * 1000).toISOString(), // 2 dakika sonra
-        })
-        .select()
-        .single();
-      
-      if (queueError) {
-        console.error("Kuyruk kaydı oluşturma hatası:", queueError);
-        return NextResponse.json(
-          { 
-            success: false, 
-            message: "Ürün kuyruğa eklenirken veritabanı hatası oluştu", 
-            error: queueError.message || queueError.code,
-            details: queueError
-          },
-          { status: 500 }
-        );
-      }
-      
-      console.log("Kuyruk kaydı başarıyla oluşturuldu:", queueData.id);
-      
-      // Başarılı yanıt
-      return NextResponse.json({
-        success: true,
-        message: "Ürün kuyruğa eklendi",
-        queue_id: queueData.id,
-        scheduled_at: queueData.scheduled_at
-      });
-    } catch (parseError) {
-      console.error("İstek gövdesi işlenirken hata:", parseError);
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: "İstek verisi işlenirken hata oluştu", 
-          error: parseError instanceof Error ? parseError.message : "Bilinmeyen hata" 
+          code: "NO_ETSY_STORE"
         },
         { status: 400 }
       );
     }
-    
-  } catch (error) {
-    console.error("Ürün kuyruğa eklenirken hata:", error);
+
+    const shopId = stores[0].shop_id;
+    console.log("Kullanılacak mağaza ID:", shopId);
+
+    // Şu anki zamanı al
+    const now = new Date();
+    // 2 dakika sonrasını hesapla
+    const scheduledAt = new Date(now.getTime() + 2 * 60 * 1000);
+    console.log("İşlem zamanı:", scheduledAt);
+
+    // Ürünü veritabanına ekle
+    const { data: queueData, error: queueError } = await supabase
+      .from('etsy_uploads')
+      .insert({
+        user_id: session.user.id,
+        shop_id: shopId,
+        product_data: productData,
+        status: 'pending',
+        scheduled_at: scheduledAt.toISOString()
+      })
+      .select();
+
+    if (queueError) {
+      console.error("Veritabanı hatası:", queueError);
+      return NextResponse.json(
+        { success: false, message: "Ürün kuyruğa eklenirken bir hata oluştu: " + queueError.message },
+        { status: 500 }
+      );
+    }
+
+    console.log("Ürün kuyruğa eklendi:", queueData);
+
     return NextResponse.json(
       { 
-        success: false, 
-        message: "Ürün kuyruğa eklenirken bir hata oluştu", 
-        error: error instanceof Error ? error.message : "Bilinmeyen hata" 
-      },
+        success: true, 
+        message: "Ürün başarıyla kuyruğa eklendi",
+        data: queueData?.[0] || null
+      }
+    );
+
+  } catch (error) {
+    console.error("Kuyruk API hatası:", error);
+    return NextResponse.json(
+      { success: false, message: `Beklenmeyen bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}` },
       { status: 500 }
     );
   }

@@ -33,6 +33,17 @@ export async function GET() {
         tags_prompt: null,
         category_prompt: null,
         focus_title_prompt: null,
+        
+        // Her prompt için ayrı model ve temperature ayarları
+        title_model: null,
+        title_temperature: null,
+        tags_model: null,
+        tags_temperature: null,
+        category_model: null,
+        category_temperature: null,
+        focus_title_model: null,
+        focus_title_temperature: null,
+        
         user_id: user.id
       };
       
@@ -61,7 +72,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     
     // Geçerli alanları kontrol et
-    const validFields = ['model', 'temperature', 'title_prompt', 'tags_prompt', 'category_prompt', 'focus_title_prompt'];
+    const validFields = [
+      'model', 'temperature', 
+      'title_prompt', 'tags_prompt', 'category_prompt', 'focus_title_prompt',
+      'title_model', 'title_temperature', 
+      'tags_model', 'tags_temperature', 
+      'category_model', 'category_temperature', 
+      'focus_title_model', 'focus_title_temperature'
+    ];
+    
     const settings: Record<string, any> = Object.entries(body)
       .filter(([key]) => validFields.includes(key))
       .reduce((obj, [key, value]) => ({ ...obj, [key]: value }), {});

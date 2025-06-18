@@ -104,6 +104,16 @@ interface AISettings {
   tags_prompt: string | null;
   category_prompt: string | null;
   focus_title_prompt: string | null;
+  
+  // Her prompt için ayrı model ve temperature ayarları
+  title_model: string | null;
+  title_temperature: number | null;
+  tags_model: string | null;
+  tags_temperature: number | null;
+  category_model: string | null;
+  category_temperature: number | null;
+  focus_title_model: string | null;
+  focus_title_temperature: number | null;
 }
 
 export default function SettingsPage() {
@@ -131,8 +141,25 @@ export default function SettingsPage() {
     title_prompt: null,
     tags_prompt: null,
     category_prompt: null,
-    focus_title_prompt: null
+    focus_title_prompt: null,
+    
+    // Her prompt için ayrı model ve temperature ayarları
+    title_model: null,
+    title_temperature: null,
+    tags_model: null,
+    tags_temperature: null,
+    category_model: null,
+    category_temperature: null,
+    focus_title_model: null,
+    focus_title_temperature: null
   });
+  
+  // Her prompt için özel ayarların etkin olup olmadığını tutan state'ler
+  const [titleCustomSettings, setTitleCustomSettings] = useState(false);
+  const [tagsCustomSettings, setTagsCustomSettings] = useState(false);
+  const [categoryCustomSettings, setCategoryCustomSettings] = useState(false);
+  const [focusTitleCustomSettings, setFocusTitleCustomSettings] = useState(false);
+  
   const [savingAiSettings, setSavingAiSettings] = useState(false);
   const [aiSettingsLoaded, setAiSettingsLoaded] = useState(false);
 
@@ -299,6 +326,12 @@ export default function SettingsPage() {
       if (response.ok) {
         const data = await response.json();
         setAiSettings(data);
+        
+        // Özel ayarların etkin olup olmadığını kontrol et
+        setTitleCustomSettings(!!data.title_model);
+        setTagsCustomSettings(!!data.tags_model);
+        setCategoryCustomSettings(!!data.category_model);
+        setFocusTitleCustomSettings(!!data.focus_title_model);
       } else {
         console.error('AI ayarları yüklenemedi');
       }
@@ -784,25 +817,46 @@ export default function SettingsPage() {
                   <>
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="ai-model">AI Modeli</Label>
+                        <Label htmlFor="ai-model" className="text-base font-medium">Varsayılan AI Modeli</Label>
                         <Select 
                           value={aiSettings.model} 
                           onValueChange={(value) => setAiSettings(prev => ({ ...prev, model: value }))}
+                          disabled={titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className={titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings ? "opacity-50" : ""}>
                             <SelectValue placeholder="Model seçin" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="gpt-4o">GPT-4o (En Gelişmiş)</SelectItem>
-                            <SelectItem value="gpt-4o-mini">GPT-4o Mini (Hızlı ve Ekonomik)</SelectItem>
-                            <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Eski)</SelectItem>
+                            <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
+                            <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
+                            <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
                           </SelectContent>
                         </Select>
-                        <p className="text-xs text-gray-500 mt-1">Kullanılan AI modelini seçin. Daha gelişmiş modeller daha iyi sonuçlar üretir ama daha yavaş ve pahalıdır.</p>
+                        <div className="mt-2 text-sm text-gray-600 space-y-2">
+                          <p><strong>🔵 GPT-4o:</strong> En güçlü model – görselden detaylı analiz yapar, en kaliteli Etsy başlıklarını üretir</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>✅ Görsel destekler</li>
+                            <li>💰 Token: $5 / M input, $15 / M output</li>
+                            <li>🖼️ Görsel: ~$0.01 / adet</li>
+                          </ul>
+                          
+                          <p className="mt-2"><strong>🔵 GPT-4o Mini:</strong> Ucuz ve hızlı – görsel analizi yapar ama bazen yüzeysel kalabilir</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>✅ Görsel destekler</li>
+                            <li>💰 Token: $0.25 / M input, $1.25 / M output</li>
+                            <li>🖼️ Görsel: ~$0.0025–$0.005 / adet</li>
+                          </ul>
+                          
+                          <p className="mt-2"><strong>❌ GPT-3.5 Turbo:</strong> Sadece metin – resim desteklemez, ama sen açıklarsan uygun başlık üretir</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>❌ Görsel desteklemez</li>
+                            <li>💰 Token: $0.50 / M input, $1.50 / M output</li>
+                          </ul>
+                        </div>
                       </div>
 
                       <div>
-                        <Label htmlFor="temperature">Yaratıcılık Seviyesi</Label>
+                        <Label htmlFor="temperature" className="text-base font-medium">Varsayılan Yaratıcılık Seviyesi</Label>
                         <div className="flex items-center space-x-2">
                           <span className="text-sm text-gray-500">Kesin</span>
                           <input
@@ -813,10 +867,18 @@ export default function SettingsPage() {
                             value={aiSettings.temperature}
                             onChange={(e) => setAiSettings(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
                             className="flex-1"
+                            disabled={titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings}
                           />
                           <span className="text-sm text-gray-500">Yaratıcı</span>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">Sıcaklık değeri: {aiSettings.temperature} - Düşük değerler daha tutarlı, yüksek değerler daha yaratıcı sonuçlar üretir.</p>
+                        
+                        {(titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings) && (
+                          <p className="text-xs text-amber-500 mt-2">
+                            <AlertCircle className="inline-block h-3 w-3 mr-1" />
+                            Bazı prompt'lar için özel ayarlar etkinleştirildiğinden varsayılan ayarlar devre dışı bırakıldı.
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -826,9 +888,79 @@ export default function SettingsPage() {
                         Özel Prompt Ayarları
                       </h3>
                       
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="title-prompt">Başlık Prompt'u</Label>
+                      <div className="space-y-6">
+                        {/* Başlık Prompt'u */}
+                        <div className="border rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <Label htmlFor="title-prompt" className="text-base font-medium">Başlık Prompt'u</Label>
+                            <div className="flex items-center">
+                              <input 
+                                type="checkbox" 
+                                id="title-custom-settings"
+                                checked={titleCustomSettings}
+                                onChange={(e) => {
+                                  setTitleCustomSettings(e.target.checked);
+                                  if (!e.target.checked) {
+                                    setAiSettings(prev => ({
+                                      ...prev,
+                                      title_model: null,
+                                      title_temperature: null
+                                    }));
+                                  } else {
+                                    setAiSettings(prev => ({
+                                      ...prev,
+                                      title_model: prev.model,
+                                      title_temperature: prev.temperature
+                                    }));
+                                  }
+                                }}
+                                className="mr-2"
+                              />
+                              <Label htmlFor="title-custom-settings" className="text-sm cursor-pointer">Özel Model/Yaratıcılık</Label>
+                            </div>
+                          </div>
+                          
+                          {titleCustomSettings && (
+                            <div className="mb-4 space-y-3 border-b pb-4">
+                              <div>
+                                <Label htmlFor="title-model" className="text-sm">Model</Label>
+                                <Select 
+                                  value={aiSettings.title_model || aiSettings.model} 
+                                  onValueChange={(value) => setAiSettings(prev => ({ ...prev, title_model: value }))}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Model seçin" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
+                                    <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
+                                    <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="title-temperature" className="text-sm">Yaratıcılık Seviyesi</Label>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-gray-500">Kesin</span>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={aiSettings.title_temperature !== null ? aiSettings.title_temperature : aiSettings.temperature}
+                                    onChange={(e) => setAiSettings(prev => ({ ...prev, title_temperature: parseFloat(e.target.value) }))}
+                                    className="flex-1"
+                                  />
+                                  <span className="text-xs text-gray-500">Yaratıcı</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Değer: {aiSettings.title_temperature !== null ? aiSettings.title_temperature : aiSettings.temperature}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          
                           <Textarea
                             id="title-prompt"
                             value={aiSettings.title_prompt || ''}
@@ -845,8 +977,78 @@ export default function SettingsPage() {
                           </Button>
                         </div>
 
-                        <div>
-                          <Label htmlFor="tags-prompt">Etiket Prompt'u</Label>
+                        {/* Etiket Prompt'u */}
+                        <div className="border rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <Label htmlFor="tags-prompt" className="text-base font-medium">Etiket Prompt'u</Label>
+                            <div className="flex items-center">
+                              <input 
+                                type="checkbox" 
+                                id="tags-custom-settings"
+                                checked={tagsCustomSettings}
+                                onChange={(e) => {
+                                  setTagsCustomSettings(e.target.checked);
+                                  if (!e.target.checked) {
+                                    setAiSettings(prev => ({
+                                      ...prev,
+                                      tags_model: null,
+                                      tags_temperature: null
+                                    }));
+                                  } else {
+                                    setAiSettings(prev => ({
+                                      ...prev,
+                                      tags_model: prev.model,
+                                      tags_temperature: prev.temperature
+                                    }));
+                                  }
+                                }}
+                                className="mr-2"
+                              />
+                              <Label htmlFor="tags-custom-settings" className="text-sm cursor-pointer">Özel Model/Yaratıcılık</Label>
+                            </div>
+                          </div>
+                          
+                          {tagsCustomSettings && (
+                            <div className="mb-4 space-y-3 border-b pb-4">
+                              <div>
+                                <Label htmlFor="tags-model" className="text-sm">Model</Label>
+                                <Select 
+                                  value={aiSettings.tags_model || aiSettings.model} 
+                                  onValueChange={(value) => setAiSettings(prev => ({ ...prev, tags_model: value }))}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Model seçin" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
+                                    <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
+                                    <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="tags-temperature" className="text-sm">Yaratıcılık Seviyesi</Label>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-gray-500">Kesin</span>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={aiSettings.tags_temperature !== null ? aiSettings.tags_temperature : aiSettings.temperature}
+                                    onChange={(e) => setAiSettings(prev => ({ ...prev, tags_temperature: parseFloat(e.target.value) }))}
+                                    className="flex-1"
+                                  />
+                                  <span className="text-xs text-gray-500">Yaratıcı</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Değer: {aiSettings.tags_temperature !== null ? aiSettings.tags_temperature : aiSettings.temperature}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          
                           <Textarea
                             id="tags-prompt"
                             value={aiSettings.tags_prompt || ''}
@@ -863,8 +1065,78 @@ export default function SettingsPage() {
                           </Button>
                         </div>
 
-                        <div>
-                          <Label htmlFor="category-prompt">Kategori Seçimi Prompt'u</Label>
+                        {/* Kategori Seçimi Prompt'u */}
+                        <div className="border rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <Label htmlFor="category-prompt" className="text-base font-medium">Kategori Seçimi Prompt'u</Label>
+                            <div className="flex items-center">
+                              <input 
+                                type="checkbox" 
+                                id="category-custom-settings"
+                                checked={categoryCustomSettings}
+                                onChange={(e) => {
+                                  setCategoryCustomSettings(e.target.checked);
+                                  if (!e.target.checked) {
+                                    setAiSettings(prev => ({
+                                      ...prev,
+                                      category_model: null,
+                                      category_temperature: null
+                                    }));
+                                  } else {
+                                    setAiSettings(prev => ({
+                                      ...prev,
+                                      category_model: prev.model,
+                                      category_temperature: prev.temperature
+                                    }));
+                                  }
+                                }}
+                                className="mr-2"
+                              />
+                              <Label htmlFor="category-custom-settings" className="text-sm cursor-pointer">Özel Model/Yaratıcılık</Label>
+                            </div>
+                          </div>
+                          
+                          {categoryCustomSettings && (
+                            <div className="mb-4 space-y-3 border-b pb-4">
+                              <div>
+                                <Label htmlFor="category-model" className="text-sm">Model</Label>
+                                <Select 
+                                  value={aiSettings.category_model || aiSettings.model} 
+                                  onValueChange={(value) => setAiSettings(prev => ({ ...prev, category_model: value }))}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Model seçin" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
+                                    <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
+                                    <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="category-temperature" className="text-sm">Yaratıcılık Seviyesi</Label>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-gray-500">Kesin</span>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={aiSettings.category_temperature !== null ? aiSettings.category_temperature : aiSettings.temperature}
+                                    onChange={(e) => setAiSettings(prev => ({ ...prev, category_temperature: parseFloat(e.target.value) }))}
+                                    className="flex-1"
+                                  />
+                                  <span className="text-xs text-gray-500">Yaratıcı</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Değer: {aiSettings.category_temperature !== null ? aiSettings.category_temperature : aiSettings.temperature}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          
                           <Textarea
                             id="category-prompt"
                             value={aiSettings.category_prompt || ''}
@@ -881,8 +1153,78 @@ export default function SettingsPage() {
                           </Button>
                         </div>
 
-                        <div>
-                          <Label htmlFor="focus-title-prompt">Odaklı Başlık Prompt'u</Label>
+                        {/* Odaklı Başlık Prompt'u */}
+                        <div className="border rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <Label htmlFor="focus-title-prompt" className="text-base font-medium">Odaklı Başlık Prompt'u</Label>
+                            <div className="flex items-center">
+                              <input 
+                                type="checkbox" 
+                                id="focus-title-custom-settings"
+                                checked={focusTitleCustomSettings}
+                                onChange={(e) => {
+                                  setFocusTitleCustomSettings(e.target.checked);
+                                  if (!e.target.checked) {
+                                    setAiSettings(prev => ({
+                                      ...prev,
+                                      focus_title_model: null,
+                                      focus_title_temperature: null
+                                    }));
+                                  } else {
+                                    setAiSettings(prev => ({
+                                      ...prev,
+                                      focus_title_model: prev.model,
+                                      focus_title_temperature: prev.temperature
+                                    }));
+                                  }
+                                }}
+                                className="mr-2"
+                              />
+                              <Label htmlFor="focus-title-custom-settings" className="text-sm cursor-pointer">Özel Model/Yaratıcılık</Label>
+                            </div>
+                          </div>
+                          
+                          {focusTitleCustomSettings && (
+                            <div className="mb-4 space-y-3 border-b pb-4">
+                              <div>
+                                <Label htmlFor="focus-title-model" className="text-sm">Model</Label>
+                                <Select 
+                                  value={aiSettings.focus_title_model || aiSettings.model} 
+                                  onValueChange={(value) => setAiSettings(prev => ({ ...prev, focus_title_model: value }))}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Model seçin" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
+                                    <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
+                                    <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="focus-title-temperature" className="text-sm">Yaratıcılık Seviyesi</Label>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs text-gray-500">Kesin</span>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={aiSettings.focus_title_temperature !== null ? aiSettings.focus_title_temperature : aiSettings.temperature}
+                                    onChange={(e) => setAiSettings(prev => ({ ...prev, focus_title_temperature: parseFloat(e.target.value) }))}
+                                    className="flex-1"
+                                  />
+                                  <span className="text-xs text-gray-500">Yaratıcı</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Değer: {aiSettings.focus_title_temperature !== null ? aiSettings.focus_title_temperature : aiSettings.temperature}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          
                           <Textarea
                             id="focus-title-prompt"
                             value={aiSettings.focus_title_prompt || ''}
@@ -899,21 +1241,6 @@ export default function SettingsPage() {
                           </Button>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t">
-                      <Button 
-                        onClick={handleSaveAiSettings} 
-                        disabled={savingAiSettings}
-                        className="bg-purple-600 hover:bg-purple-700"
-                      >
-                        {savingAiSettings ? (
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4 mr-2" />
-                        )}
-                        {savingAiSettings ? "Kaydediliyor..." : "Ayarları Kaydet"}
-                      </Button>
                     </div>
                   </>
                 )}

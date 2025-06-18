@@ -8,6 +8,17 @@ CREATE TABLE IF NOT EXISTS ai_settings (
   tags_prompt TEXT,
   category_prompt TEXT,
   focus_title_prompt TEXT,
+  
+  -- Her prompt için ayrı model ve temperature ayarları
+  title_model VARCHAR(50),
+  title_temperature DECIMAL(3, 2),
+  tags_model VARCHAR(50),
+  tags_temperature DECIMAL(3, 2),
+  category_model VARCHAR(50),
+  category_temperature DECIMAL(3, 2),
+  focus_title_model VARCHAR(50),
+  focus_title_temperature DECIMAL(3, 2),
+  
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id)

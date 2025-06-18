@@ -17,6 +17,16 @@ export interface AISettings {
   tags_prompt: string | null;
   category_prompt: string | null;
   focus_title_prompt: string | null;
+  
+  // Her prompt için ayrı model ve temperature ayarları
+  title_model: string | null;
+  title_temperature: number | null;
+  tags_model: string | null;
+  tags_temperature: number | null;
+  category_model: string | null;
+  category_temperature: number | null;
+  focus_title_model: string | null;
+  focus_title_temperature: number | null;
 }
 
 /**
@@ -139,7 +149,17 @@ export const getUserAISettings = async (): Promise<AISettings> => {
         title_prompt: null,
         tags_prompt: null,
         category_prompt: null,
-        focus_title_prompt: null
+        focus_title_prompt: null,
+        
+        // Her prompt için ayrı model ve temperature ayarları
+        title_model: null,
+        title_temperature: null,
+        tags_model: null,
+        tags_temperature: null,
+        category_model: null,
+        category_temperature: null,
+        focus_title_model: null,
+        focus_title_temperature: null
       };
     }
     
@@ -153,7 +173,17 @@ export const getUserAISettings = async (): Promise<AISettings> => {
       title_prompt: null,
       tags_prompt: null,
       category_prompt: null,
-      focus_title_prompt: null
+      focus_title_prompt: null,
+      
+      // Her prompt için ayrı model ve temperature ayarları
+      title_model: null,
+      title_temperature: null,
+      tags_model: null,
+      tags_temperature: null,
+      category_model: null,
+      category_temperature: null,
+      focus_title_model: null,
+      focus_title_temperature: null
     };
   }
 };
@@ -172,9 +202,12 @@ export const generateTitle = async (imageFile: File): Promise<string> => {
   const promptToUse = settings.title_prompt || titlePrompt.prompt;
   formData.append("prompt", promptToUse);
   
-  // Model ve temperature ayarlarını ekle
-  formData.append("model", settings.model);
-  formData.append("temperature", settings.temperature.toString());
+  // Başlık için özel model ve temperature ayarları varsa onları kullan, yoksa genel ayarları
+  const modelToUse = settings.title_model || settings.model;
+  const temperatureToUse = settings.title_temperature !== null ? settings.title_temperature : settings.temperature;
+  
+  formData.append("model", modelToUse);
+  formData.append("temperature", temperatureToUse.toString());
   
   const response = await fetch("/api/ai/generate-etsy-title", {
     method: "POST",
@@ -204,9 +237,12 @@ export const generateTitleWithFocus = async (imageFile: File, focusKeyword: stri
   const promptToUse = settings.focus_title_prompt || focusTitlePrompt.prompt;
   formData.append("prompt", promptToUse);
   
-  // Model ve temperature ayarlarını ekle
-  formData.append("model", settings.model);
-  formData.append("temperature", settings.temperature.toString());
+  // Odaklı başlık için özel model ve temperature ayarları varsa onları kullan, yoksa genel ayarları
+  const modelToUse = settings.focus_title_model || settings.model;
+  const temperatureToUse = settings.focus_title_temperature !== null ? settings.focus_title_temperature : settings.temperature;
+  
+  formData.append("model", modelToUse);
+  formData.append("temperature", temperatureToUse.toString());
   
   const response = await fetch("/api/ai/generate-etsy-title", {
     method: "POST", 
@@ -231,14 +267,18 @@ export const generateTags = async (title: string, imageFile?: File): Promise<str
   // Özel prompt varsa onu kullan, yoksa varsayılanı
   const promptToUse = settings.tags_prompt || tagPrompt.prompt;
   
+  // Etiketler için özel model ve temperature ayarları varsa onları kullan, yoksa genel ayarları
+  const modelToUse = settings.tags_model || settings.model;
+  const temperatureToUse = settings.tags_temperature !== null ? settings.tags_temperature : settings.temperature;
+  
   // Eğer resim varsa form data kullan, yoksa JSON
   if (imageFile) {
     const formData = new FormData();
     formData.append("title", title);
     formData.append("prompt", promptToUse);
     formData.append("image", imageFile);
-    formData.append("model", settings.model);
-    formData.append("temperature", settings.temperature.toString());
+    formData.append("model", modelToUse);
+    formData.append("temperature", temperatureToUse.toString());
     
     const response = await fetch("/api/ai/generate-etsy-tags", {
       method: "POST",
@@ -252,8 +292,8 @@ export const generateTags = async (title: string, imageFile?: File): Promise<str
     const requestBody = {
       title,
       prompt: promptToUse,
-      model: settings.model,
-      temperature: settings.temperature
+      model: modelToUse,
+      temperature: temperatureToUse
     };
     
     const response = await fetch("/api/ai/generate-etsy-tags", {
@@ -278,6 +318,10 @@ export const selectCategory = async (title: string, categoryNames: string[]): Pr
   // Özel prompt varsa onu kullan, yoksa varsayılanı
   const promptToUse = settings.category_prompt || categoryPrompt.prompt;
   
+  // Kategori seçimi için özel model ve temperature ayarları varsa onları kullan, yoksa genel ayarları
+  const modelToUse = settings.category_model || settings.model;
+  const temperatureToUse = settings.category_temperature !== null ? settings.category_temperature : settings.temperature;
+  
   const response = await fetch("/api/ai/select-category", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -285,8 +329,8 @@ export const selectCategory = async (title: string, categoryNames: string[]): Pr
       title,
       categoryNames,
       prompt: promptToUse,
-      model: settings.model,
-      temperature: settings.temperature
+      model: modelToUse,
+      temperature: temperatureToUse
     }),
   });
   

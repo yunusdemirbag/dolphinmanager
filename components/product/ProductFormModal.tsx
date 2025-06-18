@@ -1865,7 +1865,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
 
   // Kuyruk olarak ekle fonksiyonu
   const addToQueue = async (data: any) => {
-    setIsSubmitting(true);
+    setInternalSubmitting(true);
     try {
       // Ürünü kuyruk sistemine ekle
       const response = await fetch('/api/etsy/listings/queue', {
@@ -1896,7 +1896,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
         variant: 'destructive',
       });
     } finally {
-      setIsSubmitting(false);
+      setInternalSubmitting(false);
     }
   };
 

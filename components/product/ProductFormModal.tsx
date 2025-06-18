@@ -1275,6 +1275,12 @@ export function ProductFormModal({
         body: JSON.stringify(listingData),
       });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Yanıt Hatası:', errorData);
+        throw new Error(errorData.message || errorData.error || `Sunucu hatası: ${response.status}`);
+      }
+      
       const result = await response.json();
 
       if (result.success) {
@@ -1286,7 +1292,8 @@ export function ProductFormModal({
         // Başarılı işlem sonrası modalı kapat
         onClose();
       } else {
-        throw new Error(result.error || "Ürün kuyruğa eklenemedi");
+        console.error('API Yanıt Hatası (success=false):', result);
+        throw new Error(result.error || result.message || "Ürün kuyruğa eklenemedi");
       }
 
     } catch (error: any) {

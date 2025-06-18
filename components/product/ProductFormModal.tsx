@@ -1206,7 +1206,28 @@ export function ProductFormModal({
         description: "Lütfen bekleyin, ürün kuyruğa ekleniyor." 
       });
       
-      const formData = new FormData();
+      // Görsel dosyaları için base64 dönüşümü
+      const imagePromises = productImages.map(async (image) => {
+        return {
+          filename: image.file.name,
+          type: image.file.type,
+          size: image.file.size,
+          base64: image.preview
+        };
+      });
+      
+      const imageFilesData = await Promise.all(imagePromises);
+      
+      // Video dosyası varsa base64 dönüşümü
+      let videoFileData = null;
+      if (videoFile) {
+        videoFileData = {
+          filename: videoFile.file.name,
+          type: videoFile.file.type,
+          size: videoFile.file.size,
+          base64: videoFile.preview
+        };
+      }
 
       const listingData = {
         // Formdan gelen dinamik değerler
@@ -1238,17 +1259,20 @@ export function ProductFormModal({
         tokenUsage: tokenUsage,
         
         // Süre bilgilerini ekle
-        generationDurations: generationDurations
+        generationDurations: generationDurations,
+        
+        // Görsel ve video verileri
+        imageFiles: imageFilesData,
+        videoFiles: videoFileData ? [videoFileData] : []
       };
-
-      formData.append('listingData', JSON.stringify(listingData));
-      productImages.forEach(image => formData.append('imageFiles', image.file));
-      if (videoFile) formData.append('videoFiles', videoFile.file);
       
-      // Kuyruğa eklemek için API çağrısı yap
+      // Kuyruğa eklemek için API çağrısı yap - JSON olarak gönder
       const response = await fetch('/api/etsy/listings/queue', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(listingData),
       });
       
       const result = await response.json();
@@ -1862,43 +1886,6 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     description?: number;
     category?: number;
   }>({});
-
-  // Kuyruk olarak ekle fonksiyonu
-  const addToQueue = async (data: any) => {
-    setInternalSubmitting(true);
-    try {
-      // Ürünü kuyruk sistemine ekle
-      const response = await fetch('/api/etsy/listings/queue', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('Ürün kuyruğa eklenirken bir hata oluştu');
-      }
-
-      toast({
-        title: 'Ürün kuyruğa eklendi',
-        description: 'Ürün kuyruk sistemine eklendi. 2 dakika içinde Etsy\'ye yüklenecek.',
-        variant: 'success',
-      });
-
-      // Formu kapat
-      onClose();
-    } catch (error) {
-      console.error('Ürün kuyruğa eklenirken hata:', error);
-      toast({
-        title: 'Hata',
-        description: 'Ürün kuyruğa eklenirken bir hata oluştu.',
-        variant: 'destructive',
-      });
-    } finally {
-      setInternalSubmitting(false);
-    }
-  };
 
   return (
     <DndProvider backend={HTML5Backend}>

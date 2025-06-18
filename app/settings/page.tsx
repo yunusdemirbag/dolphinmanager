@@ -1006,12 +1006,17 @@ export default function SettingsPage() {
                           )}
                           
                           <div className="p-3">
+                            {showDefaultPrompts.title ? (
+                              <div className="mb-3 p-3 bg-gray-50 rounded-md text-sm whitespace-pre-wrap border">
+                                {defaultPrompts.title}
+                              </div>
+                            ) : null}
                             <Textarea
                               id="title-prompt"
                               value={aiSettings.title_prompt || ''}
                               onChange={(e) => setAiSettings(prev => ({ ...prev, title_prompt: e.target.value }))}
-                              placeholder={showDefaultPrompts.title ? defaultPrompts.title : "Varsayılan başlık prompt'unu kullanmak için boş bırakın"}
-                              rows={showDefaultPrompts.title ? 8 : 3}
+                              placeholder="Varsayılan başlık prompt'unu kullanmak için boş bırakın"
+                              rows={3}
                             />
                             <div className="flex space-x-2 mt-1">
                               <Button 
@@ -1114,12 +1119,17 @@ export default function SettingsPage() {
                           )}
                           
                           <div className="p-3">
+                            {showDefaultPrompts.tags ? (
+                              <div className="mb-3 p-3 bg-gray-50 rounded-md text-sm whitespace-pre-wrap border">
+                                {defaultPrompts.tags}
+                              </div>
+                            ) : null}
                             <Textarea
                               id="tags-prompt"
                               value={aiSettings.tags_prompt || ''}
                               onChange={(e) => setAiSettings(prev => ({ ...prev, tags_prompt: e.target.value }))}
-                              placeholder={showDefaultPrompts.tags ? defaultPrompts.tags : "Varsayılan etiket prompt'unu kullanmak için boş bırakın"}
-                              rows={showDefaultPrompts.tags ? 8 : 3}
+                              placeholder="Varsayılan etiket prompt'unu kullanmak için boş bırakın"
+                              rows={3}
                             />
                             <div className="flex space-x-2 mt-1">
                               <Button 
@@ -1222,12 +1232,17 @@ export default function SettingsPage() {
                           )}
                           
                           <div className="p-3">
+                            {showDefaultPrompts.category ? (
+                              <div className="mb-3 p-3 bg-gray-50 rounded-md text-sm whitespace-pre-wrap border">
+                                {defaultPrompts.category}
+                              </div>
+                            ) : null}
                             <Textarea
                               id="category-prompt"
                               value={aiSettings.category_prompt || ''}
                               onChange={(e) => setAiSettings(prev => ({ ...prev, category_prompt: e.target.value }))}
-                              placeholder={showDefaultPrompts.category ? defaultPrompts.category : "Varsayılan kategori prompt'unu kullanmak için boş bırakın"}
-                              rows={showDefaultPrompts.category ? 8 : 3}
+                              placeholder="Varsayılan kategori prompt'unu kullanmak için boş bırakın"
+                              rows={3}
                             />
                             <div className="flex space-x-2 mt-1">
                               <Button 
@@ -1330,12 +1345,17 @@ export default function SettingsPage() {
                           )}
                           
                           <div className="p-3">
+                            {showDefaultPrompts.focus_title ? (
+                              <div className="mb-3 p-3 bg-gray-50 rounded-md text-sm whitespace-pre-wrap border">
+                                {defaultPrompts.focus_title}
+                              </div>
+                            ) : null}
                             <Textarea
                               id="focus-title-prompt"
                               value={aiSettings.focus_title_prompt || ''}
                               onChange={(e) => setAiSettings(prev => ({ ...prev, focus_title_prompt: e.target.value }))}
-                              placeholder={showDefaultPrompts.focus_title ? defaultPrompts.focus_title : "Varsayılan odaklı başlık prompt'unu kullanmak için boş bırakın"}
-                              rows={showDefaultPrompts.focus_title ? 8 : 3}
+                              placeholder="Varsayılan odaklı başlık prompt'unu kullanmak için boş bırakın"
+                              rows={3}
                             />
                             <div className="flex space-x-2 mt-1">
                               <Button 

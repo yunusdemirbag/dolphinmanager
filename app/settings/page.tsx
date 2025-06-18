@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -799,8 +800,8 @@ export default function SettingsPage() {
           {/* AI Settings */}
           <TabsContent value="ai" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center text-lg">
                   <Brain className="h-5 w-5 text-purple-600 mr-2" />
                   OpenAI Ayarları
                 </CardTitle>
@@ -815,92 +816,100 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="ai-model" className="text-base font-medium">Varsayılan AI Modeli</Label>
-                        <Select 
-                          value={aiSettings.model} 
-                          onValueChange={(value) => setAiSettings(prev => ({ ...prev, model: value }))}
-                          disabled={titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings}
-                        >
-                          <SelectTrigger className={titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings ? "opacity-50" : ""}>
-                            <SelectValue placeholder="Model seçin" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
-                            <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
-                            <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="mt-2 text-sm text-gray-600 space-y-2">
-                          <p><strong>🔵 GPT-4o:</strong> En güçlü model – görselden detaylı analiz yapar, en kaliteli Etsy başlıklarını üretir</p>
-                          <ul className="list-disc pl-5 space-y-1">
-                            <li>✅ Görsel destekler</li>
-                            <li>💰 Token: $5 / M input, $15 / M output</li>
-                            <li>🖼️ Görsel: ~$0.01 / adet</li>
-                          </ul>
-                          
-                          <p className="mt-2"><strong>🔵 GPT-4o Mini:</strong> Ucuz ve hızlı – görsel analizi yapar ama bazen yüzeysel kalabilir</p>
-                          <ul className="list-disc pl-5 space-y-1">
-                            <li>✅ Görsel destekler</li>
-                            <li>💰 Token: $0.25 / M input, $1.25 / M output</li>
-                            <li>🖼️ Görsel: ~$0.0025–$0.005 / adet</li>
-                          </ul>
-                          
-                          <p className="mt-2"><strong>❌ GPT-3.5 Turbo:</strong> Sadece metin – resim desteklemez, ama sen açıklarsan uygun başlık üretir</p>
-                          <ul className="list-disc pl-5 space-y-1">
-                            <li>❌ Görsel desteklemez</li>
-                            <li>💰 Token: $0.50 / M input, $1.50 / M output</li>
-                          </ul>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="temperature" className="text-base font-medium">Varsayılan Yaratıcılık Seviyesi</Label>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-500">Kesin</span>
-                          <input
-                            type="range"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            value={aiSettings.temperature}
-                            onChange={(e) => setAiSettings(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
-                            className="flex-1"
-                            disabled={titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings}
-                          />
-                          <span className="text-sm text-gray-500">Yaratıcı</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">Sıcaklık değeri: {aiSettings.temperature} - Düşük değerler daha tutarlı, yüksek değerler daha yaratıcı sonuçlar üretir.</p>
+                    <div className="space-y-6">
+                      {/* Varsayılan AI Model Seçimi */}
+                      <div className="bg-gray-50 p-4 rounded-lg border">
+                        <h3 className="text-base font-medium mb-4">Varsayılan Ayarlar</h3>
                         
-                        {(titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings) && (
-                          <p className="text-xs text-amber-500 mt-2">
-                            <AlertCircle className="inline-block h-3 w-3 mr-1" />
-                            Bazı prompt'lar için özel ayarlar etkinleştirildiğinden varsayılan ayarlar devre dışı bırakıldı.
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="ai-model">AI Modeli</Label>
+                            <Select 
+                              value={aiSettings.model} 
+                              onValueChange={(value) => setAiSettings(prev => ({ ...prev, model: value }))}
+                              disabled={titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings}
+                            >
+                              <SelectTrigger className={titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings ? "opacity-50" : ""}>
+                                <SelectValue placeholder="Model seçin" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="gpt-4o">GPT-4o (En Gelişmiş)</SelectItem>
+                                <SelectItem value="gpt-4o-mini">GPT-4o Mini (Ekonomik)</SelectItem>
+                                <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Metin)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-                    <div className="border-t pt-6">
-                      <h3 className="text-lg font-medium flex items-center mb-4">
-                        <Sparkles className="h-5 w-5 text-amber-500 mr-2" />
-                        Özel Prompt Ayarları
-                      </h3>
-                      
-                      <div className="space-y-6">
+                          <div>
+                            <Label htmlFor="temperature">Yaratıcılık Seviyesi</Label>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm text-gray-500">Kesin</span>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.1"
+                                value={aiSettings.temperature}
+                                onChange={(e) => setAiSettings(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                                className="flex-1"
+                                disabled={titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings}
+                              />
+                              <span className="text-sm text-gray-500">Yaratıcı</span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Değer: {aiSettings.temperature}</p>
+                          </div>
+                          
+                          {(titleCustomSettings || tagsCustomSettings || categoryCustomSettings || focusTitleCustomSettings) && (
+                            <div className="text-xs text-amber-500 flex items-center">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Özel ayarlar etkinleştirildiğinden varsayılan ayarlar devre dışı
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="mt-4 pt-3 border-t">
+                          <h4 className="text-sm font-medium mb-2">Model Özellikleri</h4>
+                          <div className="space-y-2 text-xs text-gray-600">
+                            <div className="flex items-start">
+                              <div className="w-1/3">
+                                <Badge variant="outline" className="bg-blue-50">GPT-4o</Badge>
+                              </div>
+                              <div>Görsel destekli, detaylı analiz yapar</div>
+                            </div>
+                            <div className="flex items-start">
+                              <div className="w-1/3">
+                                <Badge variant="outline" className="bg-blue-50">GPT-4o Mini</Badge>
+                              </div>
+                              <div>Görsel destekli, ekonomik ve hızlı</div>
+                            </div>
+                            <div className="flex items-start">
+                              <div className="w-1/3">
+                                <Badge variant="outline" className="bg-gray-100">GPT-3.5 Turbo</Badge>
+                              </div>
+                              <div>Sadece metin, görsel desteklemez</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Prompt Ayarları */}
+                      <div className="space-y-4">
+                        <h3 className="text-base font-medium flex items-center">
+                          <Sparkles className="h-5 w-5 text-amber-500 mr-2" />
+                          Özel Prompt Ayarları
+                        </h3>
+                        
                         {/* Başlık Prompt'u */}
-                        <div className="border rounded-lg p-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <Label htmlFor="title-prompt" className="text-base font-medium">Başlık Prompt'u</Label>
+                        <div className="border rounded-lg">
+                          <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
+                            <Label htmlFor="title-prompt" className="font-medium">Başlık Prompt'u</Label>
                             <div className="flex items-center">
-                              <input 
-                                type="checkbox" 
+                              <Switch 
                                 id="title-custom-settings"
                                 checked={titleCustomSettings}
-                                onChange={(e) => {
-                                  setTitleCustomSettings(e.target.checked);
-                                  if (!e.target.checked) {
+                                onCheckedChange={(checked) => {
+                                  setTitleCustomSettings(checked);
+                                  if (!checked) {
                                     setAiSettings(prev => ({
                                       ...prev,
                                       title_model: null,
@@ -916,79 +925,82 @@ export default function SettingsPage() {
                                 }}
                                 className="mr-2"
                               />
-                              <Label htmlFor="title-custom-settings" className="text-sm cursor-pointer">Özel Model/Yaratıcılık</Label>
+                              <Label htmlFor="title-custom-settings" className="text-sm cursor-pointer">
+                                Özel Model/Yaratıcılık
+                              </Label>
                             </div>
                           </div>
                           
                           {titleCustomSettings && (
-                            <div className="mb-4 space-y-3 border-b pb-4">
-                              <div>
-                                <Label htmlFor="title-model" className="text-sm">Model</Label>
-                                <Select 
-                                  value={aiSettings.title_model || aiSettings.model} 
-                                  onValueChange={(value) => setAiSettings(prev => ({ ...prev, title_model: value }))}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Model seçin" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
-                                    <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
-                                    <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              
-                              <div>
-                                <Label htmlFor="title-temperature" className="text-sm">Yaratıcılık Seviyesi</Label>
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-xs text-gray-500">Kesin</span>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.1"
-                                    value={aiSettings.title_temperature !== null ? aiSettings.title_temperature : aiSettings.temperature}
-                                    onChange={(e) => setAiSettings(prev => ({ ...prev, title_temperature: parseFloat(e.target.value) }))}
-                                    className="flex-1"
-                                  />
-                                  <span className="text-xs text-gray-500">Yaratıcı</span>
+                            <div className="p-3 border-b space-y-3 bg-gray-50/50">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label htmlFor="title-model" className="text-sm">Model</Label>
+                                  <Select 
+                                    value={aiSettings.title_model || aiSettings.model} 
+                                    onValueChange={(value) => setAiSettings(prev => ({ ...prev, title_model: value }))}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Model seçin" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                                      <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Değer: {aiSettings.title_temperature !== null ? aiSettings.title_temperature : aiSettings.temperature}
-                                </p>
+                                
+                                <div>
+                                  <Label htmlFor="title-temperature" className="text-sm">Yaratıcılık</Label>
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="1"
+                                      step="0.1"
+                                      value={aiSettings.title_temperature !== null ? aiSettings.title_temperature : aiSettings.temperature}
+                                      onChange={(e) => setAiSettings(prev => ({ ...prev, title_temperature: parseFloat(e.target.value) }))}
+                                      className="flex-1"
+                                    />
+                                    <span className="text-xs w-6">
+                                      {aiSettings.title_temperature !== null ? aiSettings.title_temperature : aiSettings.temperature}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           )}
                           
-                          <Textarea
-                            id="title-prompt"
-                            value={aiSettings.title_prompt || ''}
-                            onChange={(e) => setAiSettings(prev => ({ ...prev, title_prompt: e.target.value }))}
-                            placeholder="Varsayılan başlık prompt'unu kullanmak için boş bırakın"
-                            rows={4}
-                          />
-                          <Button 
-                            variant="link" 
-                            className="text-xs p-0 h-auto mt-1"
-                            onClick={() => setAiSettings(prev => ({ ...prev, title_prompt: null }))}
-                          >
-                            Varsayılana sıfırla
-                          </Button>
+                          <div className="p-3">
+                            <Textarea
+                              id="title-prompt"
+                              value={aiSettings.title_prompt || ''}
+                              onChange={(e) => setAiSettings(prev => ({ ...prev, title_prompt: e.target.value }))}
+                              placeholder="Varsayılan başlık prompt'unu kullanmak için boş bırakın"
+                              rows={3}
+                            />
+                            <Button 
+                              variant="link" 
+                              className="text-xs p-0 h-auto mt-1"
+                              onClick={() => setAiSettings(prev => ({ ...prev, title_prompt: null }))}
+                            >
+                              Varsayılana sıfırla
+                            </Button>
+                          </div>
                         </div>
 
                         {/* Etiket Prompt'u */}
-                        <div className="border rounded-lg p-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <Label htmlFor="tags-prompt" className="text-base font-medium">Etiket Prompt'u</Label>
+                        <div className="border rounded-lg">
+                          <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
+                            <Label htmlFor="tags-prompt" className="font-medium">Etiket Prompt'u</Label>
                             <div className="flex items-center">
-                              <input 
-                                type="checkbox" 
+                              <Switch 
                                 id="tags-custom-settings"
                                 checked={tagsCustomSettings}
-                                onChange={(e) => {
-                                  setTagsCustomSettings(e.target.checked);
-                                  if (!e.target.checked) {
+                                onCheckedChange={(checked) => {
+                                  setTagsCustomSettings(checked);
+                                  if (!checked) {
                                     setAiSettings(prev => ({
                                       ...prev,
                                       tags_model: null,
@@ -1004,79 +1016,82 @@ export default function SettingsPage() {
                                 }}
                                 className="mr-2"
                               />
-                              <Label htmlFor="tags-custom-settings" className="text-sm cursor-pointer">Özel Model/Yaratıcılık</Label>
+                              <Label htmlFor="tags-custom-settings" className="text-sm cursor-pointer">
+                                Özel Model/Yaratıcılık
+                              </Label>
                             </div>
                           </div>
                           
                           {tagsCustomSettings && (
-                            <div className="mb-4 space-y-3 border-b pb-4">
-                              <div>
-                                <Label htmlFor="tags-model" className="text-sm">Model</Label>
-                                <Select 
-                                  value={aiSettings.tags_model || aiSettings.model} 
-                                  onValueChange={(value) => setAiSettings(prev => ({ ...prev, tags_model: value }))}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Model seçin" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
-                                    <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
-                                    <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              
-                              <div>
-                                <Label htmlFor="tags-temperature" className="text-sm">Yaratıcılık Seviyesi</Label>
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-xs text-gray-500">Kesin</span>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.1"
-                                    value={aiSettings.tags_temperature !== null ? aiSettings.tags_temperature : aiSettings.temperature}
-                                    onChange={(e) => setAiSettings(prev => ({ ...prev, tags_temperature: parseFloat(e.target.value) }))}
-                                    className="flex-1"
-                                  />
-                                  <span className="text-xs text-gray-500">Yaratıcı</span>
+                            <div className="p-3 border-b space-y-3 bg-gray-50/50">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label htmlFor="tags-model" className="text-sm">Model</Label>
+                                  <Select 
+                                    value={aiSettings.tags_model || aiSettings.model} 
+                                    onValueChange={(value) => setAiSettings(prev => ({ ...prev, tags_model: value }))}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Model seçin" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                                      <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Değer: {aiSettings.tags_temperature !== null ? aiSettings.tags_temperature : aiSettings.temperature}
-                                </p>
+                                
+                                <div>
+                                  <Label htmlFor="tags-temperature" className="text-sm">Yaratıcılık</Label>
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="1"
+                                      step="0.1"
+                                      value={aiSettings.tags_temperature !== null ? aiSettings.tags_temperature : aiSettings.temperature}
+                                      onChange={(e) => setAiSettings(prev => ({ ...prev, tags_temperature: parseFloat(e.target.value) }))}
+                                      className="flex-1"
+                                    />
+                                    <span className="text-xs w-6">
+                                      {aiSettings.tags_temperature !== null ? aiSettings.tags_temperature : aiSettings.temperature}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           )}
                           
-                          <Textarea
-                            id="tags-prompt"
-                            value={aiSettings.tags_prompt || ''}
-                            onChange={(e) => setAiSettings(prev => ({ ...prev, tags_prompt: e.target.value }))}
-                            placeholder="Varsayılan etiket prompt'unu kullanmak için boş bırakın"
-                            rows={4}
-                          />
-                          <Button 
-                            variant="link" 
-                            className="text-xs p-0 h-auto mt-1"
-                            onClick={() => setAiSettings(prev => ({ ...prev, tags_prompt: null }))}
-                          >
-                            Varsayılana sıfırla
-                          </Button>
+                          <div className="p-3">
+                            <Textarea
+                              id="tags-prompt"
+                              value={aiSettings.tags_prompt || ''}
+                              onChange={(e) => setAiSettings(prev => ({ ...prev, tags_prompt: e.target.value }))}
+                              placeholder="Varsayılan etiket prompt'unu kullanmak için boş bırakın"
+                              rows={3}
+                            />
+                            <Button 
+                              variant="link" 
+                              className="text-xs p-0 h-auto mt-1"
+                              onClick={() => setAiSettings(prev => ({ ...prev, tags_prompt: null }))}
+                            >
+                              Varsayılana sıfırla
+                            </Button>
+                          </div>
                         </div>
 
                         {/* Kategori Seçimi Prompt'u */}
-                        <div className="border rounded-lg p-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <Label htmlFor="category-prompt" className="text-base font-medium">Kategori Seçimi Prompt'u</Label>
+                        <div className="border rounded-lg">
+                          <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
+                            <Label htmlFor="category-prompt" className="font-medium">Kategori Seçimi Prompt'u</Label>
                             <div className="flex items-center">
-                              <input 
-                                type="checkbox" 
+                              <Switch 
                                 id="category-custom-settings"
                                 checked={categoryCustomSettings}
-                                onChange={(e) => {
-                                  setCategoryCustomSettings(e.target.checked);
-                                  if (!e.target.checked) {
+                                onCheckedChange={(checked) => {
+                                  setCategoryCustomSettings(checked);
+                                  if (!checked) {
                                     setAiSettings(prev => ({
                                       ...prev,
                                       category_model: null,
@@ -1092,79 +1107,82 @@ export default function SettingsPage() {
                                 }}
                                 className="mr-2"
                               />
-                              <Label htmlFor="category-custom-settings" className="text-sm cursor-pointer">Özel Model/Yaratıcılık</Label>
+                              <Label htmlFor="category-custom-settings" className="text-sm cursor-pointer">
+                                Özel Model/Yaratıcılık
+                              </Label>
                             </div>
                           </div>
                           
                           {categoryCustomSettings && (
-                            <div className="mb-4 space-y-3 border-b pb-4">
-                              <div>
-                                <Label htmlFor="category-model" className="text-sm">Model</Label>
-                                <Select 
-                                  value={aiSettings.category_model || aiSettings.model} 
-                                  onValueChange={(value) => setAiSettings(prev => ({ ...prev, category_model: value }))}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Model seçin" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
-                                    <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
-                                    <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              
-                              <div>
-                                <Label htmlFor="category-temperature" className="text-sm">Yaratıcılık Seviyesi</Label>
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-xs text-gray-500">Kesin</span>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.1"
-                                    value={aiSettings.category_temperature !== null ? aiSettings.category_temperature : aiSettings.temperature}
-                                    onChange={(e) => setAiSettings(prev => ({ ...prev, category_temperature: parseFloat(e.target.value) }))}
-                                    className="flex-1"
-                                  />
-                                  <span className="text-xs text-gray-500">Yaratıcı</span>
+                            <div className="p-3 border-b space-y-3 bg-gray-50/50">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label htmlFor="category-model" className="text-sm">Model</Label>
+                                  <Select 
+                                    value={aiSettings.category_model || aiSettings.model} 
+                                    onValueChange={(value) => setAiSettings(prev => ({ ...prev, category_model: value }))}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Model seçin" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                                      <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Değer: {aiSettings.category_temperature !== null ? aiSettings.category_temperature : aiSettings.temperature}
-                                </p>
+                                
+                                <div>
+                                  <Label htmlFor="category-temperature" className="text-sm">Yaratıcılık</Label>
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="1"
+                                      step="0.1"
+                                      value={aiSettings.category_temperature !== null ? aiSettings.category_temperature : aiSettings.temperature}
+                                      onChange={(e) => setAiSettings(prev => ({ ...prev, category_temperature: parseFloat(e.target.value) }))}
+                                      className="flex-1"
+                                    />
+                                    <span className="text-xs w-6">
+                                      {aiSettings.category_temperature !== null ? aiSettings.category_temperature : aiSettings.temperature}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           )}
                           
-                          <Textarea
-                            id="category-prompt"
-                            value={aiSettings.category_prompt || ''}
-                            onChange={(e) => setAiSettings(prev => ({ ...prev, category_prompt: e.target.value }))}
-                            placeholder="Varsayılan kategori prompt'unu kullanmak için boş bırakın"
-                            rows={4}
-                          />
-                          <Button 
-                            variant="link" 
-                            className="text-xs p-0 h-auto mt-1"
-                            onClick={() => setAiSettings(prev => ({ ...prev, category_prompt: null }))}
-                          >
-                            Varsayılana sıfırla
-                          </Button>
+                          <div className="p-3">
+                            <Textarea
+                              id="category-prompt"
+                              value={aiSettings.category_prompt || ''}
+                              onChange={(e) => setAiSettings(prev => ({ ...prev, category_prompt: e.target.value }))}
+                              placeholder="Varsayılan kategori prompt'unu kullanmak için boş bırakın"
+                              rows={3}
+                            />
+                            <Button 
+                              variant="link" 
+                              className="text-xs p-0 h-auto mt-1"
+                              onClick={() => setAiSettings(prev => ({ ...prev, category_prompt: null }))}
+                            >
+                              Varsayılana sıfırla
+                            </Button>
+                          </div>
                         </div>
 
                         {/* Odaklı Başlık Prompt'u */}
-                        <div className="border rounded-lg p-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <Label htmlFor="focus-title-prompt" className="text-base font-medium">Odaklı Başlık Prompt'u</Label>
+                        <div className="border rounded-lg">
+                          <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
+                            <Label htmlFor="focus-title-prompt" className="font-medium">Odaklı Başlık Prompt'u</Label>
                             <div className="flex items-center">
-                              <input 
-                                type="checkbox" 
+                              <Switch 
                                 id="focus-title-custom-settings"
                                 checked={focusTitleCustomSettings}
-                                onChange={(e) => {
-                                  setFocusTitleCustomSettings(e.target.checked);
-                                  if (!e.target.checked) {
+                                onCheckedChange={(checked) => {
+                                  setFocusTitleCustomSettings(checked);
+                                  if (!checked) {
                                     setAiSettings(prev => ({
                                       ...prev,
                                       focus_title_model: null,
@@ -1180,67 +1198,86 @@ export default function SettingsPage() {
                                 }}
                                 className="mr-2"
                               />
-                              <Label htmlFor="focus-title-custom-settings" className="text-sm cursor-pointer">Özel Model/Yaratıcılık</Label>
+                              <Label htmlFor="focus-title-custom-settings" className="text-sm cursor-pointer">
+                                Özel Model/Yaratıcılık
+                              </Label>
                             </div>
                           </div>
                           
                           {focusTitleCustomSettings && (
-                            <div className="mb-4 space-y-3 border-b pb-4">
-                              <div>
-                                <Label htmlFor="focus-title-model" className="text-sm">Model</Label>
-                                <Select 
-                                  value={aiSettings.focus_title_model || aiSettings.model} 
-                                  onValueChange={(value) => setAiSettings(prev => ({ ...prev, focus_title_model: value }))}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Model seçin" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="gpt-4o">🔵 GPT-4o (En Güçlü)</SelectItem>
-                                    <SelectItem value="gpt-4o-mini">🔵 GPT-4o Mini (Ekonomik)</SelectItem>
-                                    <SelectItem value="gpt-3.5-turbo">❌ GPT-3.5 Turbo (Görselsiz)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              
-                              <div>
-                                <Label htmlFor="focus-title-temperature" className="text-sm">Yaratıcılık Seviyesi</Label>
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-xs text-gray-500">Kesin</span>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.1"
-                                    value={aiSettings.focus_title_temperature !== null ? aiSettings.focus_title_temperature : aiSettings.temperature}
-                                    onChange={(e) => setAiSettings(prev => ({ ...prev, focus_title_temperature: parseFloat(e.target.value) }))}
-                                    className="flex-1"
-                                  />
-                                  <span className="text-xs text-gray-500">Yaratıcı</span>
+                            <div className="p-3 border-b space-y-3 bg-gray-50/50">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label htmlFor="focus-title-model" className="text-sm">Model</Label>
+                                  <Select 
+                                    value={aiSettings.focus_title_model || aiSettings.model} 
+                                    onValueChange={(value) => setAiSettings(prev => ({ ...prev, focus_title_model: value }))}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Model seçin" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                                      <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Değer: {aiSettings.focus_title_temperature !== null ? aiSettings.focus_title_temperature : aiSettings.temperature}
-                                </p>
+                                
+                                <div>
+                                  <Label htmlFor="focus-title-temperature" className="text-sm">Yaratıcılık</Label>
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="1"
+                                      step="0.1"
+                                      value={aiSettings.focus_title_temperature !== null ? aiSettings.focus_title_temperature : aiSettings.temperature}
+                                      onChange={(e) => setAiSettings(prev => ({ ...prev, focus_title_temperature: parseFloat(e.target.value) }))}
+                                      className="flex-1"
+                                    />
+                                    <span className="text-xs w-6">
+                                      {aiSettings.focus_title_temperature !== null ? aiSettings.focus_title_temperature : aiSettings.temperature}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           )}
                           
-                          <Textarea
-                            id="focus-title-prompt"
-                            value={aiSettings.focus_title_prompt || ''}
-                            onChange={(e) => setAiSettings(prev => ({ ...prev, focus_title_prompt: e.target.value }))}
-                            placeholder="Varsayılan odaklı başlık prompt'unu kullanmak için boş bırakın"
-                            rows={4}
-                          />
-                          <Button 
-                            variant="link" 
-                            className="text-xs p-0 h-auto mt-1"
-                            onClick={() => setAiSettings(prev => ({ ...prev, focus_title_prompt: null }))}
-                          >
-                            Varsayılana sıfırla
-                          </Button>
+                          <div className="p-3">
+                            <Textarea
+                              id="focus-title-prompt"
+                              value={aiSettings.focus_title_prompt || ''}
+                              onChange={(e) => setAiSettings(prev => ({ ...prev, focus_title_prompt: e.target.value }))}
+                              placeholder="Varsayılan odaklı başlık prompt'unu kullanmak için boş bırakın"
+                              rows={3}
+                            />
+                            <Button 
+                              variant="link" 
+                              className="text-xs p-0 h-auto mt-1"
+                              onClick={() => setAiSettings(prev => ({ ...prev, focus_title_prompt: null }))}
+                            >
+                              Varsayılana sıfırla
+                            </Button>
+                          </div>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t">
+                      <Button 
+                        onClick={handleSaveAiSettings} 
+                        disabled={savingAiSettings}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        {savingAiSettings ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {savingAiSettings ? "Kaydediliyor..." : "Ayarları Kaydet"}
+                      </Button>
                     </div>
                   </>
                 )}

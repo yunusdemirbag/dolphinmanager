@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon, Image, Video, ChevronDown, Wand2 } from "lucide-react"
+import { Loader2, Plus, X, Image as ImageIcon, Upload, GripVertical, RefreshCw, FileText, Tag as TagIcon, Image, Video, ChevronDown, Wand2, Clock } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode, ShippingProfile, EtsyProcessingProfile } from "@/types/product"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -513,6 +513,12 @@ export function ProductFormModal({
     product?.shipping_profile_id?.toString() || ""
   )
 
+  // İç state için submitting
+  const [internalSubmitting, setInternalSubmitting] = useState(false)
+  
+  // Dışarıdan gelen veya içeride yönetilen submitting durumu
+  const isSubmitting = externalSubmitting !== undefined ? externalSubmitting : internalSubmitting;
+
   // Additional fields to match Etsy
   const [tags, setTags] = useState<string[]>(product?.tags || [])
   const [newTag, setNewTag] = useState("")
@@ -983,12 +989,15 @@ export function ProductFormModal({
         const formData: Partial<Product> = {
           title,
           description,
-          price: price,
+          price: {
+            amount: Number(price) * 100,
+            divisor: 100,
+            currency_code: "USD"
+          },
           shipping_profile_id: Number(shippingProfileId),
           tags,
           has_variations: hasVariations,
           variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
-          state: state,
           shop_section_id: Number(selectedShopSection) || undefined,
           
           // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
@@ -999,13 +1008,13 @@ export function ProductFormModal({
           // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
           quantity: quantity || 4,
           taxonomy_id: taxonomyId,
-          who_made: "i_did",
-          when_made: "made_to_order",
-          is_supply: false,
           
           // Görseller
-          images: productImages.map(img => ({ file: img.file })),
-          video: videoFile ? { file: videoFile.file } : null,
+          images: productImages.map(img => ({ 
+            url: img.preview,
+            file: img.file 
+          })),
+          video_url: videoFile ? URL.createObjectURL(videoFile.file) : undefined,
         };
         
         const result = await onSubmit(formData, state);
@@ -1848,11 +1857,42 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     category?: number;
   }>({});
 
-  // İç state için submitting
-  const [internalSubmitting, setInternalSubmitting] = useState(false)
-  
-  // Dışarıdan gelen veya içeride yönetilen submitting durumu
-  const isSubmitting = externalSubmitting !== undefined ? externalSubmitting : internalSubmitting;
+  // Kuyruk olarak ekle fonksiyonu
+  const addToQueue = async (data: any) => {
+    setIsSubmitting(true);
+    try {
+      // Ürünü kuyruk sistemine ekle
+      const response = await fetch('/api/etsy/listings/queue', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Ürün kuyruğa eklenirken bir hata oluştu');
+      }
+
+      toast({
+        title: 'Ürün kuyruğa eklendi',
+        description: 'Ürün kuyruk sistemine eklendi. 2 dakika içinde Etsy\'ye yüklenecek.',
+        variant: 'success',
+      });
+
+      // Formu kapat
+      onClose();
+    } catch (error) {
+      console.error('Ürün kuyruğa eklenirken hata:', error);
+      toast({
+        title: 'Hata',
+        description: 'Ürün kuyruğa eklenirken bir hata oluştu.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -2373,7 +2413,10 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                         Kuyruğa Ekleniyor...
                       </>
                     ) : (
-                      <>Kuyrukla Ürün Ekle</>
+                      <>
+                        <Clock className="mr-2 h-4 w-4" />
+                        Kuyruk Olarak Ekle
+                      </>
                     )}
                   </Button>
                   <Button 

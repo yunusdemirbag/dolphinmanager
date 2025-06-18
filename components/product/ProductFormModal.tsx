@@ -1576,6 +1576,29 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     }
   }, [pressedKeys, isOpen, isSubmitting, title, shippingProfileId, productImages.length]);
 
+  // 123 kısa yolu - Kuyrukla ürün ekle
+  useEffect(() => {
+    if ((pressedKeys.has('control') && pressedKeys.has('alt') && pressedKeys.has('q')) && isOpen) {
+      if (isSubmitting) return;
+
+      // Basit validasyon kontrolü
+      if (!title || !shippingProfileId || productImages.length === 0) {
+        toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
+        return;
+      }
+
+      console.log('Ctrl+Alt+Q basıldı - kuyruk olarak ekleniyor...');
+      toast({
+        title: "🚀 Kuyruk İşlemi",
+        description: "Ürün kuyruğa ekleniyor..."
+      });
+
+      // Kuyrukla ürün ekle
+      handleQueueSubmit("draft");
+      setPressedKeys(new Set()); // Tuşları sıfırla
+    }
+  }, [pressedKeys, isOpen, isSubmitting, title, shippingProfileId, productImages.length]);
+
   // Resim bölümü
   const ImageSection = () => (
     <div className="space-y-4">
@@ -2387,23 +2410,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                     )}
                   </Button>
                   <Button 
-                    onClick={() => handleSubmit("active")} 
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Yükleniyor...
-                      </>
-                    ) : (
-                      <>Etsy'ye Yükle</>
-                    )}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button 
-                    variant="secondary" 
+                    variant="secondary"
                     onClick={() => handleQueueSubmit("draft")} 
                     disabled={isSubmitting}
                   >
@@ -2415,21 +2422,42 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                     ) : (
                       <>
                         <Clock className="mr-2 h-4 w-4" />
-                        Kuyruk Olarak Ekle
+                        Kuyruk Olarak Ekle <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">Ctrl+Alt+Q</kbd>
                       </>
                     )}
                   </Button>
+                </>
+              ) : (
+                <>
                   <Button 
+                    variant="outline" 
                     onClick={() => handleSubmit("draft")} 
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Ekleniyor...
+                        Taslak Ekleniyor...
                       </>
                     ) : (
-                      <>Ürün Ekle</>
+                      <>Taslak Olarak Ekle</>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="secondary"
+                    onClick={() => handleQueueSubmit("draft")} 
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Kuyruğa Ekleniyor...
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="mr-2 h-4 w-4" />
+                        Kuyruk Olarak Ekle <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">Ctrl+Alt+Q</kbd>
+                      </>
                     )}
                   </Button>
                 </>

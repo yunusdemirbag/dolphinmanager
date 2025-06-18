@@ -51,6 +51,8 @@ interface QueueStats {
 
 interface QueueSettings {
   default_interval: number
+  max_interval?: number
+  min_interval?: number
 }
 
 export function QueueManagementPanel() {
@@ -67,6 +69,7 @@ export function QueueManagementPanel() {
   })
   const [loading, setLoading] = useState(true)
   const [processorRunning, setProcessorRunning] = useState(false)
+  const [autoProcessorRunning, setAutoProcessorRunning] = useState(false)
   const [activeTab, setActiveTab] = useState("queue")
   const [countdown, setCountdown] = useState<number | null>(null)
 
@@ -95,8 +98,39 @@ export function QueueManagementPanel() {
       }
     }
 
+    const fetchQueueSettings = async () => {
+      try {
+        const response = await fetch('/api/etsy/queue-settings')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.settings) {
+            setQueueSettings(data.settings)
+          }
+        }
+      } catch (error) {
+        console.error('Kuyruk ayarları alınamadı:', error)
+      }
+    }
+
+    const fetchAutoProcessorStatus = async () => {
+      try {
+        const response = await fetch('/api/etsy/queue-processor/auto-start')
+        if (response.ok) {
+          const data = await response.json()
+          setAutoProcessorRunning(data.isRunning || false)
+        }
+      } catch (error) {
+        console.error('Otomatik işlemci durumu alınamadı:', error)
+      }
+    }
+
     fetchQueueData()
-    const interval = setInterval(fetchQueueData, 5000)
+    fetchQueueSettings()
+    fetchAutoProcessorStatus()
+    const interval = setInterval(() => {
+      fetchQueueData()
+      fetchAutoProcessorStatus()
+    }, 5000)
     return () => clearInterval(interval)
   }, [])
 
@@ -134,29 +168,29 @@ export function QueueManagementPanel() {
     } else {
       setCountdown(null)
     }
-  }, [queueItems, queueSettings.default_interval, processorRunning])
+  }, [queueItems, autoProcessorRunning])
 
   const handleStartQueue = async () => {
     try {
-      const response = await fetch('/api/etsy/queue-processor/start', { method: 'POST' })
+      const response = await fetch('/api/etsy/queue-processor/auto-start', { method: 'POST' })
       if (response.ok) {
-        setProcessorRunning(true)
-        toast({ title: "✅ Kuyruk Başlatıldı", description: "Ürünler işlenmeye başladı" })
+        setAutoProcessorRunning(true)
+        toast({ title: "✅ Otomatik Kuyruk Başlatıldı", description: `Ürünler ${queueSettings.default_interval} saniye aralıklarla işlenecek` })
       }
     } catch (error) {
-      toast({ title: "❌ Hata", description: "Kuyruk başlatılamadı", variant: "destructive" })
+      toast({ title: "❌ Hata", description: "Otomatik kuyruk başlatılamadı", variant: "destructive" })
     }
   }
 
   const handlePauseQueue = async () => {
     try {
-      const response = await fetch('/api/etsy/queue-processor/stop', { method: 'POST' })
+      const response = await fetch('/api/etsy/queue-processor/auto-start', { method: 'DELETE' })
       if (response.ok) {
-        setProcessorRunning(false)
-        toast({ title: "⏸️ Kuyruk Durduruldu", description: "İşlem geçici olarak durduruldu" })
+        setAutoProcessorRunning(false)
+        toast({ title: "⏸️ Otomatik Kuyruk Durduruldu", description: "Otomatik işlem durduruldu" })
       }
     } catch (error) {
-      toast({ title: "❌ Hata", description: "Kuyruk durdurulamadı", variant: "destructive" })
+      toast({ title: "❌ Hata", description: "Otomatik kuyruk durdurulamadı", variant: "destructive" })
     }
   }
 
@@ -185,9 +219,23 @@ export function QueueManagementPanel() {
   }
 
   const handleUpdateSettings = async (newSettings: Partial<QueueSettings>) => {
-    const updatedSettings = { ...queueSettings, ...newSettings }
-    setQueueSettings(updatedSettings)
-    toast({ title: "⚙️ Ayarlar Güncellendi", description: "Kuyruk ayarları başarıyla kaydedildi" })
+    try {
+      const response = await fetch('/api/etsy/queue-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.settings) {
+          setQueueSettings(data.settings)
+          toast({ title: "⚙️ Ayarlar Güncellendi", description: `Kuyruk aralığı ${data.settings.default_interval} saniye olarak ayarlandı` })
+        }
+      }
+    } catch (error) {
+      toast({ title: "❌ Hata", description: "Ayarlar güncellenemedi", variant: "destructive" })
+    }
   }
 
   const getStatusColor = (state: string) => {
@@ -313,22 +361,30 @@ export function QueueManagementPanel() {
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Button
-              onClick={processorRunning ? handlePauseQueue : handleStartQueue}
-              variant={processorRunning ? "secondary" : "default"}
+              onClick={autoProcessorRunning ? handlePauseQueue : handleStartQueue}
+              variant={autoProcessorRunning ? "secondary" : "default"}
               className="flex items-center gap-2"
             >
-              {processorRunning ? (
+              {autoProcessorRunning ? (
                 <>
                   <Pause className="w-4 h-4" />
-                  Duraklat
+                  Otomatik Durdur
                 </>
               ) : (
                 <>
                   <Play className="w-4 h-4" />
-                  Başlat
+                  Otomatik Başlat
                 </>
               )}
             </Button>
+            
+            {/* Durum göstergesi */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
+              <div className={`w-2 h-2 rounded-full ${autoProcessorRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <span className="text-sm text-gray-600">
+                {autoProcessorRunning ? `Otomatik İşleme Aktif (${formatInterval(queueSettings.default_interval)} aralık)` : 'Otomatik İşleme Kapalı'}
+              </span>
+            </div>
 
             <Button onClick={handleProcessNow} variant="outline" className="flex items-center gap-2">
               <Zap className="w-4 h-4" />
@@ -382,7 +438,7 @@ export function QueueManagementPanel() {
                               {new Date(item.created_at).toLocaleString('tr-TR')}
                             </p>
                             {/* Countdown timer sadece ilk pending item'da göster */}
-                            {isFirstPending && countdown !== null && processorRunning && (
+                            {isFirstPending && countdown !== null && autoProcessorRunning && (
                               <div className="flex items-center gap-1 mt-2">
                                 <Timer className="w-3 h-3 text-orange-500" />
                                 <span className="text-xs text-orange-600 font-mono bg-orange-50 px-2 py-1 rounded">
@@ -441,14 +497,14 @@ export function QueueManagementPanel() {
                     onValueChange={([value]) => 
                       handleUpdateSettings({ default_interval: value })
                     }
-                    max={120}
-                    min={15}
-                    step={15}
+                    max={queueSettings.max_interval || 120}
+                    min={queueSettings.min_interval || 5}
+                    step={5}
                     className="mt-2"
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>15sn</span>
-                    <span>2dk</span>
+                    <span>{queueSettings.min_interval || 5}sn</span>
+                    <span>{Math.floor((queueSettings.max_interval || 120) / 60)}dk</span>
                   </div>
                 </div>
               </div>

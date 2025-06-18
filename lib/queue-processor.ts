@@ -29,6 +29,7 @@ export function startQueueProcessor() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'X-Internal-API-Key': process.env.INTERNAL_API_KEY || 'queue-processor-key',
         },
       });
 

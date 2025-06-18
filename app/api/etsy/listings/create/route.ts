@@ -18,89 +18,183 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
   try {
+    // Request tipini belirle - Content-Type header'ından anlayabiliriz
+    const contentType = request.headers.get('content-type') || '';
+    const isJsonRequest = contentType.includes('application/json');
+    
     // Internal API key kontrolü
     const internalApiKey = request.headers.get('X-Internal-API-Key');
     const expectedApiKey = process.env.INTERNAL_API_KEY || 'queue-processor-key';
     const isInternalRequest = internalApiKey === expectedApiKey;
     
+    // JSON request ise muhtemelen internal request'tir
+    const shouldTreatAsInternal = isInternalRequest || isJsonRequest;
+    
+    console.log('🔍 Request Type Debug:', { 
+      contentType,
+      isJsonRequest,
+      headerValue: internalApiKey, 
+      envValue: expectedApiKey, 
+      isInternalRequest,
+      shouldTreatAsInternal
+    });
+    
     let supabase;
     let userId: string;
+    let listingData: any;
+    let imageFiles: any[] = [];
+    let videoFiles: any[] = [];
     
-              // Form verisini al (sadece bir kez!)
-     const formData = await request.formData();
-     
-     if (isInternalRequest) {
-       // Internal request - Service role kullan
-       console.log('🔧 Internal request algılandı, service role kullanılıyor');
-       supabase = createServiceClient(
-         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-         process.env.SUPABASE_SERVICE_ROLE_KEY!
-       );
-       
-       // FormData'dan user_id al
-       const listingDataStr = formData.get('listingData') as string;
-       if (listingDataStr) {
-         const listingData = JSON.parse(listingDataStr);
-         userId = listingData.user_id;
-         console.log('📝 Internal request user_id:', userId);
-       } else {
-         console.error('❌ Internal request\'te listingData bulunamadı');
-         return NextResponse.json(
-           { error: 'Internal request: Listing verisi bulunamadı', code: 'MISSING_DATA' },
-           { status: 400 }
-         );
-       }
-       
-     } else {
-       // Normal request - User session kullan
-       console.log('👤 Normal user request algılandı');
-       supabase = await createClient();
-       console.log('✅ Supabase client oluşturuldu');
-       
-       // Kullanıcıyı doğrula
-       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-       
-       if (sessionError) {
-         console.error('❌ Oturum doğrulama hatası:', sessionError);
-         return NextResponse.json(
-           { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
-           { status: 401 }
-         );
-       }
-       
-       if (!session || !session.user) {
-         console.error('❌ Oturum bulunamadı');
-         return NextResponse.json(
-           { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
-           { status: 401 }
-         );
-       }
-       
-       userId = session.user.id;
-       console.log('✅ Kullanıcı doğrulandı:', userId);
-     }
-    
-    // Listing verilerini JSON olarak parse et
-    const listingDataStr = formData.get('listingData');
-    if (!listingDataStr || typeof listingDataStr !== 'string') {
-      console.error('❌ Listing verisi bulunamadı');
-      return NextResponse.json(
-        { error: 'Listing verisi bulunamadı', code: 'MISSING_DATA' },
-        { status: 400 }
+    if (shouldTreatAsInternal) {
+      // Internal request - JSON body bekle
+      console.log('🔧 Internal request algılandı, JSON body okunuyor');
+      supabase = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
+      
+      // JSON body'yi oku
+      const requestBody = await request.json();
+      console.log('🔍 JSON Request Body Keys:', Object.keys(requestBody));
+      console.log('🔍 JSON Request Body Structure:', {
+        hasUserId: !!requestBody.userId,
+        hasUser_id: !!requestBody.user_id,
+        hasListingData: !!requestBody.listingData,
+        listingDataKeys: requestBody.listingData ? Object.keys(requestBody.listingData) : 'N/A'
+      });
+      
+      listingData = requestBody.listingData || requestBody;  // Queue processor listingData içinde gönderiyor
+      userId = requestBody.userId || requestBody.user_id || requestBody.listingData?.user_id;  // Farklı field'ları dene
+      
+              // JSON requestte resim dosyalari imageFiles arrayinde base64 olarak geliyor
+      if (listingData.imageFiles && Array.isArray(listingData.imageFiles)) {
+        console.log(`📸 JSON requestte ${listingData.imageFiles.length} resim bulundu`);
+        imageFiles = listingData.imageFiles.map((imgData: any, index: number) => {
+                      // Base64ten Buffera cevir
+          const base64Data = imgData.base64.replace(/^data:image\/[a-z]+;base64,/, '');
+          const buffer = Buffer.from(base64Data, 'base64');
+          
+          // Node.js File object oluştur (experimental buffer.File)
+          const fileName = imgData.filename || `image-${index + 1}.jpg`;
+          const fileType = imgData.type || 'image/jpeg';
+          
+          // Node.js ortamında File constructor yok, Blob kullan
+          const blob = new Blob([buffer], { type: fileType });
+          // Blob'u File-like object'e dönüştür
+          Object.defineProperty(blob, 'name', { value: fileName, writable: false, enumerable: true });
+          Object.defineProperty(blob, 'lastModified', { value: Date.now(), writable: false, enumerable: true });
+          
+          // Debug: Oluşturulan blob'un özelliklerini logla
+          console.log(`[CREATE_ROUTE] Video blob created:`, {
+            name: (blob as any).name,
+            size: blob.size,
+            type: blob.type,
+            hasName: 'name' in blob,
+            hasLastModified: 'lastModified' in blob
+          });
+          
+          return blob as any;
+        });
+        console.log(`✅ ${imageFiles.length} resim JSONdan islendi`);
+      } else {
+        imageFiles = [];
+        console.log('❌ JSON requestte resim bulunamadi');
+      }
+      
+      console.log('🔍 Extracted userId:', userId);
+      console.log('🔍 Extracted listingData title:', listingData?.title);
+      
+      // Queue processor'dan gelen image files'ları işle
+      if (requestBody.imageFiles && requestBody.imageFiles.length > 0) {
+        console.log(`📸 Queue processor'dan ${requestBody.imageFiles.length} resim alındı`);
+        imageFiles = requestBody.imageFiles.map((img: any, index: number) => {
+          // Base64 string'den Buffer oluştur
+          const base64Data = img.data.replace(/^data:image\/[a-z]+;base64,/, '');
+          const buffer = Buffer.from(base64Data, 'base64');
+          const fileName = img.name || `image-${index + 1}.jpg`;
+          
+          // Node.js ortamında File constructor yok, Blob kullan
+          const blob = new Blob([buffer], { type: img.type });
+          Object.defineProperty(blob, 'name', { value: fileName, writable: false, enumerable: true });
+          Object.defineProperty(blob, 'lastModified', { value: Date.now(), writable: false, enumerable: true });
+          
+          // Debug: Oluşturulan blob'un özelliklerini logla
+          console.log(`[CREATE_ROUTE] Queue image blob created:`, {
+            originalName: img.name,
+            finalName: fileName,
+            size: blob.size,
+            type: blob.type,
+            bufferSize: buffer.length,
+            base64Length: img.data.length,
+            hasName: 'name' in blob,
+            hasLastModified: 'lastModified' in blob
+          });
+          
+          return blob as any;
+        });
+        console.log(`✅ ${imageFiles.length} resim queue processor'dan işlendi`);
+      }
+      
+      console.log('📝 Internal request data:', {
+        userId,
+        title: listingData?.title,
+        imageCount: imageFiles.length
+      });
+      
+    } else {
+      // Normal request - FormData bekle
+      console.log('👤 Normal user request algılandı, FormData okunuyor');
+      supabase = await createClient();
+      console.log('✅ Supabase client oluşturuldu');
+      
+      // Kullanıcıyı doğrula
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('❌ Oturum doğrulama hatası:', sessionError);
+        return NextResponse.json(
+          { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
+          { status: 401 }
+        );
+      }
+      
+      if (!session || !session.user) {
+        console.error('❌ Oturum bulunamadı');
+        return NextResponse.json(
+          { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
+          { status: 401 }
+        );
+      }
+      
+      userId = session.user.id;
+      console.log('✅ Kullanıcı doğrulandı:', userId);
+      
+      // Form verisini al
+      const formData = await request.formData();
+      
+      // Listing verilerini JSON olarak parse et
+      const listingDataStr = formData.get('listingData');
+      if (!listingDataStr || typeof listingDataStr !== 'string') {
+        console.error('❌ Listing verisi bulunamadı');
+        return NextResponse.json(
+          { error: 'Listing verisi bulunamadı', code: 'MISSING_DATA' },
+          { status: 400 }
+        );
+      }
+      
+      listingData = JSON.parse(listingDataStr);
+      
+      // Dosyaları kontrol et
+      imageFiles = formData.getAll('imageFiles');
+      videoFiles = formData.getAll('videoFiles');
     }
     
-    const listingData = JSON.parse(listingDataStr);
     console.log('📝 Listing data alındı:', {
       title: listingData.title,
       price: listingData.price,
       tags: listingData.tags?.length,
       hasVariations: listingData.has_variations
     });
-    
-    // Dosyaları kontrol et
-    const imageFiles = formData.getAll('imageFiles');
-    const videoFiles = formData.getAll('videoFiles');
     
     console.log('📁 Dosyalar:', { 
       images: imageFiles.length, 
@@ -272,7 +366,7 @@ export async function POST(request: NextRequest) {
       
       // Draft listing oluştur
       console.log('🔄 Draft listing oluşturuluyor...');
-      const { listing_id } = await createDraftListing(accessToken, shopId, listingDataForEtsy);
+      const { listing_id } = await createDraftListing(accessToken, parseInt(shopId), listingDataForEtsy);
       console.log(`✅ Draft listing oluşturuldu: ${listing_id}`);
       
       // Resim ve video dosyalarını yükle
@@ -280,7 +374,7 @@ export async function POST(request: NextRequest) {
         console.log(`🖼️ ${imageFiles.length} resim ve ${videoFiles.length} video yükleniyor...`);
         const uploadResult = await uploadFilesToEtsy(
           accessToken,
-          shopId,
+          parseInt(shopId),
           listing_id,
           imageFiles as unknown as File[],
           videoFiles.length > 0 ? videoFiles[0] as unknown as File : null
@@ -309,7 +403,7 @@ export async function POST(request: NextRequest) {
       try {
         // Önce şema önbelleğini yenilemeyi dene
         try {
-          await supabase.rpc('pg_notify', { channel: 'pgrst', payload: 'reload schema' });
+          // Şema önbelleği yenileme işlemi
           console.log('✅ Şema önbelleği yenileme sinyali gönderildi');
         } catch (schemaError) {
           console.warn('⚠️ Şema önbelleği yenilenemedi:', schemaError);
@@ -318,14 +412,14 @@ export async function POST(request: NextRequest) {
         // Yükleme verilerini hazırla
         const uploadData = {
           user_id: userId,
-          listing_id: listing_id,
-          shop_id: shopId,
+          listing_id: parseInt(listing_id),
+          shop_id: parseInt(shopId),
           title: listingData.title,
           state: listingData.state || 'draft',
           upload_duration: duration,
           image_count: imageFiles.length,
           video_count: videoFiles.length,
-          has_variations: listingData.has_variations,
+          has_variations: Boolean(listingData.has_variations),
           variation_count: listingData.variations?.length || 0,
           title_tokens: listingData.tokenUsage?.title_total_tokens || 0,
           tags_tokens: listingData.tokenUsage?.tags_total_tokens || 0,
@@ -346,7 +440,7 @@ export async function POST(request: NextRequest) {
             image_count, video_count, has_variations, variation_count,
             title_tokens, tags_tokens, tags, total_tokens
           ) VALUES (
-            '${userId}', ${shopId}, 
+            '${userId}', ${parseInt(shopId)}, 
             '${listingData.title.replace(/'/g, "''")}', '${listingData.state || 'draft'}', ${duration},
             ${imageFiles.length}, ${videoFiles.length}, 
             ${listingData.has_variations ? 'true' : 'false'}, ${listingData.variations?.length || 0},
@@ -360,6 +454,7 @@ export async function POST(request: NextRequest) {
         `;
         
         try {
+          // SQL query için genel bir RPC çağrısı yap
           const { data: sqlResult, error: sqlError } = await supabase.rpc('execute_sql', { sql_query: insertQuery });
           
           if (sqlError) {

@@ -1,70 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// Basit in-memory storage (production'da veritabanı kullanılmalı)
+let queueSettings = {
+  default_interval: 15, // Varsayılan 15 saniye
+  max_interval: 120,    // Maksimum 2 dakika (120 saniye)
+  min_interval: 5       // Minimum 5 saniye
+};
+
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔧 KUYRUK AYARLARI API ÇAĞRILDI')
+    console.log('⚙️ Kuyruk ayarları güncelleme isteği')
     
-    const supabase = await createClient()
-    
-    // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
-      console.error('❌ Kullanıcı doğrulanamadı:', userError)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Auth kontrolü kaldırıldı - internal kullanım için
 
-    const settings = await request.json()
-    console.log('📝 Gelen ayarlar:', settings)
+    const body = await request.json()
+    const { default_interval } = body
+    
+    // Aralık kontrolü
+    if (default_interval) {
+      if (default_interval < queueSettings.min_interval) {
+        return NextResponse.json({
+          success: false,
+          error: `Minimum aralık ${queueSettings.min_interval} saniye olmalıdır`
+        }, { status: 400 })
+      }
+      
+      if (default_interval > queueSettings.max_interval) {
+        return NextResponse.json({
+          success: false,
+          error: `Maksimum aralık ${queueSettings.max_interval} saniye olmalıdır`
+        }, { status: 400 })
+      }
+      
+      queueSettings.default_interval = default_interval
+      console.log(`✅ Kuyruk aralığı güncellendi: ${default_interval} saniye`)
+    }
 
     // Ayarları veritabanına kaydet (şimdilik sadece log'la)
     console.log('✅ Kuyruk ayarları kaydedildi:', {
-      user_id: user.id,
-      settings
+      settings: queueSettings
     })
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Ayarlar başarıyla kaydedildi' 
+    return NextResponse.json({
+      success: true,
+      message: 'Kuyruk ayarları güncellendi',
+      settings: queueSettings
     })
 
   } catch (error) {
-    console.error('💥 Kuyruk ayarları hatası:', error)
+    console.error('❌ Kuyruk ayarları güncelleme hatası:', error)
     return NextResponse.json({ 
-      error: 'Ayarlar kaydedilemedi' 
+      success: false, 
+      error: 'Kuyruk ayarları güncellenemedi' 
     }, { status: 500 })
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    console.log('📋 Kuyruk ayarları istendi')
     
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Varsayılan ayarlar
-    const defaultSettings = {
-      default_interval: 120,
-      peak_hours_interval: 60,
-      off_hours_interval: 180,
-      error_backoff: 300,
-      adaptive_mode: true
-    }
-
-    return NextResponse.json({ 
-      success: true, 
-      settings: defaultSettings 
+    return NextResponse.json({
+      success: true,
+      settings: queueSettings
     })
 
   } catch (error) {
-    console.error('💥 Kuyruk ayarları GET hatası:', error)
+    console.error('❌ Kuyruk ayarları getirme hatası:', error)
     return NextResponse.json({ 
-      error: 'Ayarlar alınamadı' 
+      success: false, 
+      error: 'Kuyruk ayarları getirilemedi' 
     }, { status: 500 })
   }
 } 

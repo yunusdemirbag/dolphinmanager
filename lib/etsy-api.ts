@@ -2315,16 +2315,38 @@ export async function addInventoryWithVariations(accessToken: string, listingId:
     }
 }
 
+// File-like interface for Node.js compatibility
+interface FileInterface {
+    name: string;
+    size: number;
+    type: string;
+    arrayBuffer(): Promise<ArrayBuffer>;
+    stream(): ReadableStream;
+    text(): Promise<string>;
+}
+
 export async function uploadFilesToEtsy(
     accessToken: string,
     shopId: number,
     listingId: number,
-    images: File[],
-    video: File | null,
+    images: (File | FileInterface | Blob)[],
+    video: (File | FileInterface | Blob) | null,
     onProgress?: (current: number, total: number) => void
 ) {
     console.log(`[ETSY_API] Starting media upload for listing ${listingId}`);
     console.log(`[ETSY_API] Found ${images.length} images and ${video ? '1 video' : 'no video'} to upload`);
+    
+    // Debug: Resim dosyalarının detaylarını logla
+    images.forEach((image, index) => {
+        console.log(`[ETSY_API] Image ${index + 1}:`, {
+            name: (image as any).name || `image-${index + 1}`,
+            size: `${(image.size / 1024 / 1024).toFixed(2)}MB`,
+            type: image.type,
+            constructor: image.constructor.name,
+            isFile: typeof File !== 'undefined' && image instanceof File,
+            isBlob: image instanceof Blob
+        });
+    });
 
     const imageIdResults: (number|null)[] = [];
     const maxFileSize = 20 * 1024 * 1024; // 20MB limit
@@ -2353,9 +2375,16 @@ export async function uploadFilesToEtsy(
 
         while (retryCount < maxRetries && !success) {
             try {
-                console.log(`[ETSY_API] Uploading image ${i + 1}/${images.length}: ${image.name} (${(image.size / 1024 / 1024).toFixed(2)}MB)`);
+                const imageName = (image as any).name || `image-${i + 1}`;
+                console.log(`[ETSY_API] Uploading image ${i + 1}/${images.length}: ${imageName} (${(image.size / 1024 / 1024).toFixed(2)}MB)`);
                 const formData = new FormData();
-                formData.append('image', image);
+                
+                // Node.js ortamında Blob'u File-like object olarak append et
+                // Etsy API için doğru format sağla
+                const imageBlob = image as Blob;
+                
+                // Node.js ortamında FormData append için doğru format
+                formData.append('image', imageBlob, imageName);
                 formData.append('rank', (i + 1).toString());
 
                 // Timeout ile istek gönder
@@ -2376,10 +2405,12 @@ export async function uploadFilesToEtsy(
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error(`[ETSY_API] ❌ Failed to upload image ${image.name}:`, {
+                    console.error(`[ETSY_API] ❌ Failed to upload image ${imageName}:`, {
                         status: response.status,
                         statusText: response.statusText,
-                        error: errorText
+                        error: errorText,
+                        headers: Object.fromEntries(response.headers.entries()),
+                        url: response.url
                     });
 
                     // Rate limit hatası ise bekle ve tekrar dene
@@ -2470,8 +2501,24 @@ export async function uploadFilesToEtsy(
     }
 
     // Eğer hiç resim yüklenmediyse hata fırlat
-    if (successfulUploads === 0) {
-        throw new Error('Hiçbir resim yüklenemedi. Lütfen dosya boyutlarını ve internet bağlantınızı kontrol edin.');
+    if (successfulUploads === 0 && images.length > 0) {
+        // Detaylı hata bilgisi için son hataları kontrol et
+        const failureReasons = imageIdResults.map((result, index) => {
+            if (result === null) {
+                const image = images[index];
+                return `Image ${index + 1} (${image.name}): Size ${(image.size / 1024 / 1024).toFixed(2)}MB, Type ${image.type}`;
+            }
+            return null;
+        }).filter(Boolean);
+        
+        console.error('[ETSY_API] 🚨 Upload failure details:', failureReasons);
+        throw new Error(`Hiçbir resim yüklenemedi. Detaylar: ${failureReasons.join('; ')}`);
+    }
+    
+    // Eğer resim yoksa sadece uyarı ver, hata fırlatma
+    if (images.length === 0) {
+        console.warn('[ETSY_API] ⚠️ No images to upload');
+        return { uploadedImages: 0, totalImages: 0 };
     }
 }
 

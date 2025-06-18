@@ -30,14 +30,14 @@ export async function GET(request: NextRequest) {
     
     console.log('🔧 Service role ile Supabase client oluşturuldu (RLS bypass)');
     
-    // Bekleyen öğeleri al
+    // Bekleyen öğeleri al - TEK SEFERDE SADECE 1 ÜRÜN İŞLE
     const { data: pendingItems, error: queryError } = await supabase
         .from('etsy_uploads')
         .select('*')
         .eq('state', 'pending')
       .lte('scheduled_at', new Date().toISOString())
       .order('created_at', { ascending: true })
-      .limit(5);
+      .limit(1); // ✅ Tek seferde sadece 1 ürün işle
     
     if (queryError) {
       console.error('❌ Kuyruk sorgu hatası:', queryError);
@@ -118,44 +118,34 @@ export async function GET(request: NextRequest) {
           });
         }
         
-        // FormData oluştur
-        const formData = new FormData();
-        
-        // Listing verilerini JSON string olarak ekle
-        const listingDataForForm = {
-          user_id: item.user_id,
-          shop_id: item.shop_id,
-          ...item.product_data
+        // JSON body oluştur (Internal API için)
+        const requestBody = {
+          userId: item.user_id,
+          listingData: {
+            user_id: item.user_id,
+            shop_id: item.shop_id,
+            ...item.product_data
+          },
+          imageFiles: imageData.map(img => ({
+            data: img.base64,
+            type: img.type,
+            name: img.filename
+          }))
         };
-        formData.append('listingData', JSON.stringify(listingDataForForm));
         
-        // Base64 resimlerini Buffer'a dönüştür ve ekle
-        for (let i = 0; i < imageData.length; i++) {
-          const imgData = imageData[i];
-          const blob = base64ToBlob(imgData.base64, imgData.filename, imgData.type);
-          // Node.js FormData için Buffer + filename
-          const file = new Blob([blob.buffer], { type: blob.type });
-          formData.append('imageFiles', file, blob.name);
-        }
-        
-        // Video dosyalarını ekle (varsa)
-        if (item.product_data?.videoFiles && Array.isArray(item.product_data.videoFiles)) {
-          for (const videoFile of item.product_data.videoFiles) {
-            if (videoFile.base64) {
-              const blob = base64ToBlob(videoFile.base64, videoFile.filename, videoFile.type);
-              const file = new Blob([blob.buffer], { type: blob.type });
-              formData.append('videoFiles', file, blob.name);
-            }
-          }
-        }
+        console.log('📤 JSON request body hazırlandı:', {
+          userId: requestBody.userId,
+          listingTitle: requestBody.listingData?.title,
+          imageCount: requestBody.imageFiles?.length || 0
+        });
         
         const createResponse = await fetch(`${request.nextUrl.origin}/api/etsy/listings/create`, {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             'X-Internal-API-Key': process.env.INTERNAL_API_KEY || 'queue-processor-key'
-            // Content-Type otomatik olarak multipart/form-data olacak
           },
-          body: formData
+          body: JSON.stringify(requestBody)
         });
         
         if (!createResponse.ok) {

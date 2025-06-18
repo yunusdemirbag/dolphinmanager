@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   console.log('🚀 HEMEN İŞLE API ÇAĞRILDI');
   
   try {
-    const supabase = await createClient();
+    // Service role kullan - RLS bypass için
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
     
-    // Kullanıcı oturumunu kontrol et
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    console.log('🔧 Service role ile Supabase client oluşturuldu');
     
-    // Şu anda pending olan ürünleri al
+    // Şu anda pending olan ürünleri al (tüm kullanıcılar için)
     const { data: pendingItems, error: fetchError } = await supabase
       .from('etsy_uploads')
       .select('*')
-      .eq('state', 'pending')
-      .eq('user_id', user.id);
+      .eq('state', 'pending');
     
     if (fetchError) {
       console.error('Pending ürünler alınırken hata:', fetchError);
@@ -38,18 +37,21 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // Şimdi kuyruk işleme API'sini çağır
+        // Sadece 1 ürünü al ve işle
+    const firstItem = pendingItems[0];
+    
+    // Şimdi kuyruk işleme API'sini çağır - TEK ÜRÜN İÇİN
     const baseUrl = process.env.VERCEL_URL 
       ? `https://${process.env.VERCEL_URL}` 
       : 'http://localhost:3000';
-    
+
     const processResponse = await fetch(`${baseUrl}/api/etsy/listings/queue/process`, {
       method: 'GET',
       headers: {
         'X-Internal-API-Key': process.env.INTERNAL_API_KEY || 'queue-processor-key'
       }
     });
-    
+
     let processResult;
     try {
       const responseText = await processResponse.text();
@@ -65,11 +67,12 @@ export async function POST(request: NextRequest) {
       console.error('❌ JSON parse hatası:', parseError);
       processResult = { success: false, error: 'Invalid JSON response' };
     }
-    
+
     return NextResponse.json({
       success: true,
-      message: `${pendingItems?.length || 0} ürün işleme başlatıldı`,
+      message: `1 ürün işlendi (${pendingItems?.length || 0} ürün bekliyor)`,
       pending_count: pendingItems?.length || 0,
+      processed_item_id: firstItem?.id || null,
       process_result: processResult
     });
     

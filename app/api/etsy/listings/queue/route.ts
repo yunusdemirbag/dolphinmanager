@@ -6,32 +6,41 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
+    console.log("Kuyruk API'sine istek geldi");
+    
     // Supabase client oluştur
     const supabase = await createClient();
+    console.log("Supabase client oluşturuldu");
     
     // Kullanıcı oturumunu kontrol et
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
+      console.log("Oturum bulunamadı");
       return NextResponse.json(
         { success: false, message: "Oturum açmanız gerekiyor" },
         { status: 401 }
       );
     }
+    console.log("Kullanıcı oturumu bulundu:", session.user.id);
 
     // Etsy mağaza bilgilerini al
     const stores = await getEtsyStores(session.user.id);
     if (!stores || stores.length === 0) {
+      console.log("Bağlı Etsy mağazası bulunamadı");
       return NextResponse.json(
         { success: false, message: "Bağlı Etsy mağazası bulunamadı" },
         { status: 404 }
       );
     }
+    console.log("Etsy mağaza bilgileri alındı:", stores[0].shop_id);
 
     // İlk mağazayı kullan
     const store = stores[0];
     
     // İstek gövdesini al
     const productData = await req.json();
+    console.log("Alınan ürün verisi türü:", typeof productData);
+    console.log("Ürün verisi anahtarları:", Object.keys(productData));
     
     // Kuyruk kaydı oluştur
     const { data: queueData, error: queueError } = await supabase
@@ -49,10 +58,12 @@ export async function POST(req: NextRequest) {
     if (queueError) {
       console.error("Kuyruk kaydı oluşturma hatası:", queueError);
       return NextResponse.json(
-        { success: false, message: "Ürün kuyruğa eklenirken bir hata oluştu" },
+        { success: false, message: "Ürün kuyruğa eklenirken bir hata oluştu", error: queueError },
         { status: 500 }
       );
     }
+    
+    console.log("Kuyruk kaydı başarıyla oluşturuldu:", queueData.id);
     
     // Başarılı yanıt
     return NextResponse.json({
@@ -65,7 +76,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Ürün kuyruğa eklenirken hata:", error);
     return NextResponse.json(
-      { success: false, message: "Ürün kuyruğa eklenirken bir hata oluştu" },
+      { success: false, message: "Ürün kuyruğa eklenirken bir hata oluştu", error: String(error) },
       { status: 500 }
     );
   }

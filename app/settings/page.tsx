@@ -57,6 +57,7 @@ import {
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
+import { titlePrompt, tagPrompt, categoryPrompt, focusTitlePrompt } from "@/lib/openai-yonetim"
 
 interface ShopSettings {
   shop_id: number
@@ -137,7 +138,7 @@ export default function SettingsPage() {
     destination_region: "none"
   })
   const [aiSettings, setAiSettings] = useState<AISettings>({
-    model: 'gpt-4o-mini',
+    model: "gpt-4.1-mini",
     temperature: 0.7,
     title_prompt: null,
     tags_prompt: null,
@@ -163,6 +164,22 @@ export default function SettingsPage() {
   
   const [savingAiSettings, setSavingAiSettings] = useState(false);
   const [aiSettingsLoaded, setAiSettingsLoaded] = useState(false);
+
+  // Varsayılan prompt'ları tutacak state
+  const [defaultPrompts, setDefaultPrompts] = useState({
+    title: "",
+    tags: "",
+    category: "",
+    focus_title: ""
+  });
+
+  // Varsayılan prompt'ları gösterme durumunu tutacak state
+  const [showDefaultPrompts, setShowDefaultPrompts] = useState({
+    title: false,
+    tags: false,
+    category: false,
+    focus_title: false
+  });
 
   useEffect(() => {
     loadSettings()
@@ -333,6 +350,14 @@ export default function SettingsPage() {
         setTagsCustomSettings(!!data.tags_model);
         setCategoryCustomSettings(!!data.category_model);
         setFocusTitleCustomSettings(!!data.focus_title_model);
+
+        // Varsayılan prompt'ları yükle
+        setDefaultPrompts({
+          title: titlePrompt.prompt,
+          tags: tagPrompt.prompt,
+          category: categoryPrompt.prompt,
+          focus_title: focusTitlePrompt.prompt
+        });
       } else {
         console.error('AI ayarları yüklenemedi');
       }
@@ -985,16 +1010,32 @@ export default function SettingsPage() {
                               id="title-prompt"
                               value={aiSettings.title_prompt || ''}
                               onChange={(e) => setAiSettings(prev => ({ ...prev, title_prompt: e.target.value }))}
-                              placeholder="Varsayılan başlık prompt'unu kullanmak için boş bırakın"
-                              rows={3}
+                              placeholder={showDefaultPrompts.title ? defaultPrompts.title : "Varsayılan başlık prompt'unu kullanmak için boş bırakın"}
+                              rows={showDefaultPrompts.title ? 8 : 3}
                             />
-                            <Button 
-                              variant="link" 
-                              className="text-xs p-0 h-auto mt-1"
-                              onClick={() => setAiSettings(prev => ({ ...prev, title_prompt: null }))}
-                            >
-                              Varsayılana sıfırla
-                            </Button>
+                            <div className="flex space-x-2 mt-1">
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setAiSettings(prev => ({ ...prev, title_prompt: null }))}
+                              >
+                                Varsayılana sıfırla
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setShowDefaultPrompts(prev => ({ ...prev, title: !prev.title }))}
+                              >
+                                {showDefaultPrompts.title ? "Varsayılanı Gizle" : "Varsayılanı Göster"}
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setAiSettings(prev => ({ ...prev, title_prompt: defaultPrompts.title }))}
+                              >
+                                Varsayılanı Yükle
+                              </Button>
+                            </div>
                           </div>
                         </div>
 
@@ -1077,16 +1118,32 @@ export default function SettingsPage() {
                               id="tags-prompt"
                               value={aiSettings.tags_prompt || ''}
                               onChange={(e) => setAiSettings(prev => ({ ...prev, tags_prompt: e.target.value }))}
-                              placeholder="Varsayılan etiket prompt'unu kullanmak için boş bırakın"
-                              rows={3}
+                              placeholder={showDefaultPrompts.tags ? defaultPrompts.tags : "Varsayılan etiket prompt'unu kullanmak için boş bırakın"}
+                              rows={showDefaultPrompts.tags ? 8 : 3}
                             />
-                            <Button 
-                              variant="link" 
-                              className="text-xs p-0 h-auto mt-1"
-                              onClick={() => setAiSettings(prev => ({ ...prev, tags_prompt: null }))}
-                            >
-                              Varsayılana sıfırla
-                            </Button>
+                            <div className="flex space-x-2 mt-1">
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setAiSettings(prev => ({ ...prev, tags_prompt: null }))}
+                              >
+                                Varsayılana sıfırla
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setShowDefaultPrompts(prev => ({ ...prev, tags: !prev.tags }))}
+                              >
+                                {showDefaultPrompts.tags ? "Varsayılanı Gizle" : "Varsayılanı Göster"}
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setAiSettings(prev => ({ ...prev, tags_prompt: defaultPrompts.tags }))}
+                              >
+                                Varsayılanı Yükle
+                              </Button>
+                            </div>
                           </div>
                         </div>
 
@@ -1169,16 +1226,32 @@ export default function SettingsPage() {
                               id="category-prompt"
                               value={aiSettings.category_prompt || ''}
                               onChange={(e) => setAiSettings(prev => ({ ...prev, category_prompt: e.target.value }))}
-                              placeholder="Varsayılan kategori prompt'unu kullanmak için boş bırakın"
-                              rows={3}
+                              placeholder={showDefaultPrompts.category ? defaultPrompts.category : "Varsayılan kategori prompt'unu kullanmak için boş bırakın"}
+                              rows={showDefaultPrompts.category ? 8 : 3}
                             />
-                            <Button 
-                              variant="link" 
-                              className="text-xs p-0 h-auto mt-1"
-                              onClick={() => setAiSettings(prev => ({ ...prev, category_prompt: null }))}
-                            >
-                              Varsayılana sıfırla
-                            </Button>
+                            <div className="flex space-x-2 mt-1">
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setAiSettings(prev => ({ ...prev, category_prompt: null }))}
+                              >
+                                Varsayılana sıfırla
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setShowDefaultPrompts(prev => ({ ...prev, category: !prev.category }))}
+                              >
+                                {showDefaultPrompts.category ? "Varsayılanı Gizle" : "Varsayılanı Göster"}
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setAiSettings(prev => ({ ...prev, category_prompt: defaultPrompts.category }))}
+                              >
+                                Varsayılanı Yükle
+                              </Button>
+                            </div>
                           </div>
                         </div>
 
@@ -1261,16 +1334,32 @@ export default function SettingsPage() {
                               id="focus-title-prompt"
                               value={aiSettings.focus_title_prompt || ''}
                               onChange={(e) => setAiSettings(prev => ({ ...prev, focus_title_prompt: e.target.value }))}
-                              placeholder="Varsayılan odaklı başlık prompt'unu kullanmak için boş bırakın"
-                              rows={3}
+                              placeholder={showDefaultPrompts.focus_title ? defaultPrompts.focus_title : "Varsayılan odaklı başlık prompt'unu kullanmak için boş bırakın"}
+                              rows={showDefaultPrompts.focus_title ? 8 : 3}
                             />
-                            <Button 
-                              variant="link" 
-                              className="text-xs p-0 h-auto mt-1"
-                              onClick={() => setAiSettings(prev => ({ ...prev, focus_title_prompt: null }))}
-                            >
-                              Varsayılana sıfırla
-                            </Button>
+                            <div className="flex space-x-2 mt-1">
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setAiSettings(prev => ({ ...prev, focus_title_prompt: null }))}
+                              >
+                                Varsayılana sıfırla
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setShowDefaultPrompts(prev => ({ ...prev, focus_title: !prev.focus_title }))}
+                              >
+                                {showDefaultPrompts.focus_title ? "Varsayılanı Gizle" : "Varsayılanı Göster"}
+                              </Button>
+                              <Button 
+                                variant="link" 
+                                className="text-xs p-0 h-auto"
+                                onClick={() => setAiSettings(prev => ({ ...prev, focus_title_prompt: defaultPrompts.focus_title }))}
+                              >
+                                Varsayılanı Yükle
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>

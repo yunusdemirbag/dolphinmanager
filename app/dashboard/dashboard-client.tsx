@@ -27,7 +27,6 @@ import {
 import { useRouter } from "next/navigation"
 import StoreSelector from "@/components/store-selector"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { RateLimitIndicator } from "@/components/ui/rate-limit-indicator"
 
 interface DashboardClientProps {
   user: any
@@ -91,86 +90,11 @@ export default function DashboardClient({ user, profile, dashboardData, lastData
     setSelectedStore(storeId)
     // Burada store verilerini yeniden yükleyebilirsiniz
   }
-  
-  // Veri yenileme fonksiyonu
-  const refreshData = async () => {
-    try {
-      if (refreshing) return // Zaten yenileme işlemi devam ediyorsa çık
-      
-      // Son yenilemeden bu yana 5 dakika geçmediyse kullanıcıya uyarı göster
-      if (lastRefresh && (Date.now() - lastRefresh.getTime() < 5 * 60 * 1000)) {
-        const lastRefreshTime = lastRefresh.toLocaleTimeString();
-        const minutesSinceRefresh = Math.round((Date.now() - lastRefresh.getTime()) / (1000 * 60));
-        
-        const confirmRefresh = window.confirm(
-          `⚠️ API Hız Limiti Uyarısı ⚠️\n\n` +
-          `Son veri yenileme: ${lastRefreshTime} (${minutesSinceRefresh} dakika önce)\n\n` +
-          `Etsy API çağrı limitlerini aşmamak için en az 5 dakika arayla yenileme yapmanız önerilir.\n\n` +
-          `Limitleri aşmanız durumunda Etsy hesabınıza geçici erişim kısıtlaması gelebilir.\n\n` +
-          `Yine de şimdi yenilemek istiyor musunuz?`
-        );
-        
-        if (!confirmRefresh) return;
-      }
-      
-      setRefreshing(true)
-      setRefreshStatus({ message: "Etsy verileri yenileniyor..." })
-      
-      // API'ye istek gönder
-      const response = await fetch("/api/etsy/refresh", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          forceRefresh: true // Önbelleği temizle ve yeni veri çek
-        })
-      })
-      
-      const result = await response.json()
-      
-      if (result.success) {
-        // Başarılı yenileme sonrası dashboard verilerini yeniden yükle
-        router.refresh() // Next.js sayfayı yeniler ve en güncel verileri alır
-        
-        const now = new Date();
-        setLastRefresh(now)
-        
-        // Son yenileme zamanını artık localStorage yerine veritabanına kaydedeceğiz
-        // API endpoint bunu zaten profiles tablosuna kaydediyor
-        // localStorage.setItem('lastDataFetch', now.toISOString());
-        
-        setRefreshStatus({
-          success: true,
-          message: "Etsy verileri başarıyla yenilendi"
-        })
-      } else {
-        setRefreshStatus({
-          success: false,
-          message: `Yenileme hatası: ${result.message}`
-        })
-        console.error("Veri yenileme hatası:", result.message)
-      }
-    } catch (error) {
-      setRefreshStatus({
-        success: false,
-        message: "Veri yenileme sırasında bir hata oluştu"
-      })
-      console.error("Veri yenileme hatası:", error)
-    } finally {
-      setRefreshing(false)
-      
-      // 5 saniye sonra bildirim mesajını temizle
-      setTimeout(() => {
-        setRefreshStatus({})
-      }, 5000)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="max-w-5xl w-full mx-auto px-4 py-8">
-        {/* Üst: Minimalist özet kutucuklar */}
+        {/* Üst: Minimalist başlık */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-10 gap-4">
           <div className="flex flex-col gap-2">
             <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Dashboard</h1>
@@ -181,24 +105,6 @@ export default function DashboardClient({ user, profile, dashboardData, lastData
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <Button 
-              onClick={refreshData} 
-              className="bg-black hover:bg-gray-800 text-white px-8 py-3 rounded-xl text-lg font-semibold shadow-lg transition-all duration-200"
-              disabled={refreshing}
-            >
-              <RefreshCw className={`w-6 h-6 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Yenileniyor...' : 'Verileri Güncelle'}
-            </Button>
-            {lastRefresh && (
-              <div className="text-xs text-gray-400 mt-1">Son güncelleme: {lastRefresh.toLocaleString()}</div>
-            )}
-          </div>
-        </div>
-
-        {/* Rate Limit Indicator */}
-        <div className="mb-6">
-          <RateLimitIndicator />
         </div>
 
         {/* Yenileme durumu bildirimi */}

@@ -3,11 +3,7 @@
 import { useState, useEffect } from "react"
 import { createClientSupabase } from "@/lib/supabase"
 import DashboardClient from "./dashboard-client"
-import { Loader2, Info } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-// Server-side import'u client component'te kullanmamak için bu değişkeni kendimiz oluşturalım
-const shouldUseOnlyCachedData = true; // Varsayılan olarak önbellekten veri çekmeyi etkinleştir
-// import { shouldUseOnlyCachedData } from "@/lib/etsy-api"
+import { Loader2 } from "lucide-react"
 
 interface CalendarEvent {
   date: string
@@ -177,14 +173,6 @@ export default function DashboardPage() {
 
   return (
     <>
-      {shouldUseOnlyCachedData && (
-        <Alert className="max-w-5xl mx-auto mt-4 bg-blue-50 border-blue-200">
-          <Info className="w-4 h-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
-            Etsy API çağrı limitlerini korumak için veriler önbellekten yükleniyor. Güncel verileri görmek için "Verileri Güncelle" butonuna tıklayın.
-          </AlertDescription>
-        </Alert>
-      )}
       <DashboardClient 
         user={user}
         profile={profile}

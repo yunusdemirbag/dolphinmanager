@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const image = formData.get('image') as File;
     const prompt = formData.get('prompt') as string;
     const focusKeyword = formData.get('focusKeyword') as string;
-    const model = formData.get('model') as string || 'gpt-4o-mini';
+    const model = formData.get('model') as string || 'gpt-4.1-mini';
     const temperature = parseFloat((formData.get('temperature') as string) || '0.7');
     
     if (!image) {
@@ -67,28 +67,28 @@ export async function POST(request: NextRequest) {
     
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text();
-      return NextResponse.json({ error: `OpenAI API hatası (${openaiResponse.status}): ${errorText}` }, { status: 500 });
+      return NextResponse.json({ error: `OpenAI API hatası: ${errorText}` }, { status: 500 });
     }
     
     const openaiData = await openaiResponse.json();
-    const generatedTitle = openaiData.choices?.[0]?.message?.content?.trim();
+    const title = openaiData.choices?.[0]?.message?.content?.trim();
     
-    if (!generatedTitle) {
-      return NextResponse.json({ error: 'OpenAI yanıtında başlık bulunamadı' }, { status: 500 });
+    if (!title) {
+      return NextResponse.json({ error: 'Başlık üretilemedi' }, { status: 500 });
     }
     
-    // Token kullanım bilgilerini ekle
-    const tokenUsage = openaiData.usage || {};
-    
     return NextResponse.json({
-      title: generatedTitle,
-      prompt_tokens: tokenUsage.prompt_tokens,
-      completion_tokens: tokenUsage.completion_tokens,
-      total_tokens: tokenUsage.total_tokens
+      title,
+      success: true,
+      usage: openaiData.usage ? {
+        prompt_tokens: openaiData.usage.prompt_tokens,
+        completion_tokens: openaiData.usage.completion_tokens,
+        total_tokens: openaiData.usage.total_tokens,
+        duration_ms: Date.now() - (request.headers.get('x-request-start') ? parseInt(request.headers.get('x-request-start') || '0') : 0)
+      } : null
     });
     
-  } catch (error) {
-    console.error('Başlık üretme hatası:', error);
-    return NextResponse.json({ error: 'Başlık üretilirken hata oluştu' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Bilinmeyen bir hata oluştu' }, { status: 500 });
   }
 } 

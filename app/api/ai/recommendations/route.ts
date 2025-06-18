@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
 
+export const runtime = "edge"
+
 export async function POST(request: NextRequest) {
   try {
     const { salesData, businessType, currentDate } = await request.json()
@@ -36,7 +38,7 @@ JSON formatında yanıt ver:
 `
 
     const { text } = await generateText({
-      model: openai("gpt-4o-mini"),
+      model: openai("gpt-4.1-mini"),
       prompt: prompt,
       maxTokens: 1000,
     })

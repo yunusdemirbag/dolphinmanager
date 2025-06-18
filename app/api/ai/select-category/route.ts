@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json()
-    const { title, categoryNames, prompt, model = 'gpt-4o-mini', temperature = 0.7 } = body
+    const { title, categoryNames, prompt, model = 'gpt-4.1-mini', temperature = 0.7 } = body
 
     console.log("📝 Gelen parametreler:");
     console.log("- Title:", title);

@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     let prompt = '';
     let imageBase64 = '';
     let imageType = '';
-    let model = 'gpt-4o-mini';
+    let model = 'gpt-4.1-mini';
     let temperature = 0.7;
 
     // İstek türüne göre parametreleri al
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
       title = formData.get('title') as string;
       prompt = formData.get('prompt') as string;
-      model = formData.get('model') as string || 'gpt-4o-mini';
+      model = formData.get('model') as string || 'gpt-4.1-mini';
       temperature = parseFloat((formData.get('temperature') as string) || '0.7');
       
       const image = formData.get('image') as File;
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       const body = await request.json();
       title = body.title;
       prompt = body.prompt;
-      model = body.model || 'gpt-4o-mini';
+      model = body.model || 'gpt-4.1-mini';
       temperature = body.temperature || 0.7;
     }
 

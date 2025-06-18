@@ -1561,7 +1561,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
 
   // 123 kısa yolu - Kuyrukla ürün ekle
   useEffect(() => {
-    if (pressedKeys.has('1') && pressedKeys.has('2') && pressedKeys.has('3') && isOpen) {
+    if ((pressedKeys.has('1') && pressedKeys.has('2') && pressedKeys.has('3')) && isOpen) {
       if (isSubmitting) return;
 
       // Basit validasyon kontrolü
@@ -1570,24 +1570,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
         return;
       }
 
-      // Kuyrukla ürün ekle
-      handleQueueSubmit("draft");
-      setPressedKeys(new Set()); // Tuşları sıfırla
-    }
-  }, [pressedKeys, isOpen, isSubmitting, title, shippingProfileId, productImages.length]);
-
-  // 123 kısa yolu - Kuyrukla ürün ekle
-  useEffect(() => {
-    if ((pressedKeys.has('control') && pressedKeys.has('alt') && pressedKeys.has('q')) && isOpen) {
-      if (isSubmitting) return;
-
-      // Basit validasyon kontrolü
-      if (!title || !shippingProfileId || productImages.length === 0) {
-        toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
-        return;
-      }
-
-      console.log('Ctrl+Alt+Q basıldı - kuyruk olarak ekleniyor...');
+      console.log('123 basıldı - kuyruk olarak ekleniyor...');
       toast({
         title: "🚀 Kuyruk İşlemi",
         description: "Ürün kuyruğa ekleniyor..."
@@ -2403,10 +2386,13 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Taslak Ekleniyor...
+                        Yükleniyor...
                       </>
                     ) : (
-                      <>Taslak Olarak Ekle</>
+                      <>
+                        Taslak 
+                        <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">Q+W+E</kbd>
+                      </>
                     )}
                   </Button>
                   <Button 
@@ -2417,12 +2403,13 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Kuyruğa Ekleniyor...
+                        Yükleniyor...
                       </>
                     ) : (
                       <>
                         <Clock className="mr-2 h-4 w-4" />
-                        Kuyruk Olarak Ekle <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">Ctrl+Alt+Q</kbd>
+                        Kuyruk 
+                        <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">1+2+3</kbd>
                       </>
                     )}
                   </Button>
@@ -2437,10 +2424,13 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Taslak Ekleniyor...
+                        Yükleniyor...
                       </>
                     ) : (
-                      <>Taslak Olarak Ekle</>
+                      <>
+                        Taslak 
+                        <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">Q+W+E</kbd>
+                      </>
                     )}
                   </Button>
                   <Button 
@@ -2451,12 +2441,13 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Kuyruğa Ekleniyor...
+                        Yükleniyor...
                       </>
                     ) : (
                       <>
                         <Clock className="mr-2 h-4 w-4" />
-                        Kuyruk Olarak Ekle <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">Ctrl+Alt+Q</kbd>
+                        Kuyruk 
+                        <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">1+2+3</kbd>
                       </>
                     )}
                   </Button>

@@ -34,4 +34,11 @@ CREATE POLICY etsy_uploads_update_policy ON public.etsy_uploads
 
 -- Kullanıcıların kendi kayıtlarını silmesine izin ver
 CREATE POLICY etsy_uploads_delete_policy ON public.etsy_uploads
-  FOR DELETE USING (auth.uid() = user_id); 
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Şema önbelleğini yenileme
+SELECT pg_notify('pgrst', 'reload schema');
+
+-- Şema önbelleğini zorla yenilemek için geçici tablo oluştur ve sil
+CREATE TABLE IF NOT EXISTS _schema_cache_refresh_etsy_uploads (id SERIAL PRIMARY KEY);
+DROP TABLE _schema_cache_refresh_etsy_uploads; 

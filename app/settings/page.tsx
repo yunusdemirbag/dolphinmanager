@@ -48,7 +48,11 @@ import {
   Mail,
   Phone,
   MapPin,
-  Clock
+  Clock,
+  Brain,
+  Sparkles,
+  Sliders,
+  MessageSquare
 } from "lucide-react"
 import { createClientSupabase } from "@/lib/supabase"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
@@ -93,6 +97,15 @@ interface CreateShippingForm {
   destination_region: "eu" | "non_eu" | "none"
 }
 
+interface AISettings {
+  model: string;
+  temperature: number;
+  title_prompt: string | null;
+  tags_prompt: string | null;
+  category_prompt: string | null;
+  focus_title_prompt: string | null;
+}
+
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -112,9 +125,20 @@ export default function SettingsPage() {
     max_processing_time: 3,
     destination_region: "none"
   })
+  const [aiSettings, setAiSettings] = useState<AISettings>({
+    model: 'gpt-4o-mini',
+    temperature: 0.7,
+    title_prompt: null,
+    tags_prompt: null,
+    category_prompt: null,
+    focus_title_prompt: null
+  });
+  const [savingAiSettings, setSavingAiSettings] = useState(false);
+  const [aiSettingsLoaded, setAiSettingsLoaded] = useState(false);
 
   useEffect(() => {
     loadSettings()
+    loadAiSettings()
   }, [])
 
   const loadSettings = async () => {
@@ -269,6 +293,47 @@ export default function SettingsPage() {
     }
   }
 
+  const loadAiSettings = async () => {
+    try {
+      const response = await fetch('/api/ai/settings');
+      if (response.ok) {
+        const data = await response.json();
+        setAiSettings(data);
+      } else {
+        console.error('AI ayarları yüklenemedi');
+      }
+      setAiSettingsLoaded(true);
+    } catch (error) {
+      console.error('AI ayarları yükleme hatası:', error);
+      setAiSettingsLoaded(true);
+    }
+  };
+
+  const handleSaveAiSettings = async () => {
+    setSavingAiSettings(true);
+    try {
+      const response = await fetch('/api/ai/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(aiSettings),
+      });
+
+      if (response.ok) {
+        alert('✅ AI ayarları başarıyla kaydedildi!');
+      } else {
+        const errorData = await response.json();
+        alert(`❌ Hata: ${errorData.details || errorData.error}`);
+      }
+    } catch (error) {
+      console.error('AI ayarları kaydetme hatası:', error);
+      alert('❌ AI ayarları kaydedilemedi!');
+    } finally {
+      setSavingAiSettings(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -292,10 +357,11 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="shop" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="shop">Mağaza</TabsTrigger>
             <TabsTrigger value="shipping">Kargo</TabsTrigger>
             <TabsTrigger value="sections">Bölümler</TabsTrigger>
+            <TabsTrigger value="ai">AI Ayarları</TabsTrigger>
             <TabsTrigger value="account">Hesap</TabsTrigger>
           </TabsList>
 
@@ -693,6 +759,214 @@ export default function SettingsPage() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* AI Settings */}
+          <TabsContent value="ai" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Brain className="h-5 w-5 text-purple-600 mr-2" />
+                  OpenAI Ayarları
+                </CardTitle>
+                <CardDescription>
+                  AI modellerinin davranışını ve prompt'ları özelleştirin
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {!aiSettingsLoaded ? (
+                  <div className="flex items-center justify-center py-6">
+                    <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="ai-model">AI Modeli</Label>
+                        <Select 
+                          value={aiSettings.model} 
+                          onValueChange={(value) => setAiSettings(prev => ({ ...prev, model: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Model seçin" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="gpt-4o">GPT-4o (En Gelişmiş)</SelectItem>
+                            <SelectItem value="gpt-4o-mini">GPT-4o Mini (Hızlı ve Ekonomik)</SelectItem>
+                            <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Eski)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500 mt-1">Kullanılan AI modelini seçin. Daha gelişmiş modeller daha iyi sonuçlar üretir ama daha yavaş ve pahalıdır.</p>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="temperature">Yaratıcılık Seviyesi</Label>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-500">Kesin</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value={aiSettings.temperature}
+                            onChange={(e) => setAiSettings(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                            className="flex-1"
+                          />
+                          <span className="text-sm text-gray-500">Yaratıcı</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Sıcaklık değeri: {aiSettings.temperature} - Düşük değerler daha tutarlı, yüksek değerler daha yaratıcı sonuçlar üretir.</p>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-6">
+                      <h3 className="text-lg font-medium flex items-center mb-4">
+                        <Sparkles className="h-5 w-5 text-amber-500 mr-2" />
+                        Özel Prompt Ayarları
+                      </h3>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="title-prompt">Başlık Prompt'u</Label>
+                          <Textarea
+                            id="title-prompt"
+                            value={aiSettings.title_prompt || ''}
+                            onChange={(e) => setAiSettings(prev => ({ ...prev, title_prompt: e.target.value }))}
+                            placeholder="Varsayılan başlık prompt'unu kullanmak için boş bırakın"
+                            rows={4}
+                          />
+                          <Button 
+                            variant="link" 
+                            className="text-xs p-0 h-auto mt-1"
+                            onClick={() => setAiSettings(prev => ({ ...prev, title_prompt: null }))}
+                          >
+                            Varsayılana sıfırla
+                          </Button>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="tags-prompt">Etiket Prompt'u</Label>
+                          <Textarea
+                            id="tags-prompt"
+                            value={aiSettings.tags_prompt || ''}
+                            onChange={(e) => setAiSettings(prev => ({ ...prev, tags_prompt: e.target.value }))}
+                            placeholder="Varsayılan etiket prompt'unu kullanmak için boş bırakın"
+                            rows={4}
+                          />
+                          <Button 
+                            variant="link" 
+                            className="text-xs p-0 h-auto mt-1"
+                            onClick={() => setAiSettings(prev => ({ ...prev, tags_prompt: null }))}
+                          >
+                            Varsayılana sıfırla
+                          </Button>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="category-prompt">Kategori Seçimi Prompt'u</Label>
+                          <Textarea
+                            id="category-prompt"
+                            value={aiSettings.category_prompt || ''}
+                            onChange={(e) => setAiSettings(prev => ({ ...prev, category_prompt: e.target.value }))}
+                            placeholder="Varsayılan kategori prompt'unu kullanmak için boş bırakın"
+                            rows={4}
+                          />
+                          <Button 
+                            variant="link" 
+                            className="text-xs p-0 h-auto mt-1"
+                            onClick={() => setAiSettings(prev => ({ ...prev, category_prompt: null }))}
+                          >
+                            Varsayılana sıfırla
+                          </Button>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="focus-title-prompt">Odaklı Başlık Prompt'u</Label>
+                          <Textarea
+                            id="focus-title-prompt"
+                            value={aiSettings.focus_title_prompt || ''}
+                            onChange={(e) => setAiSettings(prev => ({ ...prev, focus_title_prompt: e.target.value }))}
+                            placeholder="Varsayılan odaklı başlık prompt'unu kullanmak için boş bırakın"
+                            rows={4}
+                          />
+                          <Button 
+                            variant="link" 
+                            className="text-xs p-0 h-auto mt-1"
+                            onClick={() => setAiSettings(prev => ({ ...prev, focus_title_prompt: null }))}
+                          >
+                            Varsayılana sıfırla
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t">
+                      <Button 
+                        onClick={handleSaveAiSettings} 
+                        disabled={savingAiSettings}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        {savingAiSettings ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {savingAiSettings ? "Kaydediliyor..." : "Ayarları Kaydet"}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <MessageSquare className="h-5 w-5 text-green-600 mr-2" />
+                  Varsayılan Prompt'lar
+                </CardTitle>
+                <CardDescription>
+                  Sistemde tanımlı olan varsayılan prompt'lar
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium">Başlık Prompt'u</h4>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap mt-2">
+                      {`You are an elite Etsy SEO copy-writer who specialises in PHYSICAL canvas wall art (NOT digital).
+STEP 1 — IMAGE ANALYSIS  
+• Identify the MAIN SUBJECT (woman, animal species, landscape, abstract form, floral, religious icon, etc.).  
+• If a HUMAN: note gender and clear cultural identity when obvious (e.g. Black Woman, Asian Man).  
+• If an ANIMAL: name the exact species (lion, flamingo, giraffe…).  
+• Detect the ART STYLE (abstract, minimalist, pop art, line art, cubist, ukiyo-e, graffiti, etc.).  
+• Capture the EMOTIONAL TONE (bold, calming, empowering, romantic, mystical, meditative…).  
+• Note the 1-2 most eye-catching DOMINANT COLORS (gold, turquoise, black & white, etc.).
+STEP 2 — TITLE CONSTRUCTION  ≤ 135 characters  
+Format:  
+  <Emotive Adjective> <Primary Subject> <Art Style(optional)> Canvas Wall Art Print | <Color/Tone> <Room Keyword> Decor | <Final Keyword>  
+Mandatory rules  
+• Include **exactly once** the phrase "Canvas Wall Art Print".  
+• Use popular buyer phrases such as Living Room Decor, Bedroom Wall Decor, Office Artwork, Zen Meditation, Gift for Him/Her.  
+• No duplicated words, no filler like "beautiful", no quotes, no parentheses.  
+• Use Title Case. If length exceeds 135 c, remove the least-important phrase.`}
+                    </p>
+                  </div>
+                  
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium">Etiket Prompt'u</h4>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap mt-2">
+                      {`You are an Etsy canvas wall art SEO expert.
+1. Using the image AND the generated title, create **exactly 13 tags**.  
+2. Each tag must be ≤ 19 characters, including spaces. Use 2- or 3-word phrases.  
+3. Lowercase only, no punctuation except single spaces.  
+4. No word may appear more than twice across all tags.  
+5. Cover a mix of subject, style, colors, mood, target room, and gift occasion.  
+6. Output the tags in one line, comma-separated, with no quotes or extra text.`}
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -7,7 +7,8 @@ export async function POST(request: NextRequest) {
   console.log("🚀 ENDPOINT ÇAĞRILDI - select-category");
   
   try {
-    const { title, categoryNames } = await request.json()
+    const body = await request.json()
+    const { title, categoryNames, prompt, model = 'gpt-4o-mini', temperature = 0.7 } = body
 
     console.log("📝 Gelen parametreler:");
     console.log("- Title:", title);
@@ -42,25 +43,11 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ API key mevcut");
 
-    // Kategori seçimi için prompt oluştur
-    const categoryPrompt = `
-You are an expert Etsy category classifier.
-
-Given a product title and a list of available categories, select the MOST appropriate category.
-
-Product Title: "${title}"
-
-Available Categories:
-${categoryNames.map((cat: string, i: number) => `${i + 1}. ${cat}`).join('\n')}
-
-Rules:
-- Analyze the title for subject matter, style, and target audience
-- Return ONLY the exact category name from the provided list
-- If multiple categories could work, pick the most specific one
-- Consider buyer search patterns and Etsy conventions
-
-Return ONLY the category name, nothing else.
-`.trim();
+    // Kategori listesini formatlı bir şekilde hazırla
+    const formattedCategories = categoryNames.map(cat => `- ${cat}`).join('\n');
+    
+    // Prompt'u hazırla
+    const finalPrompt = `${prompt}\n\nProduct Title: "${title}"\n\nAvailable Categories:\n${formattedCategories}\n\nSelect the most appropriate category from the list above:`;
 
     console.log("🤖 OpenAI API çağrısı yapılıyor...");
     
@@ -71,15 +58,15 @@ Return ONLY the category name, nothing else.
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: model,
         messages: [
           {
             role: 'user',
-            content: categoryPrompt
+            content: finalPrompt
           }
         ],
         max_tokens: 50,
-        temperature: 0.1
+        temperature: temperature
       })
     })
 
@@ -113,9 +100,33 @@ Return ONLY the category name, nothing else.
 
     console.log("🎉 KATEGORİ BAŞARIYLA SEÇİLDİ:", selectedCategory);
 
-    // Token kullanım bilgilerini JSON olarak döndür
+    // Seçilen kategori gerçekten listede var mı kontrol et
+    const normalizedSelectedCategory = selectedCategory.toLowerCase().trim();
+    const normalizedCategoryNames = categoryNames.map(cat => cat.toLowerCase().trim());
+    
+    // Eğer tam eşleşme yoksa, en yakın eşleşmeyi bul
+    let finalCategory = categoryNames[0]; // Varsayılan olarak ilk kategoriyi kullan
+    
+    for (const cat of categoryNames) {
+      if (cat.toLowerCase().trim() === normalizedSelectedCategory) {
+        finalCategory = cat; // Tam eşleşme bulundu
+        break;
+      }
+    }
+    
+    // Eğer tam eşleşme yoksa, içeren bir kategori ara
+    if (finalCategory === categoryNames[0]) {
+      for (const cat of categoryNames) {
+        if (normalizedSelectedCategory.includes(cat.toLowerCase().trim()) || 
+            cat.toLowerCase().trim().includes(normalizedSelectedCategory)) {
+          finalCategory = cat;
+          break;
+        }
+      }
+    }
+
     return NextResponse.json({
-      category: selectedCategory,
+      category: finalCategory,
       success: true,
       usage: openaiData.usage ? {
         prompt_tokens: openaiData.usage.prompt_tokens,

@@ -1,4 +1,5 @@
 // openai-yonetim.ts
+import { createClientFromBrowser } from "@/lib/supabase/client";
 
 export interface PromptConfig {
   id: string;
@@ -6,6 +7,16 @@ export interface PromptConfig {
   description: string;
   prompt: string;
   defaultPrompt?: string;
+}
+
+// Kullanıcı AI ayarları interface'i
+export interface AISettings {
+  model: string;
+  temperature: number;
+  title_prompt: string | null;
+  tags_prompt: string | null;
+  category_prompt: string | null;
+  focus_title_prompt: string | null;
 }
 
 /**
@@ -114,12 +125,56 @@ Return ONLY the final title string, nothing else.
 // ===== HELPER FUNCTIONS =====
 
 /**
+ * Kullanıcı AI ayarlarını getir
+ */
+export const getUserAISettings = async (): Promise<AISettings> => {
+  try {
+    const response = await fetch("/api/ai/settings");
+    
+    if (!response.ok) {
+      console.warn("AI ayarları getirilemedi, varsayılan ayarlar kullanılıyor");
+      return {
+        model: "gpt-4o-mini",
+        temperature: 0.7,
+        title_prompt: null,
+        tags_prompt: null,
+        category_prompt: null,
+        focus_title_prompt: null
+      };
+    }
+    
+    const settings = await response.json();
+    return settings;
+  } catch (error) {
+    console.error("AI ayarları getirme hatası:", error);
+    return {
+      model: "gpt-4o-mini",
+      temperature: 0.7,
+      title_prompt: null,
+      tags_prompt: null,
+      category_prompt: null,
+      focus_title_prompt: null
+    };
+  }
+};
+
+/**
  * Normal başlık üretimi fonksiyonu
  */
 export const generateTitle = async (imageFile: File): Promise<string> => {
   const formData = new FormData();
   formData.append("image", imageFile);
-  formData.append("prompt", titlePrompt.prompt);
+  
+  // Kullanıcı ayarlarını al
+  const settings = await getUserAISettings();
+  
+  // Özel prompt varsa onu kullan, yoksa varsayılanı
+  const promptToUse = settings.title_prompt || titlePrompt.prompt;
+  formData.append("prompt", promptToUse);
+  
+  // Model ve temperature ayarlarını ekle
+  formData.append("model", settings.model);
+  formData.append("temperature", settings.temperature.toString());
   
   const response = await fetch("/api/ai/generate-etsy-title", {
     method: "POST",
@@ -141,7 +196,17 @@ export const generateTitleWithFocus = async (imageFile: File, focusKeyword: stri
   const formData = new FormData();
   formData.append("image", imageFile);
   formData.append("focusKeyword", focusKeyword);
-  formData.append("prompt", focusTitlePrompt.prompt);
+  
+  // Kullanıcı ayarlarını al
+  const settings = await getUserAISettings();
+  
+  // Özel prompt varsa onu kullan, yoksa varsayılanı
+  const promptToUse = settings.focus_title_prompt || focusTitlePrompt.prompt;
+  formData.append("prompt", promptToUse);
+  
+  // Model ve temperature ayarlarını ekle
+  formData.append("model", settings.model);
+  formData.append("temperature", settings.temperature.toString());
   
   const response = await fetch("/api/ai/generate-etsy-title", {
     method: "POST", 
@@ -160,17 +225,20 @@ export const generateTitleWithFocus = async (imageFile: File, focusKeyword: stri
  * Tag üretimi fonksiyonu
  */
 export const generateTags = async (title: string, imageFile?: File): Promise<string[]> => {
-  const requestBody: any = {
-    title,
-    prompt: tagPrompt.prompt,
-  };
+  // Kullanıcı ayarlarını al
+  const settings = await getUserAISettings();
+  
+  // Özel prompt varsa onu kullan, yoksa varsayılanı
+  const promptToUse = settings.tags_prompt || tagPrompt.prompt;
   
   // Eğer resim varsa form data kullan, yoksa JSON
   if (imageFile) {
     const formData = new FormData();
     formData.append("title", title);
-    formData.append("prompt", tagPrompt.prompt);
+    formData.append("prompt", promptToUse);
     formData.append("image", imageFile);
+    formData.append("model", settings.model);
+    formData.append("temperature", settings.temperature.toString());
     
     const response = await fetch("/api/ai/generate-etsy-tags", {
       method: "POST",
@@ -181,6 +249,13 @@ export const generateTags = async (title: string, imageFile?: File): Promise<str
     const data = await response.json();
     return data.tags || [];
   } else {
+    const requestBody = {
+      title,
+      prompt: promptToUse,
+      model: settings.model,
+      temperature: settings.temperature
+    };
+    
     const response = await fetch("/api/ai/generate-etsy-tags", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -197,13 +272,21 @@ export const generateTags = async (title: string, imageFile?: File): Promise<str
  * Kategori seçimi fonksiyonu
  */
 export const selectCategory = async (title: string, categoryNames: string[]): Promise<string> => {
+  // Kullanıcı ayarlarını al
+  const settings = await getUserAISettings();
+  
+  // Özel prompt varsa onu kullan, yoksa varsayılanı
+  const promptToUse = settings.category_prompt || categoryPrompt.prompt;
+  
   const response = await fetch("/api/ai/select-category", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       title,
       categoryNames,
-      prompt: categoryPrompt.prompt,
+      prompt: promptToUse,
+      model: settings.model,
+      temperature: settings.temperature
     }),
   });
   
@@ -226,6 +309,30 @@ export const generateAllFromImage = async (imageBase64: string, imageType: strin
     throw new Error("OpenAI API key yapılandırılmamış");
   }
 
+  // Kullanıcı ayarlarını al (server-side olduğu için fetch yerine supabase kullanıyoruz)
+  let model = "gpt-4o-mini";
+  let temperature = 0.7;
+  
+  try {
+    const supabase = createClientFromBrowser();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session?.user) {
+      const { data } = await supabase
+        .from('ai_settings')
+        .select('model, temperature')
+        .eq('user_id', session.user.id)
+        .single();
+      
+      if (data) {
+        model = data.model;
+        temperature = data.temperature;
+      }
+    }
+  } catch (error) {
+    console.warn("AI ayarları getirilemedi, varsayılan ayarlar kullanılıyor:", error);
+  }
+
   // OpenAI API çağrısı
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -234,7 +341,7 @@ export const generateAllFromImage = async (imageBase64: string, imageType: strin
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: model,
       messages: [
         {
           role: 'user',
@@ -254,7 +361,7 @@ export const generateAllFromImage = async (imageBase64: string, imageType: strin
         }
       ],
       max_tokens: 150,
-      temperature: 0.7
+      temperature: temperature
     })
   });
 

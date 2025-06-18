@@ -7,7 +7,39 @@ export async function POST(request: NextRequest) {
   console.log("🚀 ENDPOINT ÇAĞRILDI - generate-etsy-tags");
   
   try {
-    const { title, prompt } = await request.json()
+    let title = '';
+    let prompt = '';
+    let imageBase64 = '';
+    let imageType = '';
+    let model = 'gpt-4o-mini';
+    let temperature = 0.7;
+
+    // İstek türüne göre parametreleri al
+    const contentType = request.headers.get('content-type') || '';
+    
+    if (contentType.includes('multipart/form-data')) {
+      // Form data isteği
+      const formData = await request.formData();
+      title = formData.get('title') as string;
+      prompt = formData.get('prompt') as string;
+      model = formData.get('model') as string || 'gpt-4o-mini';
+      temperature = parseFloat((formData.get('temperature') as string) || '0.7');
+      
+      const image = formData.get('image') as File;
+      if (image) {
+        const bytes = await image.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        imageBase64 = buffer.toString('base64');
+        imageType = image.type;
+      }
+    } else {
+      // JSON isteği
+      const body = await request.json();
+      title = body.title;
+      prompt = body.prompt;
+      model = body.model || 'gpt-4o-mini';
+      temperature = body.temperature || 0.7;
+    }
 
     console.log("📝 Gelen parametreler:");
     console.log("- Title:", title);
@@ -18,6 +50,14 @@ export async function POST(request: NextRequest) {
       console.error("❌ HATA: Başlık bulunamadı");
       return NextResponse.json(
         { error: "Başlık bulunamadı" },
+        { status: 400 }
+      )
+    }
+
+    if (!prompt) {
+      console.error("❌ HATA: Prompt bulunamadı");
+      return NextResponse.json(
+        { error: "Prompt bulunamadı" },
         { status: 400 }
       )
     }
@@ -34,19 +74,24 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ API key mevcut");
 
-    // Tag üretimi için prompt
-    const tagPrompt = prompt || `
-You are an Etsy canvas wall art SEO expert.
+    // Mesaj içeriğini hazırla
+    const content: any[] = [
+      {
+        type: 'text',
+        text: `${prompt}\n\nTITLE: "${title}"`
+      }
+    ];
 
-1. Based on the product title "${title}", craft exactly 13 tags.
-2. Each tag MUST be ≤ 19 characters including spaces (use 2–3 word phrases).
-3. Use only lowercase letters, no punctuation except spaces.
-4. Do NOT repeat words more than twice across all tags.
-5. Cover: subject, style, colors, mood, intended room, gift occasion.
-6. Separate tags with commas, no quotes.
-
-Return ONLY the 13 tags in one line, comma-separated.
-`.trim();
+    // Eğer resim varsa ekle
+    if (imageBase64 && imageType) {
+      content.push({
+        type: 'image_url',
+        image_url: {
+          url: `data:${imageType};base64,${imageBase64}`,
+          detail: 'low'
+        }
+      });
+    }
 
     console.log("🤖 OpenAI API çağrısı yapılıyor...");
     
@@ -57,15 +102,15 @@ Return ONLY the 13 tags in one line, comma-separated.
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: model,
         messages: [
           {
             role: 'user',
-            content: tagPrompt
+            content: content
           }
         ],
-        max_tokens: 100,
-        temperature: 0.7
+        max_tokens: 150,
+        temperature: temperature
       })
     })
 
@@ -107,15 +152,15 @@ Return ONLY the 13 tags in one line, comma-separated.
     console.log("🎉 TAG'LER BAŞARIYLA ÜRETİLDİ:", tagArray);
 
     // Token kullanım bilgilerini yanıta ekle
+    const tokenUsage = openaiData.usage || {};
+
     return NextResponse.json({
       tags: tagArray,
       success: true,
       count: tagArray.length,
-      usage: openaiData.usage ? {
-        prompt_tokens: openaiData.usage.prompt_tokens,
-        completion_tokens: openaiData.usage.completion_tokens,
-        total_tokens: openaiData.usage.total_tokens
-      } : null
+      prompt_tokens: tokenUsage.prompt_tokens,
+      completion_tokens: tokenUsage.completion_tokens,
+      total_tokens: tokenUsage.total_tokens
     })
 
   } catch (error: any) {

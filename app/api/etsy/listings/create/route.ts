@@ -309,11 +309,11 @@ export async function POST(request: NextRequest) {
         // SQL sorgusu ile doğrudan kaydet
         const insertQuery = `
           INSERT INTO etsy_uploads (
-            user_id, listing_id, shop_id, title, state, upload_duration,
+            user_id, shop_id, title, state, upload_duration,
             image_count, video_count, has_variations, variation_count,
             title_tokens, tags_tokens, tags, total_tokens
           ) VALUES (
-            '${userId}', ${listing_id}, ${shopId}, 
+            '${userId}', ${shopId}, 
             '${listingData.title.replace(/'/g, "''")}', '${listingData.state || 'draft'}', ${duration},
             ${imageFiles.length}, ${videoFiles.length}, 
             ${listingData.has_variations ? 'true' : 'false'}, ${listingData.variations?.length || 0},

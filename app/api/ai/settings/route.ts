@@ -27,7 +27,7 @@ export async function GET() {
     // Eğer ayarlar yoksa varsayılan ayarları döndür
     if (!data) {
       const defaultSettings = {
-        model: 'gpt-4o-mini',
+        model: "gpt-4.1-mini",
         temperature: 0.7,
         title_prompt: null,
         tags_prompt: null,

@@ -833,8 +833,9 @@ export default function SettingsPage() {
                                 <SelectValue placeholder="Model seçin" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="gpt-4o">GPT-4o (En Gelişmiş)</SelectItem>
-                                <SelectItem value="gpt-4o-mini">GPT-4o Mini (Ekonomik)</SelectItem>
+                                <SelectItem value="gpt-4.1">GPT-4.1 (En Gelişmiş)</SelectItem>
+                                <SelectItem value="gpt-4.1-mini">GPT-4.1-mini (Ekonomik)</SelectItem>
+                                <SelectItem value="gpt-4.1-nano">GPT-4.1-nano (Hızlı)</SelectItem>
                                 <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Metin)</SelectItem>
                               </SelectContent>
                             </Select>
@@ -872,15 +873,21 @@ export default function SettingsPage() {
                           <div className="space-y-2 text-xs text-gray-600">
                             <div className="flex items-start">
                               <div className="w-1/3">
-                                <Badge variant="outline" className="bg-blue-50">GPT-4o</Badge>
+                                <Badge variant="outline" className="bg-blue-50">GPT-4.1</Badge>
                               </div>
-                              <div>Görsel destekli, detaylı analiz yapar</div>
+                              <div>Görsel destekli, 1M token bağlam, en güçlü model</div>
                             </div>
                             <div className="flex items-start">
                               <div className="w-1/3">
-                                <Badge variant="outline" className="bg-blue-50">GPT-4o Mini</Badge>
+                                <Badge variant="outline" className="bg-blue-50">GPT-4.1-mini</Badge>
                               </div>
-                              <div>Görsel destekli, ekonomik ve hızlı</div>
+                              <div>Görsel destekli, ekonomik, düşük gecikme</div>
+                            </div>
+                            <div className="flex items-start">
+                              <div className="w-1/3">
+                                <Badge variant="outline" className="bg-blue-50">GPT-4.1-nano</Badge>
+                              </div>
+                              <div>Görsel destekli, en hızlı ve ekonomik</div>
                             </div>
                             <div className="flex items-start">
                               <div className="w-1/3">
@@ -944,8 +951,9 @@ export default function SettingsPage() {
                                       <SelectValue placeholder="Model seçin" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                                      <SelectItem value="gpt-4.1">GPT-4.1</SelectItem>
+                                      <SelectItem value="gpt-4.1-mini">GPT-4.1-mini</SelectItem>
+                                      <SelectItem value="gpt-4.1-nano">GPT-4.1-nano</SelectItem>
                                       <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
                                     </SelectContent>
                                   </Select>
@@ -1035,8 +1043,9 @@ export default function SettingsPage() {
                                       <SelectValue placeholder="Model seçin" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                                      <SelectItem value="gpt-4.1">GPT-4.1</SelectItem>
+                                      <SelectItem value="gpt-4.1-mini">GPT-4.1-mini</SelectItem>
+                                      <SelectItem value="gpt-4.1-nano">GPT-4.1-nano</SelectItem>
                                       <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
                                     </SelectContent>
                                   </Select>
@@ -1126,8 +1135,9 @@ export default function SettingsPage() {
                                       <SelectValue placeholder="Model seçin" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                                      <SelectItem value="gpt-4.1">GPT-4.1</SelectItem>
+                                      <SelectItem value="gpt-4.1-mini">GPT-4.1-mini</SelectItem>
+                                      <SelectItem value="gpt-4.1-nano">GPT-4.1-nano</SelectItem>
                                       <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
                                     </SelectContent>
                                   </Select>
@@ -1217,8 +1227,9 @@ export default function SettingsPage() {
                                       <SelectValue placeholder="Model seçin" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                                      <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                                      <SelectItem value="gpt-4.1">GPT-4.1</SelectItem>
+                                      <SelectItem value="gpt-4.1-mini">GPT-4.1-mini</SelectItem>
+                                      <SelectItem value="gpt-4.1-nano">GPT-4.1-nano</SelectItem>
                                       <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
                                     </SelectContent>
                                   </Select>

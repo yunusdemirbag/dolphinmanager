@@ -144,7 +144,7 @@ export const getUserAISettings = async (): Promise<AISettings> => {
     if (!response.ok) {
       console.warn("AI ayarları getirilemedi, varsayılan ayarlar kullanılıyor");
       return {
-        model: "gpt-4o-mini",
+        model: "gpt-4.1-mini",
         temperature: 0.7,
         title_prompt: null,
         tags_prompt: null,
@@ -168,7 +168,7 @@ export const getUserAISettings = async (): Promise<AISettings> => {
   } catch (error) {
     console.error("AI ayarları getirme hatası:", error);
     return {
-      model: "gpt-4o-mini",
+      model: "gpt-4.1-mini",
       temperature: 0.7,
       title_prompt: null,
       tags_prompt: null,
@@ -354,7 +354,7 @@ export const generateAllFromImage = async (imageBase64: string, imageType: strin
   }
 
   // Kullanıcı ayarlarını al (server-side olduğu için fetch yerine supabase kullanıyoruz)
-  let model = "gpt-4o-mini";
+  let model = "gpt-4.1-mini";
   let temperature = 0.7;
   
   try {
@@ -426,3 +426,46 @@ export const generateAllFromImage = async (imageBase64: string, imageType: strin
 
 // ===== EXPORT ALIASLAR (Eski fonksiyon adları için uyumluluk) =====
 export const tagsPrompt = tagPrompt; // Eski isim uyumluluğu için
+
+// Model seçimi için yardımcı fonksiyon
+export function getModelForPrompt(aiSettings: any, promptType: string): string {
+  if (!aiSettings) return "gpt-4.1"; // Varsayılan model
+
+  // Eğer belirli bir prompt için özel model ayarlanmışsa, onu kullan
+  switch (promptType) {
+    case "title":
+      return aiSettings.title_model || aiSettings.model || "gpt-4.1";
+    case "tags":
+      return aiSettings.tags_model || aiSettings.model || "gpt-4.1";
+    case "category":
+      return aiSettings.category_model || aiSettings.model || "gpt-4.1";
+    case "focus_title":
+      return aiSettings.focus_title_model || aiSettings.model || "gpt-4.1";
+    default:
+      return aiSettings.model || "gpt-4.1";
+  }
+}
+
+// Temperature seçimi için yardımcı fonksiyon
+export function getTemperatureForPrompt(aiSettings: any, promptType: string): number {
+  if (!aiSettings) return 0.7; // Varsayılan temperature
+
+  // Eğer belirli bir prompt için özel temperature ayarlanmışsa, onu kullan
+  switch (promptType) {
+    case "title":
+      return aiSettings.title_temperature !== null ? aiSettings.title_temperature : (aiSettings.temperature || 0.7);
+    case "tags":
+      return aiSettings.tags_temperature !== null ? aiSettings.tags_temperature : (aiSettings.temperature || 0.7);
+    case "category":
+      return aiSettings.category_temperature !== null ? aiSettings.category_temperature : (aiSettings.temperature || 0.7);
+    case "focus_title":
+      return aiSettings.focus_title_temperature !== null ? aiSettings.focus_title_temperature : (aiSettings.temperature || 0.7);
+    default:
+      return aiSettings.temperature || 0.7;
+  }
+}
+
+// Görsel destekleyen modeller
+export function supportsVision(model: string): boolean {
+  return model === "gpt-4.1" || model === "gpt-4.1-mini" || model === "gpt-4.1-nano";
+}

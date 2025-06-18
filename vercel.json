@@ -1,8 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/cache-images?apiKey=dolphin-manager-cron-secret",
-      "schedule": "0 3 * * *"
+      "path": "/api/etsy/listings/queue/process",
+      "schedule": "*/2 * * * *"
     }
   ]
 } 

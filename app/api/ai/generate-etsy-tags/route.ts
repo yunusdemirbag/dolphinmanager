@@ -106,10 +106,16 @@ Return ONLY the 13 tags in one line, comma-separated.
 
     console.log("🎉 TAG'LER BAŞARIYLA ÜRETİLDİ:", tagArray);
 
+    // Token kullanım bilgilerini yanıta ekle
     return NextResponse.json({
       tags: tagArray,
       success: true,
-      count: tagArray.length
+      count: tagArray.length,
+      usage: openaiData.usage ? {
+        prompt_tokens: openaiData.usage.prompt_tokens,
+        completion_tokens: openaiData.usage.completion_tokens,
+        total_tokens: openaiData.usage.total_tokens
+      } : null
     })
 
   } catch (error: any) {

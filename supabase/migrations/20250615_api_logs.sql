@@ -24,33 +24,36 @@ CREATE INDEX IF NOT EXISTS api_logs_endpoint_idx ON api_logs (endpoint);
 ALTER TABLE api_logs ENABLE ROW LEVEL SECURITY;
 
 -- Sadece kendi loglarını görebilme politikası
-CREATE POLICY "Users can view their own logs"
-  ON api_logs FOR SELECT
-  USING (auth.uid() = user_id);
-
--- Admin tüm logları görebilir
-CREATE POLICY "Admins can view all logs"
-  ON api_logs FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM auth.users
-      WHERE auth.uid() = id AND raw_user_meta_data->>'role' = 'admin'
-    )
-  );
-
--- Sadece sistem logları ekleyebilir (middleware ve API'ler tarafından)
-CREATE POLICY "System can insert logs"
-  ON api_logs FOR INSERT
-  WITH CHECK (true);
-
--- Loglar değiştirilemez veya silinemez
-CREATE POLICY "Logs cannot be updated"
-  ON api_logs FOR UPDATE
-  USING (false);
-
-CREATE POLICY "Logs cannot be deleted"
-  ON api_logs FOR DELETE
-  USING (false);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'api_logs' AND policyname = 'Users can view their own logs'
+    ) THEN
+        CREATE POLICY "Users can view their own logs"
+        ON api_logs FOR SELECT
+        USING (auth.uid() = user_id);
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'api_logs' AND policyname = 'Service role can view all logs'
+    ) THEN
+        CREATE POLICY "Service role can view all logs"
+        ON api_logs FOR SELECT
+        USING (auth.role() = 'service_role');
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'api_logs' AND policyname = 'Authenticated can insert logs'
+    ) THEN
+        CREATE POLICY "Authenticated can insert logs"
+        ON api_logs FOR INSERT
+        WITH CHECK (auth.role() = 'authenticated');
+    END IF;
+END
+$$;
 
 -- Geçmiş logları temizlemek için fonksiyon (30 günden eski logları siler)
 CREATE OR REPLACE FUNCTION clean_old_api_logs()

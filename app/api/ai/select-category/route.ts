@@ -113,13 +113,16 @@ Return ONLY the category name, nothing else.
 
     console.log("🎉 KATEGORİ BAŞARIYLA SEÇİLDİ:", selectedCategory);
 
-    // Sadece kategori adını döndür (text response)
-    return new Response(selectedCategory, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/plain',
-      },
-    })
+    // Token kullanım bilgilerini JSON olarak döndür
+    return NextResponse.json({
+      category: selectedCategory,
+      success: true,
+      usage: openaiData.usage ? {
+        prompt_tokens: openaiData.usage.prompt_tokens,
+        completion_tokens: openaiData.usage.completion_tokens,
+        total_tokens: openaiData.usage.total_tokens
+      } : null
+    });
 
   } catch (error: any) {
     console.error("💥 ENDPOINT HATASI:");

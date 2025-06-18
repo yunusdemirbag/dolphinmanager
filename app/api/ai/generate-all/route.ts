@@ -36,9 +36,56 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ Parametreler geçerli, OpenAI işlemi başlatılıyor...");
 
-    // generateAllFromImage fonksiyonunu çağır
-    const result = await generateAllFromImage(imageBase64, imageType, prompt);
+    // OpenAI API key kontrolü
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      throw new Error("OpenAI API key yapılandırılmamış");
+    }
+
+    // OpenAI API çağrısı
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt || "Analyze this image and create a descriptive title for an Etsy canvas wall art product."
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:${imageType};base64,${imageBase64}`,
+                  detail: 'low'
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.7
+      })
+    });
+
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      throw new Error(`OpenAI API hatası (${openaiResponse.status}): ${errorText}`);
+    }
+
+    const openaiData = await openaiResponse.json();
+    const result = openaiData.choices?.[0]?.message?.content?.trim();
     
+    if (!result) {
+      throw new Error("OpenAI yanıtında içerik bulunamadı");
+    }
+
     console.log("🎉 İŞLEM BAŞARILI!");
     console.log("Sonuç:", result);
 
@@ -49,7 +96,12 @@ export async function POST(request: NextRequest) {
         title: result // Uyumluluk için
       },
       success: true,
-      requestType: requestType || "normal"
+      requestType: requestType || "normal",
+      usage: openaiData.usage ? {
+        prompt_tokens: openaiData.usage.prompt_tokens,
+        completion_tokens: openaiData.usage.completion_tokens,
+        total_tokens: openaiData.usage.total_tokens
+      } : null
     })
 
   } catch (error: any) {

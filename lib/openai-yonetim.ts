@@ -17,26 +17,23 @@ export const titlePrompt: PromptConfig = {
   name: "Canvas Title Generator – Elite SEO Optimized",
   description: "Analyzes image and crafts elite Etsy canvas wall art titles.",
   prompt: `
-You are an elite Etsy SEO copywriter specialising in PHYSICAL canvas wall art (NOT digital).
-
-STEP 1 – IMAGE ANALYSIS
-• Detect the MAIN SUBJECT (woman, animal species, landscape, abstract etc.)
-• If a PERSON is visible identify approximate ethnicity when obvious (Black Woman, Asian Man …)
-• If an ANIMAL specify species (lion, flamingo, giraffe …)
-• Determine ART STYLE (abstract, minimalist, pop art, line art, cubist, ukiyo-e, graffiti, etc.)
-• Capture EMOTIONAL TONE (bold, calming, empowering, romantic, mystical …)
-• Note 1–2 DOMINANT COLORS that would attract buyers (turquoise, gold, black & white …)
-
-STEP 2 – TITLE CONSTRUCTION (MAX 135 characters)
-• Format: 
-  <Emotive Adjective> <Primary Subject> <Art Style(optional)> Canvas Wall Art Print | <Color/Tone> <Room Keyword> Decor | <Secondary Keyword>
-• Always include exactly one occurrence of "Canvas Wall Art Print".
-• Use keyword phrases buyers actually search: Living Room Decor, Bedroom Wall Décor, Office Artwork, Zen Meditation etc.
-• Avoid duplicate words, avoid filler like "beautiful", no quotes, no parentheses.
-• Use Title Case.
-• Stay ≤ 135 characters – if you're about to exceed, drop the least-important phrase.
-
-Return ONLY the final title string, nothing else.
+You are an elite Etsy SEO copy-writer who specialises in PHYSICAL canvas wall art (NOT digital).
+STEP 1 — IMAGE ANALYSIS  
+• Identify the MAIN SUBJECT (woman, animal species, landscape, abstract form, floral, religious icon, etc.).  
+• If a HUMAN: note gender and clear cultural identity when obvious (e.g. Black Woman, Asian Man).  
+• If an ANIMAL: name the exact species (lion, flamingo, giraffe…).  
+• Detect the ART STYLE (abstract, minimalist, pop art, line art, cubist, ukiyo-e, graffiti, etc.).  
+• Capture the EMOTIONAL TONE (bold, calming, empowering, romantic, mystical, meditative…).  
+• Note the 1-2 most eye-catching DOMINANT COLORS (gold, turquoise, black & white, etc.).
+STEP 2 — TITLE CONSTRUCTION  ≤ 135 characters  
+Format:  
+  <Emotive Adjective> <Primary Subject> <Art Style(optional)> Canvas Wall Art Print | <Color/Tone> <Room Keyword> Decor | <Final Keyword>  
+Mandatory rules  
+• Include **exactly once** the phrase "Canvas Wall Art Print".  
+• Use popular buyer phrases such as Living Room Decor, Bedroom Wall Decor, Office Artwork, Zen Meditation, Gift for Him/Her.  
+• No duplicated words, no filler like "beautiful", no quotes, no parentheses.  
+• Use Title Case. If length exceeds 135 c, remove the least-important phrase.
+Return **ONLY** the finished title string and nothing else.
 `.trim(),
 };
 
@@ -50,15 +47,13 @@ export const tagPrompt: PromptConfig = {
   description: "Creates 13 SEO-optimized tags for physical canvas wall art.",
   prompt: `
 You are an Etsy canvas wall art SEO expert.
-
-1. Based on the uploaded image AND the generated title, craft exactly 13 tags.
-2. Each tag MUST be ≤ 19 characters including spaces (use 2–3 word phrases).
-3. Use only lowercase letters, no punctuation except spaces.
-4. Do NOT repeat words more than twice across all tags.
-5. Cover: subject, style, colors, mood, intended room, gift occasion.
-6. Separate tags with commas, no quotes.
-
-Return ONLY the 13 tags in one line, comma-separated.
+1. Using the image AND the generated title, create **exactly 13 tags**.  
+2. Each tag must be ≤ 19 characters, including spaces. Use 2- or 3-word phrases.  
+3. Lowercase only, no punctuation except single spaces.  
+4. No word may appear more than twice across all tags.  
+5. Cover a mix of subject, style, colors, mood, target room, and gift occasion.  
+6. Output the tags in one line, comma-separated, with no quotes or extra text.
+Return **ONLY** the 13 tags.
 `.trim(),
 };
 
@@ -94,7 +89,7 @@ export const focusTitlePrompt: PromptConfig = {
   name: "Focus Keyword Title Generator",
   description: "Generates titles focused on specific keywords while analyzing the image.",
   prompt: `
-You are an elite Etsy SEO copywriter specialising in PHYSICAL canvas wall art.
+You are an elite Etsy SEO copy-writer specialising in PHYSICAL canvas wall art.
 
 TASK: Create a title that prominently features the given focus keyword while still analyzing the image properly.
 

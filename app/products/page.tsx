@@ -215,13 +215,19 @@ export default function ProductsPage() {
     try {
       setSubmitting(true)
       
+      // State değerini productData'ya ekle
+      const dataWithState = {
+        ...productData,
+        state
+      };
+      
       // Make the API call and return the response
       const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(productData)
+        body: JSON.stringify(dataWithState)
       });
 
       const data = await response.json();
@@ -368,7 +374,7 @@ export default function ProductsPage() {
   
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="container mx-auto py-8 space-y-6">
+      <div className="max-w-7xl mx-auto py-8 space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -390,9 +396,9 @@ export default function ProductsPage() {
                 )}
               </Button>
             )}
-            <Button onClick={() => setShowCreateModal(true)}>
+            <Button onClick={() => setShowCreateModal(true)} variant="outline">
               <Plus className="mr-2 h-4 w-4" />
-              Yeni Ürün
+              Taslak Olarak Ekle
             </Button>
           </div>
         </div>
@@ -449,14 +455,19 @@ export default function ProductsPage() {
         )}
 
         {/* Modals */}
-        <ProductFormModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={onCreateProduct}
-          submitting={submitting}
-          shippingProfiles={shippingProfiles}
-          loadingShippingProfiles={loadingShippingProfiles}
-        />
+        {showCreateModal && (
+          <ProductFormModal
+            isOpen={showCreateModal}
+            onClose={() => setShowCreateModal(false)}
+            onSubmit={onCreateProduct}
+            submitting={submitting}
+            shippingProfiles={shippingProfiles}
+            loadingShippingProfiles={loadingShippingProfiles}
+            processingProfiles={processingProfiles}
+            loadingProcessingProfiles={loadingProcessingProfiles}
+            showEtsyButton={true}
+          />
+        )}
 
         {showEditModal && (
           <ProductFormModal
@@ -482,3 +493,4 @@ export default function ProductsPage() {
     </DndProvider>
   )
 }
+

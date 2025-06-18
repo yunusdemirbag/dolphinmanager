@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server"; // Import the server-side 
 import { cacheManager } from "./cache"
 import { fetchWithCache } from "./api-utils"
 import { Database } from "@/types/database.types";
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabase } from '@/lib/supabase';
 
 // Mock data importları geçici olarak kaldırıldı
 // Gerekirse burada yeniden implement edilebilir
@@ -2608,4 +2608,80 @@ function generateMockLedgerEntries(limit = 10, shopId = 1) {
     })),
     count: limit
   };
+}
+
+// Eksik olan createEtsyListing fonksiyonunu ekle
+export async function createEtsyListing(accessToken: string, shopId: number, data: any): Promise<any> {
+  try {
+    console.log("Creating new Etsy listing for shop:", shopId);
+    
+    // Etsy API'ye gönderilecek veri yapısını hazırla
+    const etsyListingData = {
+      title: data.title || '',
+      description: data.description || '',
+      price: data.price || 0,
+      quantity: data.quantity || 4, // Varsayılan değer
+      shipping_profile_id: data.shipping_profile_id || null,
+      taxonomy_id: data.taxonomy_id || 1027, // Default: Wall Decor
+      tags: data.tags || [],
+      state: data.state || 'draft',
+      who_made: data.who_made || 'i_did',
+      when_made: data.when_made || 'made_to_order',
+      is_supply: data.is_supply || false,
+      shop_section_id: data.shop_section_id || null,
+      
+      // Kişiselleştirme ayarları
+      is_personalizable: data.is_personalizable || true,
+      personalization_is_required: data.personalization_is_required || false,
+      personalization_instructions: data.personalization_instructions || '',
+      personalization_char_count_max: data.personalization_char_count_max || 256,
+      
+      // Varyasyon ayarları
+      has_variations: data.has_variations || false
+    };
+
+    // OAuth 1.0 header oluştur
+    const timestamp = Math.floor(Date.now() / 1000);
+    const nonce = Math.random().toString(36).substring(2, 15);
+    
+    const authHeader = `OAuth oauth_consumer_key="${process.env.ETSY_CONSUMER_KEY}", oauth_token="${accessToken}", oauth_signature_method="HMAC-SHA1", oauth_timestamp="${timestamp}", oauth_nonce="${nonce}", oauth_version="1.0"`;
+
+    // Etsy API'ye POST isteği
+    const etsyApiUrl = `${ETSY_API_BASE}/application/shops/${shopId}/listings`;
+    
+    console.log('📤 Etsy API URL:', etsyApiUrl);
+    
+    const response = await fetch(etsyApiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ETSY_CONSUMER_KEY || ''
+      },
+      body: JSON.stringify(etsyListingData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Etsy API hatası:', errorText);
+      
+      let errorMessage = 'Etsy API hatası';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorData.message || errorText;
+      } catch (e) {
+        errorMessage = errorText;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    console.log('✅ Etsy listing oluşturuldu:', result.listing_id);
+    
+    return result;
+  } catch (error) {
+    console.error("createEtsyListing error:", error);
+    throw error;
+  }
 }

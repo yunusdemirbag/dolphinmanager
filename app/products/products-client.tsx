@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Product, ShippingProfile, EtsyProcessingProfile } from '@/types/product';
+import { useRouter } from "next/navigation";
+import { ProductFormModal } from "@/components/product/ProductFormModal";
+import { ProductDeleteModal } from "@/components/product/ProductDeleteModal";
+import { ProductFilters } from "@/components/product/ProductFilters";
+import { QueueStatusIndicator } from "@/components/product/QueueStatusIndicator";
 
 interface StoreDetails {
   shop_id: number;
@@ -209,4 +214,17 @@ export function useProductsClient() {
     storeDetails,
     fetchStoreDetailsAndProfiles
   };
+}
+
+export default function ProductsClient() {
+  // ... existing code ...
+
+  return (
+    <div className="py-6">
+      {/* Kuyruk durumu göstergesi */}
+      <QueueStatusIndicator />
+      
+      {/* ... existing code ... */}
+    </div>
+  );
 } 

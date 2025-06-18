@@ -360,6 +360,11 @@ interface ProductFormModalProps {
   product?: Product
   shippingProfiles: ShippingProfile[]
   loadingShippingProfiles: boolean
+  processingProfiles?: EtsyProcessingProfile[]
+  loadingProcessingProfiles?: boolean
+  showEtsyButton?: boolean
+  onSubmit?: (productData: Partial<Product>, state?: "draft" | "active") => Promise<CreateListingResponse>
+  submitting?: boolean
 }
 
 // Drag and drop için item tipleri
@@ -490,6 +495,11 @@ export function ProductFormModal({
   product,
   shippingProfiles,
   loadingShippingProfiles,
+  processingProfiles,
+  loadingProcessingProfiles,
+  showEtsyButton = false,
+  onSubmit,
+  submitting: externalSubmitting,
 }: ProductFormModalProps) {
   // All useState declarations at the top
   const { toast } = useToast()
@@ -521,7 +531,6 @@ export function ProductFormModal({
   // Ürün görselleri için state
   const [productImages, setProductImages] = useState<MediaFile[]>([])
   const [videoFile, setVideoFile] = useState<MediaFile | null>(null)
-  const [submitting, setSubmitting] = useState(false)
 
   // --- BAŞLIK OTO-ÜRETİMİ STATE ---
   const [autoTitleLoading, setAutoTitleLoading] = useState(false);
@@ -962,7 +971,69 @@ export function ProductFormModal({
       return;
     }
 
-    setSubmitting(true);
+    // Dışarıdan gelen onSubmit fonksiyonu varsa onu kullan
+    if (onSubmit) {
+      try {
+        // Başlangıç toast mesajı
+        toast({ 
+          title: "🚀 Ürün yükleniyor...", 
+          description: "Lütfen bekleyin, ürün Etsy'e yükleniyor." 
+        });
+        
+        const formData: Partial<Product> = {
+          title,
+          description,
+          price: price,
+          shipping_profile_id: Number(shippingProfileId),
+          tags,
+          has_variations: hasVariations,
+          variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
+          state: state,
+          shop_section_id: Number(selectedShopSection) || undefined,
+          
+          // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
+          is_personalizable: isPersonalizable,
+          personalization_is_required: personalizationRequired,
+          personalization_instructions: personalizationInstructions,
+          
+          // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
+          quantity: quantity || 4,
+          taxonomy_id: taxonomyId,
+          who_made: "i_did",
+          when_made: "made_to_order",
+          is_supply: false,
+          
+          // Görseller
+          images: productImages.map(img => ({ file: img.file })),
+          video: videoFile ? { file: videoFile.file } : null,
+        };
+        
+        const result = await onSubmit(formData, state);
+        
+        if (result.success) {
+          toast({
+            title: "✅ Başarılı",
+            description: "Ürün başarıyla oluşturuldu",
+          });
+          
+          // Başarılı işlem sonrası modalı kapat
+          onClose();
+        } else {
+          throw new Error(result.message || "Ürün oluşturulamadı");
+        }
+      } catch (error: any) {
+        console.error('Ürün oluşturma hatası:', error);
+        toast({ 
+          variant: "destructive", 
+          title: "❌ Hata Oluştu", 
+          description: error.message || "Ürün oluşturulurken bir hata oluştu." 
+        });
+      }
+      return;
+    }
+    
+    // Dışarıdan gelen onSubmit yoksa iç fonksiyonu kullan
+    setInternalSubmitting(true);
     
     // İşlem başlangıç zamanı
     const startTime = Date.now();
@@ -1088,7 +1159,113 @@ export function ProductFormModal({
         });
       }
     } finally {
-      setSubmitting(false);
+      setInternalSubmitting(false);
+    }
+  };
+
+  // Ürünü kuyruğa ekleyen fonksiyon
+  const handleQueueSubmit = async (state: "draft" | "active") => {
+    // 1. Fiyat Validasyonu
+    let isPriceValid = false;
+    if (hasVariations) {
+      isPriceValid = variations.some(v => v.is_active && v.price >= 0.20);
+    } else {
+      isPriceValid = price >= 0.20;
+    }
+
+    if (!isPriceValid) {
+      toast({
+        variant: "destructive",
+        title: "Geçersiz Fiyat",
+        description: "Lütfen en az bir ürün veya varyasyon için 0.20 USD'den yüksek bir fiyat girin.",
+      });
+      return;
+    }
+
+    // 2. Diğer Validasyonlar
+    if (!title || !shippingProfileId || productImages.length === 0) {
+      toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
+      return;
+    }
+
+    setInternalSubmitting(true);
+    
+    try {
+      // Başlangıç toast mesajı
+      toast({ 
+        title: "🚀 Ürün kuyruğa ekleniyor...", 
+        description: "Lütfen bekleyin, ürün kuyruğa ekleniyor." 
+      });
+      
+      const formData = new FormData();
+
+      const listingData = {
+        // Formdan gelen dinamik değerler
+        title,
+        description,
+        price,
+        shipping_profile_id: Number(shippingProfileId),
+        tags,
+        has_variations: hasVariations,
+        variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
+        state: state,
+        shop_section_id: Number(selectedShopSection) || undefined,
+        category: selectedShopSection ? shopSections.find(s => s.shop_section_id.toString() === selectedShopSection)?.title : undefined,
+        
+        // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
+        is_personalizable: isPersonalizable,
+        personalization_is_required: personalizationRequired,
+        personalization_instructions: personalizationInstructions,
+        personalization_char_count_max: 256, // <-- Etsy için kritik alan
+
+        // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
+        quantity: quantity || 4,
+        taxonomy_id: taxonomyId,
+        who_made: "i_did",
+        when_made: "made_to_order",
+        is_supply: false,
+        
+        // Token kullanım bilgilerini ekle
+        tokenUsage: tokenUsage,
+        
+        // Süre bilgilerini ekle
+        generationDurations: generationDurations
+      };
+
+      formData.append('listingData', JSON.stringify(listingData));
+      productImages.forEach(image => formData.append('imageFiles', image.file));
+      if (videoFile) formData.append('videoFiles', videoFile.file);
+      
+      // Kuyruğa eklemek için API çağrısı yap
+      const response = await fetch('/api/etsy/listings/queue', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "✅ Başarılı",
+          description: "Ürün başarıyla kuyruğa eklendi",
+        });
+        
+        // Başarılı işlem sonrası modalı kapat
+        onClose();
+      } else {
+        throw new Error(result.error || "Ürün kuyruğa eklenemedi");
+      }
+
+    } catch (error: any) {
+      console.error('Ürün kuyruğa ekleme hatası:', error);
+      
+      toast({ 
+        variant: "destructive", 
+        title: "❌ Hata Oluştu", 
+        description: error.message || "Ürün kuyruğa eklenirken bir hata oluştu." 
+      });
+    } finally {
+      setInternalSubmitting(false);
     }
   };
 
@@ -1350,7 +1527,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   // QWE kombinasyonu kontrolü
   useEffect(() => {
     if (pressedKeys.has('q') && pressedKeys.has('w') && pressedKeys.has('e') && isOpen) {
-      if (submitting) return;
+      if (internalSubmitting) return;
 
       // Basit validasyon kontrolü
       if (!title || !shippingProfileId || productImages.length === 0) {
@@ -1371,7 +1548,24 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       handleSubmit("draft");
       setPressedKeys(new Set()); // Tuşları sıfırla
     }
-  }, [pressedKeys, isOpen, submitting, title, shippingProfileId, productImages.length]);
+  }, [pressedKeys, isOpen, internalSubmitting, title, shippingProfileId, productImages.length]);
+
+  // 123 kısa yolu - Kuyrukla ürün ekle
+  useEffect(() => {
+    if (pressedKeys.has('1') && pressedKeys.has('2') && pressedKeys.has('3') && isOpen) {
+      if (isSubmitting) return;
+
+      // Basit validasyon kontrolü
+      if (!title || !shippingProfileId || productImages.length === 0) {
+        toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
+        return;
+      }
+
+      // Kuyrukla ürün ekle
+      handleQueueSubmit("draft");
+      setPressedKeys(new Set()); // Tuşları sıfırla
+    }
+  }, [pressedKeys, isOpen, isSubmitting, title, shippingProfileId, productImages.length]);
 
   // Resim bölümü
   const ImageSection = () => (
@@ -1653,6 +1847,12 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     description?: number;
     category?: number;
   }>({});
+
+  // İç state için submitting
+  const [internalSubmitting, setInternalSubmitting] = useState(false)
+  
+  // Dışarıdan gelen veya içeride yönetilen submitting durumu
+  const isSubmitting = externalSubmitting !== undefined ? externalSubmitting : internalSubmitting;
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -2130,33 +2330,67 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
               <Button variant="outline" onClick={handleCloseModal}>İptal</Button>
             </div>
             <div className="flex gap-2">
-              <Button 
-                variant="secondary" 
-                onClick={() => handleSubmit("draft")} 
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Taslak Kaydediliyor...
-                  </>
-                ) : (
-                  "Taslak Olarak Kaydet"
-                )}
-              </Button>
-              <Button 
-                onClick={() => handleSubmit("active")} 
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Yayınlanıyor...
-                  </>
-                ) : (
-                  "Yayınla"
-                )}
-              </Button>
+              {showEtsyButton ? (
+                <>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleSubmit("draft")} 
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Taslak Ekleniyor...
+                      </>
+                    ) : (
+                      <>Taslak Olarak Ekle</>
+                    )}
+                  </Button>
+                  <Button 
+                    onClick={() => handleSubmit("active")} 
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Yükleniyor...
+                      </>
+                    ) : (
+                      <>Etsy'ye Yükle</>
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => handleQueueSubmit("draft")} 
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Kuyruğa Ekleniyor...
+                      </>
+                    ) : (
+                      <>Kuyrukla Ürün Ekle</>
+                    )}
+                  </Button>
+                  <Button 
+                    onClick={() => handleSubmit("draft")} 
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Ekleniyor...
+                      </>
+                    ) : (
+                      <>Ürün Ekle</>
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           </DialogFooter>
         </DialogContent>

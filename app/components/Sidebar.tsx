@@ -67,7 +67,7 @@ export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
 
   return (
     <div 
-      className={`${isExpanded ? 'w-64' : 'w-16'} bg-white border-r border-gray-200 h-screen fixed left-0 top-0 z-40 flex flex-col transition-all duration-300 ease-in-out`}
+      className={`${isExpanded ? 'w-64' : 'w-16'} bg-gray-50 border-r border-gray-200 h-screen fixed left-0 top-0 z-40 flex flex-col transition-all duration-300 ease-in-out`}
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
     >
@@ -106,7 +106,7 @@ export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
                     className={`w-full flex items-center ${isExpanded ? 'px-3' : 'px-2 justify-center'} py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                       isActive
                         ? "bg-gray-100 text-black border-r-2 border-black"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-black"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-black"
                     }`}
                     title={!isExpanded ? item.label : undefined}
                   >
@@ -147,7 +147,7 @@ export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
       <div className="p-4 border-t border-gray-200">
         <Button 
           variant="ghost" 
-          className={`w-full ${isExpanded ? 'justify-start' : 'justify-center px-2'} text-gray-600 hover:text-black hover:bg-gray-50`}
+          className={`w-full ${isExpanded ? 'justify-start' : 'justify-center px-2'} text-gray-600 hover:text-black hover:bg-gray-100`}
           onClick={handleLogout}
           title={!isExpanded ? "Çıkış" : undefined}
         >

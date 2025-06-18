@@ -81,7 +81,8 @@ CREATE INDEX IF NOT EXISTS idx_etsy_stores_user_id ON etsy_stores(user_id);
 CREATE INDEX IF NOT EXISTS idx_etsy_stores_shop_id ON etsy_stores(shop_id);
 
 -- Add unique constraint to products for Etsy listing ID
-ALTER TABLE products ADD CONSTRAINT unique_etsy_listing_id UNIQUE (etsy_listing_id);
+ALTER TABLE IF EXISTS products ADD COLUMN IF NOT EXISTS etsy_listing_id BIGINT;
+ALTER TABLE IF EXISTS products ADD CONSTRAINT unique_etsy_listing_id UNIQUE (etsy_listing_id);
 
 -- Clean up old auth sessions (older than 1 hour)
 CREATE OR REPLACE FUNCTION cleanup_old_auth_sessions()

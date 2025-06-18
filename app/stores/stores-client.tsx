@@ -49,7 +49,6 @@ import {
   DialogTitle
 } from "@/components/ui/dialog"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
-import { RateLimitIndicator } from "@/components/ui/rate-limit-indicator"
 
 interface EtsyStore {
   shop_id: number
@@ -484,11 +483,6 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
         <CurrentStoreNameBadge />
       </div>
       
-      {/* Rate Limit Indicator */}
-      <div className="mb-6">
-        <RateLimitIndicator />
-      </div>
-      
       {/* Yenileme durumu bildirimi */}
       {refreshStatus.message && (
         <div className={`mb-4 p-3 rounded border flex items-center ${
@@ -516,35 +510,71 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
           <p className="text-gray-600 mt-2">Etsy mağazalarınızı tek yerden yönetin</p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleRefreshStores} 
-            disabled={refreshing}
-            className="bg-black hover:bg-gray-800 text-white border-none"
-          >
-            {refreshing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            {refreshing ? 'Yenileniyor...' : 'Verileri Güncelle'}
-          </Button>
           {!etsyConnected && (
             <Button onClick={handleConnectEtsy} className="bg-black hover:bg-gray-800 text-white">
               <Link className="mr-2 h-4 w-4" />
               Mağaza Ekle
             </Button>
           )}
+          {etsyConnected && (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={handleRefreshStores} 
+                disabled={refreshing}
+              >
+                {refreshing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Yenileniyor...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Mağazaları Yenile
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={handleReconnectEtsy} 
+                disabled={reconnecting}
+              >
+                {reconnecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Bağlanıyor...
+                  </>
+                ) : (
+                  <>
+                    <Link className="mr-2 h-4 w-4" />
+                    Etsy Bağlantısını Yenile
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={handleResetEtsyConnection} 
+                disabled={resetting}
+              >
+                {resetting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sıfırlanıyor...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Etsy Bağlantısını Sıfırla
+                  </>
+                )}
+              </Button>
+            </>
+          )}
         </div>
       </div>
-
-      {/* Son yenileme bilgisi */}
-      {lastRefresh && (
-        <div className="text-xs text-gray-500 mb-4 flex items-center">
-          <Clock className="w-3 h-3 mr-1" />
-          Son yenileme: {lastRefresh.toLocaleString()}
-        </div>
-      )}
 
       {/* İstatistikler */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -572,25 +602,6 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
             <div className="text-sm text-gray-600">Aylık Gelir</div>
           </CardContent>
         </Card>
-      </div>
-      
-      {/* Durum Bilgisi */}
-      <div className="flex items-center text-sm text-gray-500 gap-2">
-        <div className="flex items-center">
-          <div className={`w-2 h-2 rounded-full mr-2 ${etsyConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <span>{etsyConnected ? 'Etsy Hesabı Bağlı' : 'Etsy Hesabı Bağlı Değil'}</span>
-        </div>
-        <div className="text-gray-400">•</div>
-        <div>Son güncelleme: {lastUpdate || '-'}</div>
-        {connectionError && (
-          <>
-            <div className="text-gray-400">•</div>
-            <div className="text-red-500 flex items-center">
-              <AlertCircle className="h-3 w-3 mr-1" />
-              {connectionError}
-            </div>
-          </>
-        )}
       </div>
 
       {/* Store Management */}
@@ -652,20 +663,22 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
           {/* Mağaza Kartları */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {stores.map((store) => (
-              <Card key={store.shop_id} className="relative">
-                {/* Disconnect Button - sağ üst köşe */}
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute top-2 right-2 z-10 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50"
-                  title="Bağlantıyı Kes"
-                  onClick={() => {
-                    setCurrentStore(store);
-                    setDisconnectDialogOpen(true);
-                  }}
-                >
-                  <Unlink className="w-5 h-5" />
-                </Button>
+              <Card key={store.shop_id} className="relative overflow-hidden">
+                {/* Disconnect Button - Daha belirgin olarak alt kısımda */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 flex justify-end">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    onClick={() => {
+                      setCurrentStore(store);
+                      setDisconnectDialogOpen(true);
+                    }}
+                  >
+                    <Unlink className="w-4 h-4 mr-1" />
+                    Bağlantıyı Kes
+                  </Button>
+                </div>
                 <CardContent className="flex items-center">
                   <div className="relative w-20 h-20 rounded-full overflow-hidden mr-4 bg-gray-200 flex items-center justify-center">
                     {store.avatar_url || store.image_url_760x100 ? (
@@ -726,7 +739,7 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
             <Button variant="outline" onClick={() => setDisconnectDialogOpen(false)} className="border-gray-300">
               İptal
             </Button>
-            <Button variant="destructive" onClick={handleDisconnectStore} disabled={reconnecting} className="bg-black hover:bg-gray-800 text-white border-none">
+            <Button variant="destructive" onClick={handleDisconnectStore} disabled={reconnecting} className="bg-red-600 hover:bg-red-700 text-white">
               {reconnecting ? <Loader2 className="w-4 w-4 mr-2 animate-spin" /> : <LogOut className="h-4 w-4 mr-2" />}
               Bağlantıyı Kes
             </Button>

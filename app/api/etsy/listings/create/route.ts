@@ -1,6 +1,6 @@
 // /app/api/etsy/listings/create/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { Database } from "@/types/database.types";
 import { 
   getValidAccessToken, 
@@ -18,34 +18,67 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
   try {
-    // Supabase client oluştur - lib/supabase/server.ts'deki createClient fonksiyonunu kullan
-    const supabase = await createClient();
-    console.log('✅ Supabase client oluşturuldu');
+    // Internal API key kontrolü
+    const internalApiKey = request.headers.get('X-Internal-API-Key');
+    const expectedApiKey = process.env.INTERNAL_API_KEY || 'queue-processor-key';
+    const isInternalRequest = internalApiKey === expectedApiKey;
     
-    // Kullanıcıyı doğrula
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    let supabase;
+    let userId: string;
     
-    if (sessionError) {
-      console.error('❌ Oturum doğrulama hatası:', sessionError);
-      return NextResponse.json(
-        { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
-    
-    if (!session || !session.user) {
-      console.error('❌ Oturum bulunamadı');
-      return NextResponse.json(
-        { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
-    }
-    
-    const userId = session.user.id;
-    console.log('✅ Kullanıcı doğrulandı:', userId);
-    
-    // Form verisini al
-    const formData = await request.formData();
+              // Form verisini al (sadece bir kez!)
+     const formData = await request.formData();
+     
+     if (isInternalRequest) {
+       // Internal request - Service role kullan
+       console.log('🔧 Internal request algılandı, service role kullanılıyor');
+       supabase = createServiceClient(
+         process.env.NEXT_PUBLIC_SUPABASE_URL!,
+         process.env.SUPABASE_SERVICE_ROLE_KEY!
+       );
+       
+       // FormData'dan user_id al
+       const listingDataStr = formData.get('listingData') as string;
+       if (listingDataStr) {
+         const listingData = JSON.parse(listingDataStr);
+         userId = listingData.user_id;
+         console.log('📝 Internal request user_id:', userId);
+       } else {
+         console.error('❌ Internal request\'te listingData bulunamadı');
+         return NextResponse.json(
+           { error: 'Internal request: Listing verisi bulunamadı', code: 'MISSING_DATA' },
+           { status: 400 }
+         );
+       }
+       
+     } else {
+       // Normal request - User session kullan
+       console.log('👤 Normal user request algılandı');
+       supabase = await createClient();
+       console.log('✅ Supabase client oluşturuldu');
+       
+       // Kullanıcıyı doğrula
+       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+       
+       if (sessionError) {
+         console.error('❌ Oturum doğrulama hatası:', sessionError);
+         return NextResponse.json(
+           { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
+           { status: 401 }
+         );
+       }
+       
+       if (!session || !session.user) {
+         console.error('❌ Oturum bulunamadı');
+         return NextResponse.json(
+           { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
+           { status: 401 }
+         );
+       }
+       
+       userId = session.user.id;
+       console.log('✅ Kullanıcı doğrulandı:', userId);
+     }
     
     // Listing verilerini JSON olarak parse et
     const listingDataStr = formData.get('listingData');

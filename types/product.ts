@@ -17,7 +17,10 @@ export interface Product {
   }>;
   image_url?: string;
   etsy_listing_id?: number;
+  listing_id?: number;
   video_url?: string;
+  videoFile?: File | null;
+  state?: "active" | "draft";
   has_variations: boolean;
   variations?: Array<{
     size: string;

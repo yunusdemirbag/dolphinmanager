@@ -1,107 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from "@/lib/supabase/server";
-import { getUserJobs } from '@/lib/queue-manager';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
-  console.log('🔍 KUYRUK DURUMU KONTROLÜ BAŞLADI');
-  
   try {
-    // Supabase client oluştur
     const supabase = await createClient();
     
-    // Kullanıcıyı doğrula
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.error('❌ Oturum doğrulama hatası:', sessionError);
-      return NextResponse.json(
-        { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
+    // Kullanıcı oturumunu kontrol et
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    if (!session || !session.user) {
-      console.error('❌ Oturum bulunamadı');
-      return NextResponse.json(
-        { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
+    // Kuyruk istatistiklerini al
+    const { data: queueStats, error: statsError } = await supabase
+      .from('etsy_uploads')
+      .select('state')
+      .eq('user_id', user.id);
+    
+    if (statsError) {
+      console.error('Kuyruk istatistikleri alınırken hata:', statsError);
+      return NextResponse.json({ error: 'Failed to fetch queue stats' }, { status: 500 });
     }
     
-    const userId = session.user.id;
-    
-    // Kullanıcının tüm işlerini al
-    const jobs = await getUserJobs(userId);
-    
-    // İşleri durumlarına göre grupla
-    const pendingJobs = jobs.filter(job => job.status === 'pending');
-    const processingJobs = jobs.filter(job => job.status === 'processing');
-    const completedJobs = jobs.filter(job => job.status === 'completed');
-    const failedJobs = jobs.filter(job => job.status === 'failed');
-    
-    // Daha detaylı bilgi için işleri dönüştür
-    const formatJob = (job: any) => {
-      // Etsy listing işleri için ek bilgiler ekle
-      if (job.type === 'create_etsy_listing') {
-        return {
-          id: job.id,
-          type: job.type,
-          status: job.status,
-          progress: job.progress,
-          created_at: job.created_at,
-          started_at: job.started_at,
-          completed_at: job.completed_at,
-          error: job.error,
-          title: job.data?.listingData?.title || 'İsimsiz Ürün',
-          image_count: job.data?.imageFiles?.length || 0,
-          video_count: job.data?.videoFiles?.length || 0,
-          listing_id: job.data?.listing_id,
-          has_variations: job.data?.listingData?.has_variations || false
-        };
-      }
-      
-      // Diğer iş türleri için genel bilgiler
-      return {
-        id: job.id,
-        type: job.type,
-        status: job.status,
-        progress: job.progress,
-        created_at: job.created_at,
-        started_at: job.started_at,
-        completed_at: job.completed_at,
-        error: job.error
-      };
+    // İstatistikleri hesapla
+    const stats = {
+      pending: 0,
+      processing: 0,
+      completed: 0,
+      failed: 0,
+      total: queueStats?.length || 0
     };
+    
+    queueStats?.forEach(item => {
+      if (item.state === 'pending') stats.pending++;
+      else if (item.state === 'processing') stats.processing++;
+      else if (item.state === 'completed') stats.completed++;
+      else if (item.state === 'failed') stats.failed++;
+    });
+    
+    // Son 10 öğeyi al
+    const { data: recentItems, error: recentError } = await supabase
+      .from('etsy_uploads')
+      .select('id, state, created_at, listing_id')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    if (recentError) {
+      console.error('Son öğeler alınırken hata:', recentError);
+    }
     
     return NextResponse.json({
       success: true,
-      queue_summary: {
-        total: jobs.length,
-        pending: pendingJobs.length,
-        processing: processingJobs.length,
-        completed: completedJobs.length,
-        failed: failedJobs.length
-      },
-      jobs: {
-        pending: pendingJobs.map(formatJob),
-        processing: processingJobs.map(formatJob),
-        completed: completedJobs.map(formatJob),
-        failed: failedJobs.map(formatJob)
-      }
+      stats,
+      recent_items: recentItems || [],
+      message: `Queue contains ${stats.total} items total`
     });
     
-  } catch (error: any) {
-    console.error('💥 GENEL HATA:', error);
-    
-    return NextResponse.json(
-      { 
-        error: error.message || 'Bilinmeyen hata',
-        code: 'UNKNOWN_ERROR',
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error('Kuyruk durumu API hatası:', error);
+    return NextResponse.json({ 
+      error: 'Failed to get queue status', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
   }
 } 

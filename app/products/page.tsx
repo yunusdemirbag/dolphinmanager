@@ -6,7 +6,9 @@ import ProductCard from "@/components/product/ProductCard"
 import { ProductFilters } from "@/components/product/ProductFilters"
 import { ProductFormModal } from "@/components/product/ProductFormModal"
 import { ProductDeleteModal } from "@/components/product/ProductDeleteModal"
+import { QueueManagementPanel } from "@/components/product/QueueManagementPanel"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Loader2 } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode } from "@/types/product"
 import { useProductsClient } from "./products-client"
@@ -215,19 +217,34 @@ export default function ProductsPage() {
     try {
       setSubmitting(true)
       
-      // State değerini productData'ya ekle
-      const dataWithState = {
+      // FormData oluştur
+      const formData = new FormData();
+      
+      // Listing data'yı JSON'a çevir ve ekle
+      const listingData = {
         ...productData,
         state
       };
+      formData.append('listingData', JSON.stringify(listingData));
+      
+      // Görselleri ekle
+      if (productData.images) {
+        for (const image of productData.images) {
+          if (image.file) {
+            formData.append('imageFiles', image.file);
+          }
+        }
+      }
+      
+      // Video varsa ekle
+      if (productData.videoFile) {
+        formData.append('videoFile', productData.videoFile);
+      }
       
       // Make the API call and return the response
       const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataWithState)
+        body: formData
       });
 
       const data = await response.json();
@@ -277,7 +294,7 @@ export default function ProductsPage() {
       setShowEditModal(null)
       return {
         success: true,
-        listing_id: product.listing_id,
+        listing_id: product.listing_id || product.etsy_listing_id,
         message: "Ürün başarıyla güncellendi"
       }
     } catch (error) {
@@ -378,7 +395,7 @@ export default function ProductsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Ürünler</h1>
+            <h1 className="text-2xl font-bold">Ürün Yönetimi</h1>
             <p className="text-gray-500">
               {totalCount} ürün
             </p>
@@ -411,48 +428,55 @@ export default function ProductsPage() {
           </div>
         )}
 
-        {/* Filters */}
-        <ProductFilters
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          filterStatus={filterStatus}
-          onFilterStatusChange={setFilterStatus}
-          sortBy={sortBy}
-          onSortByChange={setSortBy}
-          sortOrder={sortOrder}
-          onSortOrderChange={setSortOrder}
-          gridType={gridType}
-          onGridTypeChange={setGridType}
-        />
+        {/* Main Tabs */}
+        <Tabs defaultValue="products" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="products">Ürünler</TabsTrigger>
+            <TabsTrigger value="queue">Kuyruk Yönetimi</TabsTrigger>
+          </TabsList>
 
-        {/* Products Grid */}
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        ) : filteredProducts.length > 0 ? (
-          <div className={gridClasses[gridType]}>
-            {filteredProducts.map(product => (
-              <ProductCard
-                key={product.listing_id}
-                product={product}
-                listView={gridType === 'list'}
-                isSelected={false}
-                onSelect={() => {}}
-                onEdit={setShowEditModal}
-                onCopy={onCopyProduct}
-                onDelete={setConfirmDeleteProductId}
-                onUpdateState={(product, newState) => {
-                  handleUpdateProduct({ ...product, state: newState })
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Ürün bulunamadı</p>
-          </div>
-        )}
+          <TabsContent value="products" className="space-y-6">
+            {/* Filters */}
+            <ProductFilters
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              filterStatus={filterStatus}
+              onFilterStatusChange={setFilterStatus}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
+              sortOrder={sortOrder}
+              onSortOrderChange={setSortOrder}
+              gridType={gridType}
+              onGridTypeChange={setGridType}
+            />
+
+            {/* Products Grid */}
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : filteredProducts.length > 0 ? (
+              <div className={gridClasses[gridType]}>
+                {filteredProducts.map(product => (
+                  <ProductCard
+                    key={product.listing_id}
+                    product={product}
+                    onEdit={setShowEditModal}
+                    onDelete={(product: Product) => setConfirmDeleteProductId(product.listing_id || product.etsy_listing_id || 0)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500">Ürün bulunamadı</p>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="queue" className="space-y-6">
+            <QueueManagementPanel />
+          </TabsContent>
+        </Tabs>
 
         {/* Modals */}
         {showCreateModal && (

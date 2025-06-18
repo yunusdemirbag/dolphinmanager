@@ -46,7 +46,8 @@ export function QueueStatusIndicator() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include' // Session cookies'lerini dahil et
       });
 
       if (!response.ok) {

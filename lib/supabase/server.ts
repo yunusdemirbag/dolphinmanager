@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { Database } from '@/types/database.types'
 
@@ -46,5 +47,59 @@ export async function createClient() {
     }
   )
   
+  // Şema önbelleğini yenilemeyi dene
+  try {
+    await refreshSchemaCache(client);
+    console.log("Supabase client oluşturuldu");
+  } catch (e) {
+    // Şema yenileme hatası kritik değil, devam et
+    console.log("Şema önbelleği yenileme denemesi yapıldı");
+  }
+  
   return client
+}
+
+// Service role client oluştur (RLS bypass için)
+export function createServiceClient(
+  supabaseUrl: string = process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  serviceRoleKey: string = process.env.SUPABASE_SERVICE_ROLE_KEY!
+) {
+  return createSupabaseClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
+
+// Şema önbelleğini yenilemek için yardımcı fonksiyon
+export async function refreshSchemaCache(client: any) {
+  try {
+    // Önce refresh_schema_cache RPC fonksiyonunu çağır
+    try {
+      await client.rpc('refresh_schema_cache');
+      console.log("Şema önbelleği yenilendi");
+    } catch (e) {
+      // refresh_schema_cache fonksiyonu mevcut değilse, alternatif yöntemi dene
+      console.log("refresh_schema_cache fonksiyonu bulunamadı, alternatif yöntem deneniyor");
+    }
+    
+    // Alternatif yöntem - doğrudan pg_notify
+    await client.rpc('pg_notify', { channel: 'pgrst', payload: 'reload schema' });
+    
+    // Geçici tablo oluştur ve sil (yedek yöntem)
+    try {
+      const tempTableName = `_temp_schema_refresh_${Date.now()}`;
+      await client.rpc('execute_sql', { 
+        sql: `CREATE TEMPORARY TABLE ${tempTableName} (id SERIAL PRIMARY KEY); DROP TABLE ${tempTableName};` 
+      });
+    } catch (e) {
+      // execute_sql fonksiyonu mevcut değilse, hata önemli değil
+    }
+    
+    return { success: true, message: "Şema önbelleği yenilendi" };
+  } catch (error) {
+    console.error("Şema önbelleği yenileme hatası:", error);
+    return { success: false, error };
+  }
 } 

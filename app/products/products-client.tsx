@@ -221,7 +221,7 @@ export default function ProductsClient() {
 
   return (
     <div className="py-6">
-      {/* Kuyruk durumu göstergesi */}
+      {/* Kuyruk durumu göstergesi - otomatik olarak görüntülenir */}
       <QueueStatusIndicator />
       
       {/* ... existing code ... */}

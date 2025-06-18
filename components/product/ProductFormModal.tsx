@@ -503,6 +503,9 @@ export function ProductFormModal({
 }: ProductFormModalProps) {
   // All useState declarations at the top
   const { toast } = useToast()
+  
+  // Her render'da çalışacak basit test
+  console.log("🔥 COMPONENT HER RENDER'DA ÇALIŞIYOR - Toast fonksiyonu:", typeof toast);
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false)
   const [title, setTitle] = useState(product?.title || "")
   const [titleInput, setTitleInput] = useState("")
@@ -627,7 +630,7 @@ export function ProductFormModal({
   // Basit toast alternatifi - güzel UI ile
   const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
     // Console'a yaz
-    console.log(`Toast ${type.toUpperCase()}: ${message}`);
+    console.log(`🔔 TOAST ÇAĞRILDI: ${type.toUpperCase()}: ${message}`);
     
     // Yeni toast mesajı ekle
     const newToast = {
@@ -637,20 +640,26 @@ export function ProductFormModal({
       timestamp: Date.now()
     };
     
-    setToastMessages(prev => [...prev, newToast]);
+    setToastMessages(prev => {
+      console.log(`📝 Toast mesajları güncelleniyor. Önceki: ${prev.length}, Yeni: ${prev.length + 1}`);
+      return [...prev, newToast];
+    });
     
-    // 4 saniye sonra otomatik sil
+    // 6 saniye sonra otomatik sil (daha uzun süre)
     setTimeout(() => {
       setToastMessages(prev => prev.filter(toast => toast.id !== newToast.id));
-    }, 4000);
+    }, 6000);
     
     // useToast hook'unu da dene (eğer çalışıyorsa)
     try {
+      console.log(`🎯 useToast hook'u çağrılıyor: ${message}`);
       toast({
         title: message,
         variant: type === "error" ? "destructive" : undefined
       });
+      console.log(`✅ useToast hook'u başarılı`);
     } catch (e) {
+      console.log(`❌ useToast hook'u başarısız:`, e);
       // Sessizce geç, kendi toast sistemimiz var
     }
   };
@@ -1174,6 +1183,8 @@ export function ProductFormModal({
 
   // Ürünü kuyruğa ekleyen fonksiyon
   const handleQueueSubmit = async (state: "draft" | "active") => {
+    console.log("🚀 HANDLE QUEUE SUBMIT ÇAĞRILDI - State:", state);
+    
     // 1. Fiyat Validasyonu
     let isPriceValid = false;
     if (hasVariations) {
@@ -1198,37 +1209,19 @@ export function ProductFormModal({
     }
 
     setInternalSubmitting(true);
+    console.log("⏳ Internal submitting set to true");
     
     try {
       // Başlangıç toast mesajı
+      console.log("🚀 BAŞLANGIÇ TOAST GÖSTERİLİYOR - Kuyruğa ekleniyor...");
       toast({ 
-        title: "🚀 Ürün kuyruğa ekleniyor...", 
-        description: "Lütfen bekleyin, ürün kuyruğa ekleniyor." 
+        title: "🚀 Kuyruğa Ekleniyor", 
+        description: "Ürün işleme kuyruğuna ekleniyor, lütfen bekleyin..." 
       });
       
-      // Görsel dosyaları için base64 dönüşümü
-      const imagePromises = productImages.map(async (image) => {
-        return {
-          filename: image.file.name,
-          type: image.file.type,
-          size: image.file.size,
-          base64: image.preview
-        };
-      });
+      // FormData oluştur (normal form ile aynı yöntem)
+      const formData = new FormData();
       
-      const imageFilesData = await Promise.all(imagePromises);
-      
-      // Video dosyası varsa base64 dönüşümü
-      let videoFileData = null;
-      if (videoFile) {
-        videoFileData = {
-          filename: videoFile.file.name,
-          type: videoFile.file.type,
-          size: videoFile.file.size,
-          base64: videoFile.preview
-        };
-      }
-
       const listingData = {
         // Formdan gelen dinamik değerler
         title,
@@ -1259,20 +1252,26 @@ export function ProductFormModal({
         tokenUsage: tokenUsage,
         
         // Süre bilgilerini ekle
-        generationDurations: generationDurations,
-        
-        // Görsel ve video verileri
-        imageFiles: imageFilesData,
-        videoFiles: videoFileData ? [videoFileData] : []
+        generationDurations: generationDurations
       };
       
-      // Kuyruğa eklemek için API çağrısı yap - JSON olarak gönder
+      // Listing data'yı FormData'ya ekle
+      formData.append('listingData', JSON.stringify(listingData));
+      
+      // Resimleri FormData'ya ekle
+      productImages.forEach(image => {
+        formData.append('imageFiles', image.file);
+      });
+      
+      // Video varsa FormData'ya ekle  
+      if (videoFile) {
+        formData.append('videoFiles', videoFile.file);
+      }
+      
+      // Kuyruğa eklemek için API çağrısı yap - FormData olarak gönder
       const response = await fetch('/api/etsy/listings/queue', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(listingData),
+        body: formData, // Content-Type otomatik olarak multipart/form-data olacak
       });
       
       if (!response.ok) {
@@ -1282,15 +1281,27 @@ export function ProductFormModal({
       }
       
       const result = await response.json();
+      console.log("📥 API RESPONSE ALINDI:", result);
 
       if (result.success) {
+        // Başarı toast'ını göster - hem useToast hem de custom toast
+        console.log("✅ BAŞARILI TOAST GÖSTERİLDİ - Ürün kuyruğa eklendi");
+        
+        // Custom toast sistemi ile göster
+        showToast("✅ Ürün başarıyla kuyruğa eklendi! İşleme alınacak...", "success");
+        
+        // useToast hook'u ile de dene
         toast({
           title: "✅ Başarılı",
           description: "Ürün başarıyla kuyruğa eklendi",
+          duration: 5000,
         });
         
-        // Başarılı işlem sonrası modalı kapat
-        onClose();
+        // Modal'ı 4 saniye sonra kapat
+        setTimeout(() => {
+          console.log("🔄 Modal kapatılıyor...");
+          onClose();
+        }, 4000);
       } else {
         console.error('API Yanıt Hatası (success=false):', result);
         throw new Error(result.error || result.message || "Ürün kuyruğa eklenemedi");
@@ -1894,6 +1905,13 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     category?: number;
   }>({});
 
+  // Modal açıldığında state'leri sıfırla
+  useEffect(() => {
+    if (isOpen) {
+      // Modal açıldığında gerekli başlangıç işlemleri
+    }
+  }, [isOpen]);
+
   return (
     <DndProvider backend={HTML5Backend}>
       {/* Custom Toast Container - Sağ üst köşede */}
@@ -2391,7 +2409,9 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                   </Button>
                   <Button 
                     variant="secondary"
-                    onClick={() => handleQueueSubmit("draft")} 
+                    onClick={() => {
+                      handleQueueSubmit("draft");
+                    }} 
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
@@ -2402,7 +2422,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                     ) : (
                       <>
                         <Clock className="mr-2 h-4 w-4" />
-                        Kuyruk 
+                        Kuyruğa Ekle
                         <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">1+2+3</kbd>
                       </>
                     )}
@@ -2429,7 +2449,9 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                   </Button>
                   <Button 
                     variant="secondary"
-                    onClick={() => handleQueueSubmit("draft")} 
+                    onClick={() => {
+                      handleQueueSubmit("draft");
+                    }} 
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
@@ -2440,7 +2462,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                     ) : (
                       <>
                         <Clock className="mr-2 h-4 w-4" />
-                        Kuyruk 
+                        Kuyruğa Ekle
                         <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 rounded">1+2+3</kbd>
                       </>
                     )}

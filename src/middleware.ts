@@ -1,87 +1,112 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
+import { createServerClient } from "@supabase/ssr"
 
-// API istek loglarını veritabanına kaydetmek için yardımcı fonksiyon
-async function logApiRequest(req: NextRequest, res: NextResponse, durationMs: number, error?: any) {
-  try {
-    // API endpoint'ini al
-    const url = new URL(req.url);
-    const endpoint = url.pathname;
-    
-    // Sadece /api ile başlayan istekleri logla
-    if (!endpoint.startsWith('/api')) {
-      return;
-    }
-    
-    // AI API istekleri zaten kendi içlerinde loglanıyor, mükerrer kayıt olmasın
-    if (endpoint.startsWith('/api/ai/')) {
-      return;
-    }
-    
-    // İstek detaylarını topla
-    const method = req.method;
-    const userAgent = req.headers.get('user-agent') || 'unknown';
-    const referer = req.headers.get('referer') || 'unknown';
-    const contentType = req.headers.get('content-type') || 'unknown';
-    const status = res.status;
-    const success = status >= 200 && status < 300;
-    
-    // Kullanıcı kimliğini almaya çalış
-    let userId = null;
-    
-    // API log kaydını oluştur
-    await supabaseAdmin
-      .from("api_logs")
-      .insert({
-        endpoint,
-        method,
-        user_id: userId,
-        timestamp: new Date().toISOString(),
-        success,
-        duration_ms: durationMs,
-        status_code: status,
-        details: {
-          user_agent: userAgent,
-          referer: referer,
-          content_type: contentType,
-          error: error ? String(error) : undefined
-        }
-      });
-    
-    console.log(`[API Log] ${method} ${endpoint} - ${status} - ${durationMs}ms`);
-  } catch (logError) {
-    console.error("API log kaydederken hata:", logError);
-  }
-}
-
-// Middleware fonksiyonu
 export async function middleware(req: NextRequest) {
-  // İstek başlangıç zamanını kaydet
-  const startTime = Date.now();
+  const res = NextResponse.next()
   
-  // İsteği normal şekilde devam ettir
-  const res = NextResponse.next();
-  
-  try {
-    // İstek tamamlandıktan sonra süreyi hesapla ve logla
-    const durationMs = Date.now() - startTime;
-    await logApiRequest(req, res, durationMs);
-  } catch (error) {
-    console.error("API middleware hatası:", error);
-    
-    // Hata durumunda da loglama yap
-    try {
-      const durationMs = Date.now() - startTime;
-      await logApiRequest(req, res, durationMs, error);
-    } catch (logError) {
-      console.error("Hata loglarken ikincil hata:", logError);
-    }
+  // Handle CORS preflight requests for API routes
+  if (req.method === 'OPTIONS' && req.nextUrl.pathname.startsWith('/api')) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+        'Access-Control-Max-Age': '86400'
+      }
+    });
   }
   
-  return res;
+  // Add CORS headers to API responses
+  if (req.nextUrl.pathname.startsWith('/api')) {
+    // Clone the response to avoid modifying the original
+    const response = NextResponse.next();
+    
+    // Add CORS headers
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+    
+    return response;
+  }
+  
+  // Create a Supabase client configured for the middleware
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (name) => req.cookies.get(name)?.value,
+        set: (name, value, options) => {
+          res.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove: (name, options) => {
+          res.cookies.set({
+            name,
+            value: '',
+            ...options,
+          })
+        },
+      },
+    }
+  )
+  
+  try {
+    // Refresh session if expired - required for Server Components
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    // Statik kaynaklara ve API isteklerine izin ver
+    const isApiOrStatic = req.nextUrl.pathname.startsWith("/api") || 
+                        req.nextUrl.pathname.startsWith("/_next") || 
+                        req.nextUrl.pathname === "/favicon.ico" ||
+                        req.nextUrl.pathname.endsWith(".svg") ||
+                        req.nextUrl.pathname.endsWith(".png")
+    
+    if (isApiOrStatic) {
+      return res
+    }
+
+    // Ana sayfa isteklerini dashboard'a yönlendir
+    if (req.nextUrl.pathname === "/") {
+      return NextResponse.redirect(new URL("/dashboard", req.url))
+    }
+    
+    // Onboarding sayfasına erişildiğinde dashboard'a yönlendir
+    if (req.nextUrl.pathname === "/onboarding") {
+      return NextResponse.redirect(new URL("/dashboard", req.url))
+    }
+
+    // Auth sayfaları kontrolleri - eğer oturum açıksa dashboard'a yönlendir
+    const authPages = ["/auth/login", "/auth/register"]
+    if (authPages.includes(req.nextUrl.pathname) && session) {
+      return NextResponse.redirect(new URL("/dashboard", req.url))
+    }
+    
+    // Korumalı sayfalar - oturum yoksa login'e yönlendir
+    const protectedPages = ["/dashboard", "/stores", "/products", "/finance", "/orders", "/customer-management", "/marketing"]
+    if (protectedPages.some(page => req.nextUrl.pathname.startsWith(page)) && !session) {
+      return NextResponse.redirect(new URL("/auth/login?redirect=" + encodeURIComponent(req.nextUrl.pathname), req.url))
+    }
+    
+    return res
+  } catch (error) {
+    console.error("Middleware error:", error)
+    
+    // Hata durumunda ana sayfaya yönlendir
+    const isAuthPage = req.nextUrl.pathname.startsWith("/auth")
+    if (!isAuthPage) {
+      return NextResponse.redirect(new URL("/auth/login", req.url))
+    }
+    
+    return res
+  }
 }
 
-// Middleware'in çalışacağı route'ları belirle
 export const config = {
-  matcher: '/api/:path*',
-}; 
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+}

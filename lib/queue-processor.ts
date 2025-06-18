@@ -1,57 +1,101 @@
-import { startQueueProcessor, stopQueueProcessor } from './queue-manager';
+// Kuyruk İşlemcisi - Etsy ürün yükleme kuyruğunu işler
 
-// Interval ID'sini saklayacak değişken
-let queueProcessorInterval: NodeJS.Timeout | null = null;
+// Kuyruk İşlemcisi - Etsy ürün yükleme kuyruğunu işler
+let isRunning = false;
+let processingInterval: NodeJS.Timeout | null = null;
 
-/**
- * Kuyruk işlemcisini başlatır
- * @param intervalMs İşleme aralığı (ms)
- */
-export function startQueueProcessorService(intervalMs: number = 120000): void {
-  if (queueProcessorInterval) {
-    console.log('Kuyruk işlemcisi zaten çalışıyor, önce durduruluyor...');
-    stopQueueProcessorService();
+// Kuyruk işlemcisini başlat
+export function startQueueProcessor() {
+  if (isRunning) {
+    console.log('🔄 Kuyruk işleyici zaten çalışıyor');
+    return;
   }
+
+  isRunning = true;
+  console.log('🚀 Kuyruk işleyici başlatıldı');
+
+  // 30 saniye aralıklarla işle (test için, production'da 2 dakika olacak)
+  const intervalMs = process.env.QUEUE_PROCESS_INTERVAL_MS ? 
+    parseInt(process.env.QUEUE_PROCESS_INTERVAL_MS) : 30000;
+
+  processingInterval = setInterval(async () => {
+    if (!isRunning) return;
+
+    console.log('🔄 Kuyruk işleyici çalışıyor...');
+    
+    try {
+      // Kuyruk işleme endpoint'ini çağır
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/etsy/listings/queue/process`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.processed > 0) {
+        console.log(`✅ ${result.processed} öğe başarıyla işlendi`);
+      }
+      
+      if (result.errors && result.errors.length > 0) {
+        console.log(`❌ ${result.errors.length} öğe işlenirken hata oluştu`);
+      }
+
+    } catch (error) {
+      console.error('❌ Kuyruk işleme hatası:', error);
+    }
+  }, intervalMs);
+
+  console.log(`⏰ Kuyruk işleyici ${intervalMs}ms aralıklarla çalışacak`);
+}
+
+// Kuyruk işlemcisini durdur
+export function stopQueueProcessor() {
+  if (!isRunning) {
+    console.log('⏹️ Kuyruk işleyici zaten durmuş');
+    return;
+  }
+
+  isRunning = false;
   
-  console.log(`Kuyruk işlemcisi başlatılıyor (${intervalMs}ms aralıkla)...`);
-  queueProcessorInterval = startQueueProcessor(intervalMs);
-}
-
-/**
- * Kuyruk işlemcisini durdurur
- */
-export function stopQueueProcessorService(): void {
-  if (queueProcessorInterval) {
-    stopQueueProcessor(queueProcessorInterval);
-    queueProcessorInterval = null;
-    console.log('Kuyruk işlemcisi durduruldu');
-  } else {
-    console.log('Kuyruk işlemcisi zaten çalışmıyor');
+  if (processingInterval) {
+    clearInterval(processingInterval);
+    processingInterval = null;
   }
+
+  console.log('⏹️ Kuyruk işleyici durduruldu');
 }
 
-/**
- * Kuyruk işlemcisinin durumunu kontrol eder
- * @returns İşlemcinin çalışıp çalışmadığı
- */
-export function isQueueProcessorRunning(): boolean {
-  return queueProcessorInterval !== null;
+// Kuyruk işlemcisinin durumunu kontrol et
+export function getQueueProcessorStatus() {
+  return {
+    isRunning,
+    intervalMs: process.env.QUEUE_PROCESS_INTERVAL_MS ? 
+      parseInt(process.env.QUEUE_PROCESS_INTERVAL_MS) : 30000
+  };
 }
+
+// Process sinyallerini dinle
+process.on('SIGTERM', () => {
+  console.log('SIGTERM sinyali alındı, kuyruk işlemcisi durduruluyor...');
+  stopQueueProcessor();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT sinyali alındı, kuyruk işlemcisi durduruluyor...');
+  stopQueueProcessor();
+  process.exit(0);
+});
 
 // Sunucu başlatıldığında kuyruk işlemcisini otomatik başlat
 // Bu sadece geliştirme ortamında çalışır, production'da cron job kullanılmalı
 if (process.env.NODE_ENV === 'development' && process.env.AUTO_START_QUEUE_PROCESSOR === 'true') {
   console.log('Geliştirme ortamında kuyruk işlemcisi otomatik başlatılıyor...');
-  startQueueProcessorService();
-}
-
-// Uygulama kapatıldığında kuyruk işlemcisini durdur
-process.on('SIGTERM', () => {
-  console.log('SIGTERM sinyali alındı, kuyruk işlemcisi durduruluyor...');
-  stopQueueProcessorService();
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT sinyali alındı, kuyruk işlemcisi durduruluyor...');
-  stopQueueProcessorService();
-}); 
+  startQueueProcessor();
+} 

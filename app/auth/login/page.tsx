@@ -45,26 +45,7 @@ export default function LoginPage() {
   }
 
   const handleGoogleLogin = async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-
-      if (error) {
-        setError(error.message)
-      }
-    } catch (err) {
-      setError("Google ile giriş yapılırken hata oluştu")
-      console.error("Google login error:", err)
-    } finally {
-      setLoading(false)
-    }
+    setError("Google ile giriş şu anda desteklenmiyor")
   }
 
   return (

@@ -20,9 +20,10 @@ const auth = getAuth(app)
 // Initialize Firestore
 const db = getFirestore(app)
 
-// Connect to emulators in development
+// Firebase emulators temporarily disabled - using production Firebase for local dev
+// Uncomment below if you want to use Firebase emulators
+/*
 if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-  // Only connect to emulators once and only on client side
   try {
     if (!auth._delegate._config?.emulator) {
       connectAuthEmulator(auth, 'http://localhost:9099')
@@ -39,6 +40,7 @@ if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
     console.log('Firestore emulator already connected or not available')
   }
 }
+*/
 
 export { auth, db }
 export default app

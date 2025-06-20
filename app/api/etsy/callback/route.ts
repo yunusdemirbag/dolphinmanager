@@ -22,24 +22,39 @@ export async function GET(request: NextRequest) {
     
     const userId = state
     
-    // Şimdilik basit token exchange (gerçek implementasyon sonra)
-    console.log('🔄 Token exchange simülasyonu - kullanıcı:', userId)
+    // Gerçek Etsy token exchange
+    console.log('🔄 Etsy token exchange başlatılıyor - kullanıcı:', userId)
     
-    // Mock token data - gerçek Etsy API'sine istek atmayalım şimdilik
-    const mockTokenData = {
-      access_token: 'mock_access_token_' + Date.now(),
-      refresh_token: 'mock_refresh_token_' + Date.now(),
-      expires_in: 3600,
-      token_type: 'Bearer'
+    const tokenResponse = await fetch('https://api.etsy.com/v3/public/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: process.env.ETSY_CLIENT_ID!,
+        code: code,
+        redirect_uri: process.env.ETSY_REDIRECT_URI!,
+        // code_verifier gerekirse eklenecek
+      }),
+    })
+    
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text()
+      console.error('❌ Etsy token exchange hatası:', errorText)
+      return NextResponse.redirect(new URL('/stores?error=token_exchange_failed&details=' + encodeURIComponent(errorText), request.url))
     }
+    
+    const tokenData = await tokenResponse.json()
+    console.log('✅ Etsy token alındı')
     
     // Token'ı Firebase'e kaydet
     try {
       await db.collection('etsy_tokens').doc(userId).set({
-        access_token: mockTokenData.access_token,
-        refresh_token: mockTokenData.refresh_token,
-        expires_at: new Date(Date.now() + mockTokenData.expires_in * 1000),
-        token_type: mockTokenData.token_type,
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
+        token_type: tokenData.token_type || 'Bearer',
         user_id: userId,
         created_at: new Date(),
         updated_at: new Date()
@@ -51,34 +66,60 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/stores?error=token_save_failed', request.url))
     }
     
-    // Mock mağaza data - gerçek Etsy API'sine istek atmayalım şimdilik  
-    const mockStoreData = {
-      shop_id: Math.floor(Math.random() * 1000000),
-      shop_name: 'YunusHandmade',
-      title: 'Yunus Handmade Store',
-      currency_code: 'USD',
-      listing_active_count: 15,
-      num_favorers: 250,
-      review_count: 89,
-      review_average: 4.8,
-      url: 'https://etsy.com/shop/yunushandmade',
-      is_active: true
+    // Gerçek mağaza bilgilerini Etsy API'sinden çek
+    console.log('🔄 Kullanıcının mağaza bilgileri alınıyor...')
+    
+    const shopsResponse = await fetch('https://openapi.etsy.com/v3/application/shops', {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'x-api-key': process.env.ETSY_CLIENT_ID!
+      }
+    })
+    
+    if (!shopsResponse.ok) {
+      const errorText = await shopsResponse.text()
+      console.error('❌ Etsy mağaza bilgisi alınamadı:', errorText)
+      return NextResponse.redirect(new URL('/stores?error=shop_info_failed&details=' + encodeURIComponent(errorText), request.url))
+    }
+    
+    const shopsData = await shopsResponse.json()
+    console.log('✅ Mağaza bilgileri alındı:', shopsData)
+    
+    if (!shopsData.results || shopsData.results.length === 0) {
+      console.error('❌ Kullanıcının mağazası bulunamadı')
+      return NextResponse.redirect(new URL('/stores?error=no_shop_found', request.url))
+    }
+    
+    const shop = shopsData.results[0] // İlk mağazayı al
+    const storeData = {
+      shop_id: shop.shop_id,
+      shop_name: shop.shop_name,
+      title: shop.title || shop.shop_name, // Gerçek mağaza adı
+      currency_code: shop.currency_code || 'USD',
+      listing_active_count: shop.listing_active_count || 0,
+      num_favorers: shop.num_favorers || 0,
+      review_count: shop.review_count || 0,
+      review_average: shop.review_average || 0,
+      url: shop.url || `https://etsy.com/shop/${shop.shop_name}`,
+      image_url_760x100: shop.image_url_760x100 || '',
+      is_active: shop.is_active !== false
     }
     
     // Mağaza bilgilerini Firebase'e kaydet
     try {
-      await db.collection('etsy_stores').doc(`${userId}_${mockStoreData.shop_id}`).set({
+      await db.collection('etsy_stores').doc(`${userId}_${storeData.shop_id}`).set({
         user_id: userId,
-        shop_id: mockStoreData.shop_id,
-        shop_name: mockStoreData.shop_name,
-        title: mockStoreData.title,
-        currency_code: mockStoreData.currency_code,
-        listing_active_count: mockStoreData.listing_active_count,
-        num_favorers: mockStoreData.num_favorers,
-        review_count: mockStoreData.review_count,
-        review_average: mockStoreData.review_average,
-        url: mockStoreData.url,
-        is_active: mockStoreData.is_active,
+        shop_id: storeData.shop_id,
+        shop_name: storeData.shop_name,
+        title: storeData.title, // Gerçek Etsy mağaza adı
+        currency_code: storeData.currency_code,
+        listing_active_count: storeData.listing_active_count,
+        num_favorers: storeData.num_favorers,
+        review_count: storeData.review_count,
+        review_average: storeData.review_average,
+        url: storeData.url,
+        image_url_760x100: storeData.image_url_760x100,
+        is_active: storeData.is_active,
         created_at: new Date(),
         updated_at: new Date(),
         last_synced_at: new Date()

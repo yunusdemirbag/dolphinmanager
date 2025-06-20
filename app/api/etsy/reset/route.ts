@@ -1,96 +1,59 @@
-import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-// import { createClient } from "@/lib/supabase/server"
+// app/api/etsy/reset/route.ts
 
-export async function POST(request: NextRequest) {
+import { NextResponse } from 'next/server';
+import { getAuthenticatedUser } from '@/lib/auth'; // Merkezi kullanıcı doğrulama fonksiyonumuz
+import { adminDb } from '@/lib/firebase/admin';
+import { WriteBatch } from 'firebase-admin/firestore';
+
+export async function POST(request: Request) {
   try {
-    console.log("[etsy] /reset başlangıç")
-    
-    // Mevcut client'i kullan
-    const supabase = await createClient()
-    
-    // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
-      console.log("[etsy] /reset Auth error:", userError)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // 1. Kullanıcının kimliğini Firebase oturum çerezinden doğrula
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      console.log("[etsy-reset] Unauthorized access attempt.");
+      return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
     }
 
-    console.log("[etsy] /reset Resetting Etsy connection for user:", user.id)
+    console.log(`[etsy-reset] Starting reset for user: ${user.uid}`);
 
-    try {
-      // 1. Tüm Etsy token'larını sil
-      const { error: tokenError } = await supabase
-        .from("etsy_tokens")
-        .delete()
-        .eq("user_id", user.id)
+    // 2. Firestore'da toplu silme işlemi için bir "batch" oluştur
+    const batch: WriteBatch = adminDb.batch();
 
-      if (tokenError) {
-        console.error("[etsy] /reset Error deleting tokens:", tokenError)
-        return NextResponse.json(
-          { error: "Failed to reset Etsy connection", details: tokenError.message },
-          { status: 500 }
-        )
-      }
+    // Silinecek koleksiyonlar ve doküman referansları
+    // Not: Firestore'da bir dokümanı silmek kolaydır, ancak alt koleksiyonları silmek için
+    // daha karmaşık bir yapı gerekir. Şimdilik ana dokümanları siliyoruz.
+    const collectionsToDelete = [
+      'etsy_tokens', 
+      'etsy_stores', 
+      'etsy_listings', 
+      // 'profiles' koleksiyonunu silmiyoruz, sadece güncelliyoruz.
+    ];
 
-      // 2. Tüm Etsy mağaza kayıtlarını sil
-      const { error: storeError } = await supabase
-        .from("etsy_stores")
-        .delete()
-        .eq("user_id", user.id)
-
-      if (storeError) {
-        console.warn("[etsy] /reset Store deletion warning:", storeError)
-        // Bu hata kritik değil, token silme başarılıysa devam et
-      }
-
-      // 3. Tüm Etsy ürünlerini sil
-      const { error: listingsError } = await supabase
-        .from("etsy_listings")
-        .delete()
-        .eq("user_id", user.id)
-
-      if (listingsError) {
-        console.warn("[etsy] /reset Listings deletion warning:", listingsError)
-        // Bu hata kritik değil, devam et
-      }
-
-      // 4. Profile tablosundaki Etsy bağlantı bilgilerini temizle
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          etsy_shop_id: null,
-          etsy_shop_name: null,
-          etsy_user_id: null
-        })
-        .eq("id", user.id)
-
-      if (profileError) {
-        console.warn("[etsy] /reset Profile update warning:", profileError)
-        // Bu hata kritik değil, devam et
-      }
-
-      console.log("[etsy] /reset status=200")
-      
-      return NextResponse.json({
-        success: true,
-        message: "Etsy connection reset successfully"
-      })
-
-    } catch (error) {
-      console.error("[etsy] /reset error:", error)
-      return NextResponse.json(
-        { error: "Failed to reset Etsy connection", details: error instanceof Error ? error.message : String(error) },
-        { status: 500 }
-      )
+    for (const collectionName of collectionsToDelete) {
+      const docRef = adminDb.collection(collectionName).doc(user.uid);
+      batch.delete(docRef);
+      console.log(`[etsy-reset] Scheduled deletion for doc: ${collectionName}/${user.uid}`);
     }
+
+    // 3. 'profiles' koleksiyonundaki Etsy alanlarını temizle
+    const profileRef = adminDb.collection('profiles').doc(user.uid);
+    batch.update(profileRef, {
+      etsy_shop_id: null,
+      etsy_shop_name: null,
+      etsy_user_id: null,
+    });
+    console.log(`[etsy-reset] Scheduled profile update for user: ${user.uid}`);
+
+    // 4. Tüm işlemleri tek seferde gerçekleştir
+    await batch.commit();
+
+    console.log(`[etsy-reset] Successfully reset Etsy data for user: ${user.uid}`);
+    
+    return NextResponse.json({ success: true, message: "Etsy connection reset successfully" });
 
   } catch (error) {
-    console.error("[etsy] /reset API error:", error)
-    return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    )
+    console.error("[etsy-reset] Critical error during reset:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new NextResponse(JSON.stringify({ error: 'Internal Server Error', details: errorMessage }), { status: 500 });
   }
-} 
+}

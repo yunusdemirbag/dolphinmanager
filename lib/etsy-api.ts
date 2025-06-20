@@ -1,6 +1,6 @@
 import crypto from "crypto"
 import qs from "querystring"
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+// Firebase Admin SDK geçici olarak kaldırıldı - Firebase entegrasyonu sonrası eklenecek
 // import { createClient } from "@/lib/supabase/server"; // Kullanıcıya özel sunucu istemcisi
 import { cacheManager } from "./cache"
 import { fetchWithCache } from "./api-utils"

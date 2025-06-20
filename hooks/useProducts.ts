@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { Product, CreateProductForm } from "@/types/product"
 import { toast } from "@/components/ui/use-toast"
+import { auth } from "@/lib/firebase"
+import { onAuthStateChanged } from "firebase/auth"
+import { useRouter } from "next/navigation"
 
 interface CreateListingResponse {
   success: boolean;
@@ -28,12 +31,25 @@ export function useProducts() {
   const [reconnectRequired, setReconnectRequired] = useState(false)
   const [noStoresFound, setNoStoresFound] = useState(false)
   const [currentStore, setCurrentStore] = useState<{ shop_name: string; shop_id: number } | null>(null)
+  
+  // Firebase authentication
+  const [user, setUser] = useState<any>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const router = useRouter()
 
   const loadProducts = async (page = currentPage) => {
     try {
       setLoading(true)
       setCurrentPage(page)
       setNoStoresFound(false)
+      
+      // Firebase auth token al
+      const token = user ? await user.getIdToken() : null
+      if (!token) {
+        console.error('Firebase auth token bulunamadı')
+        router.push('/auth/login')
+        return
+      }
       
       const params = new URLSearchParams({
         page: page.toString(),
@@ -45,7 +61,8 @@ export function useProducts() {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
-          'Expires': '0'
+          'Expires': '0',
+          'Authorization': `Bearer ${token}`
         }
       })
       
@@ -319,14 +336,27 @@ export function useProducts() {
     }
   }
 
+  // Firebase auth state listener
   useEffect(() => {
-    loadProducts()
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user)
+      setAuthLoading(false)
+      
+      if (user) {
+        loadProducts()
+      } else {
+        setLoading(false)
+        router.push('/auth/login')
+      }
+    })
+    
+    return () => unsubscribe()
   }, [])
 
   return {
     products,
     filteredProducts,
-    loading,
+    loading: loading || authLoading,
     currentPage,
     totalPages,
     totalCount,
@@ -342,6 +372,8 @@ export function useProducts() {
     handleCreateProduct,
     handleUpdateProduct,
     handleDeleteProduct,
-    setFilteredProducts
+    setFilteredProducts,
+    user,
+    authLoading
   }
 } 

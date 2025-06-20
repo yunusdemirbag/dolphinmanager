@@ -16,60 +16,44 @@ export async function GET(request: NextRequest) {
     const userId = authResult.userId;
     console.log('✅ Kullanıcı doğrulandı:', userId);
     
-    // Şimdilik mock data döndür - getEtsyStores fonksiyonu problemi var
-    console.log('🔍 Mock Etsy mağaza verisi döndürülüyor');
-    const stores: any[] = []
-    
-    if (!stores || stores.length === 0) {
-      console.log('❌ Etsy mağazası bulunamadı');
+    // Şimdilik Firebase Firestore'dan mağaza verilerini kontrol et
+    try {
+      const storesSnapshot = await db.collection('etsy_stores')
+        .where('user_id', '==', userId)
+        .get();
+      
+      const stores = storesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log(`📊 Firebase'den ${stores.length} mağaza bulundu`);
+      
+      if (stores.length === 0) {
+        console.log('❌ Etsy mağazası bulunamadı');
+        return NextResponse.json(
+          { 
+            error: 'Henüz Etsy mağazası bağlanmamış', 
+            code: 'NO_STORES',
+            message: 'Etsy mağazanızı bağlamak için "Mağaza Ekle" butonuna tıklayın.'
+          },
+          { status: 200 } // 404 yerine 200 dön, frontend'de handle edelim
+        );
+      }
+      
+      return NextResponse.json({
+        success: true,
+        stores,
+        count: stores.length
+      });
+      
+    } catch (firestoreError) {
+      console.error('Firebase Firestore hatası:', firestoreError);
       return NextResponse.json(
-        { error: 'Etsy mağazası bulunamadı', code: 'NO_STORES' },
-        { status: 404 }
+        { error: 'Veritabanı bağlantı hatası', details: String(firestoreError) },
+        { status: 500 }
       );
     }
-    
-    console.log(`✅ ${stores.length} Etsy mağazası bulundu`);
-    
-    // Mağaza verilerini Firebase Firestore'a kaydet
-    for (const store of stores) {
-      console.log(`🔄 Mağaza kaydediliyor: ${store.shop_name} (${store.shop_id})`);
-      
-      try {
-        // Firebase Firestore'a store verilerini kaydet
-        const storeRef = db.collection('etsy_stores').doc(`${userId}_${store.shop_id}`);
-        
-        await storeRef.set({
-          user_id: userId,
-          shop_id: store.shop_id,
-          shop_name: store.shop_name,
-          title: store.title || '',
-          currency_code: store.currency_code || 'USD',
-          listing_active_count: store.listing_active_count || 0,
-          num_favorers: store.num_favorers || 0,
-          review_count: store.review_count || 0,
-          review_average: store.review_average || 0,
-          url: store.url || '',
-          image_url_760x100: store.image_url_760x100 || '',
-          is_active: true,
-          last_synced_at: new Date(),
-          created_at: new Date(),
-          updated_at: new Date()
-        }, { merge: true }); // merge: true ile mevcut veriyi güncelle
-        
-        console.log('✅ Mağaza Firebase\'e kaydedildi:', store.shop_id);
-        
-      } catch (error) {
-        console.error('❌ Mağaza Firebase\'e kaydedilemedi:', error);
-      }
-    }
-    
-    console.log('✅ Mağazalar başarıyla Firebase\'e kaydedildi');
-    
-    return NextResponse.json({
-      success: true,
-      stores,
-      count: stores.length
-    });
     
   } catch (error: any) {
     console.error('💥 GENEL HATA:', error);

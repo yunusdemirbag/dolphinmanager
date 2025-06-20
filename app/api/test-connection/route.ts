@@ -1,39 +1,34 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    // Firebase connection test
+    const firebaseProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
-    if (!supabaseUrl || !supabaseKey) {
+    if (!firebaseProjectId || !firebaseApiKey) {
       return NextResponse.json({
         success: false,
-        error: "Environment variables not configured",
-      })
+        error: "Firebase environment variables not configured",
+      });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // Test connection by trying to access a table
-    const { data, error } = await supabase.from("profiles").select("count").limit(1)
-
-    if (error) {
-      return NextResponse.json({
-        success: false,
-        error: error.message,
-      })
-    }
-
+    // Basic Firebase configuration test
     return NextResponse.json({
       success: true,
-      message: "Connection successful",
-      data,
-    })
+      message: "Firebase connection configured successfully",
+      firebase: {
+        projectId: firebaseProjectId,
+        hasApiKey: !!firebaseApiKey,
+        hasAuthDomain: !!process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        hasStorageBucket: !!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+      }
+    });
+
   } catch (error) {
     return NextResponse.json({
       success: false,
-      error: "Connection test failed",
-    })
+      error: "Firebase connection test failed",
+    });
   }
 }

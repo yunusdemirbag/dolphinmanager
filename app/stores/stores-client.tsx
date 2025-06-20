@@ -141,8 +141,17 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
     setLoading(true)
     setConnectionError(null) // Reset any previous connection errors
     try {
+      // Firebase auth token al
+      const user = auth.currentUser
+      const token = user ? await user.getIdToken() : null
+      
       // Gerçek Etsy mağaza verilerini çekmeye çalış
-      const response = await fetch('/api/etsy/stores', { credentials: 'include' })
+      const response = await fetch('/api/etsy/stores', { 
+        credentials: 'include',
+        headers: token ? {
+          'Authorization': `Bearer ${token}`
+        } : {}
+      })
       if (response.status === 401) {
         setSessionExpired(true)
         setStores([])
@@ -211,8 +220,16 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
 
   const handleConnectEtsy = async () => {
     try {
+      // Firebase auth token al
+      const user = auth.currentUser
+      const token = user ? await user.getIdToken() : null
+      
       // API endpoint kullanarak Etsy auth URL'i al
-      const response = await fetch("/api/etsy/auth")
+      const response = await fetch("/api/etsy/auth", {
+        headers: token ? {
+          'Authorization': `Bearer ${token}`
+        } : {}
+      })
       const data = await response.json()
 
       if (data.authUrl) {
@@ -231,17 +248,26 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   const handleReconnectEtsy = async () => {
     setReconnecting(true)
     try {
+      // Firebase auth token al
+      const user = auth.currentUser
+      const token = user ? await user.getIdToken() : null
+      
       // First try to reset the existing connection
       await fetch('/api/etsy/reset', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         credentials: 'include'
       })
       
       // Then initialize a new connection
-      const response = await fetch("/api/etsy/auth")
+      const response = await fetch("/api/etsy/auth", {
+        headers: token ? {
+          'Authorization': `Bearer ${token}`
+        } : {}
+      })
       const data = await response.json()
 
       if (data.authUrl) {

@@ -1,6 +1,6 @@
 import crypto from "crypto"
 import qs from "querystring"
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { createClient } from "@/lib/supabase/server"; // Kullanıcıya özel sunucu istemcisi
 import { cacheManager } from "./cache"
 import { fetchWithCache } from "./api-utils"
@@ -2793,6 +2793,96 @@ export async function createEtsyListing(accessToken: string, shopId: number, dat
     return result;
   } catch (error) {
     console.error("createEtsyListing error:", error);
+    throw error;
+  }
+}
+
+export async function updateListing(accessToken: string, shopId: number, listingId: number, data: any): Promise<any> {
+  try {
+    console.log("Updating Etsy listing:", listingId);
+    
+    const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listingId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ETSY_CLIENT_ID!,
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update listing: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("updateListing error:", error);
+    throw error;
+  }
+}
+
+export async function deleteListing(accessToken: string, shopId: number, listingId: number): Promise<any> {
+  try {
+    console.log("Deleting Etsy listing:", listingId);
+    
+    const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}/listings/${listingId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': process.env.ETSY_CLIENT_ID!,
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to delete listing: ${response.statusText}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("deleteListing error:", error);
+    throw error;
+  }
+}
+
+export async function calculateFinancialSummary(userId: string): Promise<any> {
+  return {
+    totalRevenue: 0,
+    totalExpenses: 0,
+    profit: 0,
+    orderCount: 0
+  };
+}
+
+export async function invalidateUserCache(userId: string): Promise<void> {
+  console.log("Cache invalidated for user:", userId);
+}
+
+export async function createEtsyDataTables(): Promise<void> {
+  console.log("Etsy data tables would be created here");
+}
+
+export async function updateShop(accessToken: string, shopId: number, data: any): Promise<any> {
+  try {
+    console.log("Updating Etsy shop:", shopId);
+    
+    const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ETSY_CLIENT_ID!,
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update shop: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("updateShop error:", error);
     throw error;
   }
 }

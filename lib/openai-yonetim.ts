@@ -165,6 +165,37 @@ Carefully examine the image and pay attention to:
 Return ONLY the final title string, nothing else.`.trim(),
 };
 
+/**
+ * DESCRIPTION GENERATION PROMPT - US & GLOBAL OPTIMIZED
+ * Detailed product description generation for Etsy
+ */
+export const descriptionPrompt: PromptConfig = {
+  id: "description_prompt",
+  name: "Description Generation Prompt",
+  description: "Prompt used for generating Etsy product descriptions",
+  prompt: `You are an Etsy expert and you create compelling product descriptions for canvas wall art products.
+
+Create a detailed, SEO-friendly product description for this canvas wall art.
+
+The description should include:
+• Captivating opening that highlights the main appeal
+• Detailed product features and benefits
+• Size and material information (if provided)
+• Suitable room/space recommendations
+• Care instructions
+• Perfect gift occasions
+• SEO keywords naturally integrated
+
+The description should be:
+• 150-300 words long
+• Professional yet warm tone
+• Easy to read with bullet points or short paragraphs
+• Include relevant keywords for Etsy search
+• Appeal to emotions and lifestyle
+
+Return ONLY the description text, nothing else.`.trim(),
+};
+
 // ===== HELPER FUNCTIONS =====
 
 /**

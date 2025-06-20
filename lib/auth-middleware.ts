@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server"
-import { auth } from "@/lib/firebase-admin"
 
 export interface AuthenticatedRequest extends NextRequest {
   userId: string
@@ -8,24 +7,19 @@ export interface AuthenticatedRequest extends NextRequest {
 
 export async function authenticateRequest(request: NextRequest): Promise<{ userId: string; user: any } | null> {
   try {
-    // Authorization header'dan token al
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Authorization header bulunamadı');
-      return null
-    }
+    // Firebase geçişi sonrası geçici mock authentication
+    console.log('🔄 Mock authentication - Firebase entegrasyonu sonrası güncellenecek');
     
-    const token = authHeader.split('Bearer ')[1]
-    
-    // Firebase token'ı doğrula
-    const decodedToken = await auth.verifyIdToken(token)
-    
+    // Development/mock kullanıcısı döndür
     return {
-      userId: decodedToken.uid,
-      user: decodedToken
+      userId: 'mock-user-id',
+      user: { 
+        uid: 'mock-user-id',
+        email: 'mock@example.com'
+      }
     }
   } catch (error) {
-    console.error('❌ Token doğrulama hatası:', error);
+    console.error('❌ Mock authentication hatası:', error);
     return null
   }
 }

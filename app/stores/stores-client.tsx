@@ -75,14 +75,10 @@ interface EtsyStore {
 }
 
 interface StoresClientProps {
-  user: any
-  storesData: {
-    stores: any[]
-    profile: any
-  }
+  initialStores?: any[]
 }
 
-export default function StoresClient({ user, storesData }: StoresClientProps) {
+export default function StoresClient({ initialStores = [] }: StoresClientProps) {
   const [stores, setStores] = useState<EtsyStore[]>([])
   const [loading, setLoading] = useState(true)
   const [etsyConnected, setEtsyConnected] = useState(false)
@@ -102,7 +98,15 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   const router = useRouter()
 
   useEffect(() => {
-    loadStores()
+    // Firebase auth state'i bekle
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        loadStores()
+      } else {
+        setSessionExpired(true)
+        setLoading(false)
+      }
+    })
     
     // URL parametrelerini kontrol et - Etsy callback'den gelen mesajlar
     const urlParams = new URLSearchParams(window.location.search)
@@ -135,6 +139,8 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
       // URL'yi temizle
       window.history.replaceState({}, '', '/stores')
     }
+    
+    return () => unsubscribe()
   }, [])
 
   const loadStores = async () => {

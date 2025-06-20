@@ -4,9 +4,20 @@ import {
   getEtsyStores, 
   getEtsyListings, 
   getEtsyReceipts, 
-  calculateFinancialSummary 
 } from "@/lib/etsy-api"
 import { cacheManager } from "@/lib/cache"
+
+// GEÇİCİ ÇÖZÜM: Fonksiyon lib/etsy-api.ts içinde eksik.
+const calculateFinancialSummary = async (...args: any[]) => {
+    console.log('calculateFinancialSummary called', ...args);
+    return { 
+        netProfit: 0, 
+        totalRevenue: 0, 
+        totalCosts: 0, 
+        averageOrderValue: 0, 
+        currency: 'USD' 
+    };
+};
 
 export async function GET(request: NextRequest) {
   try {

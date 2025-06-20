@@ -1,11 +1,25 @@
-import { NextResponse } from "next/server"
-import { createServerSupabase } from "@/lib/supabase"
+import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 import { getEtsyAuthUrl } from "@/lib/etsy-api"
 
 export async function GET() {
+  const cookieStore = cookies();
+  const supabase = await createClient();
+  
+  const { data, error } = await supabase.from('profiles').select('*');
+  
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  
+  return NextResponse.json({ data });
+}
+
+export async function getEtsyAuthTest() {
   try {
     // Kullanıcı kontrolü
-    const supabase = createServerSupabase()
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {

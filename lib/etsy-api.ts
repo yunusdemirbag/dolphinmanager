@@ -1,11 +1,13 @@
 import crypto from "crypto"
 import qs from "querystring"
-import { supabaseAdmin } from "./supabase"
-import { createClient } from "@/lib/supabase/server"; // Import the server-side client
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server"; // Kullanıcıya özel sunucu istemcisi
 import { cacheManager } from "./cache"
 import { fetchWithCache } from "./api-utils"
 import { Database } from "@/types/database.types";
-import { createServerSupabase } from '@/lib/supabase';
+import { cookies } from "next/headers";
+
+// Diğer tüm eski ve hatalı supabase importları temizlendi.
 
 // Mock data importları geçici olarak kaldırıldı
 // Gerekirse burada yeniden implement edilebilir
@@ -505,60 +507,43 @@ export async function refreshEtsyToken(userId: string): Promise<string> {
 }
 
 export async function getValidAccessToken(userId: string): Promise<string | null> {
-  try {
-    console.log("Getting valid access token for user:", userId);
-    
-    const supabase = await createClient(); // Use the server-side client
-    const { data: tokens, error } = await supabase
-      .from('etsy_tokens')
-      .select('access_token, refresh_token, expires_at, created_at')
-      .eq('user_id', userId)
-      .single();
-
-    if (error) {
-      console.error("Error fetching Etsy tokens:", error);
-      return null;
-    }
-
-    if (!tokens || !tokens.access_token) {
-      console.error("No access token found for user:", userId);
-      return null;
-    }
-
-    // Debug için token bilgilerini yazdır
-    console.log("Token found:", {
-      expires_at: tokens.expires_at,
-      created_at: tokens.created_at,
-      access_token_length: tokens.access_token.length,
-      access_token_prefix: tokens.access_token.substring(0, 10) + '...',
-      token_type: tokens.access_token.startsWith('v3_') ? 'OAuth2' : 'OAuth1',
-    });
-
-    // Token'ın türünü kontrol etme ve RECONNECT_REQUIRED fırlatma kodunu kaldırdım
-    // if (!tokens.access_token.startsWith('v3_')) {
-    //   console.error("OAuth1 token detected. Need to migrate to OAuth2.");
-    //   throw new Error('RECONNECT_REQUIRED');
-    // }
-
-    // Token hala geçerli mi kontrol et - 5 dakikalık bir tampon bırak
-    if (tokens.expires_at && new Date(tokens.expires_at) > new Date(Date.now() + 5 * 60 * 1000)) {
-      console.log("Token still valid. Using existing token.");
-      return tokens.access_token;
-    }
-
-    // Token süresi dolmuş, yenile
-    console.log("Token expired or close to expiry. Refreshing...");
-    return await refreshEtsyToken(userId);
-  } catch (error) {
-    // Yeniden bağlantı gereken hata
-    if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
-      console.error("No valid access token for getEtsyStores - user needs to connect Etsy account");
-      return null;
-    }
-    
-    console.error("getValidAccessToken error:", error);
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore); // Kullanıcıya özel istemci oluştur
+  
+  const { data: user, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    console.error("No authenticated user found.");
     return null;
   }
+
+  const { data: tokenData, error: tokenError } = await supabaseAdmin
+    .from('etsy_tokens')
+    .select('access_token, expires_at, refresh_token')
+    .eq('user_id', userId)
+    .single();
+
+  if (tokenError) {
+    console.error("Error fetching Etsy tokens:", tokenError);
+    return null;
+  }
+
+  if (!tokenData) {
+    return null;
+  }
+
+  const expiresAt = new Date(tokenData.expires_at).getTime();
+  if (Date.now() > expiresAt) {
+    // Token has expired, refresh it
+    try {
+      const newAccessToken = await refreshEtsyToken(userId);
+      return newAccessToken;
+    } catch (refreshError) {
+      console.error('Failed to refresh Etsy token:', refreshError);
+      return null;
+    }
+  }
+
+  return tokenData.access_token;
 }
 
 // Veritabanı yedekleme fonksiyonu

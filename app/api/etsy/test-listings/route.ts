@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { supabaseAdmin } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase/admin"
 import { getEtsyListings } from "@/lib/etsy-api"
 
 export async function GET(request: NextRequest) {

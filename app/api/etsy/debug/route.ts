@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { supabaseAdmin } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase/admin"
+import { getEtsyStores } from "@/lib/etsy-api"
 
 export async function GET() {
   try {

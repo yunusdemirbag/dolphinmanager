@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { createSimpleClient } from "@/lib/supabase"
+import { createClientFromBrowser } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,7 +29,6 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const router = useRouter()
-  const supabase = createSimpleClient()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -78,6 +77,7 @@ export default function RegisterPage() {
     }
 
     try {
+      const supabase = createClientFromBrowser()
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,

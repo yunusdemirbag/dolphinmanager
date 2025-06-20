@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { supabaseAdmin } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase/admin"
 import { requireAuth } from "@/lib/auth"
 import StoresClient from "./stores-client"
+import { getEtsyStores } from '@/lib/etsy-api'
 
 async function getStoresData(userId: string) {
   // If userId is invalid, return empty data

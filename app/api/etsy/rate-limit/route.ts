@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getUser } from "@/lib/auth"
-import { supabaseAdmin } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase/admin"
 
 // Simple mechanism to track API usage for displaying to users
 // In a real implementation, this would likely be more sophisticated

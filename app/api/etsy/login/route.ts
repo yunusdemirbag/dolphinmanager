@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase"
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { generatePKCE } from "@/lib/etsy-api"
 import { NextRequest, NextResponse } from "next/server"
 

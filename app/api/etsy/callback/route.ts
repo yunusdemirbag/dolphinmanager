@@ -54,14 +54,14 @@ export async function GET(request: NextRequest) {
     // Mock mağaza data - gerçek Etsy API'sine istek atmayalım şimdilik  
     const mockStoreData = {
       shop_id: Math.floor(Math.random() * 1000000),
-      shop_name: 'TestShop_' + Date.now(),
-      title: 'Test Etsy Mağazası',
+      shop_name: 'YunusHandmade',
+      title: 'Yunus Handmade Store',
       currency_code: 'USD',
-      listing_active_count: 5,
-      num_favorers: 100,
-      review_count: 50,
-      review_average: 4.5,
-      url: 'https://etsy.com/shop/testshop',
+      listing_active_count: 15,
+      num_favorers: 250,
+      review_count: 89,
+      review_average: 4.8,
+      url: 'https://etsy.com/shop/yunushandmade',
       is_active: true
     }
     

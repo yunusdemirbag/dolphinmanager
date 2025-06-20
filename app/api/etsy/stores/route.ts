@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth-middleware";
 import { db } from "@/lib/firebase-admin";
-import { getEtsyStores } from "@/lib/etsy-api";
 
 export async function GET(request: NextRequest) {
   try {

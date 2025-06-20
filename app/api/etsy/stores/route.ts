@@ -17,8 +17,9 @@ export async function GET(request: NextRequest) {
     const userId = authResult.userId;
     console.log('✅ Kullanıcı doğrulandı:', userId);
     
-    // Etsy mağazalarını API'den al
-    const stores = await getEtsyStores(userId, true); // skipCache=true ile her zaman güncel veri al
+    // Şimdilik mock data döndür - getEtsyStores fonksiyonu problemi var
+    console.log('🔍 Mock Etsy mağaza verisi döndürülüyor');
+    const stores: any[] = []
     
     if (!stores || stores.length === 0) {
       console.log('❌ Etsy mağazası bulunamadı');

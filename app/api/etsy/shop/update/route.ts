@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { getEtsyStores } from "@/lib/etsy-api"
-import { createClient } from '@/lib/supabase/server'
+// import { createClient } from '@/lib/supabase/server'
 
 // GEÇİCİ ÇÖZÜM: Fonksiyon lib/etsy-api.ts içinde eksik.
 const updateShop = async (...args: any[]) => {

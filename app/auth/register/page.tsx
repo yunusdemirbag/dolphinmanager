@@ -3,7 +3,9 @@
 import type React from "react"
 
 import { useState } from "react"
-import { createClientFromBrowser } from "@/lib/supabase/client"
+import { auth, db } from "@/lib/firebase"
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth"
+import { doc, setDoc } from "firebase/firestore"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -77,31 +79,33 @@ export default function RegisterPage() {
     }
 
     try {
-      const supabase = createClientFromBrowser()
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            etsy_shop_name: formData.etsyShopName,
-          },
-        },
-      })
+      // Firebase Auth ile kullanıcı oluştur
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
+      const user = userCredential.user
 
-      if (error) {
-        setError(error.message)
-        return
-      }
+      if (user) {
+        // Kullanıcı profil bilgilerini güncelle
+        await updateProfile(user, {
+          displayName: formData.fullName
+        })
 
-      if (data.user) {
+        // Firestore'da kullanıcı profili oluştur
+        await setDoc(doc(db, 'profiles', user.uid), {
+          full_name: formData.fullName,
+          etsy_shop_name: formData.etsyShopName,
+          email: formData.email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+
         setSuccess(true)
         setTimeout(() => {
           router.push("/auth/login?message=registration_success")
         }, 3000)
       }
-    } catch (err) {
-      setError("Beklenmeyen bir hata oluştu")
+    } catch (err: any) {
+      console.error("Registration error:", err)
+      setError(err.message || "Kayıt olurken bir hata oluştu")
     } finally {
       setLoading(false)
     }

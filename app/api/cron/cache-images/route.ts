@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+// // import { createClient } from '@/lib/supabase/server';
 
 // Bu endpoint Vercel cron tarafından çağrılacak (günde bir kez)
 // Cron yapılandırması için vercel.json'a ekleyin:

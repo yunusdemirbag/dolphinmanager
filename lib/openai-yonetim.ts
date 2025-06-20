@@ -1,5 +1,6 @@
 // openai-yonetim.ts
-import { createClientFromBrowser } from "@/lib/supabase/client";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export interface PromptConfig {
   id: string;
@@ -383,30 +384,12 @@ export const generateAllFromImage = async (imageBase64: string, imageType: strin
     throw new Error("OpenAI API key not configured");
   }
 
-  // Get user settings (using supabase instead of fetch since this is server-side)
+  // Get user settings - using default for now
   let model = "gpt-4.1-mini";
   let temperature = 0.7;
   
-  try {
-    const supabase = createClientFromBrowser();
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session?.user) {
-      // TODO: Implement ai_settings table in database schema
-      // const { data } = await supabase
-      //   .from('ai_settings')
-      //   .select('model, temperature')
-      //   .eq('user_id', session.user.id)
-      //   .single();
-      
-      // if (data) {
-      //   model = data.model;
-      //   temperature = data.temperature;
-      // }
-    }
-  } catch (error) {
-    console.warn("Could not fetch AI settings, using default settings:", error);
-  }
+  // TODO: Implement Firebase user settings
+  // Firebase auth check and settings fetch would go here
 
   // OpenAI API call
   const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {

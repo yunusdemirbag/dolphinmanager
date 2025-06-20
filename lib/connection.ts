@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/firebase";
+import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc, addDoc } from "firebase/firestore";
 import { cookies } from "next/headers";
 
 // Önbellek için tip tanımlamaları
@@ -20,7 +21,6 @@ interface EtsyStore {
 }
 
 interface ConnectionCache {
-  supabaseClient: any;
   token: EtsyToken | null;
   userId: string | null;
   etsyUserId: string | null;
@@ -40,22 +40,24 @@ export function isTokenExpired(token: EtsyToken): boolean {
 }
 
 // Etsy mağaza bilgilerini getir
-async function getEtsyStores(supabase: any, userId: string, token: EtsyToken): Promise<EtsyStore[]> {
+async function getEtsyStores(userId: string, token: EtsyToken): Promise<EtsyStore[]> {
   console.log('🔍 Etsy mağaza bilgileri alınıyor...');
   
   try {
     // Önce veritabanından mağaza bilgilerini kontrol et
-    const { data: stores, error } = await supabase
-      .from('etsy_stores')
-      .select('*')
-      .eq('user_id', userId);
+    const storesQuery = query(
+      collection(db, 'etsy_stores'),
+      where('user_id', '==', userId)
+    );
     
-    if (error) {
-      console.error('❌ Veritabanından mağaza bilgileri alınamadı:', error);
-      return [];
-    }
+    const storesSnapshot = await getDocs(storesQuery);
     
-    if (stores && stores.length > 0) {
+    if (!storesSnapshot.empty) {
+      const stores = storesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as EtsyStore[];
+      
       console.log(`✅ Veritabanında ${stores.length} mağaza bulundu`);
       return stores;
     }
@@ -117,14 +119,18 @@ async function getEtsyStores(supabase: any, userId: string, token: EtsyToken): P
       updated_at: new Date().toISOString(),
     }));
     
-    const { error: saveError } = await supabase
-      .from('etsy_stores')
-      .insert(storesToSave);
-    
-    if (saveError) {
-      console.error('❌ Mağaza bilgileri veritabanına kaydedilemedi:', saveError);
-    } else {
+    try {
+      // Firestore'a mağaza bilgilerini kaydet
+      const batch = [];
+      for (const store of storesToSave) {
+        const storeRef = doc(collection(db, 'etsy_stores'));
+        batch.push(setDoc(storeRef, store));
+      }
+      
+      await Promise.all(batch);
       console.log('✅ Mağaza bilgileri veritabanına kaydedildi');
+    } catch (saveError) {
+      console.error('❌ Mağaza bilgileri veritabanına kaydedilemedi:', saveError);
     }
     
     return storesToSave;
@@ -156,51 +162,46 @@ export async function getConnection(userId: string, forceRefresh = false) {
 
   console.log("🔄 Bağlantı bilgileri yenileniyor...");
   
-  // Supabase client oluştur
-  const supabase = await createClient();
-  
   // Token bilgisini al
-  const { data: tokenData, error: tokenError } = await supabase
-    .from("etsy_tokens")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  if (tokenError && tokenError.code !== 'PGRST116') {
-    console.error("❌ Token bilgisi alınamadı:", tokenError);
-  }
-
-  const token = tokenData || null;
+  try {
+    const tokensQuery = query(
+      collection(db, "etsy_tokens"),
+      where("user_id", "==", userId),
+      orderBy("created_at", "desc"),
+      limit(1)
+    );
+    
+    const tokensSnapshot = await getDocs(tokensQuery);
+    
+    const token = !tokensSnapshot.empty 
+      ? { id: tokensSnapshot.docs[0].id, ...tokensSnapshot.docs[0].data() } as EtsyToken
+      : null;
   
-  if (!token) {
-    console.error("❌ Etsy token bulunamadı");
-    // Token yoksa boş önbellek döndür
-    connectionCache = {
-      supabaseClient: supabase,
-      token: null,
-      userId,
-      etsyUserId: null,
-      stores: null,
-      lastFetched: Date.now()
-    };
-    return connectionCache;
-  }
-  
-  if (isTokenExpired(token)) {
-    console.error("❌ Etsy token süresi dolmuş");
-    // Token süresi dolmuşsa boş önbellek döndür
-    connectionCache = {
-      supabaseClient: supabase,
-      token,
-      userId,
-      etsyUserId: null,
-      stores: null,
-      lastFetched: Date.now()
-    };
-    return connectionCache;
-  }
+    if (!token) {
+      console.error("❌ Etsy token bulunamadı");
+      // Token yoksa boş önbellek döndür
+      connectionCache = {
+        token: null,
+        userId,
+        etsyUserId: null,
+        stores: null,
+        lastFetched: Date.now()
+      };
+      return connectionCache;
+    }
+    
+    if (isTokenExpired(token)) {
+      console.error("❌ Etsy token süresi dolmuş");
+      // Token süresi dolmuşsa boş önbellek döndür
+      connectionCache = {
+        token,
+        userId,
+        etsyUserId: null,
+        stores: null,
+        lastFetched: Date.now()
+      };
+      return connectionCache;
+    }
   
   try {
     // Etsy User ID'yi al
@@ -219,7 +220,7 @@ export async function getConnection(userId: string, forceRefresh = false) {
     const etsyUserId = userData.user_id;
     
     // Yeni getEtsyStores fonksiyonunu kullan
-    const stores = await getEtsyStores(supabase, userId, token);
+    const stores = await getEtsyStores(userId, token);
     
     if (!stores || stores.length === 0) {
       console.warn("⚠️ Etsy mağazası bulunamadı:", {
@@ -239,7 +240,6 @@ export async function getConnection(userId: string, forceRefresh = false) {
     
     // Önbelleği güncelle
     connectionCache = {
-      supabaseClient: supabase,
       token,
       userId,
       etsyUserId,
@@ -252,9 +252,8 @@ export async function getConnection(userId: string, forceRefresh = false) {
   } catch (error) {
     console.error("❌ Etsy bağlantı hatası:", error);
     
-    // Hata durumunda en azından Supabase client'ı ve token'ı içeren bir önbellek döndür
+    // Hata durumunda en azından token'ı içeren bir önbellek döndür
     connectionCache = {
-      supabaseClient: supabase,
       token,
       userId,
       etsyUserId: null,
@@ -263,6 +262,17 @@ export async function getConnection(userId: string, forceRefresh = false) {
     };
     
     return connectionCache;
+  }
+  
+  } catch (error) {
+    console.error("❌ Token bilgisi alınamadı:", error);
+    return {
+      token: null,
+      userId,
+      etsyUserId: null,
+      stores: null,
+      lastFetched: Date.now()
+    };
   }
 }
 

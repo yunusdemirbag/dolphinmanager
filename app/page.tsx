@@ -2,44 +2,27 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClientSupabase } from "@/lib/supabase"
+import { auth } from "@/lib/firebase"
+import { onAuthStateChanged } from "firebase/auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function Dashboard() {
   const router = useRouter()
-  const supabase = createClientSupabase()
-  const [orders, setOrders] = useState<any[]>([])
-  const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    checkStoreConnection()
-  }, [])
-
-  const checkStoreConnection = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
         router.push("/auth/login")
         return
       }
-      // Check if user has any stores connected
-      const { data: profile } = await supabase.from("profiles").select("etsy_shop_name").eq("id", session.user.id).single()
-      if (!profile?.etsy_shop_name) {
-        router.push("/onboarding")
-        return
-      }
-      // Gerçek sipariş ve ürünleri çek (örnek, kendi API'nıza göre düzenleyin)
-      const { data: ordersData } = await supabase.from("orders").select("*").eq("user_id", session.user.id)
-      const { data: productsData } = await supabase.from("products").select("*").eq("user_id", session.user.id)
-      setOrders(ordersData || [])
-      setProducts(productsData || [])
-    } catch (error) {
-      console.error("Error checking store connection:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+      
+      // Kullanıcı varsa dashboard'a yönlendir
+      router.push("/dashboard")
+    })
+    
+    return () => unsubscribe()
+  }, [])
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

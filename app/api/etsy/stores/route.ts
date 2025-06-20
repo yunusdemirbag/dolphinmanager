@@ -1,34 +1,36 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { auth, db } from "@/lib/firebase-admin"
 import { getEtsyStores } from "@/lib/etsy-api"
 
 export async function GET(request: NextRequest) {
   try {
     console.log('🔍 Etsy mağazaları API çağrısı başladı');
     
-    // Supabase client oluştur
-    const supabase = await createClient()
-    
-    // Kullanıcıyı doğrula
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError) {
-      console.error('❌ Oturum doğrulama hatası:', sessionError);
+    // Authorization header'dan token al
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('❌ Authorization header bulunamadı');
       return NextResponse.json(
         { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }
     
-    if (!session || !session.user) {
-      console.error('❌ Oturum bulunamadı');
+    const token = authHeader.split('Bearer ')[1]
+    
+    // Firebase token'ı doğrula
+    let decodedToken
+    try {
+      decodedToken = await auth.verifyIdToken(token)
+    } catch (error) {
+      console.error('❌ Token doğrulama hatası:', error);
       return NextResponse.json(
         { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
         { status: 401 }
       )
     }
     
-    const userId = session.user.id
+    const userId = decodedToken.uid
     console.log('✅ Kullanıcı doğrulandı:', userId)
     
     // Etsy mağazalarını API'den al

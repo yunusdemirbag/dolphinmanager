@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { createClient } from '@/lib/supabase/server';
-import { createClientFromBrowser } from '@/lib/supabase/client';
+// import { createClient } from '@/lib/supabase/server';
+// import { createClientFromBrowser } from '@/lib/supabase/client';
 
 // Helper function to get the appropriate Supabase client based on context
 async function getSupabaseClient() {

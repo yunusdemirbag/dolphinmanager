@@ -1,6 +1,6 @@
 // /app/api/etsy/listings/create/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+// import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { Database } from "@/types/database.types";
 import { 
   getValidAccessToken, 

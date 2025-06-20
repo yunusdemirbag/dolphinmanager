@@ -39,7 +39,8 @@ import {
   Clock
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { createClientSupabase } from "@/lib/supabase"
+import { auth } from "@/lib/firebase"
+import { onAuthStateChanged } from "firebase/auth"
 import {
   Dialog,
   DialogContent,
@@ -99,7 +100,6 @@ export default function StoresClient({ user, storesData }: StoresClientProps) {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [sessionExpired, setSessionExpired] = useState(false)
   const router = useRouter()
-  const supabase = createClientSupabase()
 
   useEffect(() => {
     loadStores()

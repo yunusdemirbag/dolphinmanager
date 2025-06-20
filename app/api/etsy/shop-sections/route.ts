@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server"
+// import { createClient } from "@/lib/supabase/server"
 import { getValidAccessToken, getEtsyStores, getShopSections } from "@/lib/etsy-api"
 
 // Mock data for development/testing

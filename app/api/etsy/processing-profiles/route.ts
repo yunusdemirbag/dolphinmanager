@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 // import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // Supabase şimdilik kaldırıldı
 // import { cookies } from 'next/headers'; // Supabase şimdilik kaldırıldı
 import { getShippingProfiles, getEtsyStores } from '@/lib/etsy-api';
-import { createClient } from '@/lib/supabase/server';
+// import { createClient } from '@/lib/supabase/server';
 
 // Frontend'in beklediği Hazırlık Süresi Seçeneği formatı
 interface ProcessingProfileOption {

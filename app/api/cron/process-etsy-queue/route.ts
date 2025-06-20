@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+// // import { createClient } from "@/lib/supabase/server";
 import { getValidAccessToken, createEtsyListing, uploadFilesToEtsy, getEtsyStores } from "@/lib/etsy-api";
 
 export const runtime = 'nodejs';

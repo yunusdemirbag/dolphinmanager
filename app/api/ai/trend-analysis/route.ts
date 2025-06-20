@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth-middleware"
 import { getEtsyStores } from "@/lib/etsy-api"
 
 export async function POST(request: NextRequest) {
@@ -7,14 +7,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { category, timeRange } = body
     
-    const supabase = await createClient()
-    
     // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const authResult = await authenticateRequest(request)
     
-    if (userError || !user) {
-      console.log("Trend analysis API auth error:", userError, "No user found")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!authResult) {
+      return createUnauthorizedResponse()
     }
 
     // Gerçek API çağrısı burada yapılabilir

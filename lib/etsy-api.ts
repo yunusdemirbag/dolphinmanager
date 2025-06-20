@@ -1,7 +1,7 @@
 import crypto from "crypto"
 import qs from "querystring"
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { createClient } from "@/lib/supabase/server"; // Kullanıcıya özel sunucu istemcisi
+// import { createClient } from "@/lib/supabase/server"; // Kullanıcıya özel sunucu istemcisi
 import { cacheManager } from "./cache"
 import { fetchWithCache } from "./api-utils"
 import { Database } from "@/types/database.types";

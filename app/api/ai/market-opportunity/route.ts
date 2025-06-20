@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth-middleware"
 
 export async function POST(request: NextRequest) {
   try {
     const { category = "canvas_wall_art", competition = "medium" } = await request.json()
     
-    const supabase = await createClient()
-    
     // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const authResult = await authenticateRequest(request)
     
-    if (userError || !user) {
-      console.log("Market opportunity API auth error:", userError, "No user found")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!authResult) {
+      return createUnauthorizedResponse()
     }
 
     // Pazar fırsatlarını analiz et

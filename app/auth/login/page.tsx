@@ -2,7 +2,8 @@
 
 import type React from "react"
 import { useState } from "react"
-import { createClientSupabase } from "@/lib/supabase"
+import { auth } from "@/lib/firebase"
+import { signInWithEmailAndPassword } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,9 +21,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  // Initialize Supabase client
-  const supabase = createClientSupabase()
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -30,26 +28,17 @@ export default function LoginPage() {
 
     try {
       console.log("Login attempt for:", email)
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
 
-      if (error) {
-        console.error("Login error:", error.message)
-        setError(error.message)
-        return
-      }
-
-      if (data.user) {
+      if (userCredential.user) {
         console.log("Login successful, redirecting to dashboard")
         // Doğrudan dashboard'a yönlendir
         router.push("/dashboard")
         router.refresh()
       }
-    } catch (err) {
-      console.error("Unexpected login error:", err)
-      setError("Beklenmeyen bir hata oluştu")
+    } catch (err: any) {
+      console.error("Login error:", err)
+      setError(err.message || "Giriş yaparken bir hata oluştu")
     } finally {
       setLoading(false)
     }

@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getUser } from "@/lib/auth"
 import { getEtsyAuthUrl } from "@/lib/etsy-api"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
     // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const user = await getUser()
     
-    if (userError || !user) {
-      console.log("Auth error:", userError)
+    if (!user) {
+      console.log("Auth error: No user found")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -30,13 +28,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    
     // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const user = await getUser()
     
-    if (userError || !user) {
-      console.log("Auth error:", userError)
+    if (!user) {
+      console.log("Auth error: No user found")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

@@ -1,30 +1,32 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { createServerClient } from "@supabase/ssr"
+import { auth, db } from "@/lib/firebase"
+import { onAuthStateChanged, User } from "firebase/auth"
+import { doc, getDoc } from "firebase/firestore"
 import { cookies } from "next/headers"
 
-export async function getUser() {
+// Server-side authentication helper using cookies
+export async function getUser(): Promise<User | null> {
   try {
-    const supabase = await createClient()
-
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-
-    if (error || !user) {
-      console.log("getUser error:", error)
+    // For server-side, we need to verify the session token from cookies
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get('session')?.value
+    
+    if (!sessionToken) {
       return null
     }
 
-    return user
+    // In a production app, you would verify the Firebase session token here
+    // For now, we'll return null to indicate no authenticated user
+    // You'll need to implement Firebase Admin SDK for server-side verification
+    
+    return null
   } catch (error) {
     console.error("Error getting user:", error)
     return null
   }
 }
 
-export async function requireAuth() {
+export async function requireAuth(): Promise<User> {
   try {
     const user = await getUser()
 
@@ -42,16 +44,15 @@ export async function requireAuth() {
 
 export async function getUserProfile(userId: string) {
   try {
-    const supabase = await createClient()
-    
-    const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
+    const userDocRef = doc(db, "profiles", userId)
+    const userDoc = await getDoc(userDocRef)
 
-    if (error) {
-      console.error("Error fetching profile:", error)
+    if (!userDoc.exists()) {
+      console.log("User profile not found")
       return null
     }
 
-    return profile
+    return { id: userDoc.id, ...userDoc.data() }
   } catch (error) {
     console.error("Error in getUserProfile:", error)
     return null
@@ -59,26 +60,16 @@ export async function getUserProfile(userId: string) {
 }
 
 // Client-side auth helper
-export async function getClientUser() {
-  if (typeof window === "undefined") return null
-
-  try {
-    const { createClientSupabase } = await import("@/lib/supabase")
-    const supabase = createClientSupabase()
-
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-
-    if (error || !user) {
-      console.log("getClientUser error:", error)
-      return null
+export function getClientUser(): Promise<User | null> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") {
+      resolve(null)
+      return
     }
 
-    return user
-  } catch (error) {
-    console.error("Error getting client user:", error)
-    return null
-  }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe()
+      resolve(user)
+    })
+  })
 }

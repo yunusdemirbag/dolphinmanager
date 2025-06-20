@@ -55,7 +55,8 @@ import {
   Sliders,
   MessageSquare
 } from "lucide-react"
-import { createClientSupabase } from "@/lib/supabase"
+import { auth } from "@/lib/firebase"
+import { onAuthStateChanged } from "firebase/auth"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 import { titlePrompt, tagPrompt, categoryPrompt, focusTitlePrompt } from "@/lib/openai-yonetim"
 

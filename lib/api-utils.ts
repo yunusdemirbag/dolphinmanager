@@ -171,70 +171,8 @@ export async function updateRateLimitInfo(requestCount: number = 1): Promise<voi
   }
   
   try {
-    // Update rate limit information in the database if supabaseAdmin is available
-    const { supabaseAdmin } = await import('./supabase');
-    
-    if (!supabaseAdmin) return;
-    
-    // Get current user - we may not have the user in some contexts
-    let userId = null;
-    try {
-      const { data } = await supabaseAdmin.auth.getSession();
-      userId = data.session?.user?.id;
-    } catch (error) {
-      console.log("Cannot get current user for rate limit update");
-      return;
-    }
-    
-    if (!userId) return;
-    
-    // First check if entry exists
-    const { data: rateLimitData } = await supabaseAdmin
-      .from("rate_limits")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-    
-    // Reset time (next day at midnight)
-    const resetTime = new Date();
-    resetTime.setDate(resetTime.getDate() + 1);
-    resetTime.setHours(0, 0, 0, 0);
-    
-    if (rateLimitData) {
-      // Check if we need to reset the counter (new day)
-      const resetAt = new Date(rateLimitData.reset_at);
-      
-      if (now > resetAt.getTime()) {
-        // New day - reset counter
-        await supabaseAdmin
-          .from("rate_limits")
-          .update({
-            used_count: requestCount,
-            reset_at: resetTime.toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq("user_id", userId);
-      } else {
-        // Same day - increment counter
-        await supabaseAdmin
-          .from("rate_limits")
-          .update({
-            used_count: rateLimitData.used_count + requestCount,
-            updated_at: new Date().toISOString()
-          })
-          .eq("user_id", userId);
-      }
-    } else {
-      // Create new entry
-      await supabaseAdmin
-        .from("rate_limits")
-        .insert({
-          user_id: userId,
-          used_count: requestCount,
-          limit: 40, // Default Etsy API limit per day
-          reset_at: resetTime.toISOString()
-        });
-    }
+    // TODO: Firebase geçişi sonrası rate limit tracking Firebase'e taşınacak
+    console.log("Rate limit tracking - Firebase geçişi sonrası güncellenecek");
   } catch (error) {
     console.error("Failed to update rate limit info in database:", error);
     // Continue even if database update fails - we still have in-memory tracking

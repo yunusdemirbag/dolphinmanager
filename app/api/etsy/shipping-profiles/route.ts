@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getShippingProfiles, createShippingProfile, getEtsyStores } from '@/lib/etsy-api';
-import { createClient } from '@/lib/supabase/server';
+// import { createClient } from '@/lib/supabase/server';
 
 // Kargo profillerini listele
 export async function GET() {

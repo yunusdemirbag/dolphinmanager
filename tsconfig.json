@@ -23,16 +23,16 @@
 
     // --- EN ÖNEMLİ KISIM: YOL KISAYOLLARI (ALIAS) ---
     "moduleResolution": "bundler", // Modern projeler için en iyi seçenek
-    "baseUrl": ".", // Kısayolların başlayacağı kök dizini belirtir (Proje ana klasörü)
+    "baseUrl": ".", // Kısayolların başlayacağı kök dizini proje ana klasörüdür.
     "paths": {
-      "@/*": ["./src/*"] // "@/" ile başlayan her yolu, src dizininden itibaren çöz
+      "@/*": ["src/*"] // "@/" ile başlayan her yolu, "src/" klasörünün içinden itibaren çöz.
     }
   },
   // TypeScript'in hangi dosyaları kontrol edeceğini belirtir
   "include": [
     "next-env.d.ts", 
-    "**/*.ts", 
-    "**/*.tsx", 
+    "src/**/*.ts", // "src" klasörü altındaki tüm .ts dosyaları
+    "src/**/*.tsx", // "src" klasörü altındaki tüm .tsx dosyaları
     ".next/types/**/*.ts"
   ],
   // TypeScript'in hangi dosyaları görmezden geleceğini belirtir

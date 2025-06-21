@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "../../components/ui/button"
 import { 
   Home, 
   Package, 
@@ -19,13 +19,13 @@ import {
   CreditCard
 } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
-import { auth } from "@/lib/firebase"
-import { signOut } from "firebase/auth"
+import { createClientSupabase } from "@/lib/supabase"
 
 export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
+  const supabase = createClientSupabase()
   
   const isOnboarding = pathname?.includes("/onboarding")
   const isAuth = pathname?.includes("/auth")
@@ -33,13 +33,8 @@ export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
   if (isOnboarding || isAuth) return null
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth)
-      router.push("/auth/login")
-    } catch (error) {
-      console.error("Logout error:", error)
-      router.push("/auth/login")
-    }
+    await supabase.auth.signOut()
+    router.push("/auth/login")
   }
 
   const handleNavigation = (path: string) => {
@@ -72,7 +67,7 @@ export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
 
   return (
     <div 
-      className={`${isExpanded ? 'w-64' : 'w-16'} bg-gray-50 border-r border-gray-200 h-screen fixed left-0 top-0 z-40 flex flex-col transition-all duration-300 ease-in-out`}
+      className={`${isExpanded ? 'w-64' : 'w-16'} bg-white border-r border-gray-200 h-screen fixed left-0 top-0 z-40 flex flex-col transition-all duration-300 ease-in-out`}
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
     >
@@ -111,7 +106,7 @@ export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
                     className={`w-full flex items-center ${isExpanded ? 'px-3' : 'px-2 justify-center'} py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                       isActive
                         ? "bg-gray-100 text-black border-r-2 border-black"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-black"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-black"
                     }`}
                     title={!isExpanded ? item.label : undefined}
                   >
@@ -152,7 +147,7 @@ export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
       <div className="p-4 border-t border-gray-200">
         <Button 
           variant="ghost" 
-          className={`w-full ${isExpanded ? 'justify-start' : 'justify-center px-2'} text-gray-600 hover:text-black hover:bg-gray-100`}
+          className={`w-full ${isExpanded ? 'justify-start' : 'justify-center px-2'} text-gray-600 hover:text-black hover:bg-gray-50`}
           onClick={handleLogout}
           title={!isExpanded ? "Çıkış" : undefined}
         >

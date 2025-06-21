@@ -1,360 +1,552 @@
-import { createClient } from "@/lib/supabase/server";
 import { v4 as uuidv4 } from 'uuid';
-import { createDraftListing, uploadFilesToEtsy, addInventoryWithVariations } from "./etsy-api";
+// import { createClient } from '@/lib/supabase/server';
+// import { createClientFromBrowser } from '@/lib/supabase/client';
 
-// Kuyruk iş türleri
-export enum QueueJobType {
-  CREATE_ETSY_LISTING = 'create_etsy_listing',
+// Helper function to get the appropriate Supabase client based on context
+async function getSupabaseClient() {
+  try {
+    // Check if we're in a request context (server-side)
+    if (typeof window === 'undefined') {
+      try {
+        return await createClient();
+      } catch (error) {
+        console.error('Error creating server client, falling back to browser client:', error);
+        return createClientFromBrowser();
+      }
+    } else {
+      // We're in browser context
+      return createClientFromBrowser();
+    }
+  } catch (error) {
+    console.error('Failed to create Supabase client:', error);
+    return createClientFromBrowser(); // Fallback to browser client
+  }
 }
 
-// Kuyruk iş durumları
-export enum QueueJobStatus {
-  PENDING = 'pending',
-  PROCESSING = 'processing',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-}
-
-// Kuyruk işi arayüzü
 export interface QueueJob {
   id: string;
-  user_id: string;
-  type: QueueJobType;
-  status: QueueJobStatus;
-  progress: number;
+  userId: string;
+  type: 'CREATE_LISTING' | 'BATCH_UPLOAD_LISTINGS';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number; // 0-100
   data: any;
   error?: string;
-  retry_count: number;
-  created_at: string;
-  started_at?: string;
-  completed_at?: string;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  retryCount: number;
 }
 
-// Etsy ürün oluşturma işi için veri arayüzü
-export interface CreateEtsyListingJobData {
-  listingData: any;
-  imageFiles: File[];
-  videoFiles: File[];
-  shopId: number;
-}
+class QueueManager {
+  private jobs: Map<string, QueueJob> = new Map();
+  private processing: Set<string> = new Set();
+  private maxConcurrent = 3; // Aynı anda en fazla 3 iş
+  private maxRetries = 3;
+  private processingInterval: NodeJS.Timeout | null = null;
+  private isProcessing = false;
+  public enablePersistence = true; // Veritabanı kalıcılığı varsayılan olarak aktif
+  private batchSize = 5; // Bir batch'te kaç ürün işleneceği
+  private batchDelay = 2000; // Her batch arası bekleme süresi (ms)
 
-/**
- * Kuyruğa yeni bir iş ekler
- * @param userId Kullanıcı ID
- * @param type İş türü
- * @param data İş verisi
- * @returns Oluşturulan iş
- */
-export async function addJobToQueue(userId: string, type: QueueJobType, data: any): Promise<QueueJob> {
-  const supabase = await createClient();
-  
-  const jobId = uuidv4();
-  const job: Partial<QueueJob> = {
-    id: jobId,
-    user_id: userId,
-    type,
-    status: QueueJobStatus.PENDING,
-    progress: 0,
-    data,
-    retry_count: 0,
-  };
-  
-  const { data: createdJob, error } = await supabase
-    .from('queue_jobs')
-    .insert(job)
-    .select()
-    .single();
-    
-  if (error) {
-    console.error('Kuyruğa iş eklenirken hata oluştu:', error);
-    throw new Error(`Kuyruğa iş eklenirken hata: ${error.message}`);
+  constructor() {
+    // Background işleme başlat
+    this.startBackgroundProcessing();
   }
-  
-  return createdJob as QueueJob;
-}
 
-/**
- * Kullanıcının bekleyen işlerini getirir
- * @param userId Kullanıcı ID
- * @returns Bekleyen işler listesi
- */
-export async function getUserPendingJobs(userId: string): Promise<QueueJob[]> {
-  const supabase = await createClient();
-  
-  const { data: jobs, error } = await supabase
-    .from('queue_jobs')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', QueueJobStatus.PENDING)
-    .order('created_at', { ascending: true });
-    
-  if (error) {
-    console.error('Bekleyen işler alınırken hata oluştu:', error);
-    throw new Error(`Bekleyen işler alınırken hata: ${error.message}`);
-  }
-  
-  return jobs as QueueJob[];
-}
-
-/**
- * Kullanıcının tüm işlerini getirir
- * @param userId Kullanıcı ID
- * @returns İşler listesi
- */
-export async function getUserJobs(userId: string): Promise<QueueJob[]> {
-  const supabase = await createClient();
-  
-  const { data: jobs, error } = await supabase
-    .from('queue_jobs')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-    
-  if (error) {
-    console.error('İşler alınırken hata oluştu:', error);
-    throw new Error(`İşler alınırken hata: ${error.message}`);
-  }
-  
-  return jobs as QueueJob[];
-}
-
-/**
- * İş durumunu günceller
- * @param jobId İş ID
- * @param status Yeni durum
- * @param progress İlerleme yüzdesi (0-100)
- * @param error Hata mesajı (varsa)
- */
-export async function updateJobStatus(
-  jobId: string, 
-  status: QueueJobStatus, 
-  progress: number = 0, 
-  error?: string
-): Promise<void> {
-  const supabase = await createClient();
-  
-  const updateData: Partial<QueueJob> = {
-    status,
-    progress,
-  };
-  
-  // Durum değişikliğine göre zaman alanlarını güncelle
-  if (status === QueueJobStatus.PROCESSING) {
-    updateData.started_at = new Date().toISOString();
-  } else if (status === QueueJobStatus.COMPLETED || status === QueueJobStatus.FAILED) {
-    updateData.completed_at = new Date().toISOString();
-  }
-  
-  // Hata varsa ekle
-  if (error) {
-    updateData.error = error;
-  }
-  
-  const { error: updateError } = await supabase
-    .from('queue_jobs')
-    .update(updateData)
-    .eq('id', jobId);
-    
-  if (updateError) {
-    console.error('İş durumu güncellenirken hata oluştu:', updateError);
-    throw new Error(`İş durumu güncellenirken hata: ${updateError.message}`);
-  }
-}
-
-/**
- * Bir sonraki bekleyen işi işler
- * @returns İşlenen iş
- */
-export async function processNextJob(): Promise<QueueJob | null> {
-  const supabase = await createClient();
-  
-  // Bir sonraki bekleyen işi al
-  const { data: jobs, error } = await supabase
-    .from('queue_jobs')
-    .select('*')
-    .eq('status', QueueJobStatus.PENDING)
-    .order('created_at', { ascending: true })
-    .limit(1);
-    
-  if (error) {
-    console.error('Bekleyen işler alınırken hata oluştu:', error);
-    throw new Error(`Bekleyen işler alınırken hata: ${error.message}`);
-  }
-  
-  if (!jobs || jobs.length === 0) {
-    return null; // İşlenecek iş yok
-  }
-  
-  const job = jobs[0] as QueueJob;
-  
-  try {
-    // İşi işleniyor olarak işaretle
-    await updateJobStatus(job.id, QueueJobStatus.PROCESSING, 10);
-    
-    // İş türüne göre işleme
-    if (job.type === QueueJobType.CREATE_ETSY_LISTING) {
-      await processCreateEtsyListingJob(job);
-    } else {
-      throw new Error(`Bilinmeyen iş türü: ${job.type}`);
+  // Background işlemeyi başlat
+  private startBackgroundProcessing() {
+    if (this.processingInterval) {
+      clearInterval(this.processingInterval);
     }
     
-    // İşi tamamlandı olarak işaretle
-    await updateJobStatus(job.id, QueueJobStatus.COMPLETED, 100);
+    // Her 5 saniyede bir queue'yu kontrol et
+    this.processingInterval = setInterval(() => {
+      this.processQueue().catch(err => {
+        console.error('Queue processing error:', err);
+      });
+    }, 5000);
+  }
+
+  // Job ekleme
+  public async addJob(jobData: Partial<QueueJob>): Promise<string> {
+    const id = jobData.id || uuidv4();
     
-    return job;
-  } catch (error: any) {
-    console.error('İş işlenirken hata oluştu:', error);
+    const job: QueueJob = {
+      id,
+      userId: jobData.userId || '',
+      type: jobData.type || 'CREATE_LISTING',
+      status: 'pending',
+      progress: 0,
+      data: jobData.data || {},
+      createdAt: new Date(),
+      retryCount: 0
+    };
     
-    // Yeniden deneme sayısını artır
-    const { data: updatedJob, error: retryError } = await supabase
-      .from('queue_jobs')
-      .update({
-        retry_count: job.retry_count + 1,
-        status: QueueJobStatus.FAILED,
-        error: error.message || 'Bilinmeyen hata',
-      })
-      .eq('id', job.id)
-      .select()
-      .single();
-      
-    if (retryError) {
-      console.error('Yeniden deneme sayısı güncellenirken hata oluştu:', retryError);
+    this.jobs.set(id, job);
+
+    if (this.enablePersistence) {
+      try {
+        const supabase = await getSupabaseClient();
+        await supabase.from('queue_jobs').insert({
+          id: job.id,
+          user_id: job.userId,
+          type: job.type,
+          status: job.status,
+          progress: job.progress,
+          data: job.data,
+          retry_count: job.retryCount,
+          created_at: job.createdAt.toISOString(),
+        });
+      } catch (error) {
+        console.error('Failed to save job to database:', error);
+      }
+    }
+    
+    // Job'u hemen işlemeye başla
+    setTimeout(() => {
+      this.processQueue().catch(err => {
+        console.error('Queue processing error:', err);
+      });
+    }, 100);
+    
+    return id;
+  }
+  
+  // Job'u ID'ye göre al
+  public getJobById(id: string): QueueJob | undefined {
+    return this.jobs.get(id);
+  }
+
+  // Var olan job'un durumunu getir
+  public async getJobStatus(id: string): Promise<QueueJob | null> {
+    // Önce memory'den kontrol et
+    const job = this.jobs.get(id);
+    if (job) return job;
+    
+    // Memory'de yoksa ve persistence açıksa, DB'den kontrol et
+    if (this.enablePersistence) {
+      try {
+        const supabase = await getSupabaseClient();
+        const { data, error } = await supabase
+          .from('queue_jobs')
+          .select('*')
+          .eq('id', id)
+          .single();
+          
+        if (error) throw error;
+        
+        if (data) {
+          // DB'den gelen veriyi QueueJob formatına dönüştür
+          const job: QueueJob = {
+            id: data.id,
+            userId: data.user_id,
+            type: data.type as 'CREATE_LISTING' | 'BATCH_UPLOAD_LISTINGS',
+            status: data.status as 'pending' | 'processing' | 'completed' | 'failed',
+            progress: data.progress,
+            data: data.data,
+            error: data.error,
+            createdAt: new Date(data.created_at),
+            startedAt: data.started_at ? new Date(data.started_at) : undefined,
+            completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
+            retryCount: data.retry_count
+          };
+          
+          // Memory'ye ekle
+          this.jobs.set(id, job);
+          return job;
+        }
+      } catch (error) {
+        console.error('Failed to get job from database:', error);
+      }
     }
     
     return null;
   }
-}
-
-/**
- * Etsy ürün oluşturma işini işler
- * @param job İş
- */
-async function processCreateEtsyListingJob(job: QueueJob): Promise<void> {
-  const data = job.data as CreateEtsyListingJobData;
-  const { listingData, imageFiles, videoFiles, shopId } = data;
   
-  // Kullanıcı için geçerli token al
-  const supabase = await createClient();
-  
-  // Etsy token bilgilerini al
-  const { data: etsyTokenData, error: tokenError } = await supabase
-    .from('etsy_tokens')
-    .select('*')
-    .eq('user_id', job.user_id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  // Tüm kuyruğu işle
+  public async processQueue(): Promise<void> {
+    if (this.isProcessing) {
+      return; // Zaten işleniyor
+    }
     
-  if (tokenError || !etsyTokenData) {
-    throw new Error('Etsy token bilgisi bulunamadı');
+    this.isProcessing = true;
+    
+    try {
+      // Pending durumundaki jobları al
+      const pendingJobs = Array.from(this.jobs.values()).filter(
+        job => job.status === 'pending' && !this.processing.has(job.id)
+      );
+      
+      // İşlenecek job sayısını sınırla
+      const availableSlots = this.maxConcurrent - this.processing.size;
+      const jobsToProcess = pendingJobs.slice(0, availableSlots);
+      
+      // Jobları async olarak işle
+      await Promise.all(
+        jobsToProcess.map(job => this.processJob(job))
+      );
+    } catch (error) {
+      console.error('Queue processing error:', error);
+    } finally {
+      this.isProcessing = false;
+    }
   }
   
-  const accessToken = etsyTokenData.access_token;
-  
-  try {
-    // İlerleme durumunu güncelle
-    await updateJobStatus(job.id, QueueJobStatus.PROCESSING, 20);
+  // Tek bir job'u işle
+  private async processJob(job: QueueJob): Promise<void> {
+    // İşlemeye başlıyor olarak işaretle
+    this.processing.add(job.id);
+    job.status = 'processing';
+    job.startedAt = new Date();
+    this.jobs.set(job.id, { ...job });
     
-    // Draft listing oluştur
-    const { listing_id } = await createDraftListing(accessToken, shopId, listingData);
-    
-    // İlerleme durumunu güncelle
-    await updateJobStatus(job.id, QueueJobStatus.PROCESSING, 40);
-    
-    // Resim ve video dosyalarını yükle
-    if (imageFiles.length > 0 || videoFiles.length > 0) {
-      await uploadFilesToEtsy(
-        accessToken,
-        shopId,
-        listing_id,
-        imageFiles,
-        videoFiles.length > 0 ? videoFiles[0] : null
-      );
+    // DB'yi güncelle
+    if (this.enablePersistence) {
+      try {
+        const supabase = await getSupabaseClient();
+        await supabase
+          .from('queue_jobs')
+          .update({
+            status: job.status,
+            progress: job.progress,
+            started_at: job.startedAt?.toISOString(),
+          })
+          .eq('id', job.id);
+      } catch (error) {
+        console.error('Failed to update job in database:', error);
+      }
     }
     
-    // İlerleme durumunu güncelle
-    await updateJobStatus(job.id, QueueJobStatus.PROCESSING, 70);
-    
-    // Varyasyonlar varsa ekle
-    if (listingData.has_variations && listingData.variations && listingData.variations.length > 0) {
-      await addInventoryWithVariations(accessToken, listing_id, listingData.variations);
+    try {
+      // Job tipine göre işle
+      if (job.type === 'CREATE_LISTING') {
+        await this.processCreateListing(job);
+      } else if (job.type === 'BATCH_UPLOAD_LISTINGS') {
+        await this.processBatchUploadListings(job);
+      }
+      
+      // Başarıyla tamamlandı
+      job.status = 'completed';
+      job.completedAt = new Date();
+    } catch (error: any) {
+      console.error(`Job ${job.id} failed:`, error);
+      
+      // Hata durumu
+      job.status = 'failed';
+      job.error = error.message || 'Unknown error';
+      
+      // Retry'ı dene
+      if (job.retryCount < this.maxRetries) {
+        job.retryCount++;
+        job.status = 'pending';
+        job.progress = 0;
+        job.error = `Retry ${job.retryCount}/${this.maxRetries}: ${job.error}`;
+      }
+    } finally {
+      // İşleme tamamlandı
+      this.processing.delete(job.id);
+      this.jobs.set(job.id, { ...job });
+      
+      // DB'yi güncelle
+      if (this.enablePersistence) {
+        try {
+          const supabase = await getSupabaseClient();
+          await supabase
+            .from('queue_jobs')
+            .update({
+              status: job.status,
+              progress: job.progress,
+              completed_at: job.completedAt?.toISOString(),
+              error: job.error,
+              retry_count: job.retryCount,
+              data: job.data
+            })
+            .eq('id', job.id);
+        } catch (error) {
+          console.error('Failed to update job in database:', error);
+        }
+      }
     }
+  }
+
+  // Ürün oluşturma işlemi
+  private async processCreateListing(job: QueueJob): Promise<void> {
+    const { listingData, files } = job.data;
     
-    // İlerleme durumunu güncelle
-    await updateJobStatus(job.id, QueueJobStatus.PROCESSING, 90);
-    
-    // Etsy uploads tablosuna kaydet
-    const uploadData = {
-      user_id: job.user_id,
-      shop_id: shopId,
-      listing_id: listing_id,
-      title: listingData.title,
-      state: listingData.state || 'draft',
-      upload_duration: 0, // Süre bilgisi sonradan eklenecek
-      image_count: imageFiles.length,
-      video_count: videoFiles.length,
-      has_variations: listingData.has_variations || false,
-      variation_count: listingData.variations?.length || 0,
-      title_tokens: listingData.tokenUsage?.title_total_tokens || 0,
-      tags_tokens: listingData.tokenUsage?.tags_total_tokens || 0,
-      tags: listingData.tags || [],
-      total_tokens: (listingData.tokenUsage?.title_total_tokens || 0) +
-                   (listingData.tokenUsage?.tags_total_tokens || 0) +
-                   (listingData.tokenUsage?.description_total_tokens || 0)
+    // İlerleme durumunu ayarla
+    const updateProgress = (progress: number, message?: string) => {
+      job.progress = progress;
+      if (message) {
+        console.log(`Job ${job.id}: ${message} (${progress}%)`);
+      }
+      this.jobs.set(job.id, { ...job });
     };
     
-    const { error: uploadError } = await supabase
-      .from('etsy_uploads')
-      .insert(uploadData);
+    try {
+      updateProgress(10, 'Etsy bağlantısı kontrol ediliyor');
       
-    if (uploadError) {
-      console.warn('Yükleme bilgileri veritabanına kaydedilemedi:', uploadError);
+      // FormData oluştur
+      const formData = new FormData();
+      formData.append('listingData', JSON.stringify(listingData));
+      
+      // Dosyaları ekle
+      if (files && files.imageFiles) {
+        console.log(`Adding ${files.imageFiles.length} image files to FormData`);
+        for (const imageFile of files.imageFiles) {
+          formData.append('imageFiles', imageFile);
+        }
+      }
+      
+      if (files && files.videoFile) {
+        console.log('Adding video file to FormData');
+        formData.append('videoFile', files.videoFile);
+      }
+      
+      updateProgress(30, 'Etsy API\'ye istek hazırlanıyor');
+      
+      // Gerçek API'ye istek at - Doğrudan API URL'ini kullan
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://dolphinmanager.vercel.app';
+      console.log(`Using base URL: ${baseUrl} for API request`);
+      
+      // İsteği direk olarak /api/etsy/listings/create'e gönder (create-async'e değil)
+      console.log('Sending request to Etsy API...');
+      const response = await fetch(`${baseUrl}/api/etsy/listings/create`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      updateProgress(70, 'Etsy yanıtı alındı, işleniyor');
+      
+      // Yanıtı kontrol et
+      if (!response.ok) {
+        const errorData = await response.json();
+        const errorMessage = errorData.error || `Etsy API hatası: ${response.status}`;
+        console.error(`API error: ${errorMessage}, Status: ${response.status}`);
+        throw new Error(errorMessage);
+      }
+      
+      const result = await response.json();
+      console.log(`Listing created successfully, ID: ${result.listingId || 'unknown'}`);
+      
+      updateProgress(100, 'İşlem başarıyla tamamlandı');
+      
+      // Başarılı yanıtı job datasına ekle
+      job.data.result = result;
+    } catch (error) {
+      console.error('Create listing error:', error);
+      throw error;
+    }
+  }
+
+  // Yeni: Toplu ürün yükleme işlemi
+  private async processBatchUploadListings(job: QueueJob): Promise<void> {
+    const { products } = job.data;
+    
+    if (!Array.isArray(products) || products.length === 0) {
+      throw new Error('Ürün listesi boş veya geçersiz');
     }
     
-    // İş verisini güncelle (listing_id ekle)
-    const { error: updateError } = await supabase
-      .from('queue_jobs')
-      .update({
-        data: {
-          ...job.data,
-          listing_id
-        }
-      })
-      .eq('id', job.id);
-      
-    if (updateError) {
-      console.warn('İş verisi güncellenirken hata oluştu:', updateError);
+    const totalProducts = products.length;
+    console.log(`[BATCH_UPLOAD] ${totalProducts} ürün işlenecek`);
+    
+    // İlerleme durumunu ayarla
+    const updateProgress = (progress: number, message?: string) => {
+      job.progress = progress;
+      if (message) {
+        console.log(`Job ${job.id}: ${message} (${progress}%)`);
+      }
+      job.data.currentStatus = message || '';
+      this.jobs.set(job.id, { ...job });
+    };
+    
+    updateProgress(5, 'Ürünler işleniyor...');
+    
+    // Sonuçları sakla
+    const results = {
+      success: [] as any[],
+      failed: [] as any[],
+      total: totalProducts,
+      completed: 0
+    };
+    job.data.results = results;
+    
+    // Ürünleri batch'lere böl
+    const batches = [];
+    for (let i = 0; i < totalProducts; i += this.batchSize) {
+      batches.push(products.slice(i, i + this.batchSize));
     }
-  } catch (error: any) {
-    throw new Error(`Etsy ürün oluşturma hatası: ${error.message}`);
+    
+    const totalBatches = batches.length;
+    console.log(`[BATCH_UPLOAD] ${totalBatches} batch oluşturuldu`);
+    
+    // Her batch'i işle
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const batch = batches[batchIndex];
+      updateProgress(
+        Math.floor((batchIndex / totalBatches) * 80) + 5,
+        `Batch ${batchIndex + 1}/${totalBatches} işleniyor...`
+      );
+      
+      console.log(`[BATCH_UPLOAD] Batch ${batchIndex + 1}/${totalBatches} başlatılıyor (${batch.length} ürün)`);
+      
+      // Batch içindeki ürünleri paralel olarak işle
+      const batchResults = await Promise.allSettled(
+        batch.map(async (product: any) => {
+          try {
+            const formData = new FormData();
+            
+            // Ürün verisini ekle
+            formData.append('listingData', JSON.stringify(product.listingData));
+            
+            // Dosyaları ekle
+            if (product.files && product.files.imageFiles) {
+              for (const imageFile of product.files.imageFiles) {
+                formData.append('imageFiles', imageFile);
+              }
+            }
+            
+            if (product.files && product.files.videoFile) {
+              formData.append('videoFile', product.files.videoFile);
+            }
+            
+            // Etsy API'ye istek at
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://dolphinmanager.vercel.app';
+            const response = await fetch(`${baseUrl}/api/etsy/listings/create`, {
+              method: 'POST',
+              body: formData,
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || `API hatası: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Başarılı sonucu kaydet
+            results.success.push({
+              title: product.listingData.title,
+              listingId: result.listingId,
+              result
+            });
+            
+            return {
+              success: true,
+              title: product.listingData.title,
+              listingId: result.listingId
+            };
+          } catch (error: any) {
+            console.error(`Ürün yükleme hatası (${product.listingData?.title || 'Bilinmeyen'})`, error);
+            
+            // Hata sonucunu kaydet
+            results.failed.push({
+              title: product.listingData?.title || 'Bilinmeyen',
+              error: error.message || 'Bilinmeyen hata'
+            });
+            
+            return {
+              success: false,
+              title: product.listingData?.title || 'Bilinmeyen',
+              error: error.message || 'Bilinmeyen hata'
+            };
+          } finally {
+            // Tamamlanan ürün sayısını artır
+            results.completed++;
+            
+            // İlerleme durumunu güncelle
+            const progress = Math.floor((results.completed / totalProducts) * 80) + 5;
+            job.progress = progress;
+            job.data.results = results;
+            this.jobs.set(job.id, { ...job });
+          }
+        })
+      );
+      
+      console.log(`[BATCH_UPLOAD] Batch ${batchIndex + 1}/${totalBatches} tamamlandı:`, 
+        batchResults.filter(r => r.status === 'fulfilled').length, 'başarılı,',
+        batchResults.filter(r => r.status === 'rejected').length, 'başarısız');
+      
+      // Rate limit'e takılmamak için batch'ler arası bekle (son batch hariç)
+      if (batchIndex < totalBatches - 1) {
+        updateProgress(
+          Math.floor((batchIndex / totalBatches) * 80) + 5,
+          `Rate limit için bekleniyor (${this.batchDelay/1000} saniye)...`
+        );
+        
+        await new Promise(resolve => setTimeout(resolve, this.batchDelay));
+      }
+    }
+    
+    // Özet bilgileri güncelle
+    const successCount = results.success.length;
+    const failedCount = results.failed.length;
+    
+    updateProgress(100, `İşlem tamamlandı: ${successCount} başarılı, ${failedCount} başarısız`);
+    
+    // Özet bilgileri job datasına ekle
+    job.data.summary = {
+      successCount,
+      failedCount,
+      totalCount: totalProducts,
+      completedAt: new Date().toISOString()
+    };
+    
+    console.log(`[BATCH_UPLOAD] Toplu yükleme tamamlandı: ${successCount} başarılı, ${failedCount} başarısız`);
+  }
+
+  // Kullanıcının tüm işlerini getir
+  public async getUserJobs(userId: string): Promise<QueueJob[]> {
+    try {
+      // Veritabanındaki işleri kontrol et
+      if (this.enablePersistence) {
+        try {
+          const supabase = await getSupabaseClient();
+          const { data, error } = await supabase
+            .from('queue_jobs')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+          if (error) {
+            console.error('Failed to get jobs from database:', error);
+          } else if (data && data.length > 0) {
+            // Veritabanından gelen veriyi QueueJob formatına dönüştür
+            const dbJobs = data.map(item => ({
+              id: item.id,
+              userId: item.user_id,
+              type: item.type as 'CREATE_LISTING' | 'BATCH_UPLOAD_LISTINGS',
+              status: item.status as 'pending' | 'processing' | 'completed' | 'failed',
+              progress: item.progress,
+              data: item.data,
+              error: item.error,
+              createdAt: new Date(item.created_at),
+              startedAt: item.started_at ? new Date(item.started_at) : undefined,
+              completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
+              retryCount: item.retry_count
+            }));
+            
+            // Memory cache'i güncelle
+            dbJobs.forEach(job => {
+              this.jobs.set(job.id, job);
+            });
+            
+            return dbJobs;
+          }
+        } catch (dbError) {
+          console.error('Error fetching jobs from database:', dbError);
+        }
+      }
+      
+      // Bellekteki işleri kullan
+      return Array.from(this.jobs.values())
+        .filter(job => job.userId === userId)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    } catch (error) {
+      console.error('Error getting user jobs:', error);
+      return [];
+    }
   }
 }
 
-/**
- * Kuyruğu işleyen bir cron işi başlatır
- * @param intervalMs İşleme aralığı (ms)
- */
-export function startQueueProcessor(intervalMs: number = 120000): NodeJS.Timeout {
-  console.log(`Kuyruk işleyici başlatıldı (${intervalMs}ms aralıkla)`);
-  
-  return setInterval(async () => {
-    try {
-      const job = await processNextJob();
-      
-      if (job) {
-        console.log(`İş işlendi: ${job.id}, Tür: ${job.type}`);
-      }
-    } catch (error) {
-      console.error('Kuyruk işleme hatası:', error);
-    }
-  }, intervalMs);
-}
-
-/**
- * Kuyruğu işleyen cron işini durdurur
- * @param intervalId setInterval'dan dönen ID
- */
-export function stopQueueProcessor(intervalId: NodeJS.Timeout): void {
-  clearInterval(intervalId);
-  console.log('Kuyruk işleyici durduruldu');
-} 
+// Singleton instance
+export const queueManager = new QueueManager(); 

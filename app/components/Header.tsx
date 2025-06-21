@@ -3,12 +3,12 @@
 import { Button } from "@/components/ui/button"
 import { Plus, BarChart3, LogOut, Package, ShoppingBag, Home } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
-import { auth } from "@/lib/firebase"
-import { signOut } from "firebase/auth"
+import { createClientSupabase } from "@/lib/supabase"
 
 export function Header() {
   const pathname = usePathname()
   const router = useRouter()
+  const supabase = createClientSupabase()
   
   const isOnboarding = pathname?.includes("/onboarding")
   const isAuth = pathname?.includes("/auth")
@@ -16,13 +16,8 @@ export function Header() {
   if (isOnboarding || isAuth) return null
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth)
-      router.push("/auth/login")
-    } catch (error) {
-      console.error("Logout error:", error)
-      router.push("/auth/login")
-    }
+    await supabase.auth.signOut()
+    router.push("/auth/login")
   }
 
   const handleNavigation = (path: string) => {

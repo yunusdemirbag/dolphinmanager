@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 // import { createClient } from "@/lib/supabase/server"
-import { queueManager } from "@/src/lib/queue-manager"
+import { queueManager } from "@/lib/queue-manager"
 import { getUser } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {

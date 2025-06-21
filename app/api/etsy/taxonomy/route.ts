@@ -1,18 +1,57 @@
+import { createClient } from "@/lib/supabase/server"
+import { auth } from '@/lib/firebase/admin';
+import { db } from '@/lib/firebase/admin';
 import { NextRequest, NextResponse } from "next/server"
-// import { createClient } from "@/lib/supabase/server"
 import { getSellerTaxonomyNodes, getPropertiesByTaxonomyId } from "@/lib/etsy-api"
+import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
-    // Auth kontrolü ekleyelim
-    const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    // Auth kontrolü - hem token hem de session cookie desteği
+    let userId = null;
     
-    if (userError || !user) {
-      console.log("Taxonomy API auth error:", userError, "No user found")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // 1. Bearer token kontrolü
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split('Bearer ')[1];
+        const decodedToken = await auth.verifyIdToken(token);
+        userId = decodedToken.uid;
+        console.log('✅ Token ile kullanıcı doğrulandı:', userId);
+      } catch (error) {
+        console.error('❌ Token doğrulama hatası:', error);
+      }
     }
     
+    // 2. Session cookie kontrolü (token başarısız olursa)
+    if (!userId) {
+      try {
+        // Next.js 15'te cookies() API'si yerine request.headers.get('cookie') kullanıyoruz
+        const cookieHeader = request.headers.get('cookie');
+        const sessionCookie = cookieHeader?.split(';')
+          .find(c => c.trim().startsWith('session='))
+          ?.split('=')[1];
+        
+        if (sessionCookie) {
+          const decodedCookie = await auth.verifySessionCookie(sessionCookie);
+          userId = decodedCookie.uid;
+          console.log('✅ Cookie ile kullanıcı doğrulandı:', userId);
+        }
+      } catch (error) {
+        console.error('❌ Session cookie doğrulama hatası:', error);
+      }
+    }
+    
+    // 3. Kullanıcı doğrulanamadıysa mock data döndür
+    if (!userId) {
+      console.log('⚠️ Kullanıcı doğrulanamadı, mock data döndürülüyor');
+      return NextResponse.json({
+        success: true,
+        nodes: mockTaxonomyNodes(),
+        is_mock: true
+      });
+    }
+
     const { searchParams } = new URL(request.url)
     const taxonomyId = searchParams.get('taxonomy_id')
 
@@ -33,37 +72,47 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({
             success: true,
             properties: mockTaxonomyProperties(),
-            taxonomy_id: 68887271
+            taxonomy_id: parseInt(taxonomyId) || 68887271,
+            is_mock: true
           })
         }
       } else {
         // Tüm taxonomy node'larını getir
-        const taxonomyNodes = await getSellerTaxonomyNodes()
-        
-        return NextResponse.json({
-          success: true,
-          taxonomy_nodes: taxonomyNodes
-        })
+        try {
+          const taxonomyNodes = await getSellerTaxonomyNodes(userId);
+          return NextResponse.json({
+            success: true,
+            nodes: taxonomyNodes
+          });
+        } catch (error) {
+          console.error("Error fetching taxonomy nodes:", error);
+          // Mock data döndür
+          return NextResponse.json({
+            success: true,
+            nodes: mockTaxonomyNodes(),
+            is_mock: true
+          });
+        }
       }
     } catch (apiError) {
       console.error("Etsy API error:", apiError)
       // Return mock data for development
       return NextResponse.json({
         success: true,
-        taxonomy_nodes: mockTaxonomyNodes()
+        nodes: mockTaxonomyNodes(),
+        is_mock: true
       })
     }
 
   } catch (error: any) {
     console.error("Taxonomy API error:", error)
-    return NextResponse.json(
-      { 
-        error: "Failed to fetch taxonomy data", 
-        details: error.message,
-        success: false
-      },
-      { status: 500 }
-    )
+    // Hata durumunda da mock data döndür
+    return NextResponse.json({
+      success: true,
+      nodes: mockTaxonomyNodes(),
+      is_mock: true,
+      error_details: error.message
+    })
   }
 }
 
@@ -78,6 +127,8 @@ function mockTaxonomyNodes() {
     { id: 105, name: "Home & Living", level: 1, path: ["Home & Living"] },
     { id: 106, name: "Home Decor", level: 2, path: ["Home & Living", "Home Decor"] },
     { id: 107, name: "Wall Decor", level: 3, path: ["Home & Living", "Home Decor", "Wall Decor"] },
+    { id: 1027, name: "Wall Decor", level: 2, path: ["Home & Living", "Wall Decor"] },
+    { id: 2078, name: "Digital Prints", level: 2, path: ["Art & Collectibles", "Digital Prints"] }
   ]
 }
 

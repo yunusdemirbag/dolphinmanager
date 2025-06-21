@@ -6,6 +6,7 @@ import { ProductFormModal } from "@/components/product/ProductFormModal";
 import { ProductDeleteModal } from "@/components/product/ProductDeleteModal";
 import { ProductFilters } from "@/components/product/ProductFilters";
 import { QueueStatusIndicator } from "@/components/product/QueueStatusIndicator";
+import { auth } from "@/lib/firebase";
 
 interface StoreDetails {
   shop_id: number;
@@ -31,10 +32,25 @@ export function useProductsClient() {
       
       let storeInfo = null;
       
+      // Firebase auth token al
+      const user = auth.currentUser;
+      const token = user ? await user.getIdToken() : null;
+      
+      if (!token) {
+        console.error('Firebase auth token bulunamadı');
+        toast.error('Oturum bilgileriniz alınamadı, lütfen tekrar giriş yapın.');
+        return;
+      }
+      
+      const headers = {
+        'Cache-Control': 'no-cache',
+        'Authorization': `Bearer ${token}`
+      };
+      
       try {
         // Önce mağaza bilgilerini al
         const storeResponse = await fetch('/api/etsy/stores', {
-          headers: { 'Cache-Control': 'no-cache' },
+          headers,
           signal: AbortSignal.timeout(8000)
         });
         
@@ -62,7 +78,7 @@ export function useProductsClient() {
       // Kargo profilleri - varsayılan profil oluştur
       try {
         const profilesResponse = await fetch(`/api/etsy/shipping-profiles`, {
-          headers: { 'Cache-Control': 'no-cache' },
+          headers,
           signal: AbortSignal.timeout(8000)
         });
         
@@ -114,7 +130,7 @@ export function useProductsClient() {
       // İşlem profilleri
       try {
         const processingProfilesResponse = await fetch(`/api/etsy/processing-profiles`, {
-          headers: { 'Cache-Control': 'no-cache' },
+          headers,
           signal: AbortSignal.timeout(8000)
         });
         

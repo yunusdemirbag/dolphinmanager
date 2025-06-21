@@ -16,19 +16,30 @@ export default function ProductsLayout({
   const router = useRouter()
   
   useEffect(() => {
+    console.log("🔄 [ProductsLayout] useEffect başladı")
+    
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user)
-      setLoading(false)
+      console.log(`🔒 [ProductsLayout] Auth durumu değişti: ${user ? 'Oturum açık' : 'Oturum kapalı'}`)
       
       if (!user) {
-        router.push('/auth/login')
+        console.log("⚠️ [ProductsLayout] Kullanıcı oturum açmamış, login sayfasına yönlendiriliyor")
+        router.replace('/auth/login')
+      } else {
+        console.log(`✅ [ProductsLayout] Kullanıcı oturum açmış: ${user.uid}`)
+        setUser(user)
       }
+      
+      setLoading(false)
     })
     
-    return () => unsubscribe()
+    return () => {
+      console.log("🧹 [ProductsLayout] useEffect temizleniyor")
+      unsubscribe()
+    }
   }, [router])
   
   if (loading) {
+    console.log("⏳ [ProductsLayout] Yükleniyor durumu gösteriliyor")
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -40,9 +51,11 @@ export default function ProductsLayout({
   }
   
   if (!user) {
-    return null // Redirect yapılıyor
+    console.log("🚫 [ProductsLayout] Kullanıcı yok, null döndürülüyor (yönlendirme yapılıyor)")
+    return null
   }
   
+  console.log("🎯 [ProductsLayout] Sayfa içeriği gösteriliyor")
   return (
     <div className="bg-white">
       {children}

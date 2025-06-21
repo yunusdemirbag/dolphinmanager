@@ -27,6 +27,9 @@ interface CreateListingResponse {
 }
 
 export default function ProductsPage() {
+  console.log("🚀 [ProductsPage] Component render başladı")
+  
+  // Products state from hook
   const {
     products,
     filteredProducts,
@@ -48,7 +51,10 @@ export default function ProductsPage() {
     handleDeleteProduct,
     setFilteredProducts
   } = useProducts()
+  
+  console.log(`📊 [ProductsPage] useProducts hook çalıştı: ${products.length} ürün, loading: ${loading}`)
 
+  // Shipping and processing profiles from client hook
   const {
     shippingProfiles,
     loadingShippingProfiles,
@@ -57,6 +63,8 @@ export default function ProductsPage() {
     storeDetails,
     fetchStoreDetailsAndProfiles
   } = useProductsClient()
+  
+  console.log(`🚢 [ProductsPage] useProductsClient hook çalıştı: ${shippingProfiles.length} kargo profili`)
 
   // Filter & Sort States
   const [searchTerm, setSearchTerm] = useState("")
@@ -116,17 +124,29 @@ export default function ProductsPage() {
   // Taxonomy & Shipping Profile States
   const [taxonomyNodes, setTaxonomyNodes] = useState<TaxonomyNode[]>([])
 
+  // Load products when component mounts
+  useEffect(() => {
+    console.log("🔄 [ProductsPage] loadProducts useEffect çalışıyor")
+    loadProducts()
+  }, [])
+
   // Load taxonomy and shipping profiles
   useEffect(() => {
+    console.log("🔄 [ProductsPage] taxonomy useEffect çalışıyor")
+    
     const loadTaxonomyNodes = async () => {
       try {
+        console.log("📚 [ProductsPage] Taxonomy yükleniyor...")
         const response = await fetch('/api/etsy/taxonomy')
         if (response.ok) {
           const data = await response.json()
+          console.log(`✅ [ProductsPage] Taxonomy yüklendi: ${data.nodes?.length || 0} kategori`)
           setTaxonomyNodes(data.nodes || [])
+        } else {
+          console.error(`❌ [ProductsPage] Taxonomy yüklenirken hata: ${response.status}`)
         }
       } catch (error) {
-        console.error('Error loading taxonomy:', error)
+        console.error('❌ [ProductsPage] Error loading taxonomy:', error)
       }
     }
 
@@ -170,6 +190,7 @@ export default function ProductsPage() {
 
   // Filter & Sort Products
   useEffect(() => {
+    console.log("🔄 [ProductsPage] filtreleme useEffect çalışıyor")
     let filtered = [...products]
 
     // Apply search filter
@@ -209,6 +230,7 @@ export default function ProductsPage() {
         : (bValue as number) - (aValue as number)
     })
 
+    console.log(`🔍 [ProductsPage] Filtreleme sonucu: ${filtered.length} ürün`)
     setFilteredProducts(filtered)
   }, [products, searchTerm, filterStatus, sortBy, sortOrder])
 
@@ -389,127 +411,138 @@ export default function ProductsPage() {
     list: "flex flex-col gap-4"
   }
   
+  console.log("🎨 [ProductsPage] JSX render ediliyor")
+  // Return the JSX for the page
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="max-w-7xl mx-auto py-8 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Ürün Yönetimi</h1>
-            <p className="text-gray-500">
-              {totalCount} ürün
-            </p>
-          </div>
-          <div className="flex gap-2">
-            {reconnectRequired && (
-              <Button onClick={handleReconnectEtsy} disabled={refreshing}>
-                {refreshing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Bağlanıyor...
-                  </>
-                ) : (
-                  "Etsy'ye Bağlan"
-                )}
-              </Button>
-            )}
-            <Button onClick={() => setShowCreateModal(true)} variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Taslak Olarak Ekle
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col space-y-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold">Ürünlerim</h1>
+            <Button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1">
+              <Plus className="w-4 h-4" /> Yeni Ürün
             </Button>
+          </div>
+
+          {/* Queue Management Panel */}
+          <QueueManagementPanel />
+          
+          {/* Filters */}
+          <ProductFilters 
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            filterStatus={filterStatus}
+            onFilterStatusChange={setFilterStatus}
+            sortBy={sortBy}
+            onSortByChange={setSortBy}
+            sortOrder={sortOrder}
+            onSortOrderChange={setSortOrder}
+            gridType={gridType}
+            onGridTypeChange={setGridType}
+          />
+
+          {/* Products Grid */}
+          <div className={`grid gap-4 ${
+            gridType === 'grid3' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' :
+            gridType === 'grid5' ? 'grid-cols-1 md:grid-cols-3 lg:grid-cols-5' :
+            'grid-cols-1'
+          }`}>
+            {loading ? (
+              <div className="col-span-full flex justify-center items-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-500" />
+              </div>
+            ) : reconnectRequired ? (
+              <div className="col-span-full bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                <h3 className="text-lg font-medium text-yellow-800 mb-2">Etsy bağlantınızı yenilemeniz gerekiyor</h3>
+                <p className="text-yellow-700 mb-4">Etsy API erişim izniniz süresi dolmuş olabilir.</p>
+                <Button 
+                  onClick={handleReconnectEtsy}
+                  disabled={refreshing}
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                >
+                  {refreshing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Yenileniyor...
+                    </>
+                  ) : (
+                    'Etsy Bağlantısını Yenile'
+                  )}
+                </Button>
+              </div>
+            ) : noStoresFound ? (
+              <div className="col-span-full bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                <h3 className="text-lg font-medium text-yellow-800 mb-2">Etsy mağazası bulunamadı</h3>
+                <p className="text-yellow-700 mb-4">Henüz bir Etsy mağazası bağlamamışsınız.</p>
+                <Button 
+                  onClick={handleReconnectEtsy}
+                  disabled={refreshing}
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                >
+                  {refreshing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Bağlanılıyor...
+                    </>
+                  ) : (
+                    'Etsy Mağazanızı Bağlayın'
+                  )}
+                </Button>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="col-span-full bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                <h3 className="text-lg font-medium text-gray-800 mb-2">Hiç ürün bulunamadı</h3>
+                <p className="text-gray-600 mb-4">Henüz hiç ürün eklenmemiş veya filtrelere uygun ürün yok.</p>
+                <Button onClick={() => setShowCreateModal(true)}>
+                  Yeni Ürün Ekle
+                </Button>
+              </div>
+            ) : (
+              filteredProducts.map(product => (
+                <ProductCard
+                  key={product.listing_id}
+                  product={product}
+                  onEdit={() => setShowEditModal(product)}
+                  onDelete={() => setConfirmDeleteProductId(product.listing_id || 0)}
+                />
+              ))
+            )}
           </div>
         </div>
 
-        {/* Store Info */}
-        {currentStore && (
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h2 className="font-semibold">{currentStore.shop_name}</h2>
-            <p className="text-sm text-gray-500">Mağaza ID: {currentStore.shop_id}</p>
-          </div>
-        )}
-
-        {/* Main Tabs */}
-        <Tabs defaultValue="products" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="products">Ürünler</TabsTrigger>
-            <TabsTrigger value="queue">Kuyruk Yönetimi</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="products" className="space-y-6">
-            {/* Filters */}
-            <ProductFilters
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              filterStatus={filterStatus}
-              onFilterStatusChange={setFilterStatus}
-              sortBy={sortBy}
-              onSortByChange={setSortBy}
-              sortOrder={sortOrder}
-              onSortOrderChange={setSortOrder}
-              gridType={gridType}
-              onGridTypeChange={setGridType}
-            />
-
-            {/* Products Grid */}
-            {loading ? (
-              <div className="flex justify-center items-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            ) : filteredProducts.length > 0 ? (
-              <div className={gridClasses[gridType]}>
-                {filteredProducts.map(product => (
-                  <ProductCard
-                    key={product.listing_id}
-                    product={product}
-                    onEdit={setShowEditModal}
-                    onDelete={(product: Product) => setConfirmDeleteProductId(product.listing_id || product.etsy_listing_id || 0)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-gray-500">Ürün bulunamadı</p>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="queue" className="space-y-6">
-            <QueueManagementPanel />
-          </TabsContent>
-        </Tabs>
-
-        {/* Modals */}
+        {/* Create Product Modal */}
         {showCreateModal && (
           <ProductFormModal
             isOpen={showCreateModal}
             onClose={() => setShowCreateModal(false)}
-            onSubmit={onCreateProduct}
-            submitting={submitting}
+            onSubmit={handleCreateProduct}
             shippingProfiles={shippingProfiles}
-            loadingShippingProfiles={loadingShippingProfiles}
             processingProfiles={processingProfiles}
+            loadingShippingProfiles={loadingShippingProfiles}
             loadingProcessingProfiles={loadingProcessingProfiles}
-            showEtsyButton={true}
           />
         )}
 
+        {/* Edit Product Modal */}
         {showEditModal && (
           <ProductFormModal
             isOpen={true}
             onClose={() => setShowEditModal(null)}
+            onSubmit={(data) => handleUpdateProduct({...showEditModal, ...data})}
             product={showEditModal}
-            onSubmit={(data) => onUpdateProduct({ ...showEditModal, ...data } as Product)}
-            submitting={submitting}
             shippingProfiles={shippingProfiles}
             loadingShippingProfiles={loadingShippingProfiles}
+            processingProfiles={processingProfiles}
+            loadingProcessingProfiles={loadingProcessingProfiles}
           />
         )}
 
+        {/* Delete Confirmation Modal */}
         {confirmDeleteProductId && (
           <ProductDeleteModal
             confirmDeleteProductId={confirmDeleteProductId}
             setConfirmDeleteProductId={setConfirmDeleteProductId}
-            onDeleteProduct={onDeleteProduct}
+            onDeleteProduct={handleDeleteProduct}
             deletingProductId={deletingProductId}
           />
         )}

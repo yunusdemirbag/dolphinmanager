@@ -1,11 +1,15 @@
 import crypto from "crypto"
 import qs from "querystring"
-// Firebase Admin SDK geçici olarak kaldırıldı - Firebase entegrasyonu sonrası eklenecek
-// import { createClient } from "@/lib/supabase/server"; // Kullanıcıya özel sunucu istemcisi
+import { v4 as uuidv4 } from "uuid";
 import { cacheManager } from "./cache"
 import { fetchWithCache } from "./api-utils"
 import { Database } from "@/types/database.types";
 import { cookies } from "next/headers";
+import { auth, db } from '@/lib/firebase/admin';
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { NodeCache } from 'node-cache';
+import { ETSY_VALID_COLORS } from "@/lib/etsy-variation-presets";
 
 // Diğer tüm eski ve hatalı supabase importları temizlendi.
 
@@ -17,7 +21,7 @@ const ETSY_API_BASE = "https://openapi.etsy.com/v3"
 const ETSY_OAUTH_BASE = "https://www.etsy.com/oauth"
 
 const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
-const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || ""
+const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || "http://localhost:3000/api/etsy/callback"
 const ETSY_CLIENT_SECRET = process.env.ETSY_CLIENT_SECRET || ""
 // Tüm gerekli izinleri içeren scope'lar
 const ETSY_SCOPE = process.env.ETSY_SCOPE || "email_r shops_r shops_w listings_r listings_w listings_d transactions_r transactions_w profile_r address_r address_w billing_r cart_r cart_w"
@@ -506,44 +510,44 @@ export async function refreshEtsyToken(userId: string): Promise<string> {
   }
 }
 
-export async function getValidAccessToken(userId: string): Promise<string | null> {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore); // Kullanıcıya özel istemci oluştur
-  
-  const { data: user, error } = await supabase.auth.getUser();
-  if (error || !user) {
-    console.error("No authenticated user found.");
-    return null;
-  }
-
-  const { data: tokenData, error: tokenError } = await supabaseAdmin
-    .from('etsy_tokens')
-    .select('access_token, expires_at, refresh_token')
-    .eq('user_id', userId)
-    .single();
-
-  if (tokenError) {
-    console.error("Error fetching Etsy tokens:", tokenError);
-    return null;
-  }
-
-  if (!tokenData) {
-    return null;
-  }
-
-  const expiresAt = new Date(tokenData.expires_at).getTime();
-  if (Date.now() > expiresAt) {
-    // Token has expired, refresh it
-    try {
-      const newAccessToken = await refreshEtsyToken(userId);
-      return newAccessToken;
-    } catch (refreshError) {
-      console.error('Failed to refresh Etsy token:', refreshError);
+// Etsy token'ı al ve gerekirse yenile
+async function getValidAccessToken(userId: string): Promise<string | null> {
+  try {
+    // Firestore'dan token bilgilerini al
+    const tokenDoc = await db.collection('etsy_tokens').doc(userId).get();
+    
+    if (!tokenDoc.exists) {
+      console.log('No token found for user:', userId);
       return null;
     }
-  }
 
-  return tokenData.access_token;
+    const tokenData = tokenDoc.data();
+    const { access_token, refresh_token, expires_at } = tokenData;
+
+    // Token geçerlilik süresini kontrol et
+    const now = Date.now();
+    if (expires_at && now < expires_at) {
+      return access_token;
+    }
+
+    // Token'ı yenile
+    const newToken = await refreshEtsyToken(refresh_token);
+    if (!newToken) {
+      return null;
+    }
+
+    // Yeni token'ı kaydet
+    await db.collection('etsy_tokens').doc(userId).update({
+      access_token: newToken.access_token,
+      refresh_token: newToken.refresh_token,
+      expires_at: now + (newToken.expires_in * 1000)
+    });
+
+    return newToken.access_token;
+  } catch (error) {
+    console.error('Error getting valid access token:', error);
+    return null;
+  }
 }
 
 // Veritabanı yedekleme fonksiyonu
@@ -564,6 +568,7 @@ export async function getStoresFromDatabase(userId: string): Promise<EtsyStore[]
 async function storeEtsyData(userId: string, shopId: number, data: any, type: 'store' | 'listings' | 'stats' | 'receipts' | 'payments') {
   try {
     const tableName = `etsy_${type}_data`;
+    const supabaseAdmin = createAdminClient();
     const { error } = await supabaseAdmin
       .from(tableName)
       .upsert({
@@ -582,11 +587,11 @@ async function storeEtsyData(userId: string, shopId: number, data: any, type: 's
 
     // Önbelleğe de kaydet
     const cacheKey = `etsy_${type}_${userId}_${shopId}`;
-    cacheManager.set(cacheKey, data, { ttl: 24 * 60 * 60 * 1000 }); // 24 saat
+    cacheManager.set(cacheKey, { data, expiry: Date.now() + 24 * 60 * 60 * 1000 }); // 24 saat
 
     console.log(`✅ Stored ${type} data for shop ${shopId}`);
   } catch (error) {
-    console.error(`Failed to store ${type} data:`, error);
+    console.error(`Error storing ${type} data:`, error);
     throw error;
   }
 }
@@ -1555,12 +1560,37 @@ export async function getEtsyReceipts(
 }
 
 // Taxonomy fonksiyonları
-export async function getSellerTaxonomyNodes(): Promise<any[]> {
+export async function getSellerTaxonomyNodes(userId?: string): Promise<any[]> {
   try {
-    const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes`, {
-        headers: {
-        'x-api-key': ETSY_CLIENT_ID,
+    // Eğer userId varsa, önbellekten kontrol et
+    if (userId) {
+      const cachedData = await getCachedData(userId, 'taxonomy_nodes');
+      if (cachedData) {
+        console.log('Using cached taxonomy nodes');
+        return cachedData;
       }
+    }
+
+    // API'den al
+    let accessToken = null;
+    if (userId) {
+      accessToken = await getValidAccessToken(userId);
+      if (!accessToken) {
+        throw new Error('RECONNECT_REQUIRED');
+      }
+    }
+
+    const headers: HeadersInit = {
+      'x-api-key': ETSY_CLIENT_ID
+    };
+
+    // Eğer token varsa ekle
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(`${ETSY_API_BASE}/application/seller-taxonomy/nodes`, {
+      headers
     });
 
     if (!response.ok) {
@@ -1568,7 +1598,26 @@ export async function getSellerTaxonomyNodes(): Promise<any[]> {
     }
 
     const data = await response.json();
-    return data.results || [];
+    const results = data.results || [];
+
+    // Eğer userId varsa, önbelleğe al
+    if (userId) {
+      // Taxonomy node'ları dönüştür
+      const taxonomyNodes = results.map((node: any) => ({
+        id: node.id,
+        name: node.name,
+        level: node.level,
+        parent_id: node.parent_id,
+        path: node.full_path_taxonomy_ids
+      }));
+      
+      // Önbelleğe al
+      await setCachedData(userId, 'taxonomy_nodes', taxonomyNodes);
+      
+      return taxonomyNodes;
+    }
+    
+    return results;
   } catch (error) {
     console.error("Taxonomy node'ları alınırken hata oluştu:", error);
     return [];
@@ -1743,94 +1792,40 @@ export async function getShippingProfiles(userId: string, shopId: number): Promi
 }
 
 // Get processing profiles for a shop
-export async function getProcessingProfiles(userId: string, shopId: number): Promise<EtsyProcessingProfile[]> {
+export async function getProcessingProfiles(userId: string, shopId: number) {
   try {
-    console.log(`Fetching processing profiles for user ${userId} and shop ${shopId}...`);
+    const shippingProfiles = await getShippingProfiles(userId, shopId);
     
-    // Önce önbellekten kontrol et
-    const cachedProfiles = await getCachedData(userId, 'processing_profiles', shopId);
-    if (cachedProfiles) {
-      console.log(`Using ${cachedProfiles.length} cached processing profiles`);
-      return cachedProfiles;
-    }
-    
-    const accessToken = await getValidAccessToken(userId);
-    
-    if (!accessToken) {
-      console.log(`No valid access token for user ${userId} - cannot fetch processing profiles`);
-      throw new Error('RECONNECT_REQUIRED');
+    if (!shippingProfiles || !Array.isArray(shippingProfiles)) {
+      throw new Error('Invalid shipping profiles response');
     }
 
-    console.log('Making request to Etsy API for processing profiles...');
-    // Etsy'nin API'si processing profile için production-partners endpoint'ini kullanıyor
-    const response = await fetch(`${ETSY_API_BASE}/application/shops/${shopId}/production-partners`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': ETSY_CLIENT_ID
-      }
-    });
-
-    // Log the response status and headers for debugging
-    console.log('Processing profiles API response:', {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response from Etsy API:', errorText);
-      
-      if (response.status === 401) {
-        throw new Error('RECONNECT_REQUIRED');
-      }
-      
-      throw new Error(`Failed to fetch processing profiles: ${response.status} ${response.statusText} - ${errorText}`);
+    if (shippingProfiles.length === 0) {
+      // Varsayılan profil
+      return [{
+        processing_profile_id: 0,
+        title: 'Varsayılan İşlem Profili',
+        user_id: 0,
+        min_processing_days: 1,
+        max_processing_days: 3,
+        processing_days_display_label: '1-3 gün',
+        is_deleted: false
+      }];
     }
 
-    const responseText = await response.text();
-    console.log('Raw API response for processing profiles:', responseText);
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error('Failed to parse JSON response:', e);
-      throw new Error('Invalid JSON response from Etsy API');
-    }
-
-    if (!data || !data.results || !Array.isArray(data.results)) {
-      console.error('Invalid API response format:', data);
-      throw new Error('Invalid API response format');
-    }
-
-    // Etsy API'sinden gelen sonucu EtsyProcessingProfile formatına dönüştür
-    const profiles = data.results.map((profile: any) => ({
-      processing_profile_id: profile.production_partner_id,
-      title: profile.partner_name,
-      user_id: profile.user_id || 0,
-      min_processing_days: 1, // Varsayılan değerler
-      max_processing_days: 3, // Varsayılan değerler
-      processing_days_display_label: '1-3 days', // Varsayılan değer
+    // Shipping profilelardan processing profilleri oluştur
+    return shippingProfiles.map(profile => ({
+      processing_profile_id: profile.shipping_profile_id,
+      title: profile.title,
+      user_id: profile.user_id,
+      min_processing_days: profile.min_processing_days,
+      max_processing_days: profile.max_processing_days,
+      processing_days_display_label: `${profile.min_processing_days}-${profile.max_processing_days} gün`,
       is_deleted: false
     }));
-
-    console.log(`Successfully fetched ${profiles.length} processing profiles`);
-    
-    // Profilleri önbelleğe al
-    await setCachedData(userId, 'processing_profiles', profiles, shopId);
-    
-    return profiles;
   } catch (error) {
-    console.error('Error in getProcessingProfiles:', error);
-    
-    // RECONNECT_REQUIRED hatasını yeniden fırlat
-    if (error instanceof Error && error.message === 'RECONNECT_REQUIRED') {
-      throw error;
-    }
-    
-    // Boş dizi döndür
-    return [];
+    console.error('Error getting processing profiles:', error);
+    throw error;
   }
 }
 
@@ -2886,3 +2881,7 @@ export async function updateShop(accessToken: string, shopId: number, data: any)
     throw error;
   }
 }
+
+// Bu fonksiyon yukarıda birleştirildi
+// Firebase ile önbellek işlemleri artık tek bir yerde tanımlanmıştır.
+// Satır 649-691'de tanımlanan getCachedData ve setCachedData fonksiyonları kullanılacaktır.

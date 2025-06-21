@@ -31,8 +31,25 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
 
       if (userCredential.user) {
-        console.log("Login successful, redirecting to dashboard")
-        // Doğrudan dashboard'a yönlendir
+        console.log("Login successful, creating session cookie")
+        
+        // Firebase Auth token al
+        const idToken = await userCredential.user.getIdToken()
+        
+        // Session cookie oluşturmak için API'ye istek at
+        const sessionResponse = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ idToken }),
+        })
+        
+        if (!sessionResponse.ok) {
+          throw new Error('Session cookie oluşturulamadı')
+        }
+        
+        console.log("Session cookie created, redirecting to dashboard")
         router.push("/dashboard")
         router.refresh()
       }

@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth-middleware";
 import { db } from "@/lib/firebase-admin";
 
+// Geliştirme ortamında olup olmadığımızı kontrol et
+const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+
 export async function GET(request: NextRequest) {
   try {
     console.log('🔍 Etsy mağazaları API çağrısı başladı');
+    console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
+    console.log('🔧 isDevelopment:', isDevelopment);
     
     // Kullanıcı doğrulama
     const authResult = await authenticateRequest(request);
@@ -15,6 +20,30 @@ export async function GET(request: NextRequest) {
     
     const userId = authResult.userId;
     console.log('✅ Kullanıcı doğrulandı:', userId);
+    
+    // Geliştirme ortamında veya auth session yoksa mock veri döndür
+    if (isDevelopment || authResult.userId === 'test-user-id') {
+      console.log('⚠️ Geliştirme ortamında mock Etsy mağazaları döndürülüyor');
+      return NextResponse.json({
+        success: true,
+        stores: [
+          {
+            id: 'mock-store-1',
+            user_id: userId,
+            shop_id: 12345678,
+            shop_name: 'MockEtsyStore',
+            login_name: 'mockuser',
+            token: 'mock-token',
+            refresh_token: 'mock-refresh-token',
+            token_expiry: new Date(Date.now() + 86400000).toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ],
+        count: 1,
+        is_mock: true
+      });
+    }
     
     // Şimdilik Firebase Firestore'dan mağaza verilerini kontrol et
     try {

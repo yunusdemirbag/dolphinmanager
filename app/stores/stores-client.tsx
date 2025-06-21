@@ -39,8 +39,7 @@ import {
   Clock
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { auth } from "@/lib/firebase"
-import { onAuthStateChanged } from "firebase/auth"
+import { useAuth } from "@/contexts/AuthContext"
 import {
   Dialog,
   DialogContent,
@@ -96,17 +95,18 @@ export default function StoresClient({ initialStores = [] }: StoresClientProps) 
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [sessionExpired, setSessionExpired] = useState(false)
   const router = useRouter()
+  const { user, loading: authLoading, getAuthToken } = useAuth()
 
   useEffect(() => {
-    // Firebase auth state'i bekle
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        loadStores()
-      } else {
-        setSessionExpired(true)
-        setLoading(false)
-      }
-    })
+    // Auth loading bittikten sonra işlemleri yap
+    if (authLoading) return;
+    
+    if (user) {
+      loadStores()
+    } else {
+      setSessionExpired(true)
+      setLoading(false)
+    }
     
     // URL parametrelerini kontrol et - Etsy callback'den gelen mesajlar
     const urlParams = new URLSearchParams(window.location.search)
@@ -139,24 +139,33 @@ export default function StoresClient({ initialStores = [] }: StoresClientProps) 
       // URL'yi temizle
       window.history.replaceState({}, '', '/stores')
     }
-    
-    return () => unsubscribe()
-  }, [])
+  }, [user, authLoading])
 
   const loadStores = async () => {
     setLoading(true)
     setConnectionError(null) // Reset any previous connection errors
     try {
-      // Firebase auth token al
-      const user = auth.currentUser
-      const token = user ? await user.getIdToken() : null
+      console.log('🔍 Mağazalar yükleniyor...')
+      
+      // Auth context'ten token al
+      const token = await getAuthToken()
+      
+      if (!token) {
+        console.error('❌ Auth token alınamadı')
+        setSessionExpired(true)
+        setLoading(false)
+        return
+      }
+      
+      console.log('✅ Auth token alındı, API çağrısı yapılıyor')
       
       // Gerçek Etsy mağaza verilerini çekmeye çalış
       const response = await fetch('/api/etsy/stores', { 
         credentials: 'include',
-        headers: token ? {
-          'Authorization': `Bearer ${token}`
-        } : {}
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       })
       if (response.status === 401) {
         setSessionExpired(true)
@@ -226,15 +235,25 @@ export default function StoresClient({ initialStores = [] }: StoresClientProps) 
 
   const handleConnectEtsy = async () => {
     try {
-      // Firebase auth token al
-      const user = auth.currentUser
-      const token = user ? await user.getIdToken() : null
+      console.log('🔗 Etsy bağlantısı başlatılıyor...')
+      
+      // Auth context'ten token al
+      const token = await getAuthToken()
+      
+      if (!token) {
+        console.error('❌ Auth token alınamadı')
+        alert("Giriş yapmış kullanıcı bulunamadı. Lütfen tekrar giriş yapın.")
+        return
+      }
+      
+      console.log('✅ Auth token alındı, Etsy auth URL isteniyor')
       
       // API endpoint kullanarak Etsy auth URL'i al
       const response = await fetch("/api/etsy/auth", {
-        headers: token ? {
-          'Authorization': `Bearer ${token}`
-        } : {}
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       })
       const data = await response.json()
 
@@ -254,25 +273,34 @@ export default function StoresClient({ initialStores = [] }: StoresClientProps) 
   const handleReconnectEtsy = async () => {
     setReconnecting(true)
     try {
-      // Firebase auth token al
-      const user = auth.currentUser
-      const token = user ? await user.getIdToken() : null
+      console.log('🔄 Etsy yeniden bağlantısı başlatılıyor...')
+      
+      // Auth context'ten token al
+      const token = await getAuthToken()
+      
+      if (!token) {
+        console.error('❌ Auth token alınamadı')
+        alert("Giriş yapmış kullanıcı bulunamadı. Lütfen tekrar giriş yapın.")
+        setReconnecting(false)
+        return
+      }
       
       // First try to reset the existing connection
       await fetch('/api/etsy/reset', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          'Authorization': `Bearer ${token}`
         },
         credentials: 'include'
       })
       
       // Then initialize a new connection
       const response = await fetch("/api/etsy/auth", {
-        headers: token ? {
-          'Authorization': `Bearer ${token}`
-        } : {}
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       })
       const data = await response.json()
 
@@ -637,7 +665,7 @@ export default function StoresClient({ initialStores = [] }: StoresClientProps) 
       </div>
 
       {/* Store Management */}
-      {loading ? (
+      {(loading || authLoading) ? (
         <Card>
           <CardContent className="flex justify-center items-center min-h-[300px]">
             <div className="flex flex-col items-center gap-3">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-// import { createClient } from "@/lib/supabase/server"
+import { authenticateRequest, createUnauthorizedResponse } from '@/lib/auth-middleware'
+import { db } from '@/lib/firebase-admin'
 
 export async function POST(
   request: NextRequest,
@@ -9,61 +9,43 @@ export async function POST(
   try {
     console.log("[etsy] /disconnect başlangıç")
     
-    // Mevcut client'i kullan
-    const supabase = await createClient()
+    // Firebase Auth doğrulama
+    const authResult = await authenticateRequest(request)
     
-    // Kullanıcı doğrulama
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
-      console.log("[etsy] /disconnect Auth error:", userError)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!authResult) {
+      console.log("[etsy] /disconnect Auth error")
+      return createUnauthorizedResponse()
     }
 
     const shopId = params.shopId
-    console.log("[etsy] /disconnect Disconnecting Etsy store:", shopId, "for user:", user.id)
+    const userId = authResult.userId
+    console.log("[etsy] /disconnect Disconnecting Etsy store:", shopId, "for user:", userId)
 
     try {
-      // Etsy token'larını sil
-      const { error: tokenError } = await supabase
-        .from("etsy_tokens")
-        .delete()
-        .eq("user_id", user.id)
-
-      if (tokenError) {
-        console.error("[etsy] /disconnect Error deleting tokens:", tokenError)
-        return NextResponse.json(
-          { error: "Failed to disconnect store", details: tokenError.message },
-          { status: 500 }
-        )
-      }
-
-      // Etsy store kayıtlarını sil (eğer varsa)
-      const { error: storeError } = await supabase
-        .from("etsy_stores")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("shop_id", parseInt(shopId))
-
-      if (storeError) {
-        console.warn("[etsy] /disconnect Store deletion warning:", storeError)
-        // Bu hata kritik değil, token silme başarılıysa devam et
-      }
-
-      // Profile tablosundaki Etsy bağlantı bilgilerini temizle
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          etsy_shop_id: null,
-          etsy_shop_name: null,
-          etsy_user_id: null
-        })
-        .eq("id", user.id)
-
-      if (profileError) {
-        console.warn("[etsy] /disconnect Profile update warning:", profileError)
-        // Bu hata kritik değil, devam et
-      }
+      const batch = db.batch()
+      
+      // Etsy tokens temizle
+      const tokenRef = db.collection('etsy_tokens').doc(userId)
+      batch.delete(tokenRef)
+      
+      // Auth sessions temizle
+      const sessionRef = db.collection('etsy_auth_sessions').doc(userId)
+      batch.delete(sessionRef)
+      
+      // Etsy stores temizle
+      const storeRef = db.collection('etsy_stores').doc(`${userId}_${shopId}`)
+      batch.delete(storeRef)
+      
+      // Tüm kullanıcının Etsy store'larını temizle (güvenlik için)
+      const allStoresSnapshot = await db.collection('etsy_stores')
+        .where('user_id', '==', userId)
+        .get()
+      
+      allStoresSnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref)
+      })
+      
+      await batch.commit()
 
       console.log("[etsy] /disconnect status=200")
       
@@ -87,4 +69,4 @@ export async function POST(
       { status: 500 }
     )
   }
-} 
+}

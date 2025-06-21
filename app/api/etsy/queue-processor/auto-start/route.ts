@@ -3,9 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 let autoProcessorInterval: NodeJS.Timeout | null = null;
 let isAutoProcessorRunning = false;
 
+// Geliştirme ortamında olup olmadığımızı kontrol et
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 // Kuyruk ayarlarını getir
 async function getQueueInterval(): Promise<number> {
   try {
+    // Geliştirme ortamında varsayılan değeri kullan
+    if (isDevelopment) {
+      return 15; // Varsayılan 15 saniye
+    }
+    
     const response = await fetch('http://localhost:3000/api/etsy/queue-settings');
     if (response.ok) {
       const settings = await response.json();
@@ -20,6 +28,16 @@ async function getQueueInterval(): Promise<number> {
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 OTOMATİK KUYRUK İŞLEMCİSİ BAŞLATMA İSTEĞİ');
+    
+    // Geliştirme ortamında mock yanıt döndür
+    if (isDevelopment) {
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Geliştirme ortamında mock yanıt - Otomatik kuyruk işlemcisi başlatıldı',
+        status: 'started',
+        is_mock: true
+      });
+    }
     
     // Eğer zaten çalışıyorsa dur
     if (isAutoProcessorRunning) {
@@ -52,6 +70,17 @@ export async function DELETE(request: NextRequest) {
   try {
     console.log('🛑 OTOMATİK KUYRUK İŞLEMCİSİ DURDURMA İSTEĞİ');
     
+    // Geliştirme ortamında mock yanıt döndür
+    if (isDevelopment) {
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Geliştirme ortamında mock yanıt - Otomatik kuyruk işlemcisi durduruldu',
+        status: 'stopped',
+        isRunning: false,
+        is_mock: true
+      });
+    }
+    
     stopAutoProcessor();
     
     return NextResponse.json({ 
@@ -74,6 +103,17 @@ export async function DELETE(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     console.log('📊 OTOMATİK KUYRUK İŞLEMCİSİ DURUM SORGUSU');
+    
+    // Geliştirme ortamında mock yanıt döndür
+    if (isDevelopment) {
+      return NextResponse.json({ 
+        success: true, 
+        isRunning: false,
+        status: 'mock_stopped',
+        is_mock: true,
+        message: 'Geliştirme ortamında mock yanıt'
+      });
+    }
     
     return NextResponse.json({ 
       success: true, 
@@ -124,6 +164,12 @@ function stopAutoProcessor() {
 async function processQueue() {
   try {
     console.log('🔄 Otomatik kuyruk işleme başlatılıyor...');
+    
+    // Geliştirme ortamında işlem yapma
+    if (isDevelopment) {
+      console.log('⚠️ Geliştirme ortamında kuyruk işleme atlanıyor');
+      return;
+    }
     
     // Tek bir ürün işle
     const response = await fetch('http://localhost:3000/api/etsy/listings/queue/process', {

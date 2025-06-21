@@ -2,22 +2,53 @@ import { initializeApp, getApps, cert, App } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 
-let app: App
+// Geliştirme ortamında olup olmadığımızı kontrol et
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+let app: App | undefined;
 
 // Initialize Firebase Admin SDK
 if (!getApps().length) {
-  const serviceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  }
+  try {
+    // Geliştirme ortamında basit yapılandırma kullan
+    if (isDevelopment) {
+      console.log('⚠️ Geliştirme ortamında Firebase Admin başlatılıyor');
+      // Geliştirme ortamında da gerçek Firebase kullan
+      const serviceAccount = {
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }
 
-  app = initializeApp({
-    credential: cert(serviceAccount),
-    projectId: process.env.FIREBASE_PROJECT_ID,
-  })
+      app = initializeApp({
+        credential: cert(serviceAccount),
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      });
+      console.log('✅ Firebase Admin başlatıldı (geliştirme ortamında gerçek yapılandırma ile)');
+    } else {
+      // Üretim ortamında tam yapılandırma kullan
+      const serviceAccount = {
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }
+
+      app = initializeApp({
+        credential: cert(serviceAccount),
+        projectId: process.env.FIREBASE_PROJECT_ID,
+      });
+      console.log('✅ Firebase Admin başlatıldı (tam yapılandırma ile)');
+    }
+  } catch (error) {
+    console.error('❌ Firebase Admin başlatma hatası:', error);
+  }
 } else {
   app = getApps()[0]
+}
+
+// Uygulama başlatılamadıysa hata fırlat
+if (!app) {
+  throw new Error('Firebase Admin SDK başlatılamadı');
 }
 
 // Initialize services

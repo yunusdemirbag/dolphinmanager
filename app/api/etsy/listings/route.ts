@@ -2,6 +2,43 @@ import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth-middleware"
 import { db } from "@/lib/firebase-admin"
 
+// Geliştirme ortamında olup olmadığımızı kontrol et
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// Mock ürünler
+const mockProducts = [
+  {
+    listing_id: 1,
+    etsy_listing_id: 1,
+    title: "Handmade Canvas Art",
+    description: "Beautiful handmade canvas art",
+    price: { amount: 2500, divisor: 100, currency_code: "USD" },
+    quantity: 1,
+    state: "active",
+    created_timestamp: Date.now(),
+    updated_timestamp: Date.now(),
+    tags: ["art", "canvas", "handmade"],
+    materials: ["Canvas", "Paint"],
+    images: [],
+    shop_section_id: null
+  },
+  {
+    listing_id: 2,
+    etsy_listing_id: 2,
+    title: "Digital Print Wall Art",
+    description: "Modern digital print for your home",
+    price: { amount: 1500, divisor: 100, currency_code: "USD" },
+    quantity: 5,
+    state: "active",
+    created_timestamp: Date.now(),
+    updated_timestamp: Date.now(),
+    tags: ["digital", "print", "wall art"],
+    materials: ["Digital File"],
+    images: [],
+    shop_section_id: null
+  }
+];
+
 export async function GET(request: NextRequest) {
   try {
     // Firebase authentication
@@ -18,6 +55,24 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '100')
+    
+    // Geliştirme ortamında mock veri döndür
+    if (isDevelopment) {
+      console.log('⚠️ Geliştirme ortamında mock ürünler döndürülüyor');
+      return NextResponse.json({
+        success: true,
+        results: mockProducts,
+        count: mockProducts.length,
+        totalCount: mockProducts.length,
+        pagination: {
+          current_page: page,
+          total_pages: Math.ceil(mockProducts.length / limit),
+          per_page: limit,
+          total_count: mockProducts.length
+        },
+        is_mock: true
+      });
+    }
     
     // Firebase'den kullanıcının Etsy token'ını al
     const tokenDoc = await db.collection('etsy_tokens').doc(userId).get()
@@ -71,35 +126,16 @@ export async function GET(request: NextRequest) {
     const etsyData = await etsyResponse.json()
     console.log(`✅ ${etsyData.count || 0} ürün alındı`)
     
-    // Mock products for now - gerçek listings API endpoint farklı olabilir
-    const mockProducts = [
-      {
-        listing_id: 1,
-        etsy_listing_id: 1,
-        title: "Handmade Canvas Art",
-        description: "Beautiful handmade canvas art",
-        price: { amount: 2500, divisor: 100, currency_code: "USD" },
-        quantity: 1,
-        state: "active",
-        created_timestamp: Date.now(),
-        updated_timestamp: Date.now(),
-        tags: ["art", "canvas", "handmade"],
-        materials: ["Canvas", "Paint"],
-        images: [],
-        shop_section_id: null
-      }
-    ]
-    
     return NextResponse.json({
       success: true,
-      results: mockProducts,
-      count: mockProducts.length,
-      totalCount: mockProducts.length,
+      results: etsyData.results || [],
+      count: etsyData.count || 0,
+      totalCount: etsyData.count || 0,
       pagination: {
         current_page: page,
-        total_pages: Math.ceil(mockProducts.length / limit),
+        total_pages: Math.ceil((etsyData.count || 0) / limit),
         per_page: limit,
-        total_count: mockProducts.length
+        total_count: etsyData.count || 0
       }
     })
     

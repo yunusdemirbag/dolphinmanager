@@ -1,6 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/firebase-admin'
 
+async function clearUserEtsyData(userId: string) {
+  try {
+    const batch = db.batch()
+    
+    // Etsy tokens temizle
+    const tokenRef = db.collection('etsy_tokens').doc(userId)
+    batch.delete(tokenRef)
+    
+    // Auth session temizle
+    const sessionRef = db.collection('etsy_auth_sessions').doc(userId)
+    batch.delete(sessionRef)
+    
+    // Etsy stores temizle
+    const storesSnapshot = await db.collection('etsy_stores')
+      .where('user_id', '==', userId)
+      .get()
+    
+    storesSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref)
+    })
+    
+    await batch.commit()
+    console.log('✅ Eski Etsy verileri temizlendi:', userId)
+  } catch (error) {
+    console.error('❌ Etsy veri temizleme hatası:', error)
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -9,6 +37,12 @@ export async function GET(request: NextRequest) {
     const error = searchParams.get('error')
     
     console.log('🔄 Etsy callback alındı:', { code: !!code, state, error })
+    console.log('🔧 Production debug - userId:', state)
+    console.log('🔧 Environment vars:', {
+      ETSY_CLIENT_ID: !!process.env.ETSY_CLIENT_ID,
+      ETSY_CLIENT_SECRET: !!process.env.ETSY_CLIENT_SECRET,
+      ETSY_REDIRECT_URI: process.env.ETSY_REDIRECT_URI
+    })
     
     if (error) {
       console.error('❌ Etsy OAuth hatası:', error)
@@ -21,6 +55,27 @@ export async function GET(request: NextRequest) {
     }
     
     const userId = state
+    
+    // Auth session'dan code_verifier al
+    let codeVerifier = null
+    try {
+      const authSessionDoc = await db.collection('etsy_auth_sessions').doc(userId).get()
+      const sessionData = authSessionDoc.data()
+      codeVerifier = sessionData?.code_verifier
+      console.log('🔧 Auth session kontrol:', { 
+        exists: authSessionDoc.exists, 
+        hasCodeVerifier: !!codeVerifier,
+        sessionData: sessionData ? Object.keys(sessionData) : null
+      })
+    } catch (error) {
+      console.error('❌ Auth session hatası:', error)
+    }
+    
+    // PKCE gerekli ama yoksa hata ver
+    if (!codeVerifier) {
+      console.error('❌ PKCE code_verifier bulunamadı - OAuth akışı yeniden başlatılmalı')
+      return NextResponse.redirect(new URL('/stores?error=pkce_missing&details=' + encodeURIComponent('OAuth flow must be restarted'), request.url))
+    }
     
     // Gerçek Etsy token exchange
     console.log('🔄 Etsy token exchange başlatılıyor - kullanıcı:', userId)
@@ -35,19 +90,54 @@ export async function GET(request: NextRequest) {
         client_id: process.env.ETSY_CLIENT_ID!,
         code: code,
         redirect_uri: process.env.ETSY_REDIRECT_URI!,
-        // code_verifier gerekirse eklenecek
+        ...(codeVerifier && { code_verifier: codeVerifier })
       }),
     })
     
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text()
-      console.error('❌ Etsy token exchange hatası:', errorText)
+      console.error('❌ Etsy token exchange hatası:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        errorText,
+        codeVerifier: !!codeVerifier,
+        requestBody: {
+          grant_type: 'authorization_code',
+          client_id: process.env.ETSY_CLIENT_ID,
+          redirect_uri: process.env.ETSY_REDIRECT_URI,
+          code: code?.substring(0, 10) + '...',
+          has_code_verifier: !!codeVerifier
+        }
+      })
       return NextResponse.redirect(new URL('/stores?error=token_exchange_failed&details=' + encodeURIComponent(errorText), request.url))
     }
     
     const tokenData = await tokenResponse.json()
     console.log('✅ Etsy token alındı')
     
+    // Eski verileri temizle (auth session hariç)
+    try {
+      const batch = db.batch()
+      
+      // Etsy tokens temizle
+      const tokenRef = db.collection('etsy_tokens').doc(userId)
+      batch.delete(tokenRef)
+      
+      // Etsy stores temizle
+      const storesSnapshot = await db.collection('etsy_stores')
+        .where('user_id', '==', userId)
+        .get()
+      
+      storesSnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref)
+      })
+      
+      await batch.commit()
+      console.log('✅ Eski Etsy verileri temizlendi (auth session korundu)')
+    } catch (error) {
+      console.error('❌ Veri temizleme hatası:', error)
+    }
+
     // Token'ı Firebase'e kaydet
     try {
       await db.collection('etsy_tokens').doc(userId).set({
@@ -131,6 +221,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/stores?error=store_save_failed', request.url))
     }
     
+    // Auth session temizle
+    try {
+      await db.collection('etsy_auth_sessions').doc(userId).delete()
+      console.log('✅ Auth session temizlendi')
+    } catch (error) {
+      console.error('❌ Auth session temizleme hatası:', error)
+    }
+
     // Başarılı yönlendirme
     console.log('✅ Etsy bağlantısı tamamlandı!')
     return NextResponse.redirect(new URL('/stores?etsy=connected', request.url))

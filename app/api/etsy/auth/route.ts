@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest, createUnauthorizedResponse } from '@/lib/auth-middleware'
+import { db } from '@/lib/firebase-admin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,8 +21,12 @@ export async function GET(request: NextRequest) {
     const codeVerifier = generateCodeVerifier()
     const codeChallenge = await generateCodeChallenge(codeVerifier)
     
-    // Code verifier'ı geçici olarak sakla (gerçek projede Redis/DB kullan)
-    // Şimdilik cookie'de saklayalım
+    // Code verifier'ı Firebase'e sakla
+    await db.collection('etsy_auth_sessions').doc(authResult.userId).set({
+      code_verifier: codeVerifier,
+      created_at: new Date(),
+      expires_at: new Date(Date.now() + 10 * 60 * 1000) // 10 dakika
+    })
     
     const authUrl = new URL('https://www.etsy.com/oauth/connect')
     authUrl.searchParams.set('response_type', 'code')
@@ -34,8 +39,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      authUrl: authUrl.toString(),
-      codeVerifier: codeVerifier // Frontend'de saklanacak
+      authUrl: authUrl.toString()
     })
     
   } catch (error: any) {

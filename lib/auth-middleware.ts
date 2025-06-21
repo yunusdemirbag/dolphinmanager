@@ -8,7 +8,7 @@ export interface AuthenticatedRequest extends NextRequest {
 
 // Geliştirme ortamında kimlik doğrulamayı atlama seçeneği
 const DEV_MODE = process.env.NODE_ENV === 'development';
-const SKIP_AUTH_IN_DEV = process.env.SKIP_AUTH_IN_DEV === 'true' || false;
+const SKIP_AUTH_IN_DEV = process.env.SKIP_AUTH_IN_DEV === 'true';
 
 export async function authenticateRequest(request: NextRequest): Promise<{ userId: string; user: any } | null> {
   try {

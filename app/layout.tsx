@@ -3,6 +3,7 @@ import "./globals.css"
 import SidebarWithStoreName from "./components/SidebarWithStoreName"
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from 'sonner'
+import { AuthProvider } from "@/contexts/AuthContext"
 
 export const metadata = {
   title: "Dolphin Manager",
@@ -56,10 +57,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="tr">
       <body className="bg-gray-50" suppressHydrationWarning>
-        <SidebarWithStoreName />
-        <main className="ml-16 md:ml-64 min-h-screen px-4 md:px-8">{children}</main>
-        <Toaster />
-        <SonnerToaster position="top-right" />
+        <AuthProvider>
+          <SidebarWithStoreName />
+          <main className="ml-16 md:ml-64 min-h-screen px-4 md:px-8">{children}</main>
+          <Toaster />
+          <SonnerToaster position="top-right" />
+        </AuthProvider>
       </body>
     </html>
   )

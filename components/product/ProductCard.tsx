@@ -6,7 +6,7 @@ import { Product } from "@/types/product";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trash, Pencil, Pin, ExternalLink } from "lucide-react";
+import { Trash, Pencil, Pin, ExternalLink, Copy } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -14,18 +14,22 @@ interface ProductCardProps {
   product: Product;
   onEdit?: (product: Product) => void;
   onDelete?: (product: Product) => void;
+  onCopy?: (product: Product) => void;
   onTogglePin?: (product: Product) => void;
   isPinned?: boolean;
   pinLoading?: boolean;
+  gridType?: 'grid3' | 'grid4' | 'grid5' | 'list';
 }
 
 const ProductCard = ({
   product,
   onEdit,
   onDelete,
+  onCopy,
   onTogglePin,
   isPinned = false,
   pinLoading = false,
+  gridType = 'grid3'
 }: ProductCardProps) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   
@@ -136,6 +140,18 @@ const ProductCard = ({
           >
             <Pencil className="h-3.5 w-3.5 mr-1" />
             Düzenle
+          </Button>
+        )}
+        
+        {onCopy && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={() => onCopy(product)}
+          >
+            <Copy className="h-3.5 w-3.5 mr-1" />
+            Kopyala
           </Button>
         )}
         

@@ -444,6 +444,34 @@ export default function ProductsPage() {
   if (products.length === 0 && !loading) {
     return (
       <div className="container mx-auto py-8">
+        {noStoresFound || reconnectRequired ? (
+          <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-center justify-between">
+            <div className="flex items-center">
+              <Store className="h-5 w-5 text-amber-500 mr-2" />
+              <p className="text-sm text-amber-700">
+                {reconnectRequired 
+                  ? "Etsy mağazanıza yeniden bağlanmanız gerekiyor." 
+                  : "Ürünlerinizi görmek için Etsy mağazanızı bağlayın."}
+              </p>
+            </div>
+            <div>
+              {reconnectRequired ? (
+                <Button size="sm" variant="outline" onClick={handleReconnectEtsy}>
+                  <RefreshCw className="mr-2 h-3 w-3" />
+                  Yeniden Bağlan
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" asChild>
+                  <Link href="/stores">
+                    <Store className="mr-2 h-3 w-3" />
+                    Mağaza Bağla
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : null}
+        
         <div className="bg-white rounded-lg shadow-sm p-8 text-center">
           <h2 className="text-2xl font-semibold mb-2">Henüz Ürün Bulunamadı</h2>
           <p className="text-gray-600 mb-6">
@@ -451,12 +479,10 @@ export default function ProductsPage() {
               ? "Etsy mağazanızı bağladıktan sonra ürünleriniz burada görüntülenecektir."
               : "Mağazanızda henüz hiç ürün bulunmuyor. Yeni bir ürün ekleyerek başlayabilirsiniz."}
           </p>
-          {!noStoresFound && !reconnectRequired && (
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Yeni Ürün Ekle
-            </Button>
-          )}
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Yeni Ürün Ekle
+          </Button>
           
           {/* Ürün oluşturma modalı */}
           {showCreateModal && (
@@ -480,6 +506,37 @@ export default function ProductsPage() {
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="py-6">
+        {/* Etsy bağlantı uyarısı */}
+        {noStoresFound || reconnectRequired ? (
+          <div className="container mx-auto mb-6">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md flex items-center justify-between">
+              <div className="flex items-center">
+                <Store className="h-5 w-5 text-amber-500 mr-2" />
+                <p className="text-sm text-amber-700">
+                  {reconnectRequired 
+                    ? "Etsy mağazanıza yeniden bağlanmanız gerekiyor." 
+                    : "Ürünlerinizi görmek için Etsy mağazanızı bağlayın."}
+                </p>
+              </div>
+              <div>
+                {reconnectRequired ? (
+                  <Button size="sm" variant="outline" onClick={handleReconnectEtsy}>
+                    <RefreshCw className="mr-2 h-3 w-3" />
+                    Yeniden Bağlan
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" asChild>
+                    <Link href="/stores">
+                      <Store className="mr-2 h-3 w-3" />
+                      Mağaza Bağla
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+        
         {/* Kuyruk durumu göstergesi - otomatik olarak görüntülenir */}
         <QueueManagementPanel />
         
@@ -501,51 +558,31 @@ export default function ProductsPage() {
           onCreateNew={() => setShowCreateModal(true)}
         />
         
-        {/* Ürün listesi veya Etsy bağlantı uyarısı */}
-        {noStoresFound || reconnectRequired ? (
-          <div className="container mx-auto mt-6">
-            <div className="bg-white rounded-lg shadow-sm p-6 text-center border border-amber-200 bg-amber-50">
-              <Store className="h-12 w-12 mx-auto mb-3 text-amber-500" />
-              <h2 className="text-xl font-semibold mb-2">Etsy Mağazası Bağlantısı Gerekiyor</h2>
-              <p className="text-gray-600 mb-4">
-                {reconnectRequired 
-                  ? "Etsy mağazanıza yeniden bağlanmanız gerekiyor." 
-                  : user 
-                    ? "Ürünlerinizi yönetmek için önce bir Etsy mağazası bağlamanız gerekiyor."
-                    : "Ürünlerinizi yönetmek için önce giriş yapmalı ve bir Etsy mağazası bağlamalısınız."}
-              </p>
-              <div className="flex justify-center gap-4">
-                {!user ? (
-                  <Button asChild variant="default">
-                    <Link href="/auth/login?redirect=/products">
-                      Giriş Yap
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button asChild variant="default">
-                    <Link href="/stores">
-                      <Store className="mr-2 h-4 w-4" />
-                      Mağaza Bağla
-                    </Link>
-                  </Button>
-                )}
-                {reconnectRequired && (
-                  <Button variant="outline" onClick={handleReconnectEtsy}>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Yeniden Bağlan
-                  </Button>
-                )}
+        {/* Ürün listesi */}
+        <div className={`mt-6 grid gap-4 ${
+          gridType === 'grid3' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' :
+          gridType === 'grid4' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' :
+          gridType === 'grid5' ? 'grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' :
+          'grid-cols-1'
+        }`}>
+          {(noStoresFound || reconnectRequired) ? (
+            // Mağaza bağlı değilken örnek ürün kartları göster
+            Array(8).fill(0).map((_, index) => (
+              <div key={index} className="bg-white rounded-lg shadow-sm p-4 flex flex-col">
+                <div className="aspect-square bg-gray-100 rounded-md mb-3 animate-pulse"></div>
+                <div className="h-5 bg-gray-100 rounded mb-2 w-3/4 animate-pulse"></div>
+                <div className="h-4 bg-gray-100 rounded mb-3 w-1/2 animate-pulse"></div>
+                <div className="mt-auto flex justify-between items-center">
+                  <div className="h-6 bg-gray-100 rounded w-1/3 animate-pulse"></div>
+                  <div className="flex space-x-2">
+                    <div className="h-8 w-8 bg-gray-100 rounded-full animate-pulse"></div>
+                    <div className="h-8 w-8 bg-gray-100 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        ) : (
-          <div className={`mt-6 grid gap-4 ${
-            gridType === 'grid3' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' :
-            gridType === 'grid4' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' :
-            gridType === 'grid5' ? 'grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' :
-            'grid-cols-1'
-          }`}>
-            {filteredProducts.map(product => (
+            ))
+          ) : filteredProducts.length > 0 ? (
+            filteredProducts.map(product => (
               <ProductCard
                 key={product.listing_id}
                 product={product}
@@ -554,14 +591,13 @@ export default function ProductsPage() {
                 onCopy={() => {/* Copy product logic */}}
                 gridType={gridType}
               />
-            ))}
-            {filteredProducts.length === 0 && (
-              <div className="col-span-full text-center p-8">
-                <p className="text-gray-500">Kriterlere uygun ürün bulunamadı.</p>
-              </div>
-            )}
-          </div>
-        )}
+            ))
+          ) : (
+            <div className="col-span-full text-center p-8">
+              <p className="text-gray-500">Kriterlere uygun ürün bulunamadı.</p>
+            </div>
+          )}
+        </div>
         
         {/* Modallar */}
         {showCreateModal && (

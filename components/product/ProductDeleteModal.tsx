@@ -13,20 +13,20 @@ import {
 import { Loader2 } from "lucide-react"
 
 interface ProductDeleteModalProps {
-  confirmDeleteProductId: number | null
-  setConfirmDeleteProductId: (id: number | null) => void
-  onDeleteProduct: (id: number) => void
-  deletingProductId: number | null
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  deleting: boolean;
 }
 
 export function ProductDeleteModal({
-  confirmDeleteProductId,
-  setConfirmDeleteProductId,
-  onDeleteProduct,
-  deletingProductId
+  open,
+  onClose,
+  onConfirm,
+  deleting
 }: ProductDeleteModalProps) {
   return (
-    <AlertDialog open={!!confirmDeleteProductId}>
+    <AlertDialog open={open}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Ürünü Sil</AlertDialogTitle>
@@ -35,13 +35,13 @@ export function ProductDeleteModal({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setConfirmDeleteProductId(null)}>İptal</AlertDialogCancel>
+          <AlertDialogCancel onClick={onClose}>İptal</AlertDialogCancel>
           <AlertDialogAction 
-            onClick={() => confirmDeleteProductId && onDeleteProduct(confirmDeleteProductId)}
-            disabled={deletingProductId === confirmDeleteProductId}
+            onClick={onConfirm}
+            disabled={deleting}
             className="bg-red-500 hover:bg-red-600"
           >
-            {deletingProductId === confirmDeleteProductId ? (
+            {deleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Siliniyor...

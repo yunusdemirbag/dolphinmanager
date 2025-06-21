@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth-middleware";
-import { db } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase/admin";
 
 // Geliştirme ortamında olup olmadığımızı kontrol et
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
@@ -21,31 +21,7 @@ export async function GET(request: NextRequest) {
     const userId = authResult.userId;
     console.log('✅ Kullanıcı doğrulandı:', userId);
     
-    // Geliştirme ortamında veya auth session yoksa mock veri döndür
-    if (isDevelopment || authResult.userId === 'test-user-id') {
-      console.log('⚠️ Geliştirme ortamında mock Etsy mağazaları döndürülüyor');
-      return NextResponse.json({
-        success: true,
-        stores: [
-          {
-            id: 'mock-store-1',
-            user_id: userId,
-            shop_id: 12345678,
-            shop_name: 'MockEtsyStore',
-            login_name: 'mockuser',
-            token: 'mock-token',
-            refresh_token: 'mock-refresh-token',
-            token_expiry: new Date(Date.now() + 86400000).toISOString(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ],
-        count: 1,
-        is_mock: true
-      });
-    }
-    
-    // Şimdilik Firebase Firestore'dan mağaza verilerini kontrol et
+    // Gerçek Etsy bağlantısını kontrol et
     try {
       const storesSnapshot = await db.collection('etsy_stores')
         .where('user_id', '==', userId)
@@ -62,6 +38,7 @@ export async function GET(request: NextRequest) {
         console.log('❌ Etsy mağazası bulunamadı');
         return NextResponse.json(
           { 
+            success: false,
             error: 'Henüz Etsy mağazası bağlanmamış', 
             code: 'NO_STORES',
             message: 'Etsy mağazanızı bağlamak için "Mağaza Ekle" butonuna tıklayın.'
@@ -79,7 +56,7 @@ export async function GET(request: NextRequest) {
     } catch (firestoreError) {
       console.error('Firebase Firestore hatası:', firestoreError);
       return NextResponse.json(
-        { error: 'Veritabanı bağlantı hatası', details: String(firestoreError) },
+        { success: false, error: 'Veritabanı bağlantı hatası', details: String(firestoreError) },
         { status: 500 }
       );
     }

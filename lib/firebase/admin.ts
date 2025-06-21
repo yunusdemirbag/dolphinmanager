@@ -5,8 +5,8 @@ const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
   ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
   : null;
 
-// Açıkça projectId belirle
-const projectId = process.env.FIREBASE_PROJECT_ID || 'dolphinmanager-dev';
+// Açıkça projectId belirle - yunusfirebase-25 kullan
+const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'yunusfirebase-25';
 
 // Firebase Admin SDK başlatma
 if (!admin.apps.length) {

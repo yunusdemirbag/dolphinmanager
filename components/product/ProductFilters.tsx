@@ -12,37 +12,43 @@ import {
 import { Search, Filter, ArrowDownUp, ArrowUp, ArrowDown, LayoutGrid, List } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-interface ProductFiltersProps {
-  searchTerm: string
-  onSearchChange: (value: string) => void
-  filterStatus: string
-  onFilterStatusChange: (value: string) => void
-  sortBy: string
-  onSortByChange: (value: string) => void
-  sortOrder: 'asc' | 'desc'
-  onSortOrderChange: (value: 'asc' | 'desc') => void
-  gridType: 'grid3' | 'grid5' | 'list'
-  onGridTypeChange: (value: 'grid3' | 'grid5' | 'list') => void
-}
-
 export function ProductFilters({
   searchTerm,
-  onSearchChange,
+  setSearchTerm,
   filterStatus,
-  onFilterStatusChange,
+  setFilterStatus,
   sortBy,
-  onSortByChange,
+  setSortBy,
   sortOrder,
-  onSortOrderChange,
+  setSortOrder,
   gridType,
-  onGridTypeChange
-}: ProductFiltersProps) {
+  setGridType,
+  totalCount,
+  refreshing,
+  onRefresh,
+  onCreateNew
+}: {
+  searchTerm: string
+  setSearchTerm: (value: string) => void
+  filterStatus: string
+  setFilterStatus: (value: string) => void
+  sortBy: string
+  setSortBy: (value: string) => void
+  sortOrder: 'asc' | 'desc'
+  setSortOrder: (value: 'asc' | 'desc') => void
+  gridType: 'grid3' | 'grid4' | 'grid5' | 'list'
+  setGridType: (value: 'grid3' | 'grid4' | 'grid5' | 'list') => void
+  totalCount?: number
+  refreshing?: boolean
+  onRefresh?: () => void
+  onCreateNew?: () => void
+}) {
   return (
     <div className="space-y-4">
       {/* Tabs for quick filtering */}
       <Tabs 
         value={filterStatus === "draft" ? "draft" : filterStatus === "active" ? "active" : "all"} 
-        onValueChange={(value) => onFilterStatusChange(value)}
+        onValueChange={(value) => setFilterStatus(value)}
         className="w-full"
       >
         <TabsList className="grid w-full grid-cols-3">
@@ -58,7 +64,7 @@ export function ProductFilters({
           <Input
             placeholder="Ürün ara..."
             value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9"
           />
         </div>
@@ -66,7 +72,7 @@ export function ProductFilters({
         <div className="flex flex-wrap gap-2">
           <Select
             value={sortBy}
-            onValueChange={onSortByChange}
+            onValueChange={setSortBy}
           >
             <SelectTrigger className="w-[160px]">
               <ArrowDownUp className="mr-2 h-4 w-4" />

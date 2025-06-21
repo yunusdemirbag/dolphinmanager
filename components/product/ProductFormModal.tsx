@@ -355,9 +355,9 @@ interface CreateListingResponse {
 }
 
 interface ProductFormModalProps {
-  isOpen: boolean
+  open: boolean
   onClose: () => void
-  product?: Product
+  initialValues?: Partial<Product>
   shippingProfiles: ShippingProfile[]
   loadingShippingProfiles: boolean
   processingProfiles?: EtsyProcessingProfile[]
@@ -365,6 +365,8 @@ interface ProductFormModalProps {
   showEtsyButton?: boolean
   onSubmit?: (productData: Partial<Product>, state?: "draft" | "active") => Promise<CreateListingResponse>
   submitting?: boolean
+  isEditing?: boolean
+  taxonomyNodes?: TaxonomyNode[]
 }
 
 // Drag and drop için item tipleri
@@ -490,9 +492,9 @@ export interface MediaFile {
 }
 
 export function ProductFormModal({
-  isOpen,
+  open,
   onClose,
-  product,
+  initialValues,
   shippingProfiles,
   loadingShippingProfiles,
   processingProfiles,
@@ -500,6 +502,8 @@ export function ProductFormModal({
   showEtsyButton = false,
   onSubmit,
   submitting: externalSubmitting,
+  isEditing = false,
+  taxonomyNodes = []
 }: ProductFormModalProps) {
   // All useState declarations at the top
   const { toast } = useToast()
@@ -507,13 +511,13 @@ export function ProductFormModal({
   // Her render'da çalışacak basit test
   console.log("🔥 COMPONENT HER RENDER'DA ÇALIŞIYOR - Toast fonksiyonu:", typeof toast);
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false)
-  const [title, setTitle] = useState(product?.title || "")
+  const [title, setTitle] = useState(initialValues?.title || "")
   const [titleInput, setTitleInput] = useState("")
-  const [description, setDescription] = useState(product?.description || "")
-  const [price, setPrice] = useState(product?.price?.amount || 0)
+  const [description, setDescription] = useState(initialValues?.description || "")
+  const [price, setPrice] = useState(initialValues?.price?.amount || 0)
   const [quantity, setQuantity] = useState(4)
   const [shippingProfileId, setShippingProfileId] = useState(
-    product?.shipping_profile_id?.toString() || ""
+    initialValues?.shipping_profile_id?.toString() || ""
   )
 
   // İç state için submitting
@@ -523,17 +527,17 @@ export function ProductFormModal({
   const isSubmitting = externalSubmitting !== undefined ? externalSubmitting : internalSubmitting;
 
   // Additional fields to match Etsy
-  const [tags, setTags] = useState<string[]>(product?.tags || [])
+  const [tags, setTags] = useState<string[]>(initialValues?.tags || [])
   const [newTag, setNewTag] = useState("")
   const [isPersonalizable, setIsPersonalizable] = useState(true)
   const [personalizationRequired, setPersonalizationRequired] = useState(false)
   const [personalizationInstructions, setPersonalizationInstructions] = useState(
     'Phone Number for Delivery'
   )
-  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
+  const [taxonomyId, setTaxonomyId] = useState(initialValues?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
   
   const [hasVariations, setHasVariations] = useState<boolean>(true);
-  const [variations, setVariations] = useState(product?.variations || predefinedVariations)
+  const [variations, setVariations] = useState(initialValues?.variations || predefinedVariations)
   const [shopSections, setShopSections] = useState<{ shop_section_id: number; title: string }[]>([]);
   const [selectedShopSection, setSelectedShopSection] = useState<string>('');
   
@@ -673,17 +677,17 @@ export function ProductFormModal({
   ];
 
   // Eğer ürün düzenleniyorsa onun bölümünü, değilse ilk bölümü seç
-  const initialSectionId = product?.shop_section_id?.toString() || shopSections[0]?.shop_section_id.toString() || '';
+  const initialSectionId = initialValues?.shop_section_id?.toString() || shopSections[0]?.shop_section_id.toString() || '';
   
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       setSelectedShopSection(initialSectionId);
     }
-  }, [isOpen, initialSectionId]);
+  }, [open, initialSectionId]);
 
   // Dükkan bölümlerini API'den çekmek için useEffect
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       async function loadShopSections() {
         try {
           const response = await fetch('/api/etsy/shop-sections');
@@ -702,32 +706,32 @@ export function ProductFormModal({
       }
       loadShopSections();
     }
-  }, [isOpen, toast]);
+  }, [open, toast]);
 
   // Form açıldığında state'leri sıfırla
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       setProductImages([]);
       setVideoFile(null);
-      setTitle(product?.title || "");
+      setTitle(initialValues?.title || "");
       const randomDescription = generateRandomDescription();
       setDescription(randomDescription);
-      setPrice(product?.price?.amount || 0);
+      setPrice(initialValues?.price?.amount || 0);
       setQuantity(4);
-      setShippingProfileId(product?.shipping_profile_id?.toString() || "");
-      setTags(product?.tags || []);
+      setShippingProfileId(initialValues?.shipping_profile_id?.toString() || "");
+      setTags(initialValues?.tags || []);
       setNewTag("");
       setIsPersonalizable(true);
       setPersonalizationRequired(false);
       setPersonalizationInstructions(PERSONALIZATION_INSTRUCTIONS);
-      setTaxonomyId(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
-      setHasVariations(product?.variations ? product.variations.length > 0 : true);
-      const initialVariations = product?.variations && product.variations.length > 0 
-        ? product.variations 
+      setTaxonomyId(initialValues?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
+      setHasVariations(initialValues?.variations ? initialValues.variations.length > 0 : true);
+      const initialVariations = initialValues?.variations && initialValues.variations.length > 0 
+        ? initialValues.variations 
         : predefinedVariations;
       setVariations(initialVariations);
-      if (product?.images?.length) {
-        setProductImages(product.images.map(img => ({
+      if (initialValues?.images?.length) {
+        setProductImages(initialValues.images.map(img => ({
           file: new File([], img.url || ''),
           preview: img.url || '',
           uploading: false
@@ -741,14 +745,14 @@ export function ProductFormModal({
         }
       });
     };
-  }, [isOpen, product]);
+  }, [open, initialValues]);
 
   // Kargo profili varsayılanı: Yeni ürün eklerken ilk profili otomatik seç
   useEffect(() => {
-    if (isOpen && !product && shippingProfiles.length > 0) {
+    if (open && !initialValues && shippingProfiles.length > 0) {
       setShippingProfileId(shippingProfiles[0].shipping_profile_id.toString());
     }
-  }, [isOpen, product, shippingProfiles]);
+  }, [open, initialValues, shippingProfiles]);
 
   // Başlık değişimini debounce ile geciktir
   const debouncedTitle = useDebounce(title, 1000); // 1 saniye debounce
@@ -874,7 +878,7 @@ export function ProductFormModal({
 
   // ✅ OPTİMİZE EDİLMİŞ - Resim yüklendiğinde başlık üret
   useEffect(() => {
-    if (isOpen && productImages.length > 0 && !title && !autoTitleUsed && !userEditedTitle) {
+    if (open && productImages.length > 0 && !title && !autoTitleUsed && !userEditedTitle) {
       const generateAutoTitle = async () => {
         setAutoTitleLoading(true);
         try {
@@ -892,7 +896,7 @@ export function ProductFormModal({
       };
       generateAutoTitle();
     }
-  }, [productImages, isOpen, title, autoTitleUsed, userEditedTitle]);
+  }, [productImages, open, title, autoTitleUsed, userEditedTitle]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -955,11 +959,11 @@ export function ProductFormModal({
 
   // Form açıldığında otomatik seçimi aktif et
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       setShopSectionAutoSelected(true);
       console.log('Form açıldı, otomatik kategori seçimi aktif');
     }
-  }, [isOpen]);
+  }, [open]);
 
   // Form verilerini handle eden fonksiyon - FİZİKSEL ÖZELLİKLER KALDIRILDI
   const handleSubmit = async (state: "draft" | "active") => {
@@ -1394,7 +1398,7 @@ export function ProductFormModal({
   // Form açıldığında focus alanını temizle
   useEffect(() => {
     setTitleInput("");
-  }, [isOpen]);
+  }, [open]);
 
   // ✅ OPTİMİZE EDİLMİŞ - Başlık otomatik üretildiyse, açıklama ve etiket üretimini tetikle
   useEffect(() => {
@@ -1406,13 +1410,13 @@ export function ProductFormModal({
 
   // Modal açıldığında autoTitleUsed'u sıfırla
   useEffect(() => {
-    if (isOpen) setAutoTitleUsed(false);
-  }, [isOpen]);
+    if (open) setAutoTitleUsed(false);
+  }, [open]);
 
   // Modal açıldığında userEditedTitle'ı sıfırla
   useEffect(() => {
-    if (isOpen) setUserEditedTitle(false);
-  }, [isOpen]);
+    if (open) setUserEditedTitle(false);
+  }, [open]);
 
   // Sabit açıklama bölümleri
   const descriptionParts = {
@@ -1549,13 +1553,13 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
   // QWE tuş kombinasyonu ile taslak kaydetme
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
+      if (!open) return;
       
       setPressedKeys(prev => new Set([...prev, e.key.toLowerCase()]));
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (!isOpen) return;
+      if (!open) return;
       
       setPressedKeys(prev => {
         const newKeys = new Set(prev);
@@ -1564,7 +1568,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       });
     };
 
-    if (isOpen) {
+    if (open) {
       document.addEventListener('keydown', handleKeyDown);
       document.addEventListener('keyup', handleKeyUp);
     }
@@ -1573,7 +1577,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isOpen]);
+  }, [open]);
 
   // QWE kombinasyonu kontrolü
   useEffect(() => {

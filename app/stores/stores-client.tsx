@@ -186,7 +186,15 @@ export default function StoresClient({ initialStores = [] }: StoresClientProps) 
           return
         }
         
-        if (data.stores && data.stores.length > 0) {
+        // Check if API returned success: false
+        if (data.success === false) {
+          setStores([])
+          setEtsyConnected(false)
+          setConnectionError(data.message || data.error || "Etsy mağaza bilgisi alınamadı")
+          return
+        }
+        
+        if (data.stores && data.stores.length > 0 && !data.is_mock) {
           // Add connection_status property if not exists
           const enhancedStores = data.stores.map((store: any) => ({
             ...store,
@@ -210,8 +218,10 @@ export default function StoresClient({ initialStores = [] }: StoresClientProps) 
           setStores([]);
           setEtsyConnected(false);
           
-          // Check if this is due to connection issues
-          if (data.message) {
+          // Check if this is mock data
+          if (data.is_mock) {
+            setConnectionError("Mock veriler gösteriliyor. Gerçek Etsy mağazanızı bağlamak için 'Mağaza Ekle' butonuna tıklayın.");
+          } else if (data.message) {
             setConnectionError(data.message);
           }
         }

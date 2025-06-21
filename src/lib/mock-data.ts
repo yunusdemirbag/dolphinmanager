@@ -1,0 +1,1 @@
+// Bu dosya artık kullanılmıyor. Tüm mock veri fonksiyonları kaldırıldı. 

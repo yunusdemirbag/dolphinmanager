@@ -29,6 +29,10 @@ const nextConfig = {
       },
     ]
   },
+  experimental: {
+    appDir: true,
+  },
+  distDir: '.next',
 }
 
 export default nextConfig

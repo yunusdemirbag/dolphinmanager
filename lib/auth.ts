@@ -1,75 +1,85 @@
-import { redirect } from "next/navigation"
-import { auth, db } from "@/lib/firebase"
-import { onAuthStateChanged, User } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
-import { cookies } from "next/headers"
+// lib/auth.ts
+// Bu dosya, hem sunucu hem de tarayıcı tarafında kullanıcı kimliğini doğrulamak için merkezi fonksiyonlar içerir.
 
-// Server-side authentication helper using cookies
-export async function getUser(): Promise<User | null> {
+import { NextRequest } from 'next/server';
+import { adminAuth } from '@/lib/firebase/admin'; // Sadece sunucu tarafında kullanılır
+import { User, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase/client'; // Sadece tarayıcı tarafında kullanılır
+import { redirect } from 'next/navigation';
+
+/**
+ * SUNUCU TARAFI: Gelen bir isteğin (request) çerezlerini (cookies) kullanarak
+ * kullanıcının kimliğini doğrular. Sadece API rotaları ve Sunucu Bileşenleri'nde kullanılır.
+ * @param req - Next.js'ten gelen NextRequest veya standart Request objesi.
+ * @returns Doğrulanmış kullanıcı token'ı veya null.
+ */
+export async function getAuthenticatedUser(req: Request | NextRequest) {
+  // 1. İstek başlıklarından (headers) 'session' adındaki çerezi bul.
+  const sessionCookie = (req.headers.get('cookie') || '')
+    .split(';')
+    .find(c => c.trim().startsWith('session='))
+    ?.split('=')[1];
+
+  // 2. Eğer çerez yoksa, kullanıcı giriş yapmamış demektir.
+  if (!sessionCookie) {
+    return null;
+  }
+
+  // 3. Çerezi Firebase Admin SDK ile doğrula.
+  // Bu, çerezin geçerli ve sahte olmadığını garanti eder.
   try {
-    // For server-side, we need to verify the session token from cookies
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return null
-    }
-
-    // In a production app, you would verify the Firebase session token here
-    // For now, we'll return null to indicate no authenticated user
-    // You'll need to implement Firebase Admin SDK for server-side verification
-    
-    return null
+    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
+    return decodedToken;
   } catch (error) {
-    console.error("Error getting user:", error)
-    return null
+    // Çerez geçersiz veya süresi dolmuşsa, kullanıcı giriş yapmamış demektir.
+    console.warn("Invalid session cookie found in lib/auth.ts:", error);
+    return null;
   }
 }
 
-export async function requireAuth(): Promise<User> {
-  try {
-    const user = await getUser()
+/**
+ * SUNUCU TARAFI: Bir sayfanın veya API rotasının korunmasını sağlar.
+ * Eğer kullanıcı giriş yapmamışsa, onu doğrudan giriş sayfasına yönlendirir.
+ * @param req - Gelen istek.
+ * @returns Kullanıcı giriş yapmışsa kullanıcı token'ını döndürür. Aksi takdirde yönlendirme yapar.
+ */
+export async function requireAuth(req: Request | NextRequest) {
+  const user = await getAuthenticatedUser(req);
 
-    if (!user) {
-      console.log("requireAuth: No user found, redirecting to login")
-      redirect("/auth/login")
-    }
-
-    return user
-  } catch (error) {
-    console.error("Error in requireAuth:", error)
-    redirect("/auth/login")
+  if (!user) {
+    // Kullanıcı yoksa, /auth/login sayfasına yönlendir.
+    redirect('/auth/login');
   }
+
+  return user;
 }
 
-export async function getUserProfile(userId: string) {
-  try {
-    const userDocRef = doc(db, "profiles", userId)
-    const userDoc = await getDoc(userDocRef)
 
-    if (!userDoc.exists()) {
-      console.log("User profile not found")
-      return null
-    }
+// ------------------- TARAYICI TARAFI (CLIENT-SIDE) -------------------
+// Aşağıdaki fonksiyonlar SADECE "use client" ile işaretlenmiş bileşenlerde kullanılır.
 
-    return { id: userDoc.id, ...userDoc.data() }
-  } catch (error) {
-    console.error("Error in getUserProfile:", error)
-    return null
-  }
-}
 
-// Client-side auth helper
-export function getClientUser(): Promise<User | null> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") {
-      resolve(null)
-      return
-    }
+/**
+ * TARAYICI TARAFI: Kullanıcının giriş durumunu anlık olarak dinler.
+ * Bu bir "hook"tur ve React bileşenleri içinde kullanılır.
+ * @returns Mevcut kullanıcı (User objesi), null (giriş yapmamış) veya undefined (henüz kontrol ediliyor).
+ */
+import { useState, useEffect } from 'react';
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      unsubscribe()
-      resolve(user)
-    })
-  })
+export function useAuth() {
+  const [user, setUser] = useState<User | null | undefined>(undefined); // undefined: yükleniyor
+
+  useEffect(() => {
+    // onAuthStateChanged, Firebase'in kimlik doğrulama durumundaki
+    // herhangi bir değişikliği (giriş, çıkış) anında yakalar.
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+
+    // Bileşen ekrandan kaldırıldığında (unmount), bu dinleyiciyi temizle.
+    // Bu, hafıza sızıntılarını önler.
+    return () => unsubscribe();
+  }, []);
+
+  return user;
 }

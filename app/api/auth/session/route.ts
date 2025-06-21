@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/firebase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/firebase-admin";
 
 // Session cookie oluştur
 export async function POST(request: NextRequest) {

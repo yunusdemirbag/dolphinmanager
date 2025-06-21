@@ -8,11 +8,20 @@ const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
 // Firebase Admin SDK başlatma
 if (!admin.apps.length) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: process.env.FIREBASE_DATABASE_URL,
-    });
-    console.log('✅ Firebase Admin başlatıldı');
+    if (serviceAccount) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: process.env.FIREBASE_DATABASE_URL,
+      });
+      console.log('✅ Firebase Admin başlatıldı (tam yapılandırma ile)');
+    } else {
+      // Eğer service account bilgisi yoksa, credential olmadan başlat
+      admin.initializeApp({
+        // Geliştirme ortamında credential olmadan çalışabilir
+        databaseURL: process.env.FIREBASE_DATABASE_URL,
+      });
+      console.log('⚠️ Firebase Admin başlatıldı (credential olmadan - sadece geliştirme ortamı için)');
+    }
   } catch (error) {
     console.error('❌ Firebase Admin başlatma hatası:', error);
   }

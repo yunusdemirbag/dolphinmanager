@@ -1,6 +1,6 @@
 import * as React from "react"
-import "@/styles/globals.css"
-import SidebarWithStoreName from "@/components/SidebarWithStoreName"
+import "./globals.css"
+import SidebarWithStoreName from "./components/SidebarWithStoreName"
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from 'sonner'
 import { AuthProvider } from "@/contexts/AuthContext"

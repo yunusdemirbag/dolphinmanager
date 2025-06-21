@@ -2149,3 +2149,84 @@ export async function updateShop(accessToken: string, shopId: number, data: any)
 // Bu fonksiyon yukarıda birleştirildi
 // Firebase ile önbellek işlemleri artık tek bir yerde tanımlanmıştır.
 // Satır 649-691'de tanımlanan getCachedData ve setCachedData fonksiyonları kullanılacaktır.
+
+/**
+ * @deprecated Use createEtsyListing instead. This is kept for backward compatibility.
+ */
+export const createDraftListing = createEtsyListing;
+
+export async function uploadFilesToEtsy(
+  accessToken: string,
+  shopId: number,
+  listingId: number,
+  files: File[]
+): Promise<any> {
+  const url = `${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/images`;
+  
+  const results = [];
+  for (const file of files) {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const response = await rateLimitedFetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: formData
+    });
+    
+    results.push(response);
+  }
+  
+  return results;
+}
+
+export async function addInventoryWithVariations(
+  accessToken: string,
+  shopId: number,
+  listingId: number,
+  variations: any[]
+): Promise<any> {
+  // First, update the listing to have variations
+  await updateListing(accessToken, shopId, listingId, {
+    has_variations: true
+  });
+  
+  // Then add the variations
+  const url = `${ETSY_API_BASE}/application/shops/${shopId}/listings/${listingId}/inventory`;
+  
+  const response = await rateLimitedFetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      products: variations.map(variation => ({
+        sku: '',
+        property_values: [
+          {
+            property_id: 513, // Size
+            value_ids: [],
+            values: [variation.size]
+          },
+          {
+            property_id: 514, // Pattern
+            value_ids: [],
+            values: [variation.pattern]
+          }
+        ],
+        offerings: [
+          {
+            price: variation.price,
+            quantity: 999,
+            is_enabled: variation.is_active
+          }
+        ]
+      }))
+    })
+  });
+  
+  return response;
+}

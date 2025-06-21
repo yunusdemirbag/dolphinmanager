@@ -26,18 +26,18 @@ if (!getApps().length) {
       });
       console.log('✅ Firebase Admin başlatıldı (geliştirme ortamında gerçek yapılandırma ile)');
     } else {
-      // Üretim ortamında tam yapılandırma kullan
+      // Üretim ortamında da NEXT_PUBLIC_ vars kullan (tutarlılık için)
       const serviceAccount = {
-        projectId: process.env.FIREBASE_PROJECT_ID,
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       }
 
       app = initializeApp({
         credential: cert(serviceAccount),
-        projectId: process.env.FIREBASE_PROJECT_ID,
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       });
-      console.log('✅ Firebase Admin başlatıldı (tam yapılandırma ile)');
+      console.log('✅ Firebase Admin başlatıldı (NEXT_PUBLIC vars ile)');
     }
   } catch (error) {
     console.error('❌ Firebase Admin başlatma hatası:', error);

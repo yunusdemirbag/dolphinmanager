@@ -7,13 +7,24 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: [
-      'i.etsystatic.com',
-      'img.etsystatic.com',
-      'qbdzcmqcsnevzhpzdhkx.supabase.co',
-      'dolphinmanager.vercel.app'
-    ],
-    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'i.etsystatic.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.etsystatic.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'qbdzcmqcsnevzhpzdhkx.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'dolphinmanager.vercel.app',
+      }
+    ]
   },
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -28,9 +39,6 @@ const nextConfig = {
         permanent: false,
       },
     ]
-  },
-  experimental: {
-    appDir: true,
   },
   distDir: '.next',
 }

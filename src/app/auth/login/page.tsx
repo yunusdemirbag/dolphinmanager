@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
-import { auth } from "@/lib/firebase"
+import { auth } from "@/lib/firebase/client"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"

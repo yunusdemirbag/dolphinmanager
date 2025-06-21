@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { auth } from "@/lib/firebase"
 import { onAuthStateChanged } from "firebase/auth"
-import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 export default function ProductsLayout({
@@ -11,24 +10,16 @@ export default function ProductsLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
   
   useEffect(() => {
     console.log("🔄 [ProductsLayout] useEffect başladı")
     
+    // Sadece yükleme durumunu kontrol et, oturum kontrolü yapma
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       console.log(`🔒 [ProductsLayout] Auth durumu değişti: ${user ? 'Oturum açık' : 'Oturum kapalı'}`)
       
-      if (!user) {
-        console.log("⚠️ [ProductsLayout] Kullanıcı oturum açmamış, login sayfasına yönlendiriliyor")
-        router.replace('/auth/login')
-      } else {
-        console.log(`✅ [ProductsLayout] Kullanıcı oturum açmış: ${user.uid}`)
-        setUser(user)
-      }
-      
+      // Kullanıcı durumu ne olursa olsun, sadece yükleme durumunu kapat
       setLoading(false)
     })
     
@@ -36,7 +27,7 @@ export default function ProductsLayout({
       console.log("🧹 [ProductsLayout] useEffect temizleniyor")
       unsubscribe()
     }
-  }, [router])
+  }, [])
   
   if (loading) {
     console.log("⏳ [ProductsLayout] Yükleniyor durumu gösteriliyor")
@@ -48,11 +39,6 @@ export default function ProductsLayout({
         </div>
       </div>
     )
-  }
-  
-  if (!user) {
-    console.log("🚫 [ProductsLayout] Kullanıcı yok, null döndürülüyor (yönlendirme yapılıyor)")
-    return null
   }
   
   console.log("🎯 [ProductsLayout] Sayfa içeriği gösteriliyor")

@@ -9,12 +9,15 @@ import { ProductDeleteModal } from "@/components/product/ProductDeleteModal"
 import { QueueManagementPanel } from "@/components/product/QueueManagementPanel"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Loader2 } from "lucide-react"
+import { Plus, Loader2, Store, RefreshCw } from "lucide-react"
 import { Product, CreateProductForm, TaxonomyNode } from "@/types/product"
 import { useProductsClient } from "./products-client"
 import { toast } from "@/components/ui/use-toast"
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import Link from "next/link"
+import { auth } from "@/lib/firebase"
+import { onAuthStateChanged } from "firebase/auth"
 
 interface CreateListingResponse {
   success: boolean;
@@ -28,6 +31,9 @@ interface CreateListingResponse {
 
 export default function ProductsPage() {
   console.log("🚀 [ProductsPage] Component render başladı")
+  
+  // User state
+  const [user, setUser] = useState<any>(null)
   
   // Products state from hook
   const {
@@ -71,7 +77,7 @@ export default function ProductsPage() {
   const [filterStatus, setFilterStatus] = useState("all")
   const [sortBy, setSortBy] = useState("created_timestamp")
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [gridType, setGridType] = useState<'grid3' | 'grid5' | 'list'>('grid3')
+  const [gridType, setGridType] = useState<'grid3' | 'grid5' | 'list' | 'grid4'>('grid4')
 
   // Modal States
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -128,6 +134,16 @@ export default function ProductsPage() {
   useEffect(() => {
     console.log("🔄 [ProductsPage] loadProducts useEffect çalışıyor")
     loadProducts()
+  }, [])
+
+  // Check auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log(`🔒 [ProductsPage] Auth durumu değişti: ${currentUser ? 'Oturum açık' : 'Oturum kapalı'}`)
+      setUser(currentUser)
+    })
+    
+    return () => unsubscribe()
   }, [])
 
   // Load taxonomy and shipping profiles
@@ -412,138 +428,182 @@ export default function ProductsPage() {
   }
   
   console.log("🎨 [ProductsPage] JSX render ediliyor")
+  
   // Return the JSX for the page
+  if (loading) {
+    return (
+      <div className="container mx-auto py-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-lg text-gray-600">Ürünler yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (products.length === 0 && !loading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <h2 className="text-2xl font-semibold mb-2">Henüz Ürün Bulunamadı</h2>
+          <p className="text-gray-600 mb-6">
+            {noStoresFound || reconnectRequired 
+              ? "Etsy mağazanızı bağladıktan sonra ürünleriniz burada görüntülenecektir."
+              : "Mağazanızda henüz hiç ürün bulunmuyor. Yeni bir ürün ekleyerek başlayabilirsiniz."}
+          </p>
+          {!noStoresFound && !reconnectRequired && (
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Yeni Ürün Ekle
+            </Button>
+          )}
+          
+          {/* Ürün oluşturma modalı */}
+          {showCreateModal && (
+            <ProductFormModal
+              open={true}
+              onClose={() => setShowCreateModal(false)}
+              onSubmit={handleCreateProduct}
+              initialValues={createForm}
+              taxonomyNodes={taxonomyNodes}
+              shippingProfiles={shippingProfiles}
+              processingProfiles={processingProfiles}
+              loadingShippingProfiles={loadingShippingProfiles}
+              loadingProcessingProfiles={loadingProcessingProfiles}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col space-y-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Ürünlerim</h1>
-            <Button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1">
-              <Plus className="w-4 h-4" /> Yeni Ürün
-            </Button>
+      <div className="py-6">
+        {/* Kuyruk durumu göstergesi - otomatik olarak görüntülenir */}
+        <QueueManagementPanel />
+        
+        {/* Ürün filtreleri */}
+        <ProductFilters
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          filterStatus={filterStatus}
+          setFilterStatus={setFilterStatus}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          sortOrder={sortOrder}
+          setSortOrder={setSortOrder}
+          gridType={gridType}
+          setGridType={setGridType}
+          totalCount={totalCount}
+          refreshing={refreshing}
+          onRefresh={loadProducts}
+          onCreateNew={() => setShowCreateModal(true)}
+        />
+        
+        {/* Ürün listesi veya Etsy bağlantı uyarısı */}
+        {noStoresFound || reconnectRequired ? (
+          <div className="container mx-auto mt-6">
+            <div className="bg-white rounded-lg shadow-sm p-6 text-center border border-amber-200 bg-amber-50">
+              <Store className="h-12 w-12 mx-auto mb-3 text-amber-500" />
+              <h2 className="text-xl font-semibold mb-2">Etsy Mağazası Bağlantısı Gerekiyor</h2>
+              <p className="text-gray-600 mb-4">
+                {reconnectRequired 
+                  ? "Etsy mağazanıza yeniden bağlanmanız gerekiyor." 
+                  : user 
+                    ? "Ürünlerinizi yönetmek için önce bir Etsy mağazası bağlamanız gerekiyor."
+                    : "Ürünlerinizi yönetmek için önce giriş yapmalı ve bir Etsy mağazası bağlamalısınız."}
+              </p>
+              <div className="flex justify-center gap-4">
+                {!user ? (
+                  <Button asChild variant="default">
+                    <Link href="/auth/login?redirect=/products">
+                      Giriş Yap
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button asChild variant="default">
+                    <Link href="/stores">
+                      <Store className="mr-2 h-4 w-4" />
+                      Mağaza Bağla
+                    </Link>
+                  </Button>
+                )}
+                {reconnectRequired && (
+                  <Button variant="outline" onClick={handleReconnectEtsy}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Yeniden Bağlan
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
-
-          {/* Queue Management Panel */}
-          <QueueManagementPanel />
-          
-          {/* Filters */}
-          <ProductFilters 
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            filterStatus={filterStatus}
-            onFilterStatusChange={setFilterStatus}
-            sortBy={sortBy}
-            onSortByChange={setSortBy}
-            sortOrder={sortOrder}
-            onSortOrderChange={setSortOrder}
-            gridType={gridType}
-            onGridTypeChange={setGridType}
-          />
-
-          {/* Products Grid */}
-          <div className={`grid gap-4 ${
+        ) : (
+          <div className={`mt-6 grid gap-4 ${
             gridType === 'grid3' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' :
-            gridType === 'grid5' ? 'grid-cols-1 md:grid-cols-3 lg:grid-cols-5' :
+            gridType === 'grid4' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' :
+            gridType === 'grid5' ? 'grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' :
             'grid-cols-1'
           }`}>
-            {loading ? (
-              <div className="col-span-full flex justify-center items-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-gray-500" />
+            {filteredProducts.map(product => (
+              <ProductCard
+                key={product.listing_id}
+                product={product}
+                onEdit={() => setShowEditModal(product)}
+                onDelete={() => setConfirmDeleteProductId(product.listing_id)}
+                onCopy={() => {/* Copy product logic */}}
+                gridType={gridType}
+              />
+            ))}
+            {filteredProducts.length === 0 && (
+              <div className="col-span-full text-center p-8">
+                <p className="text-gray-500">Kriterlere uygun ürün bulunamadı.</p>
               </div>
-            ) : reconnectRequired ? (
-              <div className="col-span-full bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-                <h3 className="text-lg font-medium text-yellow-800 mb-2">Etsy bağlantınızı yenilemeniz gerekiyor</h3>
-                <p className="text-yellow-700 mb-4">Etsy API erişim izniniz süresi dolmuş olabilir.</p>
-                <Button 
-                  onClick={handleReconnectEtsy}
-                  disabled={refreshing}
-                  className="bg-yellow-600 hover:bg-yellow-700"
-                >
-                  {refreshing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Yenileniyor...
-                    </>
-                  ) : (
-                    'Etsy Bağlantısını Yenile'
-                  )}
-                </Button>
-              </div>
-            ) : noStoresFound ? (
-              <div className="col-span-full bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-                <h3 className="text-lg font-medium text-yellow-800 mb-2">Etsy mağazası bulunamadı</h3>
-                <p className="text-yellow-700 mb-4">Henüz bir Etsy mağazası bağlamamışsınız.</p>
-                <Button 
-                  onClick={handleReconnectEtsy}
-                  disabled={refreshing}
-                  className="bg-yellow-600 hover:bg-yellow-700"
-                >
-                  {refreshing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Bağlanılıyor...
-                    </>
-                  ) : (
-                    'Etsy Mağazanızı Bağlayın'
-                  )}
-                </Button>
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="col-span-full bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                <h3 className="text-lg font-medium text-gray-800 mb-2">Hiç ürün bulunamadı</h3>
-                <p className="text-gray-600 mb-4">Henüz hiç ürün eklenmemiş veya filtrelere uygun ürün yok.</p>
-                <Button onClick={() => setShowCreateModal(true)}>
-                  Yeni Ürün Ekle
-                </Button>
-              </div>
-            ) : (
-              filteredProducts.map(product => (
-                <ProductCard
-                  key={product.listing_id}
-                  product={product}
-                  onEdit={() => setShowEditModal(product)}
-                  onDelete={() => setConfirmDeleteProductId(product.listing_id || 0)}
-                />
-              ))
             )}
           </div>
-        </div>
-
-        {/* Create Product Modal */}
+        )}
+        
+        {/* Modallar */}
         {showCreateModal && (
           <ProductFormModal
-            isOpen={showCreateModal}
+            open={true}
             onClose={() => setShowCreateModal(false)}
             onSubmit={handleCreateProduct}
+            initialValues={createForm}
+            taxonomyNodes={taxonomyNodes}
             shippingProfiles={shippingProfiles}
             processingProfiles={processingProfiles}
             loadingShippingProfiles={loadingShippingProfiles}
             loadingProcessingProfiles={loadingProcessingProfiles}
           />
         )}
-
-        {/* Edit Product Modal */}
+        
         {showEditModal && (
           <ProductFormModal
-            isOpen={true}
+            open={true}
             onClose={() => setShowEditModal(null)}
-            onSubmit={(data) => handleUpdateProduct({...showEditModal, ...data})}
-            product={showEditModal}
+            onSubmit={(data) => handleUpdateProduct(showEditModal.listing_id, data)}
+            initialValues={showEditModal}
+            taxonomyNodes={taxonomyNodes}
             shippingProfiles={shippingProfiles}
-            loadingShippingProfiles={loadingShippingProfiles}
             processingProfiles={processingProfiles}
+            loadingShippingProfiles={loadingShippingProfiles}
             loadingProcessingProfiles={loadingProcessingProfiles}
+            isEditing={true}
           />
         )}
-
-        {/* Delete Confirmation Modal */}
+        
         {confirmDeleteProductId && (
           <ProductDeleteModal
-            confirmDeleteProductId={confirmDeleteProductId}
-            setConfirmDeleteProductId={setConfirmDeleteProductId}
-            onDeleteProduct={handleDeleteProduct}
-            deletingProductId={deletingProductId}
+            open={true}
+            onClose={() => setConfirmDeleteProductId(null)}
+            onConfirm={() => {
+              if (confirmDeleteProductId) {
+                handleDeleteProduct(confirmDeleteProductId);
+                setConfirmDeleteProductId(null);
+              }
+            }}
+            deleting={deletingProductId === confirmDeleteProductId}
           />
         )}
       </div>

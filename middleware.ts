@@ -64,14 +64,14 @@ export async function middleware(req: NextRequest) {
     }
 
     // Auth sayfaları kontrolleri - eğer oturum açıksa dashboard'a yönlendir
-    const authPages = ["/auth/login", "/auth/register"];
+    const authPages = ["/auth/login", "/auth/register", "/login"];
     if (authPages.includes(req.nextUrl.pathname) && hasSession) {
       console.log(`🔍 [Middleware] Auth page with session, redirecting to /dashboard`)
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     
     // Korumalı sayfalar - oturum yoksa login'e yönlendir
-    const protectedPages = ["/dashboard", "/stores", "/products", "/finance", "/orders", "/customer-management", "/marketing"];
+    const protectedPages = ["/dashboard", "/stores", "/finance", "/orders", "/customer-management", "/marketing"];
     if (protectedPages.some(page => req.nextUrl.pathname.startsWith(page)) && !hasSession) {
       console.log(`🔍 [Middleware] Protected page without session, redirecting to login: ${req.nextUrl.pathname}`)
       return NextResponse.redirect(new URL("/auth/login?redirect=" + encodeURIComponent(req.nextUrl.pathname), req.url));

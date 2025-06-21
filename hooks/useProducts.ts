@@ -50,10 +50,13 @@ export function useProducts() {
       const user = auth.currentUser
       
       if (!user) {
-        console.error('Firebase auth token bulunamadı')
+        console.log('Firebase auth token bulunamadı')
+        
+        // Kullanıcı oturum açmamış, Etsy bağlantısı gerektiğini göster
+        setNoStoresFound(true)
+        setEtsyConnected(false)
+        setProducts([])
         setLoading(false)
-        // Mock data döndür
-        setProducts(mockProducts())
         return
       }
 
@@ -66,12 +69,11 @@ export function useProducts() {
           skip_cache: 'true',
         })
         
-        const response = await fetch(`/api/etsy/listings?${params}`, {
+        const response = await fetch(`/api/etsy/listings?${params.toString()}`, {
           headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
           }
         })
         
@@ -83,6 +85,7 @@ export function useProducts() {
             description: "Oturum süresi dolmuş. Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
             variant: "destructive"
           })
+          setProducts([])
           return
         }
         
@@ -108,6 +111,7 @@ export function useProducts() {
               description: "Henüz Etsy mağazanızı bağlamamışsınız veya bağlantı kopmuş.",
               variant: "destructive"
             })
+            setProducts([])
             return
           }
           
@@ -121,12 +125,14 @@ export function useProducts() {
               description: "Bağlantı süresi dolmuş. Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
               variant: "destructive"
             })
+            setProducts([])
           } else {
             toast({
               title: "Ürünler yüklenemedi",
               description: errorMessage,
               variant: "destructive"
             })
+            setProducts([])
           }
           return
         }
@@ -163,25 +169,25 @@ export function useProducts() {
               description: "Etsy mağazanıza yeniden bağlanmanız gerekiyor.",
               variant: "destructive"
             })
+            setProducts([])
           } else {
             toast({
               title: "Ürün bulunamadı",
               description: "Mağazanızda hiç ürün bulunamadı veya veri alınamadı.",
               variant: "destructive"
             })
+            setProducts([])
           }
         }
       } catch (fetchError: any) {
         console.error('Ürünleri getirme hatası:', fetchError)
-        // API hatası durumunda mock data döndür
-        setProducts(mockProducts())
         setError(`Ürünler yüklenirken hata oluştu: ${fetchError.message}`)
+        setProducts([])
       }
     } catch (authError: any) {
       console.error('Auth hatası:', authError)
-      // Auth hatası durumunda mock data döndür
-      setProducts(mockProducts())
       setError(`Kimlik doğrulama hatası: ${authError.message}`)
+      setProducts([])
     } finally {
       setLoading(false)
     }
@@ -359,7 +365,9 @@ export function useProducts() {
         loadProducts()
       } else {
         setLoading(false)
-        router.push('/auth/login')
+        // Kullanıcıyı login sayfasına yönlendirmeyi kaldırıyoruz
+        // Middleware zaten gerekirse yönlendirme yapacak
+        // router.push('/auth/login') - Bu satırı kaldırdık
       }
     })
     
@@ -369,7 +377,7 @@ export function useProducts() {
   return {
     products,
     filteredProducts,
-    loading: loading || authLoading,
+    loading,
     currentPage,
     totalPages,
     totalCount,
@@ -385,53 +393,55 @@ export function useProducts() {
     handleCreateProduct,
     handleUpdateProduct,
     handleDeleteProduct,
-    setFilteredProducts,
-    user,
-    authLoading,
-    error
+    setFilteredProducts
   }
 }
 
-// Mock ürün verileri
 function mockProducts(): Product[] {
   return [
     {
-      id: 1001,
-      title: 'Örnek Ürün 1',
-      description: 'Bu bir örnek ürün açıklamasıdır.',
+      listing_id: 1001,
+      title: "Modern Soyut Kanvas Tablo - Mavi Tonlar",
+      description: "Modern ev dekorasyonu için şık ve zarif soyut kanvas tablo. Mavi tonların hakim olduğu bu tablo, oturma odanız veya yatak odanız için mükemmel bir seçim.",
       price: {
-        amount: 4999,
+        amount: 24900,
         divisor: 100,
-        currency_code: 'USD'
+        currency_code: "TRY"
       },
-      quantity: 10,
-      tags: ['örnek', 'test', 'mock'],
-      images: [{ 
-        url: '/images/placeholder.jpg',
-        url_570xN: '/images/placeholder.jpg'
-      }],
+      quantity: 4,
+      taxonomy_id: 1027,
+      state: "active",
+      shipping_profile_id: 1,
       has_variations: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      tags: ["kanvas", "tablo", "mavi", "dekorasyon", "duvar"],
+      images: [
+        {
+          url: "/placeholder.jpg",
+          url_570xN: "/placeholder.jpg"
+        }
+      ]
     },
     {
-      id: 1002,
-      title: 'Örnek Ürün 2',
-      description: 'Bu bir başka örnek ürün açıklamasıdır.',
+      listing_id: 1002,
+      title: "Minimalist Geometrik Duvar Sanatı - Siyah Beyaz",
+      description: "Minimalist tarzda geometrik desenli duvar sanatı. Siyah ve beyaz renklerin uyumu ile modern mekanlar için ideal.",
       price: {
-        amount: 2999,
+        amount: 19900,
         divisor: 100,
-        currency_code: 'USD'
+        currency_code: "TRY"
       },
-      quantity: 5,
-      tags: ['örnek', 'test', 'mock'],
-      images: [{ 
-        url: '/images/placeholder.jpg',
-        url_570xN: '/images/placeholder.jpg'
-      }],
+      quantity: 4,
+      taxonomy_id: 1027,
+      state: "active",
+      shipping_profile_id: 1,
       has_variations: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      tags: ["geometrik", "duvar", "sanat", "siyah", "beyaz", "minimalist"],
+      images: [
+        {
+          url: "/placeholder.jpg",
+          url_570xN: "/placeholder.jpg"
+        }
+      ]
     }
   ];
 } 

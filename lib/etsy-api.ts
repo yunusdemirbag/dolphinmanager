@@ -511,7 +511,7 @@ export async function refreshEtsyToken(userId: string): Promise<string> {
 }
 
 // Etsy token'ı al ve gerekirse yenile
-async function getValidAccessToken(userId: string): Promise<string | null> {
+export async function getValidAccessToken(userId: string): Promise<string | null> {
   try {
     // Firestore'dan token bilgilerini al
     const tokenDoc = await db.collection('etsy_tokens').doc(userId).get();

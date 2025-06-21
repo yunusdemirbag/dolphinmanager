@@ -8,6 +8,7 @@ E-ticaret mağaza yönetim platformu.
 - Sipariş takibi
 - Finansal raporlama
 - Çoklu mağaza desteği
+- Supabase entegrasyonu
 
 ## Geliştirme
 ```bash
@@ -15,6 +16,9 @@ npm install
 npm run dev
 ```
 
-## Vercel Test
+## Deployment
+```bash
+git push
+```
 
-Bu bir Vercel otomatik dağıtım testidir. 
+Vercel ile otomatik dağıtım yapılandırılmıştır. Main branch'e yapılan her push sonrasında uygulama otomatik olarak deploy edilir. 

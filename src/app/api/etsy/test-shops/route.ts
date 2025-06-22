@@ -33,10 +33,6 @@ export async function GET(request: NextRequest) {
       has_refresh_token: !!tokenData?.refresh_token
     });
     
-    // Etsy kullanıcı ID'sini token'dan çıkar
-    const etsyUserId = tokenData?.access_token.split('.')[0];
-    console.log('Etsy user ID extracted from token:', etsyUserId);
-    
     // Doğrudan Etsy API'sine istek yap
     console.log('Making direct request to Etsy API');
     
@@ -63,8 +59,8 @@ export async function GET(request: NextRequest) {
     const userData = await userResponse.json();
     console.log('Etsy user data:', JSON.stringify(userData).substring(0, 200) + '...');
     
-    // 2. Şimdi mağaza bilgilerini al
-    const shopsResponse = await fetch(`https://openapi.etsy.com/v3/application/users/${etsyUserId}/shops`, {
+    // 2. Şimdi mağaza bilgilerini al - me/shops endpoint'ini kullan
+    const shopsResponse = await fetch(`https://openapi.etsy.com/v3/application/me/shops`, {
       headers: {
         'Authorization': `Bearer ${tokenData?.access_token}`,
         'x-api-key': process.env.ETSY_CLIENT_ID!,
@@ -86,32 +82,14 @@ export async function GET(request: NextRequest) {
     const shopsData = await shopsResponse.json();
     console.log('Etsy shops data:', JSON.stringify(shopsData).substring(0, 200) + '...');
     
-    // 3. Alternatif endpoint'i dene
-    const altShopsResponse = await fetch(`https://openapi.etsy.com/v3/application/shops`, {
-      headers: {
-        'Authorization': `Bearer ${tokenData?.access_token}`,
-        'x-api-key': process.env.ETSY_CLIENT_ID!,
-      },
-    });
-    
-    let altShopsData = null;
-    if (altShopsResponse.ok) {
-      altShopsData = await altShopsResponse.json();
-      console.log('Alternative Etsy shops data:', JSON.stringify(altShopsData).substring(0, 200) + '...');
-    } else {
-      console.log('Alternative endpoint failed:', altShopsResponse.status);
-    }
-    
     // Tüm verileri döndür
     return NextResponse.json({
       user: userData,
       shops: shopsData,
-      altShops: altShopsData,
       tokenInfo: {
         expires_at: tokenData?.expires_at,
         has_access_token: !!tokenData?.access_token,
-        has_refresh_token: !!tokenData?.refresh_token,
-        etsy_user_id: etsyUserId
+        has_refresh_token: !!tokenData?.refresh_token
       }
     });
   } catch (error: any) {

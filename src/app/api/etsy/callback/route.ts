@@ -2,19 +2,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/firebase/admin'
 
 async function exchangeCodeForToken(code: string, codeVerifier: string) {
+  console.log('Exchanging code for token with code verifier:', codeVerifier.substring(0, 10) + '...')
+  
+  const redirectUri = process.env.ETSY_REDIRECT_URI || 
+    `${process.env.NEXT_PUBLIC_BASE_URL}/api/etsy/callback`
+  
+  console.log('Using redirect URI:', redirectUri)
+  
+  const params = new URLSearchParams({
+    grant_type: 'authorization_code',
+    client_id: process.env.ETSY_CLIENT_ID!,
+    client_secret: process.env.ETSY_CLIENT_SECRET!,
+    redirect_uri: redirectUri,
+    code,
+    code_verifier: codeVerifier,
+  })
+  
+  console.log('Token exchange params (excluding code):', {
+    grant_type: 'authorization_code',
+    client_id: process.env.ETSY_CLIENT_ID!,
+    client_secret: '***',
+    redirect_uri: redirectUri,
+    code_verifier: codeVerifier.substring(0, 10) + '...',
+  })
+
   const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: process.env.ETSY_CLIENT_ID!,
-      client_secret: process.env.ETSY_CLIENT_SECRET!,
-      redirect_uri:
-        process.env.ETSY_REDIRECT_URI ||
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/etsy/callback`,
-      code,
-      code_verifier: codeVerifier,
-    }),
+    body: params,
   })
 
   if (!response.ok) {
@@ -30,6 +45,8 @@ async function exchangeCodeForToken(code: string, codeVerifier: string) {
 }
 
 async function fetchEtsyShopInfo(accessToken: string) {
+  console.log('Fetching Etsy shop info with access token')
+  
   const response = await fetch('https://openapi.etsy.com/v3/application/shops', {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -58,6 +75,8 @@ async function saveEtsyData(
   tokenData: any,
   shopData: any,
 ) {
+  console.log('Saving Etsy data for user:', userId, 'and shop:', shopData.shop_name)
+  
   const batch = db.batch()
 
   // Save/update token
@@ -87,18 +106,28 @@ async function saveEtsyData(
   batch.delete(sessionRef)
 
   await batch.commit()
+  console.log('Etsy data saved successfully')
 }
 
 export async function GET(request: NextRequest) {
+  console.log('Etsy callback received')
+  
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const userId = searchParams.get('state') // 'state' should be the userId
   const error = searchParams.get('error')
 
+  console.log('Callback params:', { 
+    code: code ? code.substring(0, 5) + '...' : null, 
+    userId, 
+    error 
+  })
+
   const redirectError = (errorCode: string, details?: string) => {
     const url = new URL('/stores', request.url)
     url.searchParams.set('error', errorCode)
     if (details) url.searchParams.set('details', details)
+    console.error('Redirecting with error:', errorCode, details)
     return NextResponse.redirect(url)
   }
 
@@ -115,7 +144,13 @@ export async function GET(request: NextRequest) {
       .collection('etsy_auth_sessions')
       .doc(userId)
       .get()
+    
     const codeVerifier = authSessionDoc.data()?.code_verifier
+
+    console.log('Auth session found:', {
+      exists: authSessionDoc.exists,
+      hasVerifier: !!codeVerifier
+    })
 
     if (!codeVerifier) {
       return redirectError(
@@ -125,11 +160,16 @@ export async function GET(request: NextRequest) {
     }
 
     const tokenData = await exchangeCodeForToken(code, codeVerifier)
+    console.log('Token exchange successful')
+    
     const shopData = await fetchEtsyShopInfo(tokenData.access_token)
+    console.log('Shop info fetched successfully:', shopData.shop_name)
+    
     await saveEtsyData(userId, tokenData, shopData)
 
     const successUrl = new URL('/stores', request.url)
     successUrl.searchParams.set('etsy_connected', shopData.shop_name)
+    console.log('Redirecting to success URL')
     return NextResponse.redirect(successUrl)
   } catch (err: any) {
     console.error('💥 Etsy callback failed:', err)

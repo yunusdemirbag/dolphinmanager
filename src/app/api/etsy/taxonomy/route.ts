@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { auth } from '@/lib/firebase/admin';
-import { db } from '@/lib/firebase/admin';
+import { auth, db } from '@/lib/firebase/admin';
 import { NextRequest, NextResponse } from "next/server"
 import { getSellerTaxonomyNodes, getPropertiesByTaxonomyId } from "@/lib/etsy-api"
 import { cookies } from 'next/headers';

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { authenticateRequest, createUnauthorizedResponse } from '@/lib/auth-middleware';
-import { db } from '@/lib/firebase-admin';
+import { authenticateRequest, createUnauthorizedResponse } from '@/lib/auth';
+import { db } from '@/lib/firebase/admin';
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return createUnauthorizedResponse();
     }
 
-    const userId = authResult.userId;
+    const userId = authResult.uid;
     console.log(`[etsy-reset] Starting reset for user: ${userId}`);
 
     // Firestore'da toplu silme işlemi için bir "batch" oluştur

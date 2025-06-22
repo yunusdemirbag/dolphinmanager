@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getShippingProfiles, getEtsyStores, getProcessingProfiles } from '@/lib/etsy-api';
-import { auth } from '@/lib/firebase/admin';
-import { db } from '@/lib/firebase/admin';
+import { auth, db } from '@/lib/firebase/admin';
 import { cookies } from 'next/headers';
 import { createClient } from "@/lib/supabase/server";
 

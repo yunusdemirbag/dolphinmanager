@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { authenticateRequest, createUnauthorizedResponse } from '@/lib/auth-middleware'
-import { db } from '@/lib/firebase-admin'
+import { authenticateRequest, createUnauthorizedResponse } from '@/lib/auth'
+import { db } from '@/lib/firebase/admin'
 
 export async function POST(
   request: NextRequest,
@@ -18,7 +18,7 @@ export async function POST(
     }
 
     const shopId = params.shopId
-    const userId = authResult.userId
+    const userId = authResult.uid
     console.log("[etsy] /disconnect Disconnecting Etsy store:", shopId, "for user:", userId)
 
     try {

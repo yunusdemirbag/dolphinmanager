@@ -2,9 +2,6 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { adminAuth } from '@/lib/firebase/admin';
 
-// This is the crucial line that tells Vercel to use the Node.js runtime
-export const runtime = 'nodejs';
-
 // Bu fonksiyon, gelen isteklerdeki oturum çerezini doğrular
 async function verifySessionCookie(req: NextRequest) {
   const sessionCookie = req.cookies.get('session')?.value;

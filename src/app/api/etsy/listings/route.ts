@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth-middleware"
+import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth"
 import { db } from "@/lib/firebase/admin"
 
 // Geliştirme ortamında olup olmadığımızı kontrol et
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
       return createUnauthorizedResponse()
     }
     
-    const userId = authResult.userId
+    const userId = authResult.uid
     console.log('📦 Ürünler API çağrısı - kullanıcı:', userId)
     
     // URL parametrelerini al

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth-middleware"
+import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
   try {

@@ -39,6 +39,9 @@ const db = admin.firestore();
 
 export { adminAuth, db };
 
+// Auth modülünü doğrudan export et
+export const auth = admin.auth();
+
 export const storage = admin.storage;
 
 export default admin; 

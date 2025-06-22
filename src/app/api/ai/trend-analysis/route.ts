@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth-middleware"
+import { authenticateRequest, createUnauthorizedResponse } from "@/lib/auth"
 import { getEtsyStores } from "@/lib/etsy-api"
 
 export async function POST(request: NextRequest) {

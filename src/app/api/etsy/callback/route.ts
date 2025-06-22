@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
 
     // Kullanıcı ID'sini state parametresinden alıyoruz
     const userId = state
+    console.log('User ID from state:', userId)
     
     // Auth session'ı kontrol et
     const authSessionRef = adminDb.collection('etsy_auth_sessions').doc(userId)
@@ -114,6 +115,8 @@ export async function GET(request: NextRequest) {
     }
 
     const shopsData = await shopsResponse.json()
+    console.log('Shops data received:', JSON.stringify(shopsData).substring(0, 200) + '...')
+    
     if (!shopsData.results || shopsData.results.length === 0) {
       return redirectError('no_shop_found', 'No shop found for this user on Etsy.')
     }
@@ -122,42 +125,50 @@ export async function GET(request: NextRequest) {
     console.log('Shop info fetched successfully:', shop.shop_name)
     
     // Veritabanına kaydet
-    console.log('Saving Etsy data for user:', userId, 'and shop:', shop.shop_name)
+    console.log('Saving Etsy data for user:', userId, 'and shop:', shop.shop_id)
     
-    const batch = adminDb.batch()
-
-    // Token'ı kaydet
-    const tokenRef = adminDb.collection('etsy_tokens').doc(userId)
-    batch.set(tokenRef, {
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-      user_id: userId,
-      updated_at: new Date(),
-    }, { merge: true })
-
-    // Mağazayı kaydet
-    const storeRef = adminDb.collection('etsy_stores').doc(shop.shop_id.toString())
-    batch.set(storeRef, {
-      user_id: userId,
-      shop_id: shop.shop_id,
-      shop_name: shop.shop_name,
-      title: shop.title || shop.shop_name,
-      currency_code: shop.currency_code,
-      url: shop.url,
-      updated_at: new Date(),
-    }, { merge: true })
-    
-    // Geçici auth session'ı sil
-    batch.delete(authSessionRef)
-
-    await batch.commit()
-    console.log('Etsy data saved successfully')
+    try {
+      const batch = adminDb.batch()
+  
+      // Token'ı kaydet
+      const tokenRef = adminDb.collection('etsy_tokens').doc(userId)
+      batch.set(tokenRef, {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
+        user_id: userId,
+        updated_at: new Date(),
+      }, { merge: true })
+      console.log('Token data prepared for save')
+  
+      // Mağazayı kaydet
+      const storeRef = adminDb.collection('etsy_stores').doc(shop.shop_id.toString())
+      batch.set(storeRef, {
+        user_id: userId,
+        shop_id: shop.shop_id,
+        shop_name: shop.shop_name,
+        title: shop.title || shop.shop_name,
+        currency_code: shop.currency_code,
+        url: shop.url,
+        updated_at: new Date(),
+      }, { merge: true })
+      console.log('Shop data prepared for save')
+      
+      // Geçici auth session'ı sil
+      batch.delete(authSessionRef)
+      console.log('Auth session prepared for deletion')
+  
+      await batch.commit()
+      console.log('Batch commit successful - Etsy data saved successfully')
+    } catch (dbError) {
+      console.error('Error saving to database:', dbError)
+      return redirectError('database_error', dbError instanceof Error ? dbError.message : 'Unknown database error')
+    }
 
     // Başarılı yönlendirme
     const successUrl = new URL('/stores', request.url)
     successUrl.searchParams.set('etsy_connected', shop.shop_name)
-    console.log('Redirecting to success URL')
+    console.log('Redirecting to success URL:', successUrl.toString())
     return NextResponse.redirect(successUrl)
   } catch (err: any) {
     console.error('💥 Etsy callback failed:', err)

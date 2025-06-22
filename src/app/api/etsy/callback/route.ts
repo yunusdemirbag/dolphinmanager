@@ -1,178 +1,164 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/firebase/admin'
-
-async function exchangeCodeForToken(code: string, codeVerifier: string) {
-  console.log('Exchanging code for token with code verifier:', codeVerifier.substring(0, 10) + '...')
-  
-  const redirectUri = process.env.ETSY_REDIRECT_URI || 
-    `${process.env.NEXT_PUBLIC_BASE_URL}/api/etsy/callback`
-  
-  console.log('Using redirect URI:', redirectUri)
-  
-  const params = new URLSearchParams({
-    grant_type: 'authorization_code',
-    client_id: process.env.ETSY_CLIENT_ID!,
-    client_secret: process.env.ETSY_CLIENT_SECRET!,
-    redirect_uri: redirectUri,
-    code,
-    code_verifier: codeVerifier,
-  })
-  
-  console.log('Token exchange params (excluding code):', {
-    grant_type: 'authorization_code',
-    client_id: process.env.ETSY_CLIENT_ID!,
-    client_secret: '***',
-    redirect_uri: redirectUri,
-    code_verifier: codeVerifier.substring(0, 10) + '...',
-  })
-
-  const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params,
-  })
-
-  if (!response.ok) {
-    const errorBody = await response.text()
-    console.error('Etsy token exchange failed:', {
-      status: response.status,
-      body: errorBody,
-    })
-    throw new Error(`Token exchange failed: ${errorBody}`)
-  }
-
-  return response.json()
-}
-
-async function fetchEtsyShopInfo(accessToken: string) {
-  console.log('Fetching Etsy shop info with access token')
-  
-  const response = await fetch('https://openapi.etsy.com/v3/application/shops', {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'x-api-key': process.env.ETSY_CLIENT_ID!,
-    },
-  })
-
-  if (!response.ok) {
-    const errorBody = await response.text()
-    console.error('Failed to fetch Etsy shop info:', {
-      status: response.status,
-      body: errorBody,
-    })
-    throw new Error(`Failed to fetch shop info: ${errorBody}`)
-  }
-
-  const data = await response.json()
-  if (!data.results || data.results.length === 0) {
-    throw new Error('No shop found for this user on Etsy.')
-  }
-  return data.results[0] // Return the first shop
-}
-
-async function saveEtsyData(
-  userId: string,
-  tokenData: any,
-  shopData: any,
-) {
-  console.log('Saving Etsy data for user:', userId, 'and shop:', shopData.shop_name)
-  
-  const batch = db.batch()
-
-  // Save/update token
-  const tokenRef = db.collection('etsy_tokens').doc(userId)
-  batch.set(tokenRef, {
-    access_token: tokenData.access_token,
-    refresh_token: tokenData.refresh_token,
-    expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-    user_id: userId,
-    updated_at: new Date(),
-  }, { merge: true })
-
-  // Save/update store
-  const storeRef = db.collection('etsy_stores').doc(shopData.shop_id.toString())
-  batch.set(storeRef, {
-    user_id: userId,
-    shop_id: shopData.shop_id,
-    shop_name: shopData.shop_name,
-    title: shopData.title || shopData.shop_name,
-    currency_code: shopData.currency_code,
-    url: shopData.url,
-    updated_at: new Date(),
-  }, { merge: true })
-  
-  // Delete the temporary auth session
-  const sessionRef = db.collection('etsy_auth_sessions').doc(userId)
-  batch.delete(sessionRef)
-
-  await batch.commit()
-  console.log('Etsy data saved successfully')
-}
+import { db as adminDb } from '@/lib/firebase/admin'
 
 export async function GET(request: NextRequest) {
-  console.log('Etsy callback received')
-  
-  const { searchParams } = new URL(request.url)
-  const code = searchParams.get('code')
-  const userId = searchParams.get('state') // 'state' should be the userId
-  const error = searchParams.get('error')
-
-  console.log('Callback params:', { 
-    code: code ? code.substring(0, 5) + '...' : null, 
-    userId, 
-    error 
-  })
-
-  const redirectError = (errorCode: string, details?: string) => {
-    const url = new URL('/stores', request.url)
-    url.searchParams.set('error', errorCode)
-    if (details) url.searchParams.set('details', details)
-    console.error('Redirecting with error:', errorCode, details)
-    return NextResponse.redirect(url)
-  }
-
-  if (error) {
-    return redirectError('etsy_auth_failed', error)
-  }
-
-  if (!code || !userId) {
-    return redirectError('missing_params', 'Code or state is missing.')
-  }
-
   try {
-    const authSessionDoc = await db
-      .collection('etsy_auth_sessions')
-      .doc(userId)
-      .get()
+    console.log('Etsy callback received')
     
-    const codeVerifier = authSessionDoc.data()?.code_verifier
+    const { searchParams } = new URL(request.url)
+    const code = searchParams.get('code')
+    const state = searchParams.get('state') // state = userId
+    const error = searchParams.get('error')
+
+    console.log('Callback params:', { 
+      code: code ? code.substring(0, 5) + '...' : null, 
+      state, 
+      error 
+    })
+
+    const redirectError = (errorCode: string, details?: string) => {
+      const url = new URL('/stores', request.url)
+      url.searchParams.set('error', errorCode)
+      if (details) url.searchParams.set('details', details)
+      console.error('Redirecting with error:', errorCode, details)
+      return NextResponse.redirect(url)
+    }
+
+    if (error) {
+      return redirectError('etsy_auth_failed', error)
+    }
+
+    if (!code || !state) {
+      return redirectError('missing_params', 'Code or state is missing.')
+    }
+
+    // Kullanıcı ID'sini state parametresinden alıyoruz
+    const userId = state
+    
+    // Auth session'ı kontrol et
+    const authSessionRef = adminDb.collection('etsy_auth_sessions').doc(userId)
+    const authSessionDoc = await authSessionRef.get()
+
+    if (!authSessionDoc.exists) {
+      return redirectError('session_expired', 'Auth session not found.')
+    }
+
+    const { code_verifier } = authSessionDoc.data()!
 
     console.log('Auth session found:', {
       exists: authSessionDoc.exists,
-      hasVerifier: !!codeVerifier
+      hasVerifier: !!code_verifier
     })
 
-    if (!codeVerifier) {
+    if (!code_verifier) {
       return redirectError(
         'pkce_missing',
         'Session expired or invalid. Please try connecting again.',
       )
     }
 
-    const tokenData = await exchangeCodeForToken(code, codeVerifier)
+    // Token değişimi
+    console.log('Exchanging code for token with code verifier:', code_verifier.substring(0, 10) + '...')
+    
+    const redirectUri = process.env.ETSY_REDIRECT_URI || 
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/etsy/callback`
+    
+    console.log('Using redirect URI:', redirectUri)
+    
+    const tokenResponse = await fetch('https://api.etsy.com/v3/public/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: process.env.ETSY_CLIENT_ID!,
+        client_secret: process.env.ETSY_CLIENT_SECRET!,
+        redirect_uri: redirectUri,
+        code,
+        code_verifier,
+      }),
+    })
+
+    if (!tokenResponse.ok) {
+      const errorBody = await tokenResponse.text()
+      console.error('Etsy token exchange failed:', {
+        status: tokenResponse.status,
+        body: errorBody,
+      })
+      return redirectError('token_exchange_failed', errorBody)
+    }
+
+    const tokenData = await tokenResponse.json()
     console.log('Token exchange successful')
     
-    const shopData = await fetchEtsyShopInfo(tokenData.access_token)
-    console.log('Shop info fetched successfully:', shopData.shop_name)
+    // Mağaza bilgilerini çek - Doğru endpoint kullanılıyor
+    console.log('Fetching Etsy shop info with access token')
     
-    await saveEtsyData(userId, tokenData, shopData)
+    const shopsResponse = await fetch('https://openapi.etsy.com/v3/application/shops', {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'x-api-key': process.env.ETSY_CLIENT_ID!,
+      },
+    })
 
+    if (!shopsResponse.ok) {
+      const errorBody = await shopsResponse.text()
+      console.error('Failed to fetch Etsy shop info:', {
+        status: shopsResponse.status,
+        body: errorBody,
+      })
+      return redirectError('shop_info_failed', errorBody)
+    }
+
+    const shopsData = await shopsResponse.json()
+    if (!shopsData.results || shopsData.results.length === 0) {
+      return redirectError('no_shop_found', 'No shop found for this user on Etsy.')
+    }
+    
+    const shop = shopsData.results[0]
+    console.log('Shop info fetched successfully:', shop.shop_name)
+    
+    // Veritabanına kaydet
+    console.log('Saving Etsy data for user:', userId, 'and shop:', shop.shop_name)
+    
+    const batch = adminDb.batch()
+
+    // Token'ı kaydet
+    const tokenRef = adminDb.collection('etsy_tokens').doc(userId)
+    batch.set(tokenRef, {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
+      user_id: userId,
+      updated_at: new Date(),
+    }, { merge: true })
+
+    // Mağazayı kaydet
+    const storeRef = adminDb.collection('etsy_stores').doc(shop.shop_id.toString())
+    batch.set(storeRef, {
+      user_id: userId,
+      shop_id: shop.shop_id,
+      shop_name: shop.shop_name,
+      title: shop.title || shop.shop_name,
+      currency_code: shop.currency_code,
+      url: shop.url,
+      updated_at: new Date(),
+    }, { merge: true })
+    
+    // Geçici auth session'ı sil
+    batch.delete(authSessionRef)
+
+    await batch.commit()
+    console.log('Etsy data saved successfully')
+
+    // Başarılı yönlendirme
     const successUrl = new URL('/stores', request.url)
-    successUrl.searchParams.set('etsy_connected', shopData.shop_name)
+    successUrl.searchParams.set('etsy_connected', shop.shop_name)
     console.log('Redirecting to success URL')
     return NextResponse.redirect(successUrl)
   } catch (err: any) {
     console.error('💥 Etsy callback failed:', err)
-    return redirectError('callback_failed', err.message)
+    return NextResponse.redirect(
+      new URL(`/stores?error=callback_failed&details=${encodeURIComponent(err.message)}`, request.url)
+    )
   }
 }

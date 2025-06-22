@@ -40,8 +40,42 @@ export default function StoresClient() {
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false)
   const [storeToDisconnect, setStoreToDisconnect] = useState<EtsyStore | null>(null)
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { toast } = useToast()
+
+  // URL'den hata parametrelerini kontrol et
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    const detailsParam = params.get('details');
+    const connectedParam = params.get('etsy_connected');
+
+    if (errorParam) {
+      console.error('Etsy error from URL:', errorParam, detailsParam);
+      toast({
+        title: 'Etsy Bağlantı Hatası',
+        description: detailsParam || errorParam,
+        variant: 'destructive',
+      });
+      
+      // URL'den parametreleri temizle
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('error');
+      newUrl.searchParams.delete('details');
+      window.history.replaceState({}, '', newUrl);
+    } else if (connectedParam) {
+      toast({
+        title: 'Başarılı',
+        description: `${connectedParam} mağazası başarıyla bağlandı.`,
+      });
+      
+      // URL'den parametreleri temizle
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('etsy_connected');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [toast]);
 
   const fetchStores = useCallback(async () => {
     if (!user) {
@@ -54,12 +88,18 @@ export default function StoresClient() {
 
     try {
       setLoading(true)
+      setError(null);
+      console.log('Fetching Etsy stores...');
+      
       const token = await getAuthToken();
+      console.log('Auth token obtained');
+      
       const response = await fetch('/api/etsy/stores', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
 
       if (response.status === 401) {
+          console.log('Unauthorized: Session expired');
           setSessionExpired(true);
           setLoading(false);
           return;
@@ -68,9 +108,24 @@ export default function StoresClient() {
       if (!response.ok) {
         throw new Error('Mağazalar yüklenemedi.')
       }
+      
       const data = await response.json()
-      setStores(data.stores || [])
+      console.log('Stores API response:', data);
+      
+      if (data.success === false && data.code === 'NO_STORES') {
+        console.log('No stores found for user');
+        setStores([]);
+      } else if (data.stores && Array.isArray(data.stores)) {
+        console.log(`Found ${data.stores.length} stores`);
+        setStores(data.stores);
+      } else {
+        console.error('Invalid API response format:', data);
+        setError('API yanıtı geçersiz format içeriyor.');
+        setStores([]);
+      }
     } catch (error) {
+      console.error('Error fetching stores:', error);
+      setError(error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.');
       toast({
         title: 'Hata',
         description: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.',
@@ -88,6 +143,7 @@ export default function StoresClient() {
   const handleConnect = async () => {
     setIsConnecting(true)
     try {
+      console.log('Getting Etsy auth URL...');
       const token = await getAuthToken();
       const response = await fetch('/api/etsy/auth-url', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -96,8 +152,10 @@ export default function StoresClient() {
         throw new Error('Etsy kimlik doğrulama URL\'si alınamadı.')
       }
       const data = await response.json()
-      window.location.href = data.authUrl
+      console.log('Redirecting to Etsy auth URL');
+      window.location.href = data.url
     } catch (error) {
+      console.error('Error connecting to Etsy:', error);
       toast({
         title: 'Hata',
         description: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.',
@@ -227,6 +285,12 @@ export default function StoresClient() {
                 </Card>
               ))}
             </div>
+          ) : error ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Hata Oluştu</AlertTitle>
+              <UIAlertDescription>{error}</UIAlertDescription>
+              <Button className="mt-2" onClick={fetchStores}>Yeniden Dene</Button>
+            </Alert>
           ) : stores.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {stores.map(store => (
@@ -248,38 +312,49 @@ export default function StoresClient() {
                                 </div>
                             )}
                             <div>
-                                <CardTitle className="text-lg">{store.shop_name}</CardTitle>
-                                <CardDescription>{store.listing_active_count} aktif ürün</CardDescription>
+                                <h3 className="text-lg font-semibold">{store.shop_name}</h3>
+                                <p className="text-sm text-muted-foreground">
+                                {store.listing_active_count || 0} aktif ürün
+                                </p>
                             </div>
                         </div>
-                         {store.url && (
-                             <Button variant="ghost" size="icon" asChild>
-                                <a href={store.url} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink className="h-4 w-4" />
-                                </a>
-                             </Button>
-                         )}
                     </div>
                   </CardHeader>
-                  <CardFooter className="flex justify-end gap-2">
+                  <CardFooter className="flex justify-between">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleRefreshToken(store.shop_id)}
-                      disabled={isRefreshing === store.shop_id}
+                      onClick={() => window.open(store.url || `https://www.etsy.com/shop/${store.shop_name}`, '_blank')}
                     >
-                      {isRefreshing === store.shop_id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                      Yenile
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Mağazayı Görüntüle
                     </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => confirmDisconnect(store)}
-                      disabled={isDisconnecting === store.shop_id}
-                    >
-                      {isDisconnecting === store.shop_id ? <Loader2 className="mr-2 h-4 w-4 animate-pulse" /> : <Unplug className="mr-2 h-4 w-4" />}
-                      Bağlantıyı Kes
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleRefreshToken(store.shop_id)}
+                        disabled={isRefreshing === store.shop_id}
+                      >
+                        {isRefreshing === store.shop_id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => confirmDisconnect(store)}
+                        disabled={isDisconnecting === store.shop_id}
+                      >
+                        {isDisconnecting === store.shop_id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Unplug className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </CardFooter>
                 </Card>
               ))}
@@ -287,35 +362,50 @@ export default function StoresClient() {
           ) : (
             <div className="text-center py-12">
               <XCircle className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-medium">Hiçbir mağaza bağlı değil</h3>
+              <h3 className="mt-4 text-lg font-semibold">Hiçbir mağaza bağlı değil</h3>
               <p className="mt-2 text-sm text-muted-foreground">
                 Yeni bir Etsy mağazası bağlayarak ürünlerinizi yönetmeye başlayın.
               </p>
             </div>
           )}
         </CardContent>
-        {canAddStore && !loading && !authLoading && (
-           <CardFooter className="border-t pt-6">
-                <Button onClick={handleConnect} disabled={isConnecting || !canAddStore}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  {isConnecting ? 'Yönlendiriliyor...' : 'Yeni Mağaza Bağla'}
-                </Button>
-            </CardFooter>
-        )}
+        <CardFooter className="flex justify-end">
+          <Button
+            onClick={handleConnect}
+            disabled={isConnecting || !canAddStore}
+            className="flex items-center"
+          >
+            {isConnecting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Bağlanıyor...
+              </>
+            ) : (
+              <>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Yeni Mağaza Bağla
+              </>
+            )}
+          </Button>
+        </CardFooter>
       </Card>
-      
+
       <AlertDialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Emin misiniz?</AlertDialogTitle>
+            <AlertDialogTitle>Mağaza Bağlantısını Kes</AlertDialogTitle>
             <AlertDialogDescription>
-              "{storeToDisconnect?.shop_name}" mağazasının bağlantısını kesmek üzeresiniz. Bu işlem geri alınamaz.
+              {storeToDisconnect && (
+                <>
+                  <strong>{storeToDisconnect.shop_name}</strong> mağazasının bağlantısını kesmek istediğinize emin misiniz?
+                  Bu işlem geri alınamaz ve mağazanızı yeniden bağlamanız gerekecektir.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDisconnect} className="bg-destructive hover:bg-destructive/90">
-              {isDisconnecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            <AlertDialogAction onClick={handleDisconnect} className="bg-destructive">
               Bağlantıyı Kes
             </AlertDialogAction>
           </AlertDialogFooter>

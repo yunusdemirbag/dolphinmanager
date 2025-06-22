@@ -32,19 +32,18 @@ const nextConfig = {
     ]
   },
   distDir: '.next',
-  serverExternalPackages: ['firebase-admin'],
   webpack: (config, { isServer }) => {
     // WebAssembly desteği ekle
     config.experiments = {
       ...config.experiments,
-      syncWebAssembly: true,
+      asyncWebAssembly: true,
       layers: true,
     };
     
     // WebAssembly modülleri için kural ekle
     config.module.rules.push({
       test: /\.wasm$/,
-      type: 'webassembly/sync',
+      type: 'webassembly/async',
     });
     
     return config;

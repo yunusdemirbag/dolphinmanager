@@ -1,5 +1,4 @@
-import { getAuth } from 'firebase-admin/auth';
-import { initFirebaseAdminApp } from '@/lib/firebase/admin';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { NextRequest } from 'next/server';
 
 export interface AuthenticatedRequest extends NextRequest {
@@ -13,6 +12,8 @@ export interface AuthenticatedRequest extends NextRequest {
 // Geliştirme ortamında kimlik doğrulamayı atlama seçeneği
 const DEV_MODE = process.env.NODE_ENV === 'development';
 const SKIP_AUTH_IN_DEV = process.env.SKIP_AUTH_IN_DEV === 'true';
+
+const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/service_account/v1/jwk/securetoken.google.com'));
 
 export async function authenticateRequest(request: NextRequest): Promise<{ userId: string; user: any } | null> {
   try {
@@ -41,11 +42,18 @@ export async function authenticateRequest(request: NextRequest): Promise<{ userI
     
     try {
       // Firebase token'ı doğrula
-      const decodedToken = await getAuth().verifyIdToken(token)
+      const { payload } = await jwtVerify(token, JWKS, {
+        issuer: 'https://securetoken.google.com/' + process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        audience: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      })
+      
+      if (!payload.sub) {
+        throw new Error('Token does not have a subject (sub) claim.');
+      }
       
       return {
-        userId: decodedToken.uid,
-        user: decodedToken
+        userId: payload.sub,
+        user: payload
       }
     } catch (tokenError) {
       console.error('❌ Token doğrulama hatası:', tokenError);
@@ -81,11 +89,14 @@ export function createUnauthorizedResponse() {
 // Helper function to verify the token
 export async function verifyAuth(token: string) {
   try {
-    initFirebaseAdminApp();
-    const decodedToken = await getAuth().verifyIdToken(token);
-    return decodedToken;
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: 'https://securetoken.google.com/' + process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      audience: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    });
+
+    return payload;
   } catch (error) {
-    console.error('Error verifying auth token:', error);
+    console.error('Error verifying auth token with jose:', error);
     return null;
   }
 }

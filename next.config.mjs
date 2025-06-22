@@ -31,6 +31,9 @@ const nextConfig = {
     ]
   },
   distDir: '.next',
+  experimental: {
+    asyncWebAssembly: true,
+  },
 }
 
 export default nextConfig

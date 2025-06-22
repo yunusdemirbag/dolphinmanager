@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser, createUnauthorizedResponse } from '@/lib/auth'
-import { getEtsyAuthUrl } from "@/lib/etsy-api"
 import crypto from 'crypto'
 import { db } from '@/lib/firebase/admin'
 
@@ -9,6 +8,8 @@ const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
 const ETSY_CLIENT_SECRET = process.env.ETSY_CLIENT_SECRET || ""
 const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://dolphinmanager-phi.vercel.app/api/etsy/callback'
 const ETSY_SCOPE = process.env.ETSY_SCOPE || "email_r profile_r shops_r shops_w listings_r listings_w listings_d transactions_r transactions_w profile_r address_r address_w billing_r cart_r cart_w"
+
+export const runtime = 'nodejs'; // Edge Runtime'da sorun yaşanıyor, Node.js kullan
 
 export async function GET(request: NextRequest) {
   try {

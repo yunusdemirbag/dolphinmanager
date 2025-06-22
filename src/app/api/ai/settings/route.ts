@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { db as adminDb } from '@/lib/firebase/admin';
 
+// Node.js runtime kullan
+export const runtime = 'nodejs';
+
 // OpenAI ayarlarını getir
 export async function GET(request: NextRequest) {
   const user = await getAuthenticatedUser(request);

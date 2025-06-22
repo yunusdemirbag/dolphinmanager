@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/firebase/admin'
 
+// Node.js runtime kullan
+export const runtime = 'nodejs';
+
 // Etsy API kimlik bilgileri
 const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID!
 const ETSY_CLIENT_SECRET = process.env.ETSY_CLIENT_SECRET!

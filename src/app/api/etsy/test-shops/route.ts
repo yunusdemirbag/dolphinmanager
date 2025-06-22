@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { db } from '@/lib/firebase/admin';
 
+// Node.js runtime kullan
+export const runtime = 'nodejs';
+
 export async function GET(request: NextRequest) {
   try {
     console.log("Etsy test-shops API called");

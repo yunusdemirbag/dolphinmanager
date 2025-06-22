@@ -12,6 +12,11 @@ export async function middleware(req: NextRequest) {
   const hasSession = hasSessionCookie(req);
   const { pathname } = req.nextUrl;
 
+  // /undefined yoluna yapılan istekleri /dashboard'a yönlendir
+  if (pathname === '/undefined') {
+    return NextResponse.redirect(new URL('/dashboard', req.url));
+  }
+
   // API rotalarını middleware'de korumayı kaldırdık
   // Her API rotası kendi içinde kimlik doğrulama yapacak
 
@@ -34,7 +39,6 @@ export const config = {
     /*
      * Aşağıdaki yollar hariç TÜM istek yollarıyla eşleştir:
      * - /auth/ ile başlayanlar (giriş/kayıt sayfaları)
-     * - /api/auth/session (oturum oluşturma/silme API'si)
      * - _next/static, _next/image, favicon.ico (statik dosyalar)
      */
     '/((?!auth/|_next/static|_next/image|favicon.ico|api/auth/session).*)',

@@ -171,13 +171,17 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
     })
 
     // Firebase'e code verifier'ı kaydet
-    await db.collection("etsy_auth_sessions").doc(userId).set({
-      code_verifier: codeVerifier,
-      state: userId,
-      created_at: new Date().toISOString()
-    });
-
-    console.log("Auth session stored successfully in Firebase")
+    try {
+      await db.collection("etsy_auth_sessions").doc(userId).set({
+        code_verifier: codeVerifier,
+        state: userId,
+        created_at: new Date().toISOString()
+      });
+      console.log("Auth session stored successfully in Firebase")
+    } catch (dbError) {
+      console.error("Error storing auth session in Firebase:", dbError)
+      throw new Error("Failed to store auth session")
+    }
 
     // Etsy OAuth URL'ini oluştur
     const authUrl = `https://www.etsy.com/oauth/connect?` +
@@ -189,6 +193,7 @@ export async function getEtsyAuthUrl(userId: string): Promise<string> {
       `code_challenge=${codeChallenge}&` +
       `code_challenge_method=S256`
       
+    console.log("Generated Etsy auth URL:", authUrl.substring(0, 100) + "...")
     return authUrl
   } catch (error) {
     console.error("Error generating Etsy auth URL:", error)

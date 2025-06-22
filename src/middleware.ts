@@ -17,9 +17,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
-  // API rotalarını middleware'de korumayı kaldırdık
-  // Her API rotası kendi içinde kimlik doğrulama yapacak
-
   // Kullanıcı giriş yapmamışsa ve korumalı bir sayfaya gitmeye çalışıyorsa,
   // onu giriş sayfasına yönlendir.
   const protectedPages = ['/stores', '/settings', '/dashboard', '/products', '/analytics', '/orders', '/marketing'];
@@ -38,9 +35,10 @@ export const config = {
   matcher: [
     /*
      * Aşağıdaki yollar hariç TÜM istek yollarıyla eşleştir:
+     * - /api/ ile başlayanlar (API rotaları)
      * - /auth/ ile başlayanlar (giriş/kayıt sayfaları)
      * - _next/static, _next/image, favicon.ico (statik dosyalar)
      */
-    '/((?!auth/|_next/static|_next/image|favicon.ico|api/auth/session).*)',
+    '/((?!api/|auth/|_next/static|_next/image|favicon.ico|api/auth/session).*)',
   ],
 };

@@ -1,4 +1,10 @@
 {
+  "version": 2,
+  "build": {
+    "env": {
+      "VERCEL_FORCE_NO_BUILD_CACHE": "1"
+    }
+  },
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "crons": [

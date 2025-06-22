@@ -8,6 +8,7 @@ async function exchangeCodeForToken(code: string, codeVerifier: string) {
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: process.env.ETSY_CLIENT_ID!,
+      client_secret: process.env.ETSY_CLIENT_SECRET!,
       redirect_uri:
         process.env.ETSY_REDIRECT_URI ||
         `${process.env.NEXT_PUBLIC_BASE_URL}/api/etsy/callback`,

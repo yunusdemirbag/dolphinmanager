@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Auth session bilgilerini al
     const sessionDoc = sessionsSnapshot.docs[0]
     const sessionData = sessionDoc.data()
-    const userId = sessionData.user_id
+    const userId = sessionData.state // state = userId
     const codeVerifier = sessionData.code_verifier
     
     console.log('[etsy/callback] Session bulundu:', { userId })

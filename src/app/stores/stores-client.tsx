@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { PlusCircle, RefreshCw, XCircle, ExternalLink, Unplug, Loader2 } from 'lucide-react'
@@ -19,7 +19,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { Alert, AlertTitle, AlertDescription as UIAlertDescription } from "@/components/ui/alert"
 
-
 interface EtsyStore {
   shop_id: number;
   shop_name: string;
@@ -28,6 +27,45 @@ interface EtsyStore {
   listing_active_count: number;
   icon_url_fullxfull?: string;
   url?: string;
+  currency_code?: string;
+  is_vacation?: boolean;
+  title?: string;
+  image_url_760x100?: string;
+}
+
+// URL parametrelerini kontrol eden bileşen
+function StoresUrlHandler({ onError, onSuccess }: { 
+  onError: (error: string, details?: string) => void,
+  onSuccess: (shopName?: string) => void
+}) {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get('error');
+    const detailsParam = params.get('details');
+    const successParam = params.get('success');
+    const connectedParam = params.get('etsy_connected');
+
+    if (errorParam) {
+      console.error('Etsy error from URL:', errorParam, detailsParam);
+      onError(errorParam, detailsParam || undefined);
+      
+      // URL'den parametreleri temizle
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('error');
+      newUrl.searchParams.delete('details');
+      window.history.replaceState({}, '', newUrl);
+    } else if (successParam || connectedParam) {
+      onSuccess(connectedParam || undefined);
+      
+      // URL'den parametreleri temizle
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('success');
+      newUrl.searchParams.delete('etsy_connected');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [onError, onSuccess]);
+
+  return null;
 }
 
 export default function StoresClient() {
@@ -44,36 +82,25 @@ export default function StoresClient() {
 
   const { toast } = useToast()
 
-  // URL'den hata parametrelerini kontrol et
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const errorParam = params.get('error');
-    const detailsParam = params.get('details');
-    const connectedParam = params.get('etsy_connected');
+  const handleUrlError = useCallback((errorMsg: string, details?: string) => {
+    toast({
+      title: 'Etsy Bağlantı Hatası',
+      description: details || errorMsg,
+      variant: 'destructive',
+    });
+  }, [toast]);
 
-    if (errorParam) {
-      console.error('Etsy error from URL:', errorParam, detailsParam);
-      toast({
-        title: 'Etsy Bağlantı Hatası',
-        description: detailsParam || errorParam,
-        variant: 'destructive',
-      });
-      
-      // URL'den parametreleri temizle
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.delete('error');
-      newUrl.searchParams.delete('details');
-      window.history.replaceState({}, '', newUrl);
-    } else if (connectedParam) {
+  const handleUrlSuccess = useCallback((shopName?: string) => {
+    if (shopName) {
       toast({
         title: 'Başarılı',
-        description: `${connectedParam} mağazası başarıyla bağlandı.`,
+        description: `${shopName} mağazası başarıyla bağlandı.`,
       });
-      
-      // URL'den parametreleri temizle
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.delete('etsy_connected');
-      window.history.replaceState({}, '', newUrl);
+    } else {
+      toast({
+        title: 'Başarılı',
+        description: 'Etsy mağazası başarıyla bağlandı.',
+      });
     }
   }, [toast]);
 
@@ -257,138 +284,173 @@ export default function StoresClient() {
 
   return (
     <div className="container mx-auto p-4 md:p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Etsy Mağazalarım</CardTitle>
-          <CardDescription>
-            Bağlı olan Etsy mağazalarınızı yönetin. Toplam 5 adete kadar mağaza bağlayabilirsiniz.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading || authLoading ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[...Array(3)].map((_, i) => (
-                 <Card key={i}>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <Skeleton className="h-12 w-12 rounded-full" />
-                            <div className="flex flex-col gap-2">
-                                <Skeleton className="h-4 w-[150px]" />
-                                <Skeleton className="h-4 w-[100px]" />
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardFooter className="flex justify-end gap-2">
-                         <Skeleton className="h-10 w-24" />
-                         <Skeleton className="h-10 w-10" />
-                    </CardFooter>
-                </Card>
-              ))}
-            </div>
-          ) : error ? (
-            <Alert variant="destructive" className="mb-4">
-              <AlertTitle>Hata Oluştu</AlertTitle>
-              <UIAlertDescription>{error}</UIAlertDescription>
-              <Button className="mt-2" onClick={fetchStores}>Yeniden Dene</Button>
-            </Alert>
-          ) : stores.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {stores.map(store => (
-                <Card key={store.shop_id} className="flex flex-col justify-between">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            {store.icon_url_fullxfull ? (
-                                <img
-                                src={store.icon_url_fullxfull}
-                                alt={store.shop_name}
-                                className="h-12 w-12 rounded-full"
-                                />
-                            ) : (
-                                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                                <span className="text-xl font-bold">
-                                    {store.shop_name.charAt(0)}
-                                </span>
-                                </div>
-                            )}
-                            <div>
-                                <h3 className="text-lg font-semibold">{store.shop_name}</h3>
-                                <p className="text-sm text-muted-foreground">
-                                {store.listing_active_count || 0} aktif ürün
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                  </CardHeader>
-                  <CardFooter className="flex justify-between">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(store.url || `https://www.etsy.com/shop/${store.shop_name}`, '_blank')}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Mağazayı Görüntüle
-                    </Button>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleRefreshToken(store.shop_id)}
-                        disabled={isRefreshing === store.shop_id}
-                      >
-                        {isRefreshing === store.shop_id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => confirmDisconnect(store)}
-                        disabled={isDisconnecting === store.shop_id}
-                      >
-                        {isDisconnecting === store.shop_id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Unplug className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <XCircle className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">Hiçbir mağaza bağlı değil</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Yeni bir Etsy mağazası bağlayarak ürünlerinizi yönetmeye başlayın.
+      {/* URL parametrelerini işleyen bileşen */}
+      <Suspense fallback={null}>
+        <StoresUrlHandler onError={handleUrlError} onSuccess={handleUrlSuccess} />
+      </Suspense>
+      
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Etsy Mağazalarım</h1>
+          <p className="text-muted-foreground">Etsy mağazalarınızı bağlayın ve yönetin</p>
+        </div>
+        <Button 
+          onClick={handleConnect} 
+          disabled={isConnecting}
+          className="flex items-center gap-2"
+        >
+          {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+          <span>Mağaza Bağla</span>
+        </Button>
+      </div>
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTitle>Hata</AlertTitle>
+          <UIAlertDescription>{error}</UIAlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          // Yükleme durumu
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="overflow-hidden">
+              <CardHeader className="pb-2">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4 mb-4">
+                  <Skeleton className="h-16 w-16 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Skeleton className="h-10 w-full" />
+              </CardFooter>
+            </Card>
+          ))
+        ) : stores.length === 0 ? (
+          // Mağaza yok
+          <Card className="col-span-full">
+            <CardHeader>
+              <CardTitle>Henüz Mağaza Bağlanmadı</CardTitle>
+              <CardDescription>
+                Etsy mağazanızı bağlamak için "Mağaza Bağla" butonuna tıklayın.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Mağazanızı bağladıktan sonra ürünlerinizi yönetebilir, siparişlerinizi takip edebilir ve daha fazlasını yapabilirsiniz.
               </p>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-end">
-          <Button
-            onClick={handleConnect}
-            disabled={isConnecting || !canAddStore}
-            className="flex items-center"
-          >
-            {isConnecting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Bağlanıyor...
-              </>
-            ) : (
-              <>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Yeni Mağaza Bağla
-              </>
-            )}
-          </Button>
-        </CardFooter>
-      </Card>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                onClick={handleConnect} 
+                disabled={isConnecting}
+                className="w-full flex items-center justify-center gap-2"
+              >
+                {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+                <span>Mağaza Bağla</span>
+              </Button>
+            </CardFooter>
+          </Card>
+        ) : (
+          // Mağazalar
+          stores.map((store) => (
+            <Card key={store.shop_id}>
+              <CardHeader>
+                <CardTitle>{store.shop_name}</CardTitle>
+                <CardDescription>
+                  {store.listing_active_count} aktif ürün
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col space-y-4">
+                  <div className="flex items-center gap-4">
+                    {store.icon_url_fullxfull ? (
+                      <img 
+                        src={store.icon_url_fullxfull} 
+                        alt={`${store.shop_name} icon`}
+                        className="h-16 w-auto object-cover rounded"
+                      />
+                    ) : (
+                      <div className="h-16 w-32 bg-muted rounded flex items-center justify-center">
+                        <span className="text-xl font-bold">
+                          {store.shop_name.charAt(0)}
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium">{store.shop_name}</p>
+                      <p className="text-sm text-muted-foreground">ID: {store.shop_id}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Para Birimi</p>
+                      <p>{store.currency_code || 'USD'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Durum</p>
+                      <p>{store.is_vacation ? 'Tatil Modu' : 'Aktif'}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.open(store.url || `https://www.etsy.com/shop/${store.shop_name}`, '_blank')}
+                  className="flex items-center gap-1"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  <span>Ziyaret Et</span>
+                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleRefreshToken(store.shop_id)}
+                    disabled={isRefreshing === store.shop_id}
+                    className="flex items-center gap-1"
+                  >
+                    {isRefreshing === store.shop_id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    <span>Yenile</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => confirmDisconnect(store)}
+                    disabled={isDisconnecting === store.shop_id}
+                    className="flex items-center gap-1 text-destructive hover:text-destructive"
+                  >
+                    {isDisconnecting === store.shop_id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Unplug className="h-3 w-3" />
+                    )}
+                    <span>Bağlantıyı Kes</span>
+                  </Button>
+                </div>
+              </CardFooter>
+            </Card>
+          ))
+        )}
+      </div>
 
       <AlertDialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
         <AlertDialogContent>
@@ -397,15 +459,15 @@ export default function StoresClient() {
             <AlertDialogDescription>
               {storeToDisconnect && (
                 <>
-                  <strong>{storeToDisconnect.shop_name}</strong> mağazasının bağlantısını kesmek istediğinize emin misiniz?
-                  Bu işlem geri alınamaz ve mağazanızı yeniden bağlamanız gerekecektir.
+                  <p><strong>{storeToDisconnect.shop_name}</strong> mağazasının bağlantısını kesmek istediğinizden emin misiniz?</p>
+                  <p className="mt-2">Bu işlem mağazanızın verilerini sistemden silecektir. Dilediğiniz zaman tekrar bağlayabilirsiniz.</p>
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDisconnect} className="bg-destructive">
+            <AlertDialogAction onClick={handleDisconnect} className="bg-destructive hover:bg-destructive/90">
               Bağlantıyı Kes
             </AlertDialogAction>
           </AlertDialogFooter>

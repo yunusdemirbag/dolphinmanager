@@ -12,17 +12,8 @@ export async function middleware(req: NextRequest) {
   const hasSession = hasSessionCookie(req);
   const { pathname } = req.nextUrl;
 
-  // Korunması gereken API rotaları
-  const protectedApiRoutes = ['/api/etsy', '/api/user', '/api/ai'];
-
-  // Eğer istek korumalı bir API rotasına gidiyorsa VE oturum çerezi yoksa,
-  // isteği reddet. Gerçek kimlik doğrulama API rotalarında yapılacak.
-  if (protectedApiRoutes.some(path => pathname.startsWith(path)) && !hasSession) {
-    return new NextResponse(
-        JSON.stringify({ error: 'Unauthorized: No valid session cookie' }), 
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
+  // API rotalarını middleware'de korumayı kaldırdık
+  // Her API rotası kendi içinde kimlik doğrulama yapacak
 
   // Kullanıcı giriş yapmamışsa ve korumalı bir sayfaya gitmeye çalışıyorsa,
   // onu giriş sayfasına yönlendir.

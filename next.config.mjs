@@ -37,8 +37,16 @@ const nextConfig = {
     // WebAssembly desteği ekle
     config.experiments = {
       ...config.experiments,
-      asyncWebAssembly: true,
+      syncWebAssembly: true,
+      layers: true,
     };
+    
+    // WebAssembly modülleri için kural ekle
+    config.module.rules.push({
+      test: /\.wasm$/,
+      type: 'webassembly/sync',
+    });
+    
     return config;
   },
 }

@@ -42,7 +42,7 @@ const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID || ""
 const ETSY_REDIRECT_URI = process.env.ETSY_REDIRECT_URI || "http://localhost:3000/api/etsy/callback"
 const ETSY_CLIENT_SECRET = process.env.ETSY_CLIENT_SECRET || ""
 // Tüm gerekli izinleri içeren scope'lar
-const ETSY_SCOPE = process.env.ETSY_SCOPE || "email_r shops_r shops_w listings_r listings_w listings_d transactions_r transactions_w profile_r address_r address_w billing_r cart_r cart_w"
+const ETSY_SCOPE = process.env.ETSY_SCOPE || "email_r profile_r shops_r shops_w listings_r listings_w listings_d transactions_r transactions_w profile_r address_r address_w billing_r cart_r cart_w"
 
 // Environment variables kontrolü
 function checkEtsyConfig() {

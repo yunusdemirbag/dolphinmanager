@@ -172,19 +172,32 @@ export default function StoresClient() {
     try {
       console.log('Getting Etsy auth URL...');
       const token = await getAuthToken();
+      if (!token) {
+        throw new Error('Kimlik doğrulama tokenı bulunamadı.');
+      }
+
       const response = await fetch('/api/etsy/auth-url', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
+
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Etsy kimlik doğrulama URL\'si alınamadı.')
+        console.error('Failed to get auth URL:', data);
+        throw new Error(data.error || `Sunucu hatası: ${response.status}`);
       }
-      const data = await response.json()
-      console.log('Redirecting to Etsy auth URL');
-      window.location.href = data.url
+      
+      if (data.url) {
+        console.log('Redirecting to Etsy auth URL:', data.url);
+        window.location.href = data.url
+      } else {
+        console.error('Auth URL not found in response:', data);
+        throw new Error('Etsy kimlik doğrulama URL\'si yanıtta bulunamadı.');
+      }
     } catch (error) {
       console.error('Error connecting to Etsy:', error);
       toast({
-        title: 'Hata',
+        title: 'Bağlantı Hatası',
         description: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu.',
         variant: 'destructive',
       })

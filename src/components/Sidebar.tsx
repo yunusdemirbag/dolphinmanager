@@ -1,172 +1,117 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { 
-  Home, 
-  Package, 
-  ShoppingBag, 
-  BarChart3, 
-  Bot, 
-  DollarSign,
-  Search,
-  Store,
-  Users,
-  TrendingUp,
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import {
+  Home,
+  LineChart,
+  Package,
+  Package2,
   Settings,
-  LogOut,
-  Sparkles,
-  CreditCard
+  ShoppingCart,
+  Users2,
 } from "lucide-react"
-import { usePathname, useRouter } from "next/navigation"
-import { createClientSupabase } from "@/lib/supabase"
-import { SupabaseClient } from "@supabase/supabase-js"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
-export function Sidebar({ currentStoreName }: { currentStoreName?: string }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+export default function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
-  
-  useEffect(() => {
-    async function initSupabase() {
-      const client = await createClientSupabase()
-      setSupabase(client)
-    }
-    
-    initSupabase()
-  }, [])
-  
-  const isOnboarding = pathname?.includes("/onboarding")
-  const isAuth = pathname?.includes("/auth")
 
-  if (isOnboarding || isAuth) return null
-
-  const handleLogout = async () => {
-    if (supabase) {
-      await supabase.auth.signOut()
-      router.push("/auth/login")
-    }
+  const isActive = (path: string) => {
+    return pathname === path
   }
-
-  const handleNavigation = (path: string) => {
-    router.push(path)
-  }
-
-  const menuItems = [
-    {
-      section: "ANA MENÜ",
-      items: [
-        { icon: BarChart3, label: "Dashboard", path: "/dashboard" },
-        { icon: Store, label: "Mağazalar", path: "/stores" },
-        { icon: ShoppingBag, label: "Ürünler", path: "/products" },
-        { icon: Package, label: "Siparişler", path: "/orders" },
-        { icon: Sparkles, label: "Dolphin AI", path: "/dolphin-ai" },
-        { icon: DollarSign, label: "Maliyetler", path: "/costs" },
-        { icon: CreditCard, label: "Finans", path: "/finance" },
-      ]
-    },
-    {
-      section: "YÖNETİM",
-      items: [
-        { icon: Users, label: "Müşteri Yönetimi", path: "/customer-management" },
-        { icon: TrendingUp, label: "Marketing", path: "/marketing" },
-        { icon: Search, label: "SEO Optimizer", path: "/seo-optimizer" },
-        { icon: Settings, label: "Ayarlar", path: "/settings" },
-      ]
-    }
-  ]
 
   return (
-    <div 
-      className={`${isExpanded ? 'w-64' : 'w-16'} bg-white border-r border-gray-200 h-screen fixed left-0 top-0 z-40 flex flex-col transition-all duration-300 ease-in-out`}
-      onMouseEnter={() => setIsExpanded(true)}
-      onMouseLeave={() => setIsExpanded(false)}
-    >
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div 
-          className="flex items-center space-x-3 cursor-pointer" 
-          onClick={() => handleNavigation("/dashboard")}
-        >
-          <div className="w-8 h-8 bg-black rounded-xl flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-lg">D</span>
-          </div>
-          {isExpanded && (
-            <h1 className="text-xl font-bold text-black whitespace-nowrap">Dolphin Manager</h1>
-          )}
-        </div>
-      </div>
-
-      {/* Menu Items */}
-      <div className="flex-1 overflow-y-auto py-4">
-        {menuItems.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="mb-6">
-            {isExpanded && (
-              <h3 className="px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                {section.section}
-              </h3>
-            )}
-            <nav className="space-y-1 px-3">
-              {section.items.map((item, itemIndex) => {
-                const Icon = item.icon
-                const isActive = pathname === item.path
-                return (
-                  <button
-                    key={itemIndex}
-                    onClick={() => handleNavigation(item.path)}
-                    className={`w-full flex items-center ${isExpanded ? 'px-3' : 'px-2 justify-center'} py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                      isActive
-                        ? "bg-gray-100 text-black border-r-2 border-black"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-black"
-                    }`}
-                    title={!isExpanded ? item.label : undefined}
-                  >
-                    <Icon className={`h-5 w-5 ${isActive ? "text-black" : "text-gray-400"} ${isExpanded ? 'mr-3' : ''} flex-shrink-0`} />
-                    {isExpanded && (
-                      <span className="whitespace-nowrap">{item.label}</span>
-                    )}
-                  </button>
-                )
-              })}
-            </nav>
-            {/* Ayarlar'dan sonra mağaza adı */}
-            {section.section === "YÖNETİM" && isExpanded && (
-              <div className="mt-8 mb-2 flex flex-col items-start">
-                {currentStoreName && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium mt-2 shadow-sm">
-                    <Store className="w-4 h-4 mr-1 text-black" />
-                    {currentStoreName}
-                  </span>
-                )}
-              </div>
-            )}
-            {section.section === "YÖNETİM" && !isExpanded && (
-              <div className="mt-4 flex flex-col items-center">
-                {currentStoreName && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-[10px] font-medium mt-2 shadow-sm">
-                    <Store className="w-3 h-3 mr-1 text-black" />
-                    {currentStoreName.length > 10 ? currentStoreName.slice(0, 10) + '…' : currentStoreName}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-200">
-        <Button 
-          variant="ghost" 
-          className={`w-full ${isExpanded ? 'justify-start' : 'justify-center px-2'} text-gray-600 hover:text-black hover:bg-gray-50`}
-          onClick={handleLogout}
-          title={!isExpanded ? "Çıkış" : undefined}
-        >
-          <LogOut className={`h-5 w-5 ${isExpanded ? 'mr-3' : ''} flex-shrink-0`} />
-          {isExpanded && "Çıkış"}
-        </Button>
-      </div>
-    </div>
+    <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
+      <TooltipProvider>
+        <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
+          <Link
+            href="/dashboard"
+            className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
+          >
+            <Package2 className="h-4 w-4 transition-all group-hover:scale-110" />
+            <span className="sr-only">Dolphin Manager</span>
+          </Link>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/dashboard"
+                className={`flex h-9 w-9 items-center justify-center rounded-lg ${isActive('/dashboard') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'} transition-colors hover:text-foreground md:h-8 md:w-8`}
+              >
+                <Home className="h-5 w-5" />
+                <span className="sr-only">Dashboard</span>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Dashboard</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/orders"
+                className={`flex h-9 w-9 items-center justify-center rounded-lg ${isActive('/orders') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'} transition-colors hover:text-foreground md:h-8 md:w-8`}
+              >
+                <ShoppingCart className="h-5 w-5" />
+                <span className="sr-only">Siparişler</span>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Siparişler</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/products"
+                className={`flex h-9 w-9 items-center justify-center rounded-lg ${isActive('/products') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'} transition-colors hover:text-foreground md:h-8 md:w-8`}
+              >
+                <Package className="h-5 w-5" />
+                <span className="sr-only">Ürünler</span>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Ürünler</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/customer-management"
+                className={`flex h-9 w-9 items-center justify-center rounded-lg ${isActive('/customer-management') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'} transition-colors hover:text-foreground md:h-8 md:w-8`}
+              >
+                <Users2 className="h-5 w-5" />
+                <span className="sr-only">Müşteriler</span>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Müşteriler</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/analytics"
+                className={`flex h-9 w-9 items-center justify-center rounded-lg ${isActive('/analytics') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'} transition-colors hover:text-foreground md:h-8 md:w-8`}
+              >
+                <LineChart className="h-5 w-5" />
+                <span className="sr-only">Analizler</span>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Analizler</TooltipContent>
+          </Tooltip>
+        </nav>
+        <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/settings"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8"
+              >
+                <Settings className="h-5 w-5" />
+                <span className="sr-only">Ayarlar</span>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Ayarlar</TooltipContent>
+          </Tooltip>
+        </nav>
+      </TooltipProvider>
+    </aside>
   )
 } 

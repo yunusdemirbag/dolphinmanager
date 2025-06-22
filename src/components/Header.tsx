@@ -1,107 +1,121 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { Plus, BarChart3, LogOut, Package, ShoppingBag, Home } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
-import { createClientSupabase } from "@/lib/supabase"
-import { useState, useEffect } from "react"
-import { SupabaseClient } from "@supabase/supabase-js"
+import { signOut } from "firebase/auth"
+import { auth } from "@/lib/firebase/client"
+import { useAuth } from "@/lib/auth/client"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Home,
+  LineChart,
+  Package,
+  Package2,
+  PanelLeft,
+  ShoppingCart,
+  Users2,
+} from "lucide-react"
+import CurrentStoreNameBadge from "@/app/components/CurrentStoreNameBadge"
 
-export function Header() {
-  const pathname = usePathname()
+export default function Header() {
+  const { user } = useAuth()
   const router = useRouter()
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
-  
-  useEffect(() => {
-    async function initSupabase() {
-      const client = await createClientSupabase()
-      setSupabase(client)
-    }
-    
-    initSupabase()
-  }, [])
-  
-  const isOnboarding = pathname?.includes("/onboarding")
-  const isAuth = pathname?.includes("/auth")
-
-  if (isOnboarding || isAuth) return null
+  const pathname = usePathname()
 
   const handleLogout = async () => {
-    if (supabase) {
-      await supabase.auth.signOut()
+    try {
+      await signOut(auth)
+      await fetch('/api/auth/session', { method: 'DELETE' })
+      router.push("/auth/login")
+      router.refresh()
+    } catch (error) {
+      console.error("Çıkış yaparken hata oluştu:", error)
       router.push("/auth/login")
     }
   }
+  
+  const isAuthPage = pathname.startsWith('/auth')
 
-  const handleNavigation = (path: string) => {
-    router.push(path)
+  // Kullanıcı yoksa veya auth sayfasındaysa header'ı gösterme
+  if (!user || isAuthPage) {
+    return null;
   }
 
+  // Bu noktadan sonra TypeScript user nesnesinin var olduğunu bilir.
   return (
-    <header className="bg-white shadow-sm border-b sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center cursor-pointer" onClick={() => handleNavigation("/dashboard")}>
-              <span className="text-white font-bold text-lg">D</span>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 cursor-pointer" onClick={() => handleNavigation("/dashboard")}>
-              Dolphin Manager
-            </h1>
-          </div>
-          
-          {/* Navigation Menu */}
-          <div className="hidden md:flex items-center space-x-2">
-            <Button 
-              variant={pathname === "/dashboard" ? "default" : "ghost"} 
-              size="sm"
-              onClick={() => handleNavigation("/dashboard")}
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button size="icon" variant="outline" className="sm:hidden">
+            <PanelLeft className="h-5 w-5" />
+            <span className="sr-only">Toggle Menu</span>
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="sm:max-w-xs">
+          <nav className="grid gap-6 text-lg font-medium">
+            <Link
+              href="/dashboard"
+              className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
             >
-              <Home className="w-4 h-4 mr-2" />
-              Ana Sayfa
-            </Button>
-            <Button 
-              variant={pathname === "/products" ? "default" : "ghost"} 
-              size="sm"
-              onClick={() => handleNavigation("/products")}
-            >
-              <Package className="w-4 h-4 mr-2" />
-              Ürünler
-            </Button>
-            <Button 
-              variant={pathname === "/orders" ? "default" : "ghost"} 
-              size="sm"
-              onClick={() => handleNavigation("/orders")}
-            >
-              <ShoppingBag className="w-4 h-4 mr-2" />
+              <Package2 className="h-5 w-5 transition-all group-hover:scale-110" />
+              <span className="sr-only">Dolphin Manager</span>
+            </Link>
+            <Link href="/dashboard" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+              <Home className="h-5 w-5" />
+              Dashboard
+            </Link>
+            <Link href="/orders" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+              <ShoppingCart className="h-5 w-5" />
               Siparişler
-            </Button>
-            <Button 
-              variant={pathname === "/analytics" ? "default" : "ghost"} 
-              size="sm"
-              onClick={() => handleNavigation("/analytics")}
-            >
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Analitikler
-            </Button>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => handleNavigation("/products/new")}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Yeni Ürün
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Çıkış
-            </Button>
-          </div>
-        </div>
+            </Link>
+            <Link href="/products" className="flex items-center gap-4 px-2.5 text-foreground">
+              <Package className="h-5 w-5" />
+              Ürünler
+            </Link>
+            <Link href="/customer-management" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+              <Users2 className="h-5 w-5" />
+              Müşteriler
+            </Link>
+            <Link href="/analytics" className="flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground">
+              <LineChart className="h-5 w-5" />
+              Analizler
+            </Link>
+          </nav>
+        </SheetContent>
+      </Sheet>
+      
+      <div className="relative ml-auto flex-1 md:grow-0">
+        <CurrentStoreNameBadge />
       </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="overflow-hidden rounded-full"
+          >
+            <Users2 className="h-5 w-5" />
+            <span className="sr-only">Kullanıcı menüsünü aç</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => router.push('/settings')}>Ayarlar</DropdownMenuItem>
+          <DropdownMenuItem>Destek</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout}>Çıkış Yap</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </header>
   )
 } 

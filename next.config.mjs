@@ -32,9 +32,7 @@ const nextConfig = {
     ]
   },
   distDir: '.next',
-  experimental: {
-    serverComponentsExternalPackages: ['firebase-admin'],
-  },
+  serverExternalPackages: ['firebase-admin'],
   webpack: (config, { isServer }) => {
     // WebAssembly desteği ekle
     config.experiments = {

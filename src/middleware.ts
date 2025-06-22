@@ -1,36 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { adminAuth } from '@/lib/firebase/admin';
 
-// Bu fonksiyon, gelen isteklerdeki oturum çerezini doğrular
-async function verifySessionCookie(req: NextRequest) {
+// Bu fonksiyon, gelen isteklerdeki oturum çerezini kontrol eder
+// Edge Runtime'da Firebase Admin SDK kullanamadığımız için basit bir kontrol yapıyoruz
+function hasSessionCookie(req: NextRequest) {
   const sessionCookie = req.cookies.get('session')?.value;
-
-  if (!sessionCookie) {
-    return null;
-  }
-
-  try {
-    // Çerezi Firebase Admin SDK ile doğrula
-    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
-    return decodedToken;
-  } catch (error: any) {
-    // Hata durumunda (örn: token süresi dolmuş) null döndür
-    console.warn('[Middleware] Invalid session cookie:', error.code);
-    return null;
-  }
+  return !!sessionCookie; // Sadece çerezin varlığını kontrol ediyoruz
 }
 
 export async function middleware(req: NextRequest) {
-  const user = await verifySessionCookie(req);
+  const hasSession = hasSessionCookie(req);
   const { pathname } = req.nextUrl;
 
   // Korunması gereken API rotaları
   const protectedApiRoutes = ['/api/etsy', '/api/user', '/api/ai'];
 
-  // Eğer istek korumalı bir API rotasına gidiyorsa VE kullanıcı doğrulanmamışsa,
-  // isteği reddet.
-  if (protectedApiRoutes.some(path => pathname.startsWith(path)) && !user) {
+  // Eğer istek korumalı bir API rotasına gidiyorsa VE oturum çerezi yoksa,
+  // isteği reddet. Gerçek kimlik doğrulama API rotalarında yapılacak.
+  if (protectedApiRoutes.some(path => pathname.startsWith(path)) && !hasSession) {
     return new NextResponse(
         JSON.stringify({ error: 'Unauthorized: No valid session cookie' }), 
         { status: 401, headers: { 'Content-Type': 'application/json' } }
@@ -40,7 +27,7 @@ export async function middleware(req: NextRequest) {
   // Kullanıcı giriş yapmamışsa ve korumalı bir sayfaya gitmeye çalışıyorsa,
   // onu giriş sayfasına yönlendir.
   const protectedPages = ['/stores', '/settings', '/dashboard', '/products', '/analytics', '/orders', '/marketing'];
-  if (!user && protectedPages.some(path => pathname.startsWith(path))) {
+  if (!hasSession && protectedPages.some(path => pathname.startsWith(path))) {
     const loginUrl = new URL('/auth/login', req.url);
     loginUrl.searchParams.set('redirect', pathname); // Kullanıcıyı giriş yaptıktan sonra geri yönlendir
     return NextResponse.redirect(loginUrl);

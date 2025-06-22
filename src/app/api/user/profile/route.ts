@@ -1,55 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest, createUnauthorizedResponse } from '@/lib/auth-middleware'
-import { db } from '@/lib/firebase-admin'
+import { getAuthenticatedUser } from '@/lib/auth'
+import { db as adminDb } from '@/lib/firebase/admin'
 
 export async function GET(request: NextRequest) {
+  const user = await getAuthenticatedUser(request)
+  if (!user) {
+    return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+  }
+
   try {
-    // Kullanıcı doğrulama
-    const authResult = await authenticateRequest(request)
-    
-    if (!authResult) {
-      return createUnauthorizedResponse()
-    }
-    
-    const userId = authResult.userId
-    
-    // Firebase Firestore'dan kullanıcı profili al
-    const profileRef = db.collection('profiles').doc(userId)
-    const profileDoc = await profileRef.get()
-    
+    const profileDocRef = adminDb.collection('profiles').doc(user.uid)
+    const profileDoc = await profileDocRef.get()
+
     if (!profileDoc.exists) {
-      // Profil yoksa oluştur
-      const defaultProfile = {
-        user_id: userId,
-        email: authResult.user.email || '',
-        display_name: authResult.user.name || authResult.user.email || '',
-        etsy_shop_id: null,
-        etsy_shop_name: null,
-        etsy_user_id: null,
-        created_at: new Date(),
-        updated_at: new Date()
-      }
-      
-      await profileRef.set(defaultProfile)
-      
-      return NextResponse.json({
-        success: true,
-        profile: defaultProfile
-      })
+      return new NextResponse(JSON.stringify({ error: 'Profile not found' }), { status: 404 })
     }
-    
-    const profileData = profileDoc.data()
-    
-    return NextResponse.json({
-      success: true,
-      profile: profileData
-    })
-    
-  } catch (error: any) {
-    console.error('Profile API error:', error)
-    return NextResponse.json(
-      { error: 'Internal Server Error', details: error.message },
-      { status: 500 }
-    )
+    return NextResponse.json(profileDoc.data())
+  } catch (error) {
+    return new NextResponse(JSON.stringify({ error: 'Internal Server Error' }), { status: 500 })
   }
 }

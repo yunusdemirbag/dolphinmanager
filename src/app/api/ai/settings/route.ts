@@ -1,30 +1,24 @@
 import { NextResponse } from 'next/server';
-import { getUser } from '@/lib/auth';
+import { getAuthenticatedUser } from '@/lib/auth';
+import { db as adminDb } from '@/lib/firebase/admin';
 
 // OpenAI ayarlarını getir
-export async function GET() {
+export async function GET(request: Request) {
+  const user = await getAuthenticatedUser(request);
+  if (!user) {
+    return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+  }
+
   try {
-    // Kullanıcı kimlik doğrulaması
-    const user = await getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Yetkilendirme hatası' }, { status: 401 });
+    const settingsDocRef = adminDb.collection('ai_settings').doc(user.uid);
+    const settingsDoc = await settingsDocRef.get();
+
+    if (!settingsDoc.exists) {
+      return NextResponse.json({ settings: {} });
     }
-    
-    // TODO: Firebase'den kullanıcının OpenAI ayarlarını getir
-    // Şimdilik varsayılan ayarları döndür
-    const data = {
-      model: 'gpt-4.1-mini',
-      temperature: 0.7,
-      title_prompt: null,
-      tags_prompt: null,
-      category_prompt: null,
-      focus_title_prompt: null
-    };
-    
-    return NextResponse.json(data);
+    return NextResponse.json({ settings: settingsDoc.data() });
   } catch (error) {
-    console.error('OpenAI ayarları getirme hatası:', error);
-    return NextResponse.json({ error: 'OpenAI ayarları getirilemedi' }, { status: 500 });
+    return new NextResponse(JSON.stringify({ error: 'Internal Server Error' }), { status: 500 });
   }
 }
 
@@ -32,7 +26,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     // Kullanıcı kimlik doğrulaması
-    const user = await getUser();
+    const user = await getAuthenticatedUser(request);
     if (!user) {
       return NextResponse.json({ error: 'Yetkilendirme hatası' }, { status: 401 });
     }

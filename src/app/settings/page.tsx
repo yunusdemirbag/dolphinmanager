@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -53,12 +53,14 @@ import {
   Brain,
   Sparkles,
   Sliders,
-  MessageSquare
+  MessageSquare,
+  Loader2
 } from "lucide-react"
-import { auth } from "@/lib/firebase"
+import { useAuth } from "@/contexts/AuthContext"
 import { onAuthStateChanged } from "firebase/auth"
 import CurrentStoreNameBadge from "../components/CurrentStoreNameBadge"
 import { titlePrompt, tagPrompt, categoryPrompt, focusTitlePrompt } from "@/lib/openai-yonetim"
+import { useToast } from "@/components/ui/use-toast"
 
 interface ShopSettings {
   shop_id: number
@@ -120,6 +122,8 @@ interface AISettings {
 }
 
 export default function SettingsPage() {
+  const { user, getAuthToken } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [etsyConnected, setEtsyConnected] = useState(false)
@@ -181,6 +185,8 @@ export default function SettingsPage() {
     category: false,
     focus_title: false
   });
+
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
     loadSettings()
@@ -317,27 +323,49 @@ export default function SettingsPage() {
     }
   }
 
-  const handleEtsyReconnect = async () => {
+  const handleEtsyConnect = useCallback(async () => {
+    setIsConnecting(true);
     try {
-      const response = await fetch('/api/etsy/auth', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+      console.log('Getting Etsy auth URL from settings page...');
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error('Kimlik doğrulama tokenı bulunamadı.');
+      }
+
+      const response = await fetch('/api/etsy/auth-url', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Failed to get auth URL:', data);
+        toast({
+          title: 'Bağlantı Hatası',
+          description: data.error || `Sunucu hatası: ${response.status}`,
+          variant: 'destructive',
+        });
+        throw new Error(data.error || `Sunucu hatası: ${response.status}`);
+      }
       
-      if (response.ok) {
-        const { authUrl } = await response.json()
-        window.location.href = authUrl
+      if (data.url) {
+        console.log('Redirecting to Etsy auth URL:', data.url);
+        window.location.href = data.url;
       } else {
-        const errorData = await response.json()
-        alert(`Etsy bağlantısı başlatılamadı: ${errorData.details || errorData.error}`)
+        console.error('Auth URL not found in response:', data);
+        toast({
+          title: 'Bağlantı Hatası',
+          description: 'Etsy kimlik doğrulama URL\'si yanıtta bulunamadı.',
+          variant: 'destructive',
+        });
+        throw new Error('Etsy kimlik doğrulama URL\'si yanıtta bulunamadı.');
       }
     } catch (error) {
-      console.error('Error connecting to Etsy:', error)
-      alert('Bağlantı hatası: ' + (error instanceof Error ? error.message : String(error)))
+      console.error('Error connecting to Etsy:', error);
+      // Toast messages are already shown inside the try block for specific errors
+      setIsConnecting(false);
     }
-  }
+  }, [getAuthToken, toast]);
 
   const loadAiSettings = async () => {
     try {
@@ -427,166 +455,188 @@ export default function SettingsPage() {
 
           {/* Shop Settings */}
           <TabsContent value="shop" className="space-y-6">
-            {!etsyConnected ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <AlertCircle className="h-5 w-5 text-orange-500 mr-2" />
-                    Etsy Bağlantısı Gerekli
-                  </CardTitle>
-                  <CardDescription>
-                    Mağaza ayarlarını yönetmek için önce Etsy hesabınızı bağlamanız gerekiyor.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button onClick={handleEtsyReconnect} className="bg-orange-600 hover:bg-orange-700">
-                    <Link className="h-4 w-4 mr-2" />
-                    Etsy'ye Bağlan
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                {/* Shop Info */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Store className="h-5 w-5 text-blue-600 mr-2" />
-                      Mağaza Bilgileri
-                    </CardTitle>
-                    <CardDescription>
-                      Etsy mağazanızın temel bilgilerini güncelleyin
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {shopSettings && (
-                      <>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="shop_name">Mağaza Adı</Label>
-                            <Input
-                              id="shop_name"
-                              value={shopSettings.shop_name}
-                              disabled
-                              className="bg-gray-50"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Mağaza adı Etsy'de değiştirilemez</p>
-                          </div>
-                          <div>
-                            <Label htmlFor="currency">Para Birimi</Label>
-                            <Input
-                              id="currency"
-                              value={shopSettings.currency_code}
-                              disabled
-                              className="bg-gray-50"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="title">Mağaza Başlığı</Label>
-                          <Input
-                            id="title"
-                            value={shopSettings.title}
-                            onChange={(e) => setShopSettings(prev => prev ? { ...prev, title: e.target.value } : null)}
-                            placeholder="Mağazanızın başlığı"
-                            maxLength={55}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">{shopSettings.title.length}/55 karakter</p>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="announcement">Mağaza Duyurusu</Label>
-                          <Textarea
-                            id="announcement"
-                            value={shopSettings.announcement}
-                            onChange={(e) => setShopSettings(prev => prev ? { ...prev, announcement: e.target.value } : null)}
-                            placeholder="Mağaza ana sayfasında gösterilecek duyuru"
-                            rows={3}
-                            maxLength={160}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">{shopSettings.announcement.length}/160 karakter</p>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="sale_message">Satış Mesajı</Label>
-                          <Textarea
-                            id="sale_message"
-                            value={shopSettings.sale_message}
-                            onChange={(e) => setShopSettings(prev => prev ? { ...prev, sale_message: e.target.value } : null)}
-                            placeholder="Müşterilere satış sonrası gönderilecek mesaj"
-                            rows={3}
-                            maxLength={500}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">{shopSettings.sale_message.length}/500 karakter</p>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="digital_sale_message">Dijital Ürün Satış Mesajı</Label>
-                          <Textarea
-                            id="digital_sale_message"
-                            value={shopSettings.digital_sale_message}
-                            onChange={(e) => setShopSettings(prev => prev ? { ...prev, digital_sale_message: e.target.value } : null)}
-                            placeholder="Dijital ürün satışları için özel mesaj"
-                            rows={3}
-                            maxLength={500}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">{shopSettings.digital_sale_message.length}/500 karakter</p>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-4 border-t">
-                          <div className="flex items-center space-x-2">
-                            <Globe className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">
-                              Mağaza URL: <a href={shopSettings.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{shopSettings.url}</a>
-                            </span>
-                          </div>
-                          <Button onClick={handleSaveShopSettings} disabled={saving}>
-                            {saving ? (
-                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4 mr-2" />
-                            )}
-                            {saving ? "Kaydediliyor..." : "Kaydet"}
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Vacation Mode */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Clock className="h-5 w-5 text-purple-600 mr-2" />
-                      Tatil Modu
-                    </CardTitle>
-                    <CardDescription>
-                      Mağazanızı geçici olarak kapatın
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">
-                          {shopSettings?.is_vacation ? "Tatil modu aktif" : "Tatil modu pasif"}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {shopSettings?.is_vacation 
-                            ? "Mağazanız şu anda kapalı ve yeni siparişler alınmıyor"
-                            : "Mağazanız açık ve siparişler alınıyor"
-                          }
-                        </p>
-                      </div>
-                      <Badge variant={shopSettings?.is_vacation ? "destructive" : "default"}>
-                        {shopSettings?.is_vacation ? "Kapalı" : "Açık"}
-                      </Badge>
+            <Card>
+              <CardHeader>
+                <CardTitle>Etsy Bağlantısı</CardTitle>
+                <CardDescription>
+                  Etsy mağazanızla bağlantı kurun veya mevcut bağlantıyı yönetin.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex items-center space-x-2">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Bağlantı durumu kontrol ediliyor...</span>
+                  </div>
+                ) : etsyConnected ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span className="font-medium">Bağlantı Aktif</span>
+                      <CurrentStoreNameBadge />
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+                    <Button variant="destructive" size="sm">
+                      <Unlink className="mr-2 h-4 w-4" />
+                      Bağlantıyı Kes
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="h-5 w-5 text-destructive" />
+                      <span className="font-medium text-destructive">Bağlantı Yok</span>
+                    </div>
+                    <Button onClick={handleEtsyConnect} disabled={isConnecting}>
+                      {isConnecting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Link className="mr-2 h-4 w-4" />
+                      )}
+                      {isConnecting ? "Bağlanılıyor..." : "Şimdi Bağlan"}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Shop Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Store className="h-5 w-5 text-blue-600 mr-2" />
+                  Mağaza Bilgileri
+                </CardTitle>
+                <CardDescription>
+                  Etsy mağazanızın temel bilgilerini güncelleyin
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {shopSettings && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="shop_name">Mağaza Adı</Label>
+                        <Input
+                          id="shop_name"
+                          value={shopSettings.shop_name}
+                          disabled
+                          className="bg-gray-50"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Mağaza adı Etsy'de değiştirilemez</p>
+                      </div>
+                      <div>
+                        <Label htmlFor="currency">Para Birimi</Label>
+                        <Input
+                          id="currency"
+                          value={shopSettings.currency_code}
+                          disabled
+                          className="bg-gray-50"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="title">Mağaza Başlığı</Label>
+                      <Input
+                        id="title"
+                        value={shopSettings.title}
+                        onChange={(e) => setShopSettings(prev => prev ? { ...prev, title: e.target.value } : null)}
+                        placeholder="Mağazanızın başlığı"
+                        maxLength={55}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{shopSettings.title.length}/55 karakter</p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="announcement">Mağaza Duyurusu</Label>
+                      <Textarea
+                        id="announcement"
+                        value={shopSettings.announcement}
+                        onChange={(e) => setShopSettings(prev => prev ? { ...prev, announcement: e.target.value } : null)}
+                        placeholder="Mağaza ana sayfasında gösterilecek duyuru"
+                        rows={3}
+                        maxLength={160}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{shopSettings.announcement.length}/160 karakter</p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="sale_message">Satış Mesajı</Label>
+                      <Textarea
+                        id="sale_message"
+                        value={shopSettings.sale_message}
+                        onChange={(e) => setShopSettings(prev => prev ? { ...prev, sale_message: e.target.value } : null)}
+                        placeholder="Müşterilere satış sonrası gönderilecek mesaj"
+                        rows={3}
+                        maxLength={500}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{shopSettings.sale_message.length}/500 karakter</p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="digital_sale_message">Dijital Ürün Satış Mesajı</Label>
+                      <Textarea
+                        id="digital_sale_message"
+                        value={shopSettings.digital_sale_message}
+                        onChange={(e) => setShopSettings(prev => prev ? { ...prev, digital_sale_message: e.target.value } : null)}
+                        placeholder="Dijital ürün satışları için özel mesaj"
+                        rows={3}
+                        maxLength={500}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{shopSettings.digital_sale_message.length}/500 karakter</p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <div className="flex items-center space-x-2">
+                        <Globe className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm text-gray-600">
+                          Mağaza URL: <a href={shopSettings.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{shopSettings.url}</a>
+                        </span>
+                      </div>
+                      <Button onClick={handleSaveShopSettings} disabled={saving}>
+                        {saving ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        {saving ? "Kaydediliyor..." : "Kaydet"}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Vacation Mode */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Clock className="h-5 w-5 text-purple-600 mr-2" />
+                  Tatil Modu
+                </CardTitle>
+                <CardDescription>
+                  Mağazanızı geçici olarak kapatın
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">
+                      {shopSettings?.is_vacation ? "Tatil modu aktif" : "Tatil modu pasif"}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {shopSettings?.is_vacation 
+                        ? "Mağazanız şu anda kapalı ve yeni siparişler alınmıyor"
+                        : "Mağazanız açık ve siparişler alınıyor"
+                      }
+                    </p>
+                  </div>
+                  <Badge variant={shopSettings?.is_vacation ? "destructive" : "default"}>
+                    {shopSettings?.is_vacation ? "Kapalı" : "Açık"}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Shipping Settings */}

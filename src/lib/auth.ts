@@ -23,7 +23,7 @@ export async function getAuthenticatedUser(req: Request | NextRequest) {
 // Server component'lerde kullanılmak üzere
 export async function getUser() {
   try {
-    const cookieStore = await cookies();
+    const cookieStore = cookies();
     const sessionCookie = cookieStore.get('session')?.value;
     
     if (!sessionCookie) {

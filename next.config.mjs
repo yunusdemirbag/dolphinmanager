@@ -16,7 +16,8 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'img.etsystatic.com',
       },
-    ]
+    ],
+    domains: ['i.etsystatic.com', 'firebasestorage.googleapis.com'],
   },
   env: {
     NEXT_PUBLIC_APP_URL: 'https://dolphinmanager.vercel.app',
@@ -32,7 +33,7 @@ const nextConfig = {
   },
   distDir: '.next',
   experimental: {
-    asyncWebAssembly: true,
+    asyncWebAssembly: true
   },
 }
 

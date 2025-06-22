@@ -12,6 +12,9 @@ export default function EtsyTestPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
+  const [dbData, setDbData] = useState<any>(null);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   const testEtsyApi = async () => {
     setLoading(true);
@@ -34,6 +37,30 @@ export default function EtsyTestPage() {
       setError(err instanceof Error ? err.message : 'Bilinmeyen bir hata oluştu');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkFirebaseDb = async () => {
+    setDbLoading(true);
+    setDbError(null);
+    try {
+      const token = await getAuthToken();
+      const response = await fetch('/api/etsy/test-stores', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.details || 'Firebase DB kontrolü başarısız oldu');
+      }
+
+      const responseData = await response.json();
+      setDbData(responseData);
+    } catch (err) {
+      console.error('Error checking Firebase DB:', err);
+      setDbError(err instanceof Error ? err.message : 'Bilinmeyen bir hata oluştu');
+    } finally {
+      setDbLoading(false);
     }
   };
 
@@ -62,70 +89,135 @@ export default function EtsyTestPage() {
     <div className="container mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">Etsy API Test Sayfası</h1>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Etsy API Testi</CardTitle>
-          <CardDescription>
-            Bu sayfada Etsy API bağlantısını test edebilirsiniz.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertTitle>Hata</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          {data && (
-            <div className="mt-4 space-y-4">
-              <div>
-                <h3 className="text-lg font-medium mb-2">Token Bilgileri</h3>
-                <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
-                  {JSON.stringify(data.tokenInfo, null, 2)}
-                </pre>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-medium mb-2">Kullanıcı Bilgileri</h3>
-                <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
-                  {JSON.stringify(data.user, null, 2)}
-                </pre>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-medium mb-2">Mağaza Bilgileri</h3>
-                <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
-                  {JSON.stringify(data.shops, null, 2)}
-                </pre>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-medium mb-2">Alternatif Mağaza Bilgileri</h3>
-                <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
-                  {JSON.stringify(data.altShops, null, 2)}
-                </pre>
-              </div>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter>
-          <Button 
-            onClick={testEtsyApi} 
-            disabled={loading}
-            className="flex items-center"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Test Ediliyor...
-              </>
-            ) : (
-              'Etsy API Test Et'
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Etsy API Testi</CardTitle>
+            <CardDescription>
+              Bu bölümde Etsy API bağlantısını test edebilirsiniz.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertTitle>Hata</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
-          </Button>
-        </CardFooter>
-      </Card>
+            
+            {data && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Token Bilgileri</h3>
+                  <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
+                    {JSON.stringify(data.tokenInfo, null, 2)}
+                  </pre>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Kullanıcı Bilgileri</h3>
+                  <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
+                    {JSON.stringify(data.user, null, 2)}
+                  </pre>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Mağaza Bilgileri</h3>
+                  <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
+                    {JSON.stringify(data.shops, null, 2)}
+                  </pre>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Alternatif Mağaza Bilgileri</h3>
+                  <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
+                    {JSON.stringify(data.altShops, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button 
+              onClick={testEtsyApi} 
+              disabled={loading}
+              className="flex items-center"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Test Ediliyor...
+                </>
+              ) : (
+                'Etsy API Test Et'
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Firebase Veritabanı Kontrolü</CardTitle>
+            <CardDescription>
+              Bu bölümde Firebase'deki etsy_stores koleksiyonunu kontrol edebilirsiniz.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dbError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertTitle>Hata</AlertTitle>
+                <AlertDescription>{dbError}</AlertDescription>
+              </Alert>
+            )}
+            
+            {dbData && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Mağaza Durumu</h3>
+                  <div className="bg-muted p-4 rounded-md">
+                    <p>Mağaza Sayısı: <span className="font-bold">{dbData.storesCount}</span></p>
+                    <p>Token Durumu: <span className="font-bold">{dbData.hasToken ? 'Mevcut' : 'Yok'}</span></p>
+                  </div>
+                </div>
+                
+                {dbData.hasToken && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Token Bilgileri</h3>
+                    <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
+                      {JSON.stringify(dbData.tokenInfo, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                
+                {dbData.storesCount > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Mağaza Bilgileri</h3>
+                    <pre className="bg-muted p-4 rounded-md overflow-auto text-xs">
+                      {JSON.stringify(dbData.stores, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button 
+              onClick={checkFirebaseDb} 
+              disabled={dbLoading}
+              className="flex items-center"
+            >
+              {dbLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Kontrol Ediliyor...
+                </>
+              ) : (
+                'Firebase Veritabanını Kontrol Et'
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   );
 } 

@@ -1,18 +1,24 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
+    console.log("Etsy test-stores API called");
+    
+    // Basit bir yanıt döndür
     return NextResponse.json({
       success: true,
-      message: "Firebase geçişi sonrası mock endpoint - Etsy test stores",
-      stores: []
+      message: "Firebase veritabanı kontrolü - basit test",
+      timestamp: new Date().toISOString()
     });
 
-  } catch (error) {
-    return NextResponse.json({
-      success: false,
-      error: "Firebase geçişi sonrası mock endpoint",
-      details: "Test stores API Firebase ile entegre edilecek"
-    }, { status: 200 });
+  } catch (error: any) {
+    console.error('Error in test endpoint:', error);
+    return new NextResponse(
+      JSON.stringify({ 
+        error: 'Internal Server Error', 
+        details: error.message 
+      }),
+      { status: 500 },
+    );
   }
 }

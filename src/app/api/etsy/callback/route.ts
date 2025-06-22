@@ -1,179 +1,156 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db as adminDb } from '@/lib/firebase/admin'
+import { db } from '@/lib/firebase/admin'
+
+// Etsy API kimlik bilgileri
+const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID!
+const ETSY_CLIENT_SECRET = process.env.ETSY_CLIENT_SECRET!
+const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://dolphinmanager-phi.vercel.app/api/etsy/callback'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('Etsy callback received')
+    console.log('[etsy/callback] Callback başlangıç')
     
-    const { searchParams } = new URL(request.url)
-    const code = searchParams.get('code')
-    const state = searchParams.get('state') // state = userId
-    const error = searchParams.get('error')
-
-    console.log('Callback params:', { 
-      code: code ? code.substring(0, 5) + '...' : null, 
-      state, 
-      error 
-    })
-
-    const redirectError = (errorCode: string, details?: string) => {
-      const url = new URL('/stores', request.url)
-      url.searchParams.set('error', errorCode)
-      if (details) url.searchParams.set('details', details)
-      console.error('Redirecting with error:', errorCode, details)
-      return NextResponse.redirect(url)
-    }
-
+    // URL parametrelerini al
+    const url = new URL(request.url)
+    const code = url.searchParams.get('code')
+    const state = url.searchParams.get('state')
+    const error = url.searchParams.get('error')
+    
+    console.log('[etsy/callback] Parametreler:', { code: !!code, state: !!state, error })
+    
+    // Hata kontrolü
     if (error) {
-      return redirectError('etsy_auth_failed', error)
+      console.error('[etsy/callback] Etsy error:', error)
+      return NextResponse.redirect('/stores?error=' + encodeURIComponent(error))
     }
-
+    
     if (!code || !state) {
-      return redirectError('missing_params', 'Code or state is missing.')
+      console.error('[etsy/callback] Eksik parametreler')
+      return NextResponse.redirect('/stores?error=missing_params')
     }
-
-    // Kullanıcı ID'sini state parametresinden alıyoruz
-    const userId = state
-    console.log('User ID from state:', userId)
     
-    // Auth session'ı kontrol et
-    const authSessionRef = adminDb.collection('etsy_auth_sessions').doc(userId)
-    const authSessionDoc = await authSessionRef.get()
-
-    if (!authSessionDoc.exists) {
-      return redirectError('session_expired', 'Auth session not found.')
+    // State değerine göre auth session'ı bul
+    const sessionsSnapshot = await db.collection('etsy_auth_sessions')
+      .where('state', '==', state)
+      .get()
+    
+    if (sessionsSnapshot.empty) {
+      console.error('[etsy/callback] Geçersiz state')
+      return NextResponse.redirect('/stores?error=invalid_state')
     }
-
-    const { code_verifier } = authSessionDoc.data()!
-
-    console.log('Auth session found:', {
-      exists: authSessionDoc.exists,
-      hasVerifier: !!code_verifier
-    })
-
-    if (!code_verifier) {
-      return redirectError(
-        'pkce_missing',
-        'Session expired or invalid. Please try connecting again.',
-      )
-    }
-
-    // Token değişimi
-    console.log('Exchanging code for token with code verifier:', code_verifier.substring(0, 10) + '...')
     
-    const redirectUri = process.env.ETSY_REDIRECT_URI || 
-      `${process.env.NEXT_PUBLIC_BASE_URL}/api/etsy/callback`
+    // Auth session bilgilerini al
+    const sessionDoc = sessionsSnapshot.docs[0]
+    const sessionData = sessionDoc.data()
+    const userId = sessionData.user_id
+    const codeVerifier = sessionData.code_verifier
     
-    console.log('Using redirect URI:', redirectUri)
+    console.log('[etsy/callback] Session bulundu:', { userId })
     
+    // Token takası için Etsy API'ye istek gönder
     const tokenResponse = await fetch('https://api.etsy.com/v3/public/oauth/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: process.env.ETSY_CLIENT_ID!,
-        client_secret: process.env.ETSY_CLIENT_SECRET!,
-        redirect_uri: redirectUri,
-        code,
-        code_verifier,
-      }),
+        client_id: ETSY_CLIENT_ID,
+        client_secret: ETSY_CLIENT_SECRET, // Önemli: client_secret gerekli
+        code: code,
+        redirect_uri: REDIRECT_URI,
+        code_verifier: codeVerifier,
+      }).toString(),
     })
-
+    
     if (!tokenResponse.ok) {
-      const errorBody = await tokenResponse.text()
-      console.error('Etsy token exchange failed:', {
-        status: tokenResponse.status,
-        body: errorBody,
-      })
-      return redirectError('token_exchange_failed', errorBody)
+      const errorText = await tokenResponse.text()
+      console.error('[etsy/callback] Token hatası:', tokenResponse.status, errorText)
+      return NextResponse.redirect(`/stores?error=token_error&details=${encodeURIComponent(errorText)}`)
     }
-
+    
+    // Token yanıtını parse et
     const tokenData = await tokenResponse.json()
-    console.log('Token exchange successful')
+    console.log('[etsy/callback] Token alındı:', { 
+      has_access_token: !!tokenData.access_token,
+      has_refresh_token: !!tokenData.refresh_token,
+      expires_in: tokenData.expires_in
+    })
+    
+    // Token bilgilerini Firebase'e kaydet
+    const expiresAt = new Date()
+    expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in)
+    
+    await db.collection('etsy_tokens').doc(userId).set({
+      user_id: userId,
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      token_type: tokenData.token_type,
+      expires_at: expiresAt.toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    
+    console.log('[etsy/callback] Token kaydedildi')
     
     // Etsy kullanıcı ID'sini token'dan çıkar
     const etsyUserId = tokenData.access_token.split('.')[0]
-    console.log('Etsy user ID extracted from token:', etsyUserId)
+    console.log('[etsy/callback] Etsy user ID:', etsyUserId)
     
-    // Mağaza bilgilerini çek - Kullanıcıya özel endpoint kullanılıyor
-    console.log('Fetching Etsy shop info with access token')
-    
-    const shopsResponse = await fetch(`https://openapi.etsy.com/v3/application/users/${etsyUserId}/shops`, {
+    // Etsy mağaza bilgilerini çek - EN GÜVENİLİR YÖNTEM: /me/shops endpoint'ini kullan
+    const shopsResponse = await fetch('https://openapi.etsy.com/v3/application/me/shops', {
       headers: {
         'Authorization': `Bearer ${tokenData.access_token}`,
-        'x-api-key': process.env.ETSY_CLIENT_ID!,
+        'x-api-key': ETSY_CLIENT_ID,
       },
     })
-
+    
     if (!shopsResponse.ok) {
-      const errorBody = await shopsResponse.text()
-      console.error('Failed to fetch Etsy shop info:', {
-        status: shopsResponse.status,
-        body: errorBody,
-      })
-      return redirectError('shop_info_failed', errorBody)
+      const errorText = await shopsResponse.text()
+      console.error('[etsy/callback] Mağaza bilgileri hatası:', shopsResponse.status, errorText)
+      return NextResponse.redirect('/stores?success=token_saved&error=shops_error')
     }
-
+    
+    // Mağaza bilgilerini parse et
     const shopsData = await shopsResponse.json()
-    console.log('Shops data received:', JSON.stringify(shopsData).substring(0, 200) + '...')
+    console.log('[etsy/callback] Mağazalar alındı:', shopsData.count)
     
-    if (!shopsData.results || shopsData.results.length === 0) {
-      return redirectError('no_shop_found', 'No shop found for this user on Etsy.')
-    }
-    
-    const shop = shopsData.results[0]
-    console.log('Shop info fetched successfully:', shop.shop_name)
-    
-    // Veritabanına kaydet
-    console.log('Saving Etsy data for user:', userId, 'and shop:', shop.shop_id)
-    
-    try {
-      const batch = adminDb.batch()
-  
-      // Token'ı kaydet
-      const tokenRef = adminDb.collection('etsy_tokens').doc(userId)
-      batch.set(tokenRef, {
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-        user_id: userId,
-        updated_at: new Date(),
-      }, { merge: true })
-      console.log('Token data prepared for save')
-  
-      // Mağazayı kaydet
-      const storeRef = adminDb.collection('etsy_stores').doc(shop.shop_id.toString())
-      batch.set(storeRef, {
-        user_id: userId,
-        shop_id: shop.shop_id,
-        shop_name: shop.shop_name,
-        title: shop.title || shop.shop_name,
-        currency_code: shop.currency_code,
-        url: shop.url,
-        updated_at: new Date(),
-      }, { merge: true })
-      console.log('Shop data prepared for save')
+    // Mağaza bilgilerini Firebase'e kaydet
+    if (shopsData.count > 0) {
+      const batch = db.batch()
       
-      // Geçici auth session'ı sil
-      batch.delete(authSessionRef)
-      console.log('Auth session prepared for deletion')
-  
+      for (const shop of shopsData.results) {
+        const shopRef = db.collection('etsy_stores').doc(`${userId}_${shop.shop_id}`)
+        batch.set(shopRef, {
+          user_id: userId,
+          shop_id: shop.shop_id,
+          shop_name: shop.shop_name,
+          title: shop.title,
+          currency_code: shop.currency_code,
+          is_vacation: shop.is_vacation || false,
+          listing_active_count: shop.listing_active_count || 0,
+          num_favorers: shop.num_favorers || 0,
+          url: shop.url || `https://www.etsy.com/shop/${shop.shop_name}`,
+          image_url_760x100: shop.image_url_760x100,
+          review_count: shop.review_count || 0,
+          review_average: shop.review_average || 0,
+          is_active: true,
+          etsy_user_id: etsyUserId,
+          last_synced_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      }
+      
       await batch.commit()
-      console.log('Batch commit successful - Etsy data saved successfully')
-    } catch (dbError) {
-      console.error('Error saving to database:', dbError)
-      return redirectError('database_error', dbError instanceof Error ? dbError.message : 'Unknown database error')
+      console.log('[etsy/callback] Mağaza bilgileri kaydedildi')
     }
-
-    // Başarılı yönlendirme
-    const successUrl = new URL('/stores', request.url)
-    successUrl.searchParams.set('etsy_connected', shop.shop_name)
-    console.log('Redirecting to success URL:', successUrl.toString())
-    return NextResponse.redirect(successUrl)
-  } catch (err: any) {
-    console.error('💥 Etsy callback failed:', err)
-    return NextResponse.redirect(
-      new URL(`/stores?error=callback_failed&details=${encodeURIComponent(err.message)}`, request.url)
-    )
+    
+    // Kullanıcıyı mağaza sayfasına yönlendir
+    return NextResponse.redirect('/stores?success=true')
+    
+  } catch (error) {
+    console.error('[etsy/callback] Hata:', error)
+    return NextResponse.redirect('/stores?error=unexpected_error')
   }
 }

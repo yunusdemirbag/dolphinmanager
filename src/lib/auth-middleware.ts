@@ -1,82 +1,76 @@
-import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import * as jose from 'jose'
 
-export interface AuthenticatedRequest extends NextRequest {
-  user?: {
-    uid: string;
-    email?: string;
-    [key: string]: any;
-  };
+const FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+const JWKS_URL =
+  'https://www.googleapis.com/service_account/v1/jwk/securetoken.google.com'
+
+async function verifyToken(token: string) {
+  try {
+    if (!FIREBASE_PROJECT_ID) {
+      throw new Error('Missing NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable')
+    }
+    const JWKS = jose.createRemoteJWKSet(new URL(JWKS_URL))
+    const { payload } = await jose.jwtVerify(token, JWKS, {
+      issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
+      audience: FIREBASE_PROJECT_ID,
+    })
+    return payload
+  } catch (error: any) {
+    console.error('Token verification failed:', error.message)
+    return null
+  }
 }
 
-// Geliştirme ortamında kimlik doğrulamayı atlama seçeneği
-const DEV_MODE = process.env.NODE_ENV === 'development';
-const SKIP_AUTH_IN_DEV = process.env.SKIP_AUTH_IN_DEV === 'true';
-
-const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/service_account/v1/jwk/securetoken.google.com'));
-
-export async function authenticateRequest(request: NextRequest): Promise<{ userId: string; user: any } | null> {
-  try {
-    // Authorization header'dan token al
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Authorization header bulunamadı');
-      
-      // Geliştirme ortamında ve SKIP_AUTH_IN_DEV aktifse test kullanıcısı döndür
-      if (DEV_MODE && SKIP_AUTH_IN_DEV) {
-        console.log('⚠️ Geliştirme ortamında kimlik doğrulama atlanıyor, test kullanıcısı kullanılıyor');
-        return {
-          userId: 'test-user-id',
-          user: {
-            uid: 'test-user-id',
-            email: 'test@example.com',
-            role: 'admin'
-          }
-        };
-      }
-      
-      return null;
-    }
-    
-    const token = authHeader.split('Bearer ')[1]
-    
-    try {
-      // Firebase token'ı doğrula
-      const { payload } = await jwtVerify(token, JWKS, {
-        issuer: 'https://securetoken.google.com/' + process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        audience: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      })
-      
-      if (!payload.sub) {
-        throw new Error('Token does not have a subject (sub) claim.');
-      }
-      
-      return {
-        userId: payload.sub,
-        user: payload
-      }
-    } catch (tokenError) {
-      console.error('❌ Token doğrulama hatası:', tokenError);
-      
-      // Geliştirme ortamında ve SKIP_AUTH_IN_DEV aktifse test kullanıcısı döndür
-      if (DEV_MODE && SKIP_AUTH_IN_DEV) {
-        console.log('⚠️ Geliştirme ortamında kimlik doğrulama atlanıyor, test kullanıcısı kullanılıyor');
-        return {
-          userId: 'test-user-id',
-          user: {
-            uid: 'test-user-id',
-            email: 'test@example.com',
-            role: 'admin'
-          }
-        };
-      }
-      
-      return null;
-    }
-  } catch (error) {
-    console.error('❌ Kimlik doğrulama işleminde beklenmeyen hata:', error);
-    return null;
+export async function authMiddleware(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization')
+  
+  // In development, if headers are not provided, we can bypass auth for ease of testing
+  if (process.env.NODE_ENV === 'development' && !authHeader) {
+    console.warn("Auth bypassed in development mode. No Authorization header found.");
+    const devHeaders = new Headers(request.headers);
+    devHeaders.set('x-user-id', 'dev-user-id');
+    devHeaders.set('x-user-email', 'dev@example.com');
+    return NextResponse.next({
+      request: {
+        headers: devHeaders,
+      },
+    });
   }
+
+  const token = authHeader?.split('Bearer ')[1]
+
+  if (!token) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Unauthorized: No token provided' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
+  const decodedToken = await verifyToken(token)
+
+  if (!decodedToken || !decodedToken.sub) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Unauthorized: Invalid token' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
+  console.log('Firebase token verified successfully for UID:', decodedToken.sub)
+
+  // Add user info to headers to be accessed in API routes
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-user-id', decodedToken.sub)
+  if (decodedToken.email) {
+     requestHeaders.set('x-user-email', decodedToken.email as string);
+  }
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
 }
 
 export function createUnauthorizedResponse() {
@@ -89,9 +83,9 @@ export function createUnauthorizedResponse() {
 // Helper function to verify the token
 export async function verifyAuth(token: string) {
   try {
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: 'https://securetoken.google.com/' + process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      audience: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    const { payload } = await jose.jwtVerify(token, jose.createRemoteJWKSet(new URL(JWKS_URL)), {
+      issuer: `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`,
+      audience: FIREBASE_PROJECT_ID,
     });
 
     return payload;

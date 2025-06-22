@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import EtsyConnection from '@/components/etsy-connection';
@@ -14,7 +14,8 @@ interface EtsyStore {
   image_url_760x100?: string;
 }
 
-export default function StoresPage() {
+// SearchParams'ı kullanan bir client component
+function StoresContent() {
   const { user, loading: authLoading } = useAuth();
   const [stores, setStores] = useState<EtsyStore[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,5 +152,18 @@ export default function StoresPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Ana sayfa bileşeni
+export default function StoresPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    }>
+      <StoresContent />
+    </Suspense>
   );
 }

@@ -1,37 +1,27 @@
 import * as admin from 'firebase-admin';
 
-// Firebase Admin SDK yapılandırması
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
-  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-  : null;
+const serviceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+};
 
-// Açıkça projectId belirle - yunusfirebase-25 kullan
-const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'yunusfirebase-25';
-
-// Firebase Admin SDK başlatma
-if (!admin.apps.length) {
-  try {
-    if (serviceAccount) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        databaseURL: process.env.FIREBASE_DATABASE_URL,
-        projectId: projectId
-      });
-      console.log('✅ Firebase Admin başlatıldı (tam yapılandırma ile)');
-    } else {
-      // Eğer service account bilgisi yoksa, emülatör modunda başlat
-      admin.initializeApp({
-        projectId: projectId
-      });
-      console.log('⚠️ Firebase Admin başlatıldı (emülatör modu - sadece geliştirme ortamı için)');
+export function initFirebaseAdminApp() {
+    if (admin.apps.length > 0) {
+        return admin.app();
     }
-  } catch (error) {
-    console.error('❌ Firebase Admin başlatma hatası:', error);
-  }
+
+    try {
+        return admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+        });
+    } catch (error) {
+        console.error("Firebase admin initialization error:", error);
+        throw error;
+    }
 }
 
-export const auth = admin.auth();
-export const db = admin.firestore();
-export const storage = admin.storage();
+export const auth = admin.auth;
+export const firestore = admin.firestore;
 
 export default admin; 

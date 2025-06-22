@@ -1,9 +1,13 @@
-import { NextRequest } from "next/server"
-import { auth } from "@/lib/firebase/admin"
+import { getAuth } from 'firebase-admin/auth';
+import { initFirebaseAdminApp } from '@/lib/firebase/admin';
+import { NextRequest } from 'next/server';
 
 export interface AuthenticatedRequest extends NextRequest {
-  userId: string
-  user: any
+  user?: {
+    uid: string;
+    email?: string;
+    [key: string]: any;
+  };
 }
 
 // Geliştirme ortamında kimlik doğrulamayı atlama seçeneği
@@ -37,7 +41,7 @@ export async function authenticateRequest(request: NextRequest): Promise<{ userI
     
     try {
       // Firebase token'ı doğrula
-      const decodedToken = await auth.verifyIdToken(token)
+      const decodedToken = await getAuth().verifyIdToken(token)
       
       return {
         userId: decodedToken.uid,
@@ -72,4 +76,16 @@ export function createUnauthorizedResponse() {
     { error: 'Yetkisiz erişim', code: 'UNAUTHORIZED' },
     { status: 401 }
   )
+}
+
+// Helper function to verify the token
+export async function verifyAuth(token: string) {
+  try {
+    initFirebaseAdminApp();
+    const decodedToken = await getAuth().verifyIdToken(token);
+    return decodedToken;
+  } catch (error) {
+    console.error('Error verifying auth token:', error);
+    return null;
+  }
 }

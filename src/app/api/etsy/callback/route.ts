@@ -90,10 +90,14 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json()
     console.log('Token exchange successful')
     
-    // Mağaza bilgilerini çek - Doğru endpoint kullanılıyor
+    // Etsy kullanıcı ID'sini token'dan çıkar
+    const etsyUserId = tokenData.access_token.split('.')[0]
+    console.log('Etsy user ID extracted from token:', etsyUserId)
+    
+    // Mağaza bilgilerini çek - Kullanıcıya özel endpoint kullanılıyor
     console.log('Fetching Etsy shop info with access token')
     
-    const shopsResponse = await fetch('https://openapi.etsy.com/v3/application/shops', {
+    const shopsResponse = await fetch(`https://openapi.etsy.com/v3/application/users/${etsyUserId}/shops`, {
       headers: {
         'Authorization': `Bearer ${tokenData.access_token}`,
         'x-api-key': process.env.ETSY_CLIENT_ID!,

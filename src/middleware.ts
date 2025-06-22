@@ -1,76 +1,67 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
-import { verifyAuth } from "./lib/auth-middleware"
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { adminAuth } from '@/lib/firebase/admin';
 
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+// This is the crucial line that tells Vercel to use the Node.js runtime
+export const runtime = 'nodejs';
 
-  // API rotaları için kimlik doğrulama
-  if (pathname.startsWith('/api/')) {
-    // Auth ve public rotaları hariç tut
-    if (pathname.startsWith('/api/auth/')) {
-      return NextResponse.next();
-    }
-
-    const token = req.headers.get('Authorization')?.split('Bearer ')[1];
-
-    if (!token) {
-      console.log('🚫 [Middleware] No token provided for API route');
-      return new NextResponse(JSON.stringify({ error: 'Yetkisiz erişim: Token bulunamadı.' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    try {
-      const decodedToken = await verifyAuth(token);
-      if (!decodedToken) {
-        throw new Error("Invalid token");
-      }
-      console.log(`✅ [Middleware] Auth successful for: ${decodedToken.email}`);
-      
-      // Add user info to the request headers to be used in API routes
-      const requestHeaders = new Headers(req.headers);
-      requestHeaders.set('X-User-Info', JSON.stringify(decodedToken));
-
-      return NextResponse.next({
-        request: {
-          headers: requestHeaders,
-        },
-      });
-
-    } catch (error) {
-      console.error('❌ [Middleware] Invalid token:', error);
-      return new NextResponse(JSON.stringify({ error: 'Yetkisiz erişim: Geçersiz token.' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-    }
-  }
-
-  // Sayfa yönlendirme mantığı (client-side rendering için)
+// Bu fonksiyon, gelen isteklerdeki oturum çerezini doğrular
+async function verifySessionCookie(req: NextRequest) {
   const sessionCookie = req.cookies.get('session')?.value;
-  const hasSession = !!sessionCookie;
 
-  const authPages = ["/auth/login", "/auth/register", "/login"];
-  if (authPages.includes(pathname) && hasSession) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
-  }
-  
-  const protectedPages = ["/dashboard", "/stores", "/products", "/settings"];
-  if (protectedPages.some(page => pathname.startsWith(page)) && !hasSession) {
-      return NextResponse.redirect(new URL("/auth/login?redirect=" + encodeURIComponent(pathname), req.url));
-  }
-  
-  if (pathname === "/") {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+  if (!sessionCookie) {
+    return null;
   }
 
-  return NextResponse.next()
+  try {
+    // Çerezi Firebase Admin SDK ile doğrula
+    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
+    return decodedToken;
+  } catch (error: any) {
+    // Hata durumunda (örn: token süresi dolmuş) null döndür
+    console.warn('[Middleware] Invalid session cookie:', error.code);
+    return null;
+  }
 }
 
+export async function middleware(req: NextRequest) {
+  const user = await verifySessionCookie(req);
+  const { pathname } = req.nextUrl;
+
+  // Korunması gereken API rotaları
+  const protectedApiRoutes = ['/api/etsy', '/api/user', '/api/ai'];
+
+  // Eğer istek korumalı bir API rotasına gidiyorsa VE kullanıcı doğrulanmamışsa,
+  // isteği reddet.
+  if (protectedApiRoutes.some(path => pathname.startsWith(path)) && !user) {
+    return new NextResponse(
+        JSON.stringify({ error: 'Unauthorized: No valid session cookie' }), 
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Kullanıcı giriş yapmamışsa ve korumalı bir sayfaya gitmeye çalışıyorsa,
+  // onu giriş sayfasına yönlendir.
+  const protectedPages = ['/stores', '/settings', '/dashboard', '/products', '/analytics', '/orders', '/marketing'];
+  if (!user && protectedPages.some(path => pathname.startsWith(path))) {
+    const loginUrl = new URL('/auth/login', req.url);
+    loginUrl.searchParams.set('redirect', pathname); // Kullanıcıyı giriş yaptıktan sonra geri yönlendir
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Diğer tüm durumlarda isteğin devam etmesine izin ver
+  return NextResponse.next();
+}
+
+// Middleware'in hangi sayfalarda çalışacağını belirle
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * Aşağıdaki yollar hariç TÜM istek yollarıyla eşleştir:
+     * - /auth/ ile başlayanlar (giriş/kayıt sayfaları)
+     * - /api/auth/session (oturum oluşturma/silme API'si)
+     * - _next/static, _next/image, favicon.ico (statik dosyalar)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!auth/|_next/static|_next/image|favicon.ico|api/auth/session).*)',
   ],
-}
+};

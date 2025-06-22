@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -16,7 +16,14 @@ const firebaseConfig = {
 
 // Initialize Firebase
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const analytics = getAnalytics(app);
+
+// Initialize Analytics only in browser environment
+export const analytics = typeof window !== 'undefined' 
+  ? (async () => {
+      const isAnalyticsSupported = await isSupported();
+      return isAnalyticsSupported ? getAnalytics(app) : null;
+    })() 
+  : null;
 
 // Initialize Firebase Auth
 export const auth = getAuth(app);

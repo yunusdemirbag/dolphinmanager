@@ -11,9 +11,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    // Geliştirme ortamında mock veri döndür
-    if (process.env.NODE_ENV === 'development' && userId === 'local-user-123') {
-      console.log('Using mock store data for local development');
+    // Mock kullanıcı ID'si için her ortamda mock veri döndür
+    if (userId === 'local-user-123') {
+      console.log('Using mock store data for local-user-123');
       return NextResponse.json({ 
         store: {
           shop_id: 56171647,
@@ -98,9 +98,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Geliştirme ortamında mock başarılı yanıt döndür
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Development mode: Mocking successful store sync');
+    // Mock kullanıcı ID'si için her ortamda mock başarılı yanıt döndür
+    if (user_id === 'local-user-123') {
+      console.log('Mock successful store sync for local-user-123');
       return NextResponse.json({ 
         message: 'Store synced to Firebase successfully (mock)',
         shop_id,

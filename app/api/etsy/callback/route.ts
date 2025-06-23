@@ -92,13 +92,27 @@ export async function GET(request: NextRequest) {
     console.log('Mağaza bilgileri:', meData.shops?.length, 'mağaza');
     console.log('Tam API response:', JSON.stringify(meData, null, 2));
 
-    // Güvenlik kontrolü - mağaza bilgilerini kontrol et
-    if (!meData.shops || meData.shops.length === 0) {
-      console.error('Kullanıcının mağazası bulunamadı - shops array boş veya undefined');
-      return NextResponse.redirect(new URL('/stores?error=no_shop_found_in_me', request.url));
+    // Response'ta shop_id var ama shops array yok - direkt shop_id kullan
+    if (!meData.shop_id) {
+      console.error('Kullanıcının mağaza ID\'si bulunamadı');
+      return NextResponse.redirect(new URL('/stores?error=no_shop_id_in_me', request.url));
     }
 
-    const shop = meData.shops[0];
+    // Shop bilgilerini ayrıca çekmek gerekiyor
+    const shopResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${meData.shop_id}`, {
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'x-api-key': process.env.ETSY_CLIENT_ID!,
+      },
+    });
+
+    if (!shopResponse.ok) {
+      const errorText = await shopResponse.text();
+      console.error('Mağaza detayları alınamadı:', errorText);
+      return NextResponse.redirect(new URL('/stores?error=shop_details_failed', request.url));
+    }
+
+    const shop = await shopResponse.json();
     const userData = { user_id: meData.user_id };
     console.log('Mağaza seçildi:', shop.shop_name);
 

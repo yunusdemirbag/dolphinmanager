@@ -11,7 +11,9 @@ const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://dolphinmanager-ph
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('[etsy/callback] Callback başlangıç')
+    console.log('[etsy/callback] Callback başlangıç');
+    console.log('[etsy/callback] Firebase DB object:', typeof db);
+    console.log(`[etsy/callback] ETSY_CLIENT_ID set: ${!!ETSY_CLIENT_ID}`);
     
     // URL parametrelerini al
     const url = new URL(request.url)
@@ -32,6 +34,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect('/stores?error=missing_params')
     }
     
+    console.log('[etsy/callback] Veritabanı sorgusu başlıyor...');
     // State değerine göre auth session'ı bul
     const sessionsSnapshot = await db.collection('etsy_auth_sessions')
       .where('state', '==', state)

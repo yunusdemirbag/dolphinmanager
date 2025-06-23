@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
     const meData = await meResponse.json();
     console.log('Kullanıcı bilgileri alındı:', meData.user_id);
     console.log('Mağaza bilgileri:', meData.shops?.length, 'mağaza');
+    console.log('Tam API response:', JSON.stringify(meData, null, 2));
 
     // Güvenlik kontrolü - mağaza bilgilerini kontrol et
     if (!meData.shops || meData.shops.length === 0) {

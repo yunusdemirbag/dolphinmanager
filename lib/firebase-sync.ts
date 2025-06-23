@@ -1,5 +1,6 @@
 import { collection, doc, setDoc, updateDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
+import { adminDb, initializeAdminApp } from './firebase-admin';
 
 export interface EtsyStore {
   shop_id: number;
@@ -10,6 +11,9 @@ export interface EtsyStore {
   connected_at: Date;
   last_sync_at: Date;
   is_active: boolean;
+  total_products?: number;
+  active_listings?: number;
+  monthly_sales?: string;
 }
 
 export interface ProductDraft {
@@ -339,5 +343,149 @@ export async function deleteProductDraftFromFirebase(draftId: string): Promise<v
   } catch (error) {
     console.error('Error deleting product draft from Firebase:', error);
     throw error;
+  }
+}
+
+// --- ADMIN-SIDE (SERVER) FUNCTIONS ---
+
+/**
+ * Syncs a batch of products to Firebase for a specific user using the Admin SDK.
+ */
+export async function syncProductsToFirebaseAdmin(userId: string, products: any[]): Promise<void> {
+  initializeAdminApp();
+  if (!adminDb) throw new Error('Firebase Admin not initialized');
+  if (!products || products.length === 0) return;
+  
+  console.log(`🔄 Syncing ${products.length} products to Firebase for user ${userId}...`);
+
+  const userProductsRef = adminDb.collection('users').doc(userId).collection('products');
+  
+  // Firestore allows a maximum of 500 operations in a single batch.
+  const chunkSize = 499;
+
+  for (let i = 0; i < products.length; i += chunkSize) {
+    const chunk = products.slice(i, i + chunkSize);
+    const batch = adminDb.batch();
+
+    chunk.forEach(product => {
+      const docRef = userProductsRef.doc(String(product.listing_id));
+      batch.set(docRef, { ...product, synced_at: new Date() });
+    });
+    
+    console.log(`Writing chunk ${Math.floor(i / chunkSize) + 1} of ${Math.ceil(products.length / chunkSize)}...`);
+    await batch.commit();
+  }
+
+  console.log(`✅ Successfully synced ${products.length} products to Firebase for user ${userId}.`);
+}
+
+/**
+ * Counts the total products for a user in Firebase using the Admin SDK.
+ */
+export async function countProductsInFirebaseAdmin(userId: string): Promise<number> {
+  initializeAdminApp();
+  if (!adminDb) {
+    console.error('Firebase Admin not initialized. Cannot count products.');
+    return 0;
+  }
+  if (!userId) {
+    console.error("Error: countProductsInFirebaseAdmin called with empty userId.");
+    return 0;
+  }
+  const productsCollRef = adminDb.collection('users').doc(userId).collection('products');
+  const snapshot = await productsCollRef.count().get();
+  return snapshot.data().count;
+}
+
+/**
+ * Gets paginated products for a user from Firebase using the Admin SDK.
+ * Uses a listing_id as a cursor for pagination.
+ */
+export async function getProductsFromFirebaseAdmin(
+  userId: string,
+  pageSize: number = 10,
+  startAfterListingId: number | null = null
+) {
+  initializeAdminApp();
+  if (!adminDb) {
+    console.error("Firebase Admin DB not initialized");
+    return { products: [], nextCursor: null };
+  }
+
+  let query = adminDb.collection('users').doc(userId).collection('products')
+    .orderBy('listing_id')
+    .limit(pageSize);
+
+  if (startAfterListingId) {
+    query = query.startAfter(startAfterListingId);
+  }
+
+  const snapshot = await query.get();
+
+  const products = snapshot.docs.map(doc => {
+    const data = doc.data();
+
+    // Firebase Timestamp nesnelerini, istemcinin anlayabileceği
+    // ISO string formatına dönüştürüyoruz.
+    const serializableData = { ...data };
+    for (const key in serializableData) {
+      if (serializableData[key] && typeof serializableData[key].toDate === 'function') {
+        serializableData[key] = serializableData[key].toDate().toISOString();
+      }
+    }
+
+    return {
+      id: doc.id,
+      ...serializableData,
+    };
+  });
+
+  const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+  const nextCursor = lastDoc ? lastDoc.data().listing_id : null;
+
+  return { products, nextCursor };
+}
+
+export async function getConnectedStoreFromFirebaseAdmin(userId: string): Promise<EtsyStore | null> {
+  initializeAdminApp();
+  if (!adminDb) {
+    console.error("Firebase Admin DB not initialized");
+    return null;
+  }
+  
+  try {
+    if (!userId || userId.trim() === '') {
+      console.error("Geçersiz userId: Boş veya null değer.");
+      return null;
+    }
+
+    console.log(`🔍 ${userId} kullanıcısı için mağaza bilgileri alınıyor...`);
+    const storesQuery = adminDb.collection('etsy_stores')
+      .where('user_id', '==', userId)
+      .where('is_active', '==', true)
+      .limit(1);
+
+    const querySnapshot = await storesQuery.get();
+
+    if (querySnapshot.empty) {
+      console.error('No active Etsy store connected for this user.');
+      return null;
+    }
+
+    const storeDoc = querySnapshot.docs[0];
+    const storeData = storeDoc.data() as EtsyStore;
+    
+    if (storeData.connected_at && typeof (storeData.connected_at as any).toDate === 'function') {
+        storeData.connected_at = (storeData.connected_at as any).toDate();
+    }
+     if (storeData.last_sync_at && typeof (storeData.last_sync_at as any).toDate === 'function') {
+        storeData.last_sync_at = (storeData.last_sync_at as any).toDate();
+    }
+
+    return storeData;
+
+  } catch (error) {
+    console.error('Error fetching connected store from Firebase Admin:', error);
+    return null;
   }
 }

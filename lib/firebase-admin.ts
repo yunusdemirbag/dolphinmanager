@@ -1,43 +1,67 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
-let adminDb: FirebaseFirestore.Firestore | null = null;
+let adminDb: Firestore | null = null;
 
-// Firebase admin sadece server-side'da çalıştır
-if (typeof window === 'undefined') {
+export function initializeAdminApp() {
+  // If already initialized, just ensure adminDb is set
+  if (getApps().length > 0) {
+    if (!adminDb) {
+      adminDb = getFirestore();
+    }
+    return;
+  }
+
   try {
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    
+    if (!privateKey) {
+      console.error('Firebase Private Key bulunamadı!');
+      return;
+    }
+
+    // Private key'in doğru formatta olduğundan emin ol
+    const formattedPrivateKey = privateKey.includes('\\n') 
+      ? privateKey.replace(/\\n/g, '\n') 
+      : privateKey;
+
     const firebaseAdminConfig = {
-      projectId: process.env.FIREBASE_PROJECT_ID || '',
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: formattedPrivateKey,
     };
 
-    // Firebase admin yapılandırmasını kontrol et
-    const hasValidConfig = firebaseAdminConfig.projectId && 
-                         firebaseAdminConfig.clientEmail && 
-                         firebaseAdminConfig.privateKey &&
-                         firebaseAdminConfig.privateKey.includes('BEGIN PRIVATE KEY');
+    // Config kontrolü
+    console.log('Firebase Admin Config kontrol ediliyor:');
+    console.log('- Project ID:', firebaseAdminConfig.projectId ? '✅ Mevcut' : '❌ Eksik');
+    console.log('- Client Email:', firebaseAdminConfig.clientEmail ? '✅ Mevcut' : '❌ Eksik');
+    console.log('- Private Key:', firebaseAdminConfig.privateKey?.startsWith('-----BEGIN PRIVATE KEY-----') ? '✅ Doğru format' : '❌ Hatalı format');
 
-    if (!getApps().length && hasValidConfig) {
-      try {
-        initializeApp({
-          credential: cert(firebaseAdminConfig),
-          projectId: process.env.FIREBASE_PROJECT_ID,
-        });
-        adminDb = getFirestore();
-        console.log('Firebase admin initialized successfully');
-      } catch (error) {
-        console.error('Firebase admin initialization error:', error);
-        adminDb = null;
-      }
+    if (
+      firebaseAdminConfig.projectId &&
+      firebaseAdminConfig.clientEmail &&
+      firebaseAdminConfig.privateKey &&
+      firebaseAdminConfig.privateKey.includes('BEGIN PRIVATE KEY')
+    ) {
+      initializeApp({
+        credential: cert(firebaseAdminConfig),
+        projectId: process.env.FIREBASE_PROJECT_ID,
+      });
+      adminDb = getFirestore();
+      console.log('Firebase admin initialized successfully');
     } else {
-      console.log('Firebase admin config incomplete');
-      adminDb = null;
+      console.error('Firebase admin config incomplete or invalid. Initialization skipped.');
+      console.error('Lütfen .env.local dosyanızda FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL ve FIREBASE_PROJECT_ID değerlerinin doğru olduğundan emin olun.');
     }
   } catch (error) {
-    console.error('Firebase admin setup error:', error);
+    console.error('Firebase admin initialization error:', error);
     adminDb = null;
   }
 }
 
-export { adminDb, getApps };
+// Initialize on first load in a server environment.
+if (typeof window === 'undefined') {
+  initializeAdminApp();
+}
+
+export { adminDb };

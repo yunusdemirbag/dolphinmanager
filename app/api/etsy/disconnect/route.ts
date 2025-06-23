@@ -7,23 +7,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Firebase admin not initialized' }, { status: 500 });
     }
 
-    const { shop_id } = await request.json();
+    const { shop_id, user_id } = await request.json();
 
     if (!shop_id) {
       return NextResponse.json({ error: 'Shop ID is required' }, { status: 400 });
     }
 
-    console.log(`Mağaza bağlantısı kesiliyor: ${shop_id}`);
+    if (!user_id) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
 
-    const shopIdStr = shop_id.toString();
+    console.log(`Mağaza bağlantısı kesiliyor: ${shop_id} (Kullanıcı: ${user_id})`);
 
-    // Firestore'dan ilgili dökümanları sil
-    const etsyStoreRef = adminDb.collection('etsy_stores').doc(shopIdStr);
-    const apiKeyRef = adminDb.collection('etsy_api_keys').doc(shopIdStr);
+    // Kullanıcının Etsy bilgilerini güncelle
+    const storeDetailsRef = adminDb.collection('users').doc(user_id).collection('etsy_credentials').doc('store_details');
 
-    await adminDb.runTransaction(async (transaction) => {
-      transaction.delete(etsyStoreRef);
-      transaction.delete(apiKeyRef);
+    // Belgeyi tamamen silmek yerine aktif olmadığını işaretle
+    await storeDetailsRef.update({
+      is_active: false,
+      disconnected_at: new Date()
     });
 
     console.log(`Mağaza ${shop_id} bağlantısı başarıyla kesildi.`);

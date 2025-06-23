@@ -3,37 +3,18 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Store, Link as LinkIcon, RefreshCw, Unlink } from "lucide-react";
 
 export default function StoresPage() {
   const [connectedStore, setConnectedStore] = useState<{shop_name: string} | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [apiKey, setApiKey] = useState('');
 
-  const handleApiKeyConnect = async () => {
-    if (!apiKey.trim()) return;
-    
+  const handleConnectEtsy = async () => {
     setIsConnecting(true);
     try {
-      const response = await fetch('/api/etsy/connect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ apiKey }),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setConnectedStore({ shop_name: data.shop_name });
-      } else {
-        alert('Bağlantı hatası: ' + data.error);
-      }
+      window.location.href = '/api/etsy/auth';
     } catch (error) {
-      console.error('API Key bağlantı hatası:', error);
-      alert('Bağlantı hatası oluştu');
+      console.error('Etsy bağlantı hatası:', error);
     } finally {
       setIsConnecting(false);
     }
@@ -115,25 +96,19 @@ export default function StoresPage() {
             <div className="w-16 h-16 bg-orange-500 rounded-lg flex items-center justify-center mx-auto mb-4">
               <Store className="w-8 h-8 text-white" />
             </div>
-            <CardTitle>Etsy API Key ile Bağlan</CardTitle>
+            <CardTitle>Etsy Mağazası Bağlayın</CardTitle>
             <CardDescription>
-              Etsy Personal Access API key&apos;inizi girerek mağazanızı bağlayın
+              Etsy mağazanızı bağlayarak ürünlerinizi yönetmeye başlayın
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Input 
-              placeholder="Etsy API Key&apos;inizi girin"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              type="password"
-            />
+          <CardContent>
             <Button 
               className="w-full" 
-              onClick={handleApiKeyConnect}
-              disabled={isConnecting || !apiKey.trim()}
+              onClick={handleConnectEtsy}
+              disabled={isConnecting}
             >
               <LinkIcon className="w-4 h-4 mr-2" />
-              {isConnecting ? 'Bağlanıyor...' : 'API Key ile Bağlan'}
+              {isConnecting ? 'Bağlanıyor...' : 'Etsy ile Bağlan'}
             </Button>
           </CardContent>
         </Card>

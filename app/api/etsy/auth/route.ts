@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebase-admin';
+import { generateCodeVerifier, generateCodeChallenge, generateState } from '@/lib/crypto-utils';
 
 export async function GET() {
   try {
@@ -18,17 +20,33 @@ export async function GET() {
       );
     }
 
-    const state = Math.random().toString(36).substring(7);
-    
-    // Basitleştirilmiş Etsy OAuth - PKCE olmadan
+    // PKCE parametrelerini oluştur
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+    const state = generateState();
+    const sessionId = Math.random().toString(36).substring(7);
+
+    // Session bilgilerini Firebase'e kaydet
+    if (adminDb) {
+      await adminDb.collection('etsy_auth_sessions').doc(sessionId).set({
+        codeVerifier,
+        state,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 dakika
+      });
+    }
+
+    // Etsy OAuth URL'si oluştur
     const authUrl = new URL('https://www.etsy.com/oauth/connect');
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', clientId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('scope', scope);
-    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('state', `${state}:${sessionId}`);
+    authUrl.searchParams.set('code_challenge', codeChallenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
 
-    console.log('Etsy yetkilendirme URL\'si oluşturuldu:', authUrl.toString());
+    console.log('Etsy yetkilendirme URL\'si oluşturuldu');
 
     return NextResponse.redirect(authUrl.toString());
   } catch (error) {

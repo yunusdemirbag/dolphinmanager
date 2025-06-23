@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
-    const state = searchParams.get('state');
+    const stateParam = searchParams.get('state');
     const error = searchParams.get('error');
 
     if (error) {
@@ -13,12 +13,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/stores?error=auth_failed', request.url));
     }
 
-    if (!code) {
-      console.error('Etsy callback - kod parametresi eksik');
-      return NextResponse.redirect(new URL('/stores?error=no_code', request.url));
+    if (!code || !stateParam) {
+      console.error('Etsy callback - kod veya state parametresi eksik');
+      return NextResponse.redirect(new URL('/stores?error=missing_params', request.url));
     }
 
-    console.log('Etsy callback alındı:', { code: code.substring(0, 10) + '...', state });
+    // State'ten sessionId'yi çıkar
+    const [state, sessionId] = stateParam.split(':');
+    if (!state || !sessionId) {
+      console.error('Geçersiz state formatı');
+      return NextResponse.redirect(new URL('/stores?error=invalid_state', request.url));
+    }
+
+    console.log('Etsy callback alındı:', { code: code.substring(0, 10) + '...', sessionId });
+
+    // Session bilgilerini Firebase'den al
+    if (!adminDb) {
+      console.error('Firebase admin başlatılamadı');
+      return NextResponse.redirect(new URL('/stores?error=firebase_failed', request.url));
+    }
+
+    const sessionDoc = await adminDb.collection('etsy_auth_sessions').doc(sessionId).get();
+    if (!sessionDoc.exists) {
+      console.error('Session bulunamadı');
+      return NextResponse.redirect(new URL('/stores?error=session_not_found', request.url));
+    }
+
+    const sessionData = sessionDoc.data();
+    if (sessionData?.state !== state) {
+      console.error('State uyuşmazlığı');
+      return NextResponse.redirect(new URL('/stores?error=state_mismatch', request.url));
+    }
+
+    // Session'u sil
+    await adminDb.collection('etsy_auth_sessions').doc(sessionId).delete();
 
     // Token exchange
     const tokenResponse = await fetch('https://api.etsy.com/v3/public/oauth/token', {
@@ -31,7 +59,8 @@ export async function GET(request: NextRequest) {
         client_id: process.env.ETSY_CLIENT_ID!,
         client_secret: process.env.ETSY_CLIENT_SECRET!,
         code: code,
-        redirect_uri: process.env.ETSY_REDIRECT_URI!
+        redirect_uri: process.env.ETSY_REDIRECT_URI!,
+        code_verifier: sessionData.codeVerifier
       }),
     });
 

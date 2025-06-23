@@ -73,46 +73,33 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json();
     console.log('Token alındı:', { access_token: tokenData.access_token?.substring(0, 10) + '...' });
 
-    // Kullanıcı bilgilerini al
-    const userResponse = await fetch('https://openapi.etsy.com/v3/application/users/me', {
+    // Kullanıcı ve mağaza bilgilerini tek seferde al - includes=shops kullan
+    const meResponse = await fetch('https://openapi.etsy.com/v3/application/users/me?includes=shops', {
       headers: {
         'Authorization': `Bearer ${tokenData.access_token}`,
         'x-api-key': process.env.ETSY_CLIENT_ID!,
       },
     });
 
-    if (!userResponse.ok) {
-      console.error('Kullanıcı bilgileri alınamadı:', await userResponse.text());
-      return NextResponse.redirect(new URL('/stores?error=user_failed', request.url));
+    if (!meResponse.ok) {
+      const errorText = await meResponse.text();
+      console.error('Kullanıcı/mağaza bilgileri alınamadı:', errorText);
+      return NextResponse.redirect(new URL('/stores?error=me_endpoint_failed', request.url));
     }
 
-    const userData = await userResponse.json();
-    console.log('Kullanıcı bilgileri alındı:', userData.user_id);
-
-    // Mağaza bilgilerini al - direkt shops endpoint
-    const shopsResponse = await fetch(`https://openapi.etsy.com/v3/application/shops`, {
-      headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'x-api-key': process.env.ETSY_CLIENT_ID!,
-      },
-    });
-
-    if (!shopsResponse.ok) {
-      console.error('Mağaza bilgileri alınamadı:', await shopsResponse.text());
-      return NextResponse.redirect(new URL('/stores?error=shops_failed', request.url));
-    }
-
-    const shopsData = await shopsResponse.json();
-    console.log('Mağaza bilgileri alındı:', shopsData.results?.length, 'mağaza');
+    const meData = await meResponse.json();
+    console.log('Kullanıcı bilgileri alındı:', meData.user_id);
+    console.log('Mağaza bilgileri:', meData.shops?.length, 'mağaza');
 
     // Güvenlik kontrolü - mağaza bilgilerini kontrol et
-    if (!shopsData || !shopsData.results || shopsData.results.length === 0) {
-      console.error('Kullanıcının mağazası bulunamadı veya Etsy API boş cevap döndü');
-      return NextResponse.redirect(new URL('/stores?error=no_shop_found', request.url));
+    if (!meData.shops || meData.shops.length === 0) {
+      console.error('Kullanıcının mağazası bulunamadı - shops array boş veya undefined');
+      return NextResponse.redirect(new URL('/stores?error=no_shop_found_in_me', request.url));
     }
 
-    const shop = shopsData.results[0];
-    console.log('İlk mağaza seçildi:', shop.shop_name);
+    const shop = meData.shops[0];
+    const userData = { user_id: meData.user_id };
+    console.log('Mağaza seçildi:', shop.shop_name);
 
     // Firebase'e kaydet
     if (!adminDb) {

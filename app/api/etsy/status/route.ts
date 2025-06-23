@@ -66,30 +66,30 @@ export async function GET() {
         }
       } else {
         console.error('Etsy API error:', await response.text());
+        return NextResponse.json({ 
+          connected: false, 
+          error: `Etsy API error: ${response.status}`
+        }, { status: response.status });
       }
     } catch (etsyError) {
       console.error('Etsy API error:', etsyError);
+      return NextResponse.json({ 
+        connected: false, 
+        error: 'Etsy API connection failed'
+      }, { status: 500 });
     }
     
-    console.log('Returning mock store data for development');
-    
-    // Gerçek veri alınamadıysa, varsayılan mağaza bilgilerini döndür
-    return NextResponse.json({
-      connected: true,
-      shop_name: "CyberDecorArt",
-      shop_id: "12345678",
-      user_id: testUserId
-    });
+    // Hiçbir veri bulunamadıysa
+    return NextResponse.json({ 
+      connected: false,
+      error: 'No shop data found'
+    }, { status: 404 });
     
   } catch (error) {
     console.error('Etsy status kontrol hatası:', error);
-    
-    // Hata durumunda da varsayılan mağaza bilgilerini döndür
-    return NextResponse.json({
-      connected: true,
-      shop_name: "CyberDecorArt",
-      shop_id: "12345678",
-      user_id: "1007541496"
-    });
+    return NextResponse.json({ 
+      connected: false, 
+      error: 'Status check failed' 
+    }, { status: 500 });
   }
 }

@@ -14,81 +14,10 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      console.log(`Etsy API error: ${response.status}. Returning mock data for development.`);
-      
-      // Eğer API çağrısı başarısız olursa mock veri döndür
-      return NextResponse.json({
-        count: 3,
-        results: [
-          {
-            id: '1001',
-            title: 'Modern Minimalist Wall Art',
-            description: 'Beautiful minimalist wall art for your home.',
-            price: 29.99,
-            currency_code: 'USD',
-            quantity: 10,
-            taxonomy_id: 1027, // Wall Decor
-            tags: ['minimalist', 'wall art', 'home decor'],
-            materials: ['canvas', 'wood'],
-            images: [
-              'https://i.etsystatic.com/sample/1.jpg',
-              'https://i.etsystatic.com/sample/2.jpg'
-            ],
-            variations: [
-              { size: 'Small', price: 29.99, quantity: 5, is_enabled: true },
-              { size: 'Medium', price: 39.99, quantity: 3, is_enabled: true },
-              { size: 'Large', price: 49.99, quantity: 2, is_enabled: true }
-            ],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            state: 'active'
-          },
-          {
-            id: '1002',
-            title: 'Abstract Canvas Print',
-            description: 'Colorful abstract art print on premium canvas.',
-            price: 39.99,
-            currency_code: 'USD',
-            quantity: 8,
-            taxonomy_id: 1027, // Wall Decor
-            tags: ['abstract', 'canvas print', 'colorful'],
-            materials: ['canvas', 'ink'],
-            images: [
-              'https://i.etsystatic.com/sample/3.jpg',
-              'https://i.etsystatic.com/sample/4.jpg'
-            ],
-            variations: [
-              { size: 'Small', price: 39.99, quantity: 4, is_enabled: true },
-              { size: 'Large', price: 59.99, quantity: 4, is_enabled: true }
-            ],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            state: 'active'
-          },
-          {
-            id: '1003',
-            title: 'Custom Family Portrait',
-            description: 'Personalized digital family portrait illustration.',
-            price: 49.99,
-            currency_code: 'USD',
-            quantity: 999,
-            taxonomy_id: 2078, // Digital Prints
-            tags: ['portrait', 'custom', 'family', 'digital'],
-            materials: ['digital file'],
-            images: [
-              'https://i.etsystatic.com/sample/5.jpg',
-              'https://i.etsystatic.com/sample/6.jpg'
-            ],
-            variations: [
-              { style: 'Cartoon', price: 49.99, quantity: 999, is_enabled: true },
-              { style: 'Realistic', price: 69.99, quantity: 999, is_enabled: true }
-            ],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            state: 'active'
-          }
-        ]
-      });
+      return NextResponse.json({ 
+        error: 'Failed to fetch products from Etsy API',
+        message: `Etsy API error: ${response.status}`
+      }, { status: response.status });
     }
 
     const data = await response.json();
@@ -167,79 +96,9 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Error fetching products from Etsy API:', error);
-    
-    // Hata durumunda da mock veri döndür
-    return NextResponse.json({
-      count: 3,
-      results: [
-        {
-          id: '1001',
-          title: 'Modern Minimalist Wall Art',
-          description: 'Beautiful minimalist wall art for your home.',
-          price: 29.99,
-          currency_code: 'USD',
-          quantity: 10,
-          taxonomy_id: 1027, // Wall Decor
-          tags: ['minimalist', 'wall art', 'home decor'],
-          materials: ['canvas', 'wood'],
-          images: [
-            'https://i.etsystatic.com/sample/1.jpg',
-            'https://i.etsystatic.com/sample/2.jpg'
-          ],
-          variations: [
-            { size: 'Small', price: 29.99, quantity: 5, is_enabled: true },
-            { size: 'Medium', price: 39.99, quantity: 3, is_enabled: true },
-            { size: 'Large', price: 49.99, quantity: 2, is_enabled: true }
-          ],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          state: 'active'
-        },
-        {
-          id: '1002',
-          title: 'Abstract Canvas Print',
-          description: 'Colorful abstract art print on premium canvas.',
-          price: 39.99,
-          currency_code: 'USD',
-          quantity: 8,
-          taxonomy_id: 1027, // Wall Decor
-          tags: ['abstract', 'canvas print', 'colorful'],
-          materials: ['canvas', 'ink'],
-          images: [
-            'https://i.etsystatic.com/sample/3.jpg',
-            'https://i.etsystatic.com/sample/4.jpg'
-          ],
-          variations: [
-            { size: 'Small', price: 39.99, quantity: 4, is_enabled: true },
-            { size: 'Large', price: 59.99, quantity: 4, is_enabled: true }
-          ],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          state: 'active'
-        },
-        {
-          id: '1003',
-          title: 'Custom Family Portrait',
-          description: 'Personalized digital family portrait illustration.',
-          price: 49.99,
-          currency_code: 'USD',
-          quantity: 999,
-          taxonomy_id: 2078, // Digital Prints
-          tags: ['portrait', 'custom', 'family', 'digital'],
-          materials: ['digital file'],
-          images: [
-            'https://i.etsystatic.com/sample/5.jpg',
-            'https://i.etsystatic.com/sample/6.jpg'
-          ],
-          variations: [
-            { style: 'Cartoon', price: 49.99, quantity: 999, is_enabled: true },
-            { style: 'Realistic', price: 69.99, quantity: 999, is_enabled: true }
-          ],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          state: 'active'
-        }
-      ]
-    });
+    return NextResponse.json({ 
+      error: 'Failed to fetch products from Etsy API',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 } 

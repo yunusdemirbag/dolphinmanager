@@ -93,13 +93,19 @@ export default function ProductsPage() {
   const fetchProducts = async () => {
     setIsLoadingProducts(true);
     try {
-      const response = await fetch('/api/products/mock');
+      // Mock API yerine gerçek API'yi kullan
+      const response = await fetch('/api/products');
       if (response.ok) {
         const data = await response.json();
         setProducts(data.results || []);
+      } else {
+        const errorData = await response.json();
+        console.error('Ürünler yüklenirken API hatası:', errorData);
+        setProducts([]);
       }
     } catch (error) {
       console.error('Ürünler yüklenirken hata:', error);
+      setProducts([]);
     } finally {
       setIsLoadingProducts(false);
     }

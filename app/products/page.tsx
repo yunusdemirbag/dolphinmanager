@@ -97,7 +97,8 @@ export default function ProductsPage() {
       const response = await fetch('/api/products');
       if (response.ok) {
         const data = await response.json();
-        setProducts(data.results || []);
+        setProducts(data.products || []);
+        console.log('Alınan ürünler:', data.products?.length || 0);
       } else {
         const errorData = await response.json();
         console.error('Ürünler yüklenirken API hatası:', errorData);
@@ -229,12 +230,12 @@ export default function ProductsPage() {
       ) : (
         <div className="grid md:grid-cols-3 gap-4">
           {products.map(product => (
-            <Card key={product.id} className="overflow-hidden">
+            <Card key={product.listing_id} className="overflow-hidden">
               <div className="aspect-square relative bg-gray-100">
-                {product.images && product.images[0] && (
+                {product.images && product.images.length > 0 && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img 
-                    src={product.images[0]} 
+                    src={product.images[0]?.url_570xN || product.images[0]?.url_fullxfull} 
                     alt={product.title}
                     className="object-cover w-full h-full"
                   />
@@ -244,10 +245,13 @@ export default function ProductsPage() {
                 <h3 className="font-medium truncate">{product.title}</h3>
                 <div className="flex justify-between items-center mt-2">
                   <span className="text-sm text-gray-600">
-                    {product.variations?.length || 0} varyasyon
+                    {product.state || 'active'}
                   </span>
                   <span className="font-semibold">
-                    ${product.price}
+                    {product.price?.currency_code || '$'}{' '}
+                    {product.price?.amount && product.price?.divisor 
+                      ? (product.price.amount / product.price.divisor).toFixed(2) 
+                      : '0.00'}
                   </span>
                 </div>
                 <div className="mt-4 flex justify-between">

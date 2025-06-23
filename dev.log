@@ -54,3 +54,13 @@
  ✓ Compiled in 62ms
  ✓ Compiled in 67ms
  GET /stores 200 in 73ms
+ GET /settings 200 in 227ms
+ GET /products 200 in 230ms
+ GET /settings 200 in 76ms
+ GET /stores 200 in 57ms
+ ✓ Compiled in 48ms
+ ✓ Compiled in 74ms
+ ✓ Compiled in 67ms
+ ✓ Compiled in 86ms
+ ✓ Compiled in 74ms
+ ✓ Compiled in 47ms

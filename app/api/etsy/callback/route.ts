@@ -78,6 +78,11 @@ export async function GET(request: NextRequest) {
     console.log('Mağaza bilgileri alındı:', shopsData.results?.length, 'mağaza');
 
     // Firebase'e kaydet
+    if (!adminDb) {
+      console.error('Firebase admin başlatılamadı');
+      return NextResponse.redirect(new URL('/stores?error=firebase_failed', request.url));
+    }
+
     const storeData = {
       user_id: userData.user_id,
       shop_id: shopsData.results[0]?.shop_id,

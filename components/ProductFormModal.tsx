@@ -6,24 +6,21 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter,
-  DialogDescription 
+  DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Upload, 
   X, 
   Plus, 
-  Minus, 
   Sparkles, 
   Save,
   Clock,
-  Image as ImageIcon,
-  DragDropVertical
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface ProductFormModalProps {
@@ -167,9 +164,9 @@ Minimalist geometrik şekillerin uyumlu bir kompozisyonu ile modern evlerin vazg
             <Plus className="w-5 h-5" />
             <span>Yeni Ürün Ekle</span>
           </DialogTitle>
-          <DialogDescription>
+          <p className="text-sm text-gray-600">
             Varyasyonlu ürün ekleme formu - AI destekli içerik üretimi ile
-          </DialogDescription>
+          </p>
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="space-y-4">
@@ -328,6 +325,7 @@ Minimalist geometrik şekillerin uyumlu bir kompozisyonu ile modern evlerin vazg
                   <div key={item.id} className="relative group">
                     <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
                       {item.type === 'image' ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={item.preview}
                           alt="Preview"
@@ -375,7 +373,7 @@ Minimalist geometrik şekillerin uyumlu bir kompozisyonu ile modern evlerin vazg
             disabled={!title.trim()}
           >
             <Save className="w-4 h-4 mr-2" />
-            Taslak Olarak Etsy'e Yükle
+            Taslak Olarak Etsy&apos;e Yükle
           </Button>
           <Button 
             onClick={() => handleSubmit('queue')}

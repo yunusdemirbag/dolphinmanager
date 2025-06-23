@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Store, Link as LinkIcon, RefreshCw, Unlink } from "lucide-react";
 
 export default function StoresPage() {
-  const [connectedStore, setConnectedStore] = useState<any>(null);
+  const [connectedStore, setConnectedStore] = useState<{shop_name: string} | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
 
   const handleConnectEtsy = async () => {

@@ -12,7 +12,7 @@ export default function Home() {
         </h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
           2100 yılından gelmiş gibi hissettiren, hiper-modern Etsy ürün yönetim sistemi. 
-          Tesla ve Apple'ın tasarım felsefesiyle buluşan minimalist deneyim.
+          Tesla ve Apple&apos;ın tasarım felsefesiyle buluşan minimalist deneyim.
         </p>
       </div>
 

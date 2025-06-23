@@ -22,7 +22,7 @@ export default function ProductsPage() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-semibold">Ürünler</h2>
-          <p className="text-gray-600">Etsy'e yüklenmiş veya taslak ürünleriniz</p>
+          <p className="text-gray-600">Etsy&apos;e yüklenmiş veya taslak ürünleriniz</p>
         </div>
         <Button onClick={() => setIsProductFormOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
@@ -47,7 +47,7 @@ export default function ProductsPage() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-semibold">Kuyruk Yönetimi</h2>
-          <p className="text-gray-600">Etsy'e yüklenmeyi bekleyen ürünler</p>
+          <p className="text-gray-600">Etsy&apos;e yüklenmeyi bekleyen ürünler</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline">
@@ -78,7 +78,7 @@ export default function ProductsPage() {
           <div className="text-center text-gray-500">
             <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p>Kuyrukta ürün bulunmuyor</p>
-            <p className="text-sm">Ürün ekleme formundan "Kuyruğa Ekle" butonunu kullanın</p>
+            <p className="text-sm">Ürün ekleme formundan &ldquo;Kuyruğa Ekle&rdquo; butonunu kullanın</p>
           </div>
         </Card>
       </div>
@@ -135,7 +135,7 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-black">Ürünler</h1>
-        <p className="text-gray-600">Ürünlerinizi yönetin ve Etsy'e yükleyin</p>
+        <p className="text-gray-600">Ürünlerinizi yönetin ve Etsy&apos;e yükleyin</p>
       </div>
 
       <div className="border-b border-gray-200">

@@ -77,7 +77,7 @@ async function getInitialProducts(userId: string) {
 
 // Server Component
 export default async function ProductsPage() {
-  const userId = process.env.MOCK_USER_ID || 'local-user-123'; // In a real app, this would come from the user's session
+  const userId = process.env.MOCK_USER_ID || 'local-user-123'; // Gerçek kullanıcı ID'si .env.local dosyasından alınıyor
   
   // Fetch initial data on the server
   const store = await getConnectedStoreFromFirebaseAdmin(userId);

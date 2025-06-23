@@ -356,8 +356,9 @@ export async function syncProductsToFirebaseAdmin(userId: string, products: any[
   if (!adminDb) throw new Error('Firebase Admin not initialized');
   if (!products || products.length === 0) return;
   
-  console.log(`🔄 Syncing ${products.length} products to Firebase for user ${userId}...`);
+  console.log(`🔄 Veritabanına ${products.length} ürün yazılıyor (Kullanıcı: ${userId})...`);
 
+  // Ürünleri ana 'products' koleksiyonuna yazıyoruz.
   const productsCollection = adminDb.collection('products');
   
   const chunkSize = 499;
@@ -367,23 +368,27 @@ export async function syncProductsToFirebaseAdmin(userId: string, products: any[
     const batch = adminDb.batch();
 
     chunk.forEach(product => {
+      // Belge ID'si olarak ürünün ID'sini kullanıyoruz.
       const docRef = productsCollection.doc(String(product.listing_id));
       
-      const productData = {
+      // --- KESİN ÇÖZÜM BURADA ---
+      // Gelen 'product' nesnesi zaten zenginleştirilmiş ve 'images' alanını içeriyor.
+      // Bu nesneyi olduğu gibi alıp, sadece 'userId' ve 'synced_at' alanlarını ekliyoruz.
+      const productDataToSave = {
         ...product,
-        userId: userId,
-        images: product.images || [],
-        synced_at: new Date()
+        userId: userId, // Ürünün kime ait olduğunu belirtmek için
+        synced_at: new Date() // Senkronizasyon zamanı
       };
+      // --- KESİN ÇÖZÜM SONU ---
       
-      batch.set(docRef, productData, { merge: true });
+      batch.set(docRef, productDataToSave, { merge: true });
     });
     
-    console.log(`Writing chunk ${Math.floor(i / chunkSize) + 1} of ${Math.ceil(products.length / chunkSize)}...`);
+    console.log(`Yazma işlemi: Parça ${Math.floor(i / chunkSize) + 1} / ${Math.ceil(products.length / chunkSize)} işleniyor...`);
     await batch.commit();
   }
 
-  console.log(`✅ Successfully synced ${products.length} products to Firebase for user ${userId}.`);
+  console.log(`✅ ${products.length} ürün Firebase'e başarıyla senkronize edildi.`);
 }
 
 /**

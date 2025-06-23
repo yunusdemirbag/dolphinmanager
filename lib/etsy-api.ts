@@ -51,9 +51,11 @@ async function refreshEtsyToken(shopId: string): Promise<string | null> {
     await adminDb.collection('etsy_api_keys').doc(shopId).update({
         access_token: newAccessToken,
         refresh_token: newTokens.refresh_token, // Etsy might send a new refresh token
+        expires_at: new Date(Date.now() + newTokens.expires_in * 1000),
+        updated_at: new Date()
     });
 
-    console.log(`✅ Successfully refreshed Etsy token for shop ${shopId}.`);
+    console.log(`✅ Successfully refreshed and saved new token for shop ${shopId}.`);
     return newAccessToken;
 }
 

@@ -1,5 +1,6 @@
 import { getConnectedStoreFromFirebaseAdmin, countProductsInFirebaseAdmin, EtsyStore } from '@/lib/firebase-sync';
 import { StoreClientPage } from '@/components/StoreClientPage';
+import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 
 // Server Component
 export default async function StoresPage() {
@@ -10,6 +11,7 @@ export default async function StoresPage() {
   console.log("KULLANILAN KULLANICI ID:", userId);
 
   const store = await getConnectedStoreFromFirebaseAdmin(userId);
+  
   console.log("BULUNAN MAĞAZA BİLGİSİ:", store);
 
   if (!store) {

@@ -117,12 +117,12 @@ export default function StoresPage() {
             </div>
             <CardTitle>Etsy API Key ile Bağlan</CardTitle>
             <CardDescription>
-              Etsy Personal Access API key'inizi girerek mağazanızı bağlayın
+              Etsy Personal Access API key&apos;inizi girerek mağazanızı bağlayın
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Input 
-              placeholder="Etsy API Key'inizi girin"
+              placeholder="Etsy API Key&apos;inizi girin"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               type="password"

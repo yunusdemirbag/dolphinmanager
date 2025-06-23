@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 
 export async function GET(request: NextRequest) {
   try {
+    // Firebase Admin'i başlat
+    initializeAdminApp();
+    
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const stateParam = searchParams.get('state');
@@ -43,6 +46,11 @@ export async function GET(request: NextRequest) {
     if (sessionData?.state !== state) {
       console.error('State uyuşmazlığı');
       return NextResponse.redirect(new URL('/stores?error=state_mismatch', request.url));
+    }
+    const appUserId = sessionData.userId || process.env.MOCK_USER_ID;
+    if (!appUserId) {
+      console.error('Oturumda kullanıcı kimliği bulunamadı.');
+      return NextResponse.redirect(new URL('/stores?error=no_userid_in_session', request.url));
     }
 
     // Session'u sil
@@ -133,7 +141,8 @@ export async function GET(request: NextRequest) {
 
     // Mağaza bilgilerini kaydet
     const storeData = {
-      user_id: meData.user_id,
+      user_id: appUserId,
+      etsy_user_id: meData.user_id,
       shop_id: shop.shop_id,
       shop_name: shop.shop_name,
       connected_at: new Date(),

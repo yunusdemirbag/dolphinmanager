@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getConnectedStoreFromFirebase, syncEtsyStoreToFirebase } from '@/lib/firebase-sync';
+import { adminDb } from '@/lib/firebase-admin';
 
 export async function GET(request: Request) {
   try {
@@ -8,6 +9,21 @@ export async function GET(request: Request) {
     
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    // Geliştirme ortamında mock veri döndür
+    if (process.env.NODE_ENV === 'development' && userId === 'local-user-123') {
+      console.log('Using mock store data for local development');
+      return NextResponse.json({ 
+        store: {
+          shop_id: 56171647,
+          shop_name: "CyberDecorArt",
+          user_id: "local-user-123",
+          connected_at: new Date(),
+          last_sync_at: new Date(),
+          is_active: true
+        }
+      });
     }
 
     try {
@@ -80,6 +96,16 @@ export async function POST(request: Request) {
         { error: 'Missing required fields: shop_id, shop_name, user_id' },
         { status: 400 }
       );
+    }
+
+    // Geliştirme ortamında mock başarılı yanıt döndür
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Development mode: Mocking successful store sync');
+      return NextResponse.json({ 
+        message: 'Store synced to Firebase successfully (mock)',
+        shop_id,
+        shop_name
+      });
     }
 
     await syncEtsyStoreToFirebase({

@@ -97,8 +97,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/stores?error=no_shop_id_in_me', request.url));
     }
 
+    // Shop ID'yi integer olarak kullan
+    const shopIdInt = parseInt(meData.shop_id.toString(), 10);
+    if (isNaN(shopIdInt)) {
+      console.error('Geçersiz mağaza ID formatı');
+      return NextResponse.redirect(new URL('/stores?error=invalid_shop_id', request.url));
+    }
+
     // Shop bilgilerini ayrıca çekmek gerekiyor
-    const shopResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${meData.shop_id}`, {
+    const shopResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopIdInt}`, {
       headers: {
         'Authorization': `Bearer ${tokenData.access_token}`,
         'x-api-key': process.env.ETSY_CLIENT_ID!,
@@ -149,7 +156,7 @@ export async function GET(request: NextRequest) {
     console.log('Mağaza ve API bilgileri Firebase\'e kaydedildi, ID:', shopIdStr);
 
     return NextResponse.redirect(new URL('/stores?success=connected', request.url));
-  } catch (error) {
+  } catch (error: any) {
     console.error('Etsy callback genel hatası:', error);
     return NextResponse.redirect(new URL('/stores?error=general', request.url));
   }

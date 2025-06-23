@@ -20,98 +20,72 @@ export async function GET() {
           
           // Mağaza ID'sine göre API anahtarlarını al
           if (shopId) {
-            const apiKeysRef = adminDb.collection('etsy_api_keys').doc(shopId);
-            const apiSnapshot = await apiKeysRef.get();
+            const apiKeyRef = adminDb.collection('etsy_api_keys').doc(shopId);
+            const apiKeyDoc = await apiKeyRef.get();
             
-            if (apiSnapshot.exists) {
-              const apiData = apiSnapshot.data();
-              apiKey = apiData?.api_key || apiKey;
-              accessToken = apiData?.access_token || accessToken;
+            if (apiKeyDoc.exists) {
+              const apiKeyData = apiKeyDoc.data();
+              apiKey = apiKeyData?.api_key;
+              accessToken = apiKeyData?.access_token;
             }
           }
         }
-      } catch (dbError) {
-        console.error('Firebase API bilgileri okuma hatası:', dbError);
+      } catch (error) {
+        console.error('Firebase\'den API bilgileri alınamadı:', error);
       }
     }
 
-    if (!apiKey || !accessToken) {
-      console.error('Etsy API kimlik bilgileri bulunamadı.');
+    // Etsy API'ye istek gönder
+    if (!apiKey || !accessToken || !shopId) {
       return NextResponse.json({ 
-        connected: false,
-        error: 'Etsy API kimlik bilgileri bulunamadı. Lütfen Etsy mağazanızı bağlayın.'
-      }, { status: 500 });
+        error: 'Etsy API kimlik bilgileri bulunamadı',
+        isConnected: false,
+        shopId: null,
+        shopName: null
+      }, { status: 401 });
     }
-    
-    // Etsy API'den mağaza bilgilerini çek
-    try {
-      const response = await fetch('https://openapi.etsy.com/v3/application/users/me/shops', {
-        headers: {
-          'x-api-key': apiKey,
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.count > 0 && data.results && data.results[0]) {
-          const shop = data.results[0];
-          
-          // Mağaza bilgilerini Firebase'e kaydet
-          if (adminDb) {
-            try {
-              const shopIdStr = shop.shop_id.toString();
-              await adminDb.collection('etsy_stores').doc(shopIdStr).set({
-                shop_id: shop.shop_id,
-                shop_name: shop.shop_name,
-                connected_at: new Date(),
-                last_sync_at: new Date(),
-                is_active: true
-              });
-              
-              // API bilgilerini de kaydet
-              await adminDb.collection('etsy_api_keys').doc(shopIdStr).set({
-                api_key: apiKey,
-                access_token: accessToken,
-                updated_at: new Date()
-              });
-            } catch (saveError) {
-              console.error('Mağaza bilgilerini Firebase\'e kaydetme hatası:', saveError);
-            }
-          }
-          
-          return NextResponse.json({
-            connected: true,
-            shop_name: shop.shop_name,
-            shop_id: shop.shop_id.toString()
-          });
-        }
-      } else {
-        const errorBody = await response.text();
-        console.error('Etsy API hatası (status):', errorBody);
-        return NextResponse.json({ 
-          connected: false, 
-          error: `Etsy API error: ${response.status}`
-        }, { status: response.status });
+
+    // Etsy API'ye istek gönder - user_id'yi integer olarak gönder
+    const shopIdInt = parseInt(shopId, 10);
+    if (isNaN(shopIdInt)) {
+      return NextResponse.json({ 
+        error: 'Geçersiz mağaza ID formatı',
+        isConnected: false,
+        shopId: null,
+        shopName: null
+      }, { status: 400 });
+    }
+
+    const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopIdInt}`, {
+      headers: {
+        'x-api-key': apiKey,
+        'Authorization': `Bearer ${accessToken}`
       }
-    } catch (etsyError) {
-      console.error('Etsy API bağlantı hatası:', etsyError);
+    });
+
+    if (!response.ok) {
       return NextResponse.json({ 
-        connected: false, 
-        error: 'Etsy API connection failed'
-      }, { status: 500 });
+        error: `Etsy API hatası: ${response.status}`,
+        isConnected: false,
+        shopId: shopId,
+        shopName: null
+      }, { status: response.status });
     }
-    
+
+    const data = await response.json();
+
+    return NextResponse.json({
+      isConnected: true,
+      shopId: data.shop_id,
+      shopName: data.shop_name
+    });
+  } catch (error: any) {
+    console.error('Etsy bağlantı durumu kontrolü sırasında hata:', error);
     return NextResponse.json({ 
-      connected: false,
-      error: 'No shop data found'
-    }, { status: 404 });
-    
-  } catch (error) {
-    console.error('Etsy status kontrol hatası:', error);
-    return NextResponse.json({ 
-      connected: false, 
-      error: 'Status check failed' 
+      error: `Etsy bağlantı durumu kontrolü başarısız: ${error.message}`,
+      isConnected: false,
+      shopId: null,
+      shopName: null
     }, { status: 500 });
   }
 }

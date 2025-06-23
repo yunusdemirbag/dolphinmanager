@@ -20,125 +20,64 @@ export async function GET() {
           
           // Mağaza ID'sine göre API anahtarlarını al
           if (shopId) {
-            const apiKeysRef = adminDb.collection('etsy_api_keys').doc(shopId);
-            const apiSnapshot = await apiKeysRef.get();
+            const apiKeyRef = adminDb.collection('etsy_api_keys').doc(shopId);
+            const apiKeyDoc = await apiKeyRef.get();
             
-            if (apiSnapshot.exists) {
-              const apiData = apiSnapshot.data();
-              apiKey = apiData?.api_key || apiKey;
-              accessToken = apiData?.access_token || accessToken;
+            if (apiKeyDoc.exists) {
+              const apiKeyData = apiKeyDoc.data();
+              apiKey = apiKeyData?.api_key;
+              accessToken = apiKeyData?.access_token;
             }
           }
         }
-      } catch (dbError) {
-        console.error('Firebase bağlantı hatası:', dbError);
+      } catch (error) {
+        console.error('Firebase\'den API bilgileri alınamadı:', error);
       }
     }
-
-    if (!shopId || !apiKey || !accessToken) {
-      console.error('Etsy API kimlik bilgileri bulunamadı.');
+    
+    // Etsy API'ye istek gönder
+    if (!apiKey || !accessToken || !shopId) {
       return NextResponse.json({ 
-        error: 'Etsy API kimlik bilgileri bulunamadı. Lütfen Etsy mağazanızı bağlayın.'
+        error: 'Etsy API kimlik bilgileri bulunamadı',
+        products: []
+      }, { status: 401 });
+    }
+    
+    // Shop ID'yi integer'a dönüştür
+    const shopIdInt = parseInt(shopId, 10);
+    if (isNaN(shopIdInt)) {
+      return NextResponse.json({ 
+        error: 'Geçersiz mağaza ID formatı',
+        products: []
+      }, { status: 400 });
+    }
+
+    try {
+      const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopIdInt}/listings/active`, {
+        headers: {
+          'x-api-key': apiKey,
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Etsy API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return NextResponse.json({ products: data.results || [] });
+    } catch (error: any) {
+      console.error('Error fetching products from Etsy API:', error);
+      return NextResponse.json({ 
+        error: `Etsy API'den ürünler alınamadı: ${error.message}`,
+        products: []
       }, { status: 500 });
     }
-  
-    const apiUrl = `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/active`;
-    
-    const response = await fetch(apiUrl, {
-      headers: {
-        'x-api-key': apiKey,
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error('Etsy API error:', errorBody);
-      return NextResponse.json({ 
-        error: 'Failed to fetch products from Etsy API',
-        message: `Etsy API error: ${response.status}`
-      }, { status: response.status });
-    }
-
-    const data = await response.json();
-    
-    // Ürün detaylarını zenginleştir
-    const enrichedProducts = await Promise.all(
-      data.results.map(async (product: any) => {
-        // Her ürün için görüntüleri al
-        const imagesResponse = await fetch(
-          `https://openapi.etsy.com/v3/application/listings/${product.listing_id}/images`,
-          {
-            headers: {
-              'x-api-key': apiKey,
-              'Authorization': `Bearer ${accessToken}`
-            }
-          }
-        );
-
-        let images = [];
-        if (imagesResponse.ok) {
-          const imagesData = await imagesResponse.json();
-          images = imagesData.results.map((img: any) => img.url_fullxfull);
-        }
-
-        // Her ürün için varyasyonları al
-        const inventoryResponse = await fetch(
-          `https://openapi.etsy.com/v3/application/listings/${product.listing_id}/inventory`,
-          {
-            headers: {
-              'x-api-key': apiKey,
-              'Authorization': `Bearer ${accessToken}`
-            }
-          }
-        );
-
-        let variations = [];
-        if (inventoryResponse.ok) {
-          const inventoryData = await inventoryResponse.json();
-          variations = inventoryData.products.map((variant: any) => {
-            const properties = variant.property_values.reduce((acc: any, prop: any) => {
-              acc[prop.property_name.toLowerCase()] = prop.values[0];
-              return acc;
-            }, {});
-
-            return {
-              ...properties,
-              price: variant.offerings[0]?.price?.amount / variant.offerings[0]?.price?.divisor || product.price.amount / product.price.divisor,
-              quantity: variant.offerings[0]?.quantity || product.quantity,
-              is_enabled: variant.is_enabled
-            };
-          });
-        }
-
-        return {
-          id: product.listing_id,
-          title: product.title,
-          description: product.description,
-          price: product.price.amount / product.price.divisor,
-          currency_code: product.price.currency_code,
-          quantity: product.quantity,
-          taxonomy_id: product.taxonomy_id,
-          tags: product.tags,
-          materials: product.materials,
-          images,
-          variations,
-          created_at: product.creation_timestamp,
-          updated_at: product.last_modified_timestamp,
-          state: product.state
-        };
-      })
-    );
-
-    return NextResponse.json({
-      count: data.count,
-      results: enrichedProducts
-    });
-  } catch (error) {
-    console.error('Error fetching products from Etsy API:', error);
+  } catch (error: any) {
+    console.error('Ürün listesi alınırken hata oluştu:', error);
     return NextResponse.json({ 
-      error: 'Failed to fetch products from Etsy API',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      error: `Ürün listesi alınamadı: ${error.message}`,
+      products: []
     }, { status: 500 });
   }
 } 

@@ -360,7 +360,6 @@ export async function syncProductsToFirebaseAdmin(userId: string, products: any[
 
   const userProductsRef = adminDb.collection('users').doc(userId).collection('products');
   
-  // Firestore allows a maximum of 500 operations in a single batch.
   const chunkSize = 499;
 
   for (let i = 0; i < products.length; i += chunkSize) {
@@ -370,22 +369,11 @@ export async function syncProductsToFirebaseAdmin(userId: string, products: any[
     chunk.forEach(product => {
       const docRef = userProductsRef.doc(String(product.listing_id));
       
-      // Ürün nesnesinin images alanını içerdiğinden emin oluyoruz
       const productData = {
-        ...product,  // Tüm ürün verilerini kopyala
+        ...product,
+        images: product.images || [],
         synced_at: new Date()
       };
-      
-      // Eğer images alanı yoksa ve product.Images varsa (Etsy API bazen büyük harfle döndürebilir)
-      if (!productData.images && product.Images) {
-        productData.images = product.Images;
-      }
-      
-      // Eğer hala images alanı yoksa, boş bir dizi oluştur
-      if (!productData.images) {
-        console.warn(`Ürün ${product.listing_id} için resim bilgisi bulunamadı. Boş dizi oluşturuluyor.`);
-        productData.images = [];
-      }
       
       batch.set(docRef, productData);
     });

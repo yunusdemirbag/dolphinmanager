@@ -1,21 +1,28 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 
 export async function GET() {
   try {
+    // Firebase'i başlat
+    initializeAdminApp();
+    
     // Firebase'den API bilgilerini al
     let shopId = null;
     let shopName = null;
     let apiKey = process.env.ETSY_API_KEY;
     let accessToken = process.env.ETSY_ACCESS_TOKEN;
     let isConnected = false;
+    
+    // Kullanıcı kimliği - gerçek ortamda session'dan gelecek
+    const userId = process.env.MOCK_USER_ID || 'local-user-123';
 
     if (adminDb) {
       try {
-        console.log('Firebase bağlantısı mevcut, mağaza bilgileri alınıyor...');
-        // En son bağlanan mağaza bilgilerini al
-        const storesRef = adminDb.collection('etsy_stores');
-        const storeSnapshot = await storesRef.orderBy('connected_at', 'desc').limit(1).get();
+        console.log(`Firebase bağlantısı mevcut, kullanıcı ${userId} için mağaza bilgileri alınıyor...`);
+        
+        // Kullanıcı ID'sine göre mağaza bilgilerini al
+        const storesRef = adminDb.collection('etsy_stores').where('user_id', '==', userId).where('is_active', '==', true);
+        const storeSnapshot = await storesRef.limit(1).get();
         
         if (!storeSnapshot.empty) {
           const storeData = storeSnapshot.docs[0].data();
@@ -39,7 +46,7 @@ export async function GET() {
             }
           }
         } else {
-          console.log('Firebase\'de bağlı mağaza bulunamadı');
+          console.log(`Firebase'de kullanıcı ${userId} için bağlı mağaza bulunamadı`);
         }
       } catch (error) {
         console.error('Firebase\'den API bilgileri alınamadı:', error);

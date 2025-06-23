@@ -5,32 +5,43 @@ let adminDb: FirebaseFirestore.Firestore | null = null;
 
 // Firebase admin sadece server-side'da çalıştır
 if (typeof window === 'undefined') {
-  const firebaseAdminConfig = {
-    projectId: process.env.FIREBASE_PROJECT_ID || '',
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
-    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
-  };
-
-  // Firebase admin yapılandırmasını kontrol et
-  const hasValidConfig = firebaseAdminConfig.projectId && 
-                         firebaseAdminConfig.clientEmail && 
-                         firebaseAdminConfig.privateKey &&
-                         firebaseAdminConfig.privateKey.includes('BEGIN PRIVATE KEY');
-
-  if (!getApps().length && hasValidConfig) {
-    try {
-      initializeApp({
-        credential: cert(firebaseAdminConfig),
-        projectId: process.env.FIREBASE_PROJECT_ID,
-      });
-      adminDb = getFirestore();
-      console.log('Firebase admin initialized successfully');
-    } catch (error) {
-      console.error('Firebase admin initialization error:', error);
+  try {
+    // Geliştirme ortamında Firebase Admin'i devre dışı bırak
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Development mode: Using mock data instead of Firebase Admin');
       adminDb = null;
+    } else {
+      const firebaseAdminConfig = {
+        projectId: process.env.FIREBASE_PROJECT_ID || '',
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
+      };
+
+      // Firebase admin yapılandırmasını kontrol et
+      const hasValidConfig = firebaseAdminConfig.projectId && 
+                           firebaseAdminConfig.clientEmail && 
+                           firebaseAdminConfig.privateKey &&
+                           firebaseAdminConfig.privateKey.includes('BEGIN PRIVATE KEY');
+
+      if (!getApps().length && hasValidConfig) {
+        try {
+          initializeApp({
+            credential: cert(firebaseAdminConfig),
+            projectId: process.env.FIREBASE_PROJECT_ID,
+          });
+          adminDb = getFirestore();
+          console.log('Firebase admin initialized successfully');
+        } catch (error) {
+          console.error('Firebase admin initialization error:', error);
+          adminDb = null;
+        }
+      } else {
+        console.log('Firebase admin config incomplete');
+        adminDb = null;
+      }
     }
-  } else {
-    console.log('Firebase admin config incomplete');
+  } catch (error) {
+    console.error('Firebase admin setup error:', error);
     adminDb = null;
   }
 }

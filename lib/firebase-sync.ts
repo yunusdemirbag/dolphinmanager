@@ -421,7 +421,7 @@ export async function countProductsInFirebaseAdmin(userId: string): Promise<numb
  */
 export async function getProductsFromFirebaseAdmin(
   userId: string,
-  pageSize: number = 10,
+  pageSize: number = 12,
   startAfterListingId: number | null = null
 ) {
   initializeAdminApp();
@@ -431,7 +431,7 @@ export async function getProductsFromFirebaseAdmin(
   }
 
   let query = adminDb.collection('users').doc(userId).collection('products')
-    .orderBy('listing_id')
+    .orderBy('listing_id', 'desc')
     .limit(pageSize);
 
   if (startAfterListingId) {
@@ -443,14 +443,12 @@ export async function getProductsFromFirebaseAdmin(
   const products = snapshot.docs.map(doc => {
     const data = doc.data();
 
-    // Firebase Timestamp nesnelerini, istemcinin anlayabileceği
-    // ISO string formatına dönüştürüyoruz.
-    const serializableData = { ...data };
-    for (const key in serializableData) {
-      if (serializableData[key] && typeof serializableData[key].toDate === 'function') {
-        serializableData[key] = serializableData[key].toDate().toISOString();
-      }
-    }
+    const serializableData = {
+      ...data,
+      synced_at: data.synced_at?.toDate ? data.synced_at.toDate().toISOString() : null,
+      created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : null,
+      updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : null,
+    };
 
     return {
       id: doc.id,

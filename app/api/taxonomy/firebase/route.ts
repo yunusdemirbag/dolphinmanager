@@ -14,27 +14,14 @@ export async function GET() {
   } catch (error) {
     console.error('Error fetching taxonomy nodes from Firebase:', error);
     
-    // Return mock data as fallback
-    const mockNodes = [
-      { id: 68887271, name: "Art & Collectibles", level: 1, path: ["Art & Collectibles"] },
-      { id: 68887312, name: "Prints", level: 2, path: ["Art & Collectibles", "Prints"] },
-      { id: 68887313, name: "Digital Prints", level: 3, path: ["Art & Collectibles", "Prints", "Digital Prints"] },
-      { id: 68887314, name: "Giclee", level: 3, path: ["Art & Collectibles", "Prints", "Giclee"] },
-      { id: 68887280, name: "Painting", level: 2, path: ["Art & Collectibles", "Painting"] },
-      { id: 68887281, name: "Canvas Art", level: 3, path: ["Art & Collectibles", "Painting", "Canvas Art"] },
-      { id: 68887282, name: "Acrylic Painting", level: 3, path: ["Art & Collectibles", "Painting", "Acrylic"] },
-      { id: 68889482, name: "Home & Living", level: 1, path: ["Home & Living"] },
-      { id: 1027, name: "Home Decor", level: 2, path: ["Home & Living", "Home Decor"] },
-      { id: 1366, name: "Wall Decor", level: 3, path: ["Home & Living", "Home Decor", "Wall Decor"] },
-      { id: 1028, name: "Wall Hangings", level: 3, path: ["Home & Living", "Home Decor", "Wall Hangings"] }
-    ];
-    
-    return NextResponse.json({
-      success: true,
-      taxonomy_nodes: mockNodes,
-      cached: false,
-      source: 'mock'
-    });
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Failed to fetch taxonomy nodes from Firebase',
+        message: 'Firebase erişiminde bir sorun oluştu. Lütfen Firebase bağlantınızı kontrol edin.'
+      },
+      { status: 500 }
+    );
   }
 }
 

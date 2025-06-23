@@ -64,3 +64,126 @@
  ✓ Compiled in 86ms
  ✓ Compiled in 74ms
  ✓ Compiled in 47ms
+ ✓ Compiled in 106ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1634ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.b2atcuz6vew'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.b2atcuz6vew'
+}
+[Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.vvkor5jr0q'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.vvkor5jr0q'
+}
+[Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.x0k2k505xrq'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.x0k2k505xrq'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.rh48r3n67ym'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.rh48r3n67ym'
+}
+[Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.ys2q64stl18'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.ys2q64stl18'
+}
+[Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.yvbtxr9on9q'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.yvbtxr9on9q'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.lfobltogc7j'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.lfobltogc7j'
+}
+[Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/stores/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.v4iubwla7sm'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.v4iubwla7sm'
+}
+[Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.4c230tybq3f'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.4c230tybq3f'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/_not-found/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/_not-found/page/app-build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.jjogm5jm8k'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.jjogm5jm8k'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.u1xhqe5uwi'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.u1xhqe5uwi'
+}
+[Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.mim31o9ym3'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/static/development/_buildManifest.js.tmp.mim31o9ym3'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
+}

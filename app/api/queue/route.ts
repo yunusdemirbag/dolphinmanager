@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
+import { CollectionReference, Query, DocumentData } from 'firebase-admin/firestore';
 
 // QueueItem arayüzü
 interface QueueItem {
@@ -32,80 +33,109 @@ const mockQueueItems = [
     id: 'mock-item-2',
     user_id: '1007541496',
     product_data: {
-      title: 'Abstract Digital Print',
-      description: 'High quality digital print with abstract design',
-      price: 19.99,
+      title: 'Abstract Painting',
+      description: 'Colorful abstract painting on canvas',
+      price: 39.99,
       images: ['https://example.com/image2.jpg']
     },
     status: 'pending',
     created_at: new Date(Date.now() - 3600000).toISOString(), // 1 saat önce
-    updated_at: new Date(Date.now() - 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 3600000).toISOString(), // 1 saat önce
     retry_count: 0
   }
 ];
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Test user ID - gerçek implementasyonda session'dan gelecek
-    const testUserId = '1007541496';
+    // URL parametrelerini al
+    const searchParams = request.nextUrl.searchParams;
+    const userId = searchParams.get('user_id');
+    const status = searchParams.get('status');
     
+    // Firebase bağlantısı yoksa mock veri döndür
     if (!adminDb) {
       console.log('Using mock queue data');
-      // Mock veri döndür
-      const stats = {
-        pending: mockQueueItems.filter(item => item.status === 'pending').length,
-        processing: mockQueueItems.filter(item => item.status === 'processing').length,
-        completed: mockQueueItems.filter(item => item.status === 'completed').length,
-        failed: mockQueueItems.filter(item => item.status === 'failed').length,
-      };
       
-      return NextResponse.json({
-        items: mockQueueItems,
-        stats
-      });
+      // Eğer user_id parametresi varsa, o kullanıcıya ait öğeleri filtrele
+      let filteredItems = [...mockQueueItems];
+      if (userId) {
+        filteredItems = filteredItems.filter(item => item.user_id === userId);
+      }
+      
+      // Eğer status parametresi varsa, o duruma ait öğeleri filtrele
+      if (status) {
+        filteredItems = filteredItems.filter(item => item.status === status);
+      }
+      
+      return NextResponse.json({ items: filteredItems });
     }
     
-    // Kuyruk ürünlerini al
-    const queueQuery = await adminDb
-      .collection('product_queue')
-      .where('user_id', '==', testUserId)
-      .orderBy('created_at', 'desc')
-      .get();
-
-    const queueItems = queueQuery.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      created_at: doc.data().created_at?.toDate()?.toISOString(),
-      status: doc.data().status || 'pending',
-    }));
-
-    // İstatistikler
-    const stats = {
-      pending: queueItems.filter(item => item.status === 'pending').length,
-      processing: queueItems.filter(item => item.status === 'processing').length,
-      completed: queueItems.filter(item => item.status === 'completed').length,
-      failed: queueItems.filter(item => item.status === 'failed').length,
-    };
-
-    return NextResponse.json({
-      items: queueItems,
-      stats
-    });
+    // Firebase'den kuyruk öğelerini çek
+    try {
+      console.log('Fetching queue items from Firebase');
+      
+      // Temel sorguyu oluştur
+      let queueRef: CollectionReference | Query<DocumentData> = adminDb.collection('queue');
+      
+      // Filtrelemeleri uygula
+      if (userId) {
+        queueRef = queueRef.where('user_id', '==', userId);
+      }
+      
+      if (status) {
+        queueRef = queueRef.where('status', '==', status);
+      }
+      
+      // Oluşturma tarihine göre sırala (en yeniden en eskiye)
+      queueRef = queueRef.orderBy('created_at', 'desc');
+      
+      // Sorguyu çalıştır
+      const snapshot = await queueRef.get();
+      
+      if (snapshot.empty) {
+        console.log('No queue items found in Firebase');
+        return NextResponse.json({ items: [] });
+      }
+      
+      // Sonuçları dönüştür
+      const items: QueueItem[] = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        items.push({
+          id: doc.id,
+          user_id: data.user_id,
+          product_data: data.product_data,
+          status: data.status,
+          created_at: data.created_at.toDate().toISOString(),
+          updated_at: data.updated_at.toDate().toISOString(),
+          retry_count: data.retry_count || 0
+        });
+      });
+      
+      console.log(`Found ${items.length} queue items in Firebase`);
+      return NextResponse.json({ items });
+    } catch (error) {
+      console.error('Error fetching queue items from Firebase:', error);
+      
+      // Firebase hatası durumunda mock veri döndür
+      console.log('Returning mock queue data due to Firebase error');
+      
+      // Eğer user_id parametresi varsa, o kullanıcıya ait öğeleri filtrele
+      let filteredItems = [...mockQueueItems];
+      if (userId) {
+        filteredItems = filteredItems.filter(item => item.user_id === userId);
+      }
+      
+      // Eğer status parametresi varsa, o duruma ait öğeleri filtrele
+      if (status) {
+        filteredItems = filteredItems.filter(item => item.status === status);
+      }
+      
+      return NextResponse.json({ items: filteredItems });
+    }
   } catch (error) {
-    console.error('Queue fetch error:', error);
-    // Hata durumunda da mock veri döndür
-    console.log('Error fetching queue, returning mock data');
-    const stats = {
-      pending: mockQueueItems.filter(item => item.status === 'pending').length,
-      processing: mockQueueItems.filter(item => item.status === 'processing').length,
-      completed: mockQueueItems.filter(item => item.status === 'completed').length,
-      failed: mockQueueItems.filter(item => item.status === 'failed').length,
-    };
-    
-    return NextResponse.json({
-      items: mockQueueItems,
-      stats
-    });
+    console.error('Queue API error:', error);
+    return NextResponse.json({ error: 'Failed to fetch queue items' }, { status: 500 });
   }
 }
 

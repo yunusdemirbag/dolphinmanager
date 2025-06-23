@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Test için şimdilik hep connected dön
     // Gerçek implementasyonda Firebase session/user kontrolü yapılacak

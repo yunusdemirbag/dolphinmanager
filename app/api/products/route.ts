@@ -3,36 +3,35 @@ import { adminDb } from '@/lib/firebase-admin';
 
 export async function GET() {
   try {
-    // Test user ID - gerçek implementasyonda session'dan gelecek
-    const testUserId = '1007541496';
-    let shopId, apiKey, accessToken;
+    let shopId = process.env.ETSY_SHOP_ID;
+    let apiKey = process.env.ETSY_API_KEY;
+    let accessToken = process.env.ETSY_ACCESS_TOKEN;
     
-    // Firebase'den Etsy mağaza bilgilerini çek
+    // Firebase bağlantısı varsa, oradan API bilgilerini çek
     if (adminDb) {
       try {
-        const storeDoc = await adminDb.collection('etsy_stores').doc(testUserId).get();
+        // En son eklenen mağaza bilgilerini al
+        const storesRef = adminDb.collection('etsy_stores');
+        const storeSnapshot = await storesRef.orderBy('connected_at', 'desc').limit(1).get();
         
-        if (storeDoc.exists) {
-          const storeData = storeDoc.data();
-          shopId = storeData?.shop_id;
+        if (!storeSnapshot.empty) {
+          const storeData = storeSnapshot.docs[0].data();
+          shopId = storeData?.shop_id?.toString();
           
           // API anahtarlarını al
-          const apiKeysDoc = await adminDb.collection('etsy_api_keys').doc(testUserId).get();
-          if (apiKeysDoc.exists) {
-            const apiData = apiKeysDoc.data();
-            apiKey = apiData?.api_key;
-            accessToken = apiData?.access_token;
+          const apiKeysRef = adminDb.collection('etsy_api_keys');
+          const apiSnapshot = await apiKeysRef.orderBy('updated_at', 'desc').limit(1).get();
+          
+          if (!apiSnapshot.empty) {
+            const apiData = apiSnapshot.docs[0].data();
+            apiKey = apiData?.api_key || apiKey;
+            accessToken = apiData?.access_token || accessToken;
           }
         }
       } catch (dbError) {
         console.error('Firebase bağlantı hatası:', dbError);
       }
     }
-    
-    // Eğer Firebase'den bilgiler alınamadıysa, ortam değişkenlerini dene
-    if (!shopId) shopId = process.env.ETSY_SHOP_ID;
-    if (!apiKey) apiKey = process.env.ETSY_API_KEY;
-    if (!accessToken) accessToken = process.env.ETSY_ACCESS_TOKEN;
 
     if (!shopId || !apiKey || !accessToken) {
       console.error('Etsy API kimlik bilgileri bulunamadı.');

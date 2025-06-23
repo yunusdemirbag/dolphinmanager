@@ -94,9 +94,34 @@ export async function GET(request: NextRequest) {
       
       console.log('[etsy/callback] Token kaydedildi')
       
-      // Etsy mağaza bilgilerini çek - EN GÜVENİLİR YÖNTEM: /me/shops endpoint'ini kullan
+      // Etsy mağaza bilgilerini çek
       try {
-        const shopsResponse = await fetch('https://openapi.etsy.com/v3/application/me/shops', {
+        // 1. Adım: /users/me endpoint'i ile kullanıcı bilgilerini al
+        const userResponse = await fetch('https://openapi.etsy.com/v3/application/users/me', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'x-api-key': ETSY_CLIENT_ID,
+          },
+        });
+
+        if (!userResponse.ok) {
+          const errorText = await userResponse.text();
+          console.error('[etsy/callback] Kullanıcı bilgileri hatası:', userResponse.status, errorText);
+          return NextResponse.redirect(`${origin}/stores?success=token_saved&error=user_info_error`);
+        }
+
+        const userData = await userResponse.json();
+        const etsyUserId = userData.user_id;
+
+        if (!etsyUserId) {
+          console.error('[etsy/callback] Etsy kullanıcı ID alınamadı');
+          return NextResponse.redirect(`${origin}/stores?success=token_saved&error=no_user_id`);
+        }
+
+        console.log(`[etsy/callback] Etsy kullanıcı ID alındı: ${etsyUserId}`);
+
+        // 2. Adım: Alınan kullanıcı ID ile mağazaları çek
+        const shopsResponse = await fetch(`https://openapi.etsy.com/v3/application/users/${etsyUserId}/shops`, {
           headers: {
             'Authorization': `Bearer ${tokenData.access_token}`,
             'x-api-key': ETSY_CLIENT_ID,

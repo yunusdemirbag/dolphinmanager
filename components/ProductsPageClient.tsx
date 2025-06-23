@@ -123,7 +123,7 @@ export function ProductsPageClient({ initialProducts, initialNextCursor, userId 
                   {product.images && product.images.length > 0 ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img 
-                      src={product.images[0]?.url_570xN || product.images[0]?.url_fullxfull || product.images[0]?.url} 
+                      src={product.images[0]} 
                       alt={product.title}
                       className="object-cover w-full h-full"
                       onError={(e) => {
@@ -142,7 +142,14 @@ export function ProductsPageClient({ initialProducts, initialNextCursor, userId 
                   <h3 className="font-medium truncate">{product.title}</h3>
                   <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
                     <span>{product.quantity} Adet</span>
-                    <span className="font-semibold">{product.price?.amount ? (product.price.amount / product.price.divisor) : 'N/A'} {product.price?.currency_code}</span>
+                    <span className="font-semibold">
+                      {product.price && typeof product.price === 'number' 
+                        ? `${product.price.toFixed(2)} ${product.currency_code || 'USD'}` 
+                        : product.price?.amount 
+                          ? `${(product.price.amount / product.price.divisor).toFixed(2)} ${product.price?.currency_code}` 
+                          : 'N/A'
+                      }
+                    </span>
                   </div>
                 </CardContent>
               </Card>

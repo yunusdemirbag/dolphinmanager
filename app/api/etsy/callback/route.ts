@@ -90,7 +90,6 @@ export async function GET(request: NextRequest) {
     const meData = await meResponse.json();
     console.log('Kullanıcı bilgileri alındı:', meData.user_id);
     console.log('Mağaza bilgileri:', meData.shops?.length, 'mağaza');
-    console.log('Tam API response:', JSON.stringify(meData, null, 2));
 
     // Response'ta shop_id var ama shops array yok - direkt shop_id kullan
     if (!meData.shop_id) {
@@ -113,7 +112,7 @@ export async function GET(request: NextRequest) {
     }
 
     const shop = await shopResponse.json();
-    const userData = { user_id: meData.user_id };
+
     console.log('Mağaza seçildi:', shop.shop_name);
 
     // Firebase'e kaydet
@@ -122,8 +121,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/stores?error=firebase_failed', request.url));
     }
 
+    // Mağaza ID'sini string olarak kullan
+    const shopIdStr = shop.shop_id.toString();
+
+    // Mağaza bilgilerini kaydet
     const storeData = {
-      user_id: userData.user_id,
+      user_id: meData.user_id,
       shop_id: shop.shop_id,
       shop_name: shop.shop_name,
       connected_at: new Date(),
@@ -140,11 +143,10 @@ export async function GET(request: NextRequest) {
       updated_at: new Date()
     };
 
-    // Mağaza ve API bilgilerini kaydet
-    const shopIdStr = shop.shop_id.toString();
+    // Mağaza ve API bilgilerini kaydet - her ikisi için de aynı belge ID'sini kullan
     await adminDb.collection('etsy_stores').doc(shopIdStr).set(storeData);
     await adminDb.collection('etsy_api_keys').doc(shopIdStr).set(apiKeysData);
-    console.log('Mağaza Firebase\'e kaydedildi');
+    console.log('Mağaza ve API bilgileri Firebase\'e kaydedildi, ID:', shopIdStr);
 
     return NextResponse.redirect(new URL('/stores?success=connected', request.url));
   } catch (error) {

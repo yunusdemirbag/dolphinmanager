@@ -5,18 +5,30 @@ export async function GET() {
   try {
     let apiKey = process.env.ETSY_API_KEY;
     let accessToken = process.env.ETSY_ACCESS_TOKEN;
+    let shopId = null;
     
     // Firebase bağlantısı varsa, oradan API bilgilerini çek
     if (adminDb) {
       try {
-        // Kullanıcı bilgilerini Firebase'den al
-        const userCollectionRef = adminDb.collection('etsy_api_keys');
-        const snapshot = await userCollectionRef.limit(1).get();
+        // En son bağlanan mağaza bilgilerini al
+        const storesRef = adminDb.collection('etsy_stores');
+        const storeSnapshot = await storesRef.orderBy('connected_at', 'desc').limit(1).get();
         
-        if (!snapshot.empty) {
-          const apiData = snapshot.docs[0].data();
-          apiKey = apiData?.api_key || apiKey;
-          accessToken = apiData?.access_token || accessToken;
+        if (!storeSnapshot.empty) {
+          const storeData = storeSnapshot.docs[0].data();
+          shopId = storeData?.shop_id?.toString();
+          
+          // Mağaza ID'sine göre API anahtarlarını al
+          if (shopId) {
+            const apiKeysRef = adminDb.collection('etsy_api_keys').doc(shopId);
+            const apiSnapshot = await apiKeysRef.get();
+            
+            if (apiSnapshot.exists) {
+              const apiData = apiSnapshot.data();
+              apiKey = apiData?.api_key || apiKey;
+              accessToken = apiData?.access_token || accessToken;
+            }
+          }
         }
       } catch (dbError) {
         console.error('Firebase API bilgileri okuma hatası:', dbError);
@@ -48,7 +60,8 @@ export async function GET() {
           // Mağaza bilgilerini Firebase'e kaydet
           if (adminDb) {
             try {
-              await adminDb.collection('etsy_stores').doc(shop.shop_id.toString()).set({
+              const shopIdStr = shop.shop_id.toString();
+              await adminDb.collection('etsy_stores').doc(shopIdStr).set({
                 shop_id: shop.shop_id,
                 shop_name: shop.shop_name,
                 connected_at: new Date(),
@@ -57,7 +70,7 @@ export async function GET() {
               });
               
               // API bilgilerini de kaydet
-              await adminDb.collection('etsy_api_keys').doc(shop.shop_id.toString()).set({
+              await adminDb.collection('etsy_api_keys').doc(shopIdStr).set({
                 api_key: apiKey,
                 access_token: accessToken,
                 updated_at: new Date()

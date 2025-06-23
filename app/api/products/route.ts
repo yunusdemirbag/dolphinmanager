@@ -10,7 +10,7 @@ export async function GET() {
     // Firebase bağlantısı varsa, oradan API bilgilerini çek
     if (adminDb) {
       try {
-        // En son eklenen mağaza bilgilerini al
+        // En son bağlanan mağaza bilgilerini al
         const storesRef = adminDb.collection('etsy_stores');
         const storeSnapshot = await storesRef.orderBy('connected_at', 'desc').limit(1).get();
         
@@ -18,14 +18,16 @@ export async function GET() {
           const storeData = storeSnapshot.docs[0].data();
           shopId = storeData?.shop_id?.toString();
           
-          // API anahtarlarını al
-          const apiKeysRef = adminDb.collection('etsy_api_keys');
-          const apiSnapshot = await apiKeysRef.orderBy('updated_at', 'desc').limit(1).get();
-          
-          if (!apiSnapshot.empty) {
-            const apiData = apiSnapshot.docs[0].data();
-            apiKey = apiData?.api_key || apiKey;
-            accessToken = apiData?.access_token || accessToken;
+          // Mağaza ID'sine göre API anahtarlarını al
+          if (shopId) {
+            const apiKeysRef = adminDb.collection('etsy_api_keys').doc(shopId);
+            const apiSnapshot = await apiKeysRef.get();
+            
+            if (apiSnapshot.exists) {
+              const apiData = apiSnapshot.data();
+              apiKey = apiData?.api_key || apiKey;
+              accessToken = apiData?.access_token || accessToken;
+            }
           }
         }
       } catch (dbError) {

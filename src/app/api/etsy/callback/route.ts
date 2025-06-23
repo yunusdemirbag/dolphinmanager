@@ -10,10 +10,10 @@ const ETSY_CLIENT_SECRET = process.env.ETSY_CLIENT_SECRET!
 const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://dolphinmanager-phi.vercel.app/api/etsy/callback'
 
 export async function GET(request: NextRequest) {
+  const { origin } = new URL(request.url);
+
   try {
     console.log('[etsy/callback] Callback başlangıç');
-    console.log('[etsy/callback] Firebase DB object:', typeof db);
-    console.log(`[etsy/callback] ETSY_CLIENT_ID set: ${!!ETSY_CLIENT_ID}`);
     
     // URL parametrelerini al
     const url = new URL(request.url)
@@ -21,20 +21,16 @@ export async function GET(request: NextRequest) {
     const state = url.searchParams.get('state')
     const error = url.searchParams.get('error')
     
-    console.log('[etsy/callback] Parametreler:', { code: !!code, state: !!state, error })
-    
-    // Hata kontrolü
     if (error) {
       console.error('[etsy/callback] Etsy error:', error)
-      return NextResponse.redirect('/stores?error=' + encodeURIComponent(error))
+      return NextResponse.redirect(`${origin}/stores?error=` + encodeURIComponent(error))
     }
     
     if (!code || !state) {
       console.error('[etsy/callback] Eksik parametreler')
-      return NextResponse.redirect('/stores?error=missing_params')
+      return NextResponse.redirect(`${origin}/stores?error=missing_params`)
     }
     
-    console.log('[etsy/callback] Veritabanı sorgusu başlıyor...');
     // State değerine göre auth session'ı bul
     const sessionsSnapshot = await db.collection('etsy_auth_sessions')
       .where('state', '==', state)
@@ -42,7 +38,7 @@ export async function GET(request: NextRequest) {
     
     if (sessionsSnapshot.empty) {
       console.error('[etsy/callback] Geçersiz state')
-      return NextResponse.redirect('/stores?error=invalid_state')
+      return NextResponse.redirect(`${origin}/stores?error=invalid_state`)
     }
     
     // Auth session bilgilerini al
@@ -50,8 +46,6 @@ export async function GET(request: NextRequest) {
     const sessionData = sessionDoc.data()
     const userId = sessionData.state // state = userId
     const codeVerifier = sessionData.code_verifier
-    
-    console.log('[etsy/callback] Session bulundu:', { userId })
     
     // Token takası için Etsy API'ye istek gönder
     try {
@@ -73,7 +67,7 @@ export async function GET(request: NextRequest) {
       if (!tokenResponse.ok) {
         const errorText = await tokenResponse.text()
         console.error('[etsy/callback] Token hatası:', tokenResponse.status, errorText)
-        return NextResponse.redirect(`/stores?error=token_error&details=${encodeURIComponent(errorText)}`)
+        return NextResponse.redirect(`${origin}/stores?error=token_error&details=${encodeURIComponent(errorText)}`)
       }
       
       // Token yanıtını parse et
@@ -112,7 +106,7 @@ export async function GET(request: NextRequest) {
         if (!shopsResponse.ok) {
           const errorText = await shopsResponse.text()
           console.error('[etsy/callback] Mağaza bilgileri hatası:', shopsResponse.status, errorText)
-          return NextResponse.redirect('/stores?success=token_saved&error=shops_error')
+          return NextResponse.redirect(`${origin}/stores?success=token_saved&error=shops_error`)
         }
         
         // Mağaza bilgilerini parse et
@@ -150,17 +144,17 @@ export async function GET(request: NextRequest) {
         }
         
         // Kullanıcıyı mağaza sayfasına yönlendir
-        return NextResponse.redirect('/stores?success=true')
+        return NextResponse.redirect(`${origin}/stores?success=true`)
       } catch (shopError) {
         console.error('[etsy/callback] Mağaza bilgileri alınırken hata:', shopError)
-        return NextResponse.redirect('/stores?success=token_saved&error=shops_error')
+        return NextResponse.redirect(`${origin}/stores?success=token_saved&error=shops_error`)
       }
     } catch (tokenError) {
       console.error('[etsy/callback] Token takası hatası:', tokenError)
-      return NextResponse.redirect('/stores?error=token_exchange_error')
+      return NextResponse.redirect(`${origin}/stores?error=token_exchange_error`)
     }
   } catch (error) {
     console.error('[etsy/callback] Hata:', error)
-    return NextResponse.redirect('/stores?error=unexpected_error')
+    return NextResponse.redirect(`${origin}/stores?error=unexpected_error`)
   }
 }

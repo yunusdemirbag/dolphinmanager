@@ -123,7 +123,7 @@ export function ProductsPageClient({ initialProducts, initialNextCursor, userId 
                   {product.images && product.images.length > 0 ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img 
-                      src={product.images[0]} 
+                      src={product.images[0]?.url_570xN || product.images[0]?.url_fullxfull} 
                       alt={product.title}
                       className="object-cover w-full h-full"
                       onError={(e) => {

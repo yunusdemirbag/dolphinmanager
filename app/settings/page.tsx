@@ -4,11 +4,16 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Save, Clock, User, Palette } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Save, Clock, User, Palette, MessageSquare, RotateCcw } from "lucide-react";
+import { prompts, updatePrompt, resetPrompt, resetAllPrompts } from "@/lib/prompts";
 
 export default function SettingsPage() {
   const [queueDelay, setQueueDelay] = useState(20);
   const [isSaving, setIsSaving] = useState(false);
+  const [promptsState, setPromptsState] = useState(prompts);
+  const [activeTab, setActiveTab] = useState('general');
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -23,6 +28,27 @@ export default function SettingsPage() {
     }
   };
 
+  const handlePromptUpdate = (promptId: string, newPrompt: string) => {
+    updatePrompt(promptId, newPrompt);
+    setPromptsState(prev => 
+      prev.map(p => p.id === promptId ? { ...p, prompt: newPrompt } : p)
+    );
+  };
+
+  const handlePromptReset = (promptId: string) => {
+    resetPrompt(promptId);
+    setPromptsState(prev => 
+      prev.map(p => p.id === promptId ? { ...p, prompt: p.defaultPrompt } : p)
+    );
+  };
+
+  const handleResetAllPrompts = () => {
+    resetAllPrompts();
+    setPromptsState(prev => 
+      prev.map(p => ({ ...p, prompt: p.defaultPrompt }))
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -30,7 +56,14 @@ export default function SettingsPage() {
         <p className="text-gray-600">Sistem ayarlarınızı yapılandırın</p>
       </div>
 
-      <div className="grid gap-6 max-w-2xl">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="general">Genel Ayarlar</TabsTrigger>
+          <TabsTrigger value="prompts">AI Promptları</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-6">
+          <div className="grid gap-6 max-w-2xl">
         <Card>
           <CardHeader>
             <div className="flex items-center space-x-2">
@@ -112,13 +145,88 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={isSaving}>
-            <Save className="w-4 h-4 mr-2" />
-            {isSaving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
-          </Button>
-        </div>
-      </div>
+            <div className="flex justify-end">
+              <Button onClick={handleSave} disabled={isSaving}>
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="prompts" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-semibold">AI Promptları</h2>
+              <p className="text-gray-600">OpenAI API çağrıları için kullanılan promptları özelleştirin</p>
+            </div>
+            <Button onClick={handleResetAllPrompts} variant="outline" size="sm">
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Tümünü Sıfırla
+            </Button>
+          </div>
+
+          <div className="grid gap-6">
+            {promptsState.map((prompt) => (
+              <Card key={prompt.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <MessageSquare className="w-5 h-5" />
+                      <div>
+                        <CardTitle className="text-lg">{prompt.name}</CardTitle>
+                        <CardDescription>{prompt.description}</CardDescription>
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={() => handlePromptReset(prompt.id)} 
+                      variant="outline" 
+                      size="sm"
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Sıfırla
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Prompt İçeriği
+                      </label>
+                      <Textarea
+                        value={prompt.prompt}
+                        onChange={(e) => handlePromptUpdate(prompt.id, e.target.value)}
+                        placeholder="Prompt içeriğini girin..."
+                        rows={8}
+                        className="font-mono text-sm"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Değişkenler: ${`{title}`}, ${`{categoryNames}`} gibi değişkenler kullanabilirsiniz
+                      </p>
+                    </div>
+                    
+                    {prompt.prompt !== prompt.defaultPrompt && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          ⚠️ Bu prompt varsayılan ayarlardan farklı. Sıfırla butonuna basarak varsayılan haline döndürebilirsiniz.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={isSaving}>
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? 'Kaydediliyor...' : 'Promptları Kaydet'}
+            </Button>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

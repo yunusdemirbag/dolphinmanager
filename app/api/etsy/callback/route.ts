@@ -89,8 +89,8 @@ export async function GET(request: NextRequest) {
     const userData = await userResponse.json();
     console.log('Kullanıcı bilgileri alındı:', userData.user_id);
 
-    // Mağaza bilgilerini al - tüm mağazaları dahil et
-    const shopsResponse = await fetch(`https://openapi.etsy.com/v3/application/users/${userData.user_id}/shops?include_inactive=true`, {
+    // Mağaza bilgilerini al - direkt shops endpoint
+    const shopsResponse = await fetch(`https://openapi.etsy.com/v3/application/shops`, {
       headers: {
         'Authorization': `Bearer ${tokenData.access_token}`,
         'x-api-key': process.env.ETSY_CLIENT_ID!,

@@ -117,43 +117,45 @@ export function ProductsPageClient({ initialProducts, initialNextCursor, userId 
       ) : (
         <>
           <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {products.map(product => (
-              <Card key={product.listing_id || product.id} className="overflow-hidden">
-                <div className="aspect-square relative bg-gray-100">
-                  {product.images && product.images.length > 0 ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                      src={product.images[0]?.url_570xN || product.images[0]?.url_fullxfull} 
-                      alt={product.title}
-                      className="object-cover w-full h-full"
-                      onError={(e) => {
-                        console.error("Resim yüklenirken hata:", e);
-                        // Hata durumunda yedek resim göster
-                        e.currentTarget.src = "/placeholder-image.svg";
-                      }}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <Image className="w-12 h-12 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-medium truncate">{product.title}</h3>
-                  <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
-                    <span>{product.quantity} Adet</span>
-                    <span className="font-semibold">
-                      {product.price && typeof product.price === 'number' 
-                        ? `${product.price.toFixed(2)} ${product.currency_code || 'USD'}` 
-                        : product.price?.amount 
-                          ? `${(product.price.amount / product.price.divisor).toFixed(2)} ${product.price?.currency_code}` 
-                          : 'N/A'
-                      }
-                    </span>
+            {products.map(product => {
+              return (
+                <Card key={product.listing_id || product.id} className="overflow-hidden">
+                  <div className="aspect-square relative bg-gray-100">
+                    {product.images && product.images.length > 0 ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img 
+                        src={product.images[0]?.url_570xN || product.images[0]?.url_fullxfull} 
+                        alt={product.title}
+                        className="object-cover w-full h-full"
+                        onError={(e) => {
+                          console.error("Resim yüklenirken hata:", e);
+                          // Hata durumunda yedek resim göster
+                          e.currentTarget.src = "/placeholder-image.svg";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <Image className="w-12 h-12 text-gray-400" />
+                      </div>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <CardContent className="p-4">
+                    <h3 className="font-medium truncate">{product.title}</h3>
+                    <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
+                      <span>{product.quantity} Adet</span>
+                      <span className="font-semibold">
+                        {product.price && typeof product.price === 'number' 
+                          ? `${product.price.toFixed(2)} ${product.currency_code || 'USD'}` 
+                          : product.price?.amount 
+                            ? `${(product.price.amount / product.price.divisor).toFixed(2)} ${product.price?.currency_code}` 
+                            : 'N/A'
+                        }
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
           {hasMoreProducts && (
             <div className="text-center mt-6">

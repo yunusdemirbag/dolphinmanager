@@ -369,7 +369,25 @@ export async function syncProductsToFirebaseAdmin(userId: string, products: any[
 
     chunk.forEach(product => {
       const docRef = userProductsRef.doc(String(product.listing_id));
-      batch.set(docRef, { ...product, synced_at: new Date() });
+      
+      // Ürün nesnesinin images alanını içerdiğinden emin oluyoruz
+      const productData = {
+        ...product,  // Tüm ürün verilerini kopyala
+        synced_at: new Date()
+      };
+      
+      // Eğer images alanı yoksa ve product.Images varsa (Etsy API bazen büyük harfle döndürebilir)
+      if (!productData.images && product.Images) {
+        productData.images = product.Images;
+      }
+      
+      // Eğer hala images alanı yoksa, boş bir dizi oluştur
+      if (!productData.images) {
+        console.warn(`Ürün ${product.listing_id} için resim bilgisi bulunamadı. Boş dizi oluşturuluyor.`);
+        productData.images = [];
+      }
+      
+      batch.set(docRef, productData);
     });
     
     console.log(`Writing chunk ${Math.floor(i / chunkSize) + 1} of ${Math.ceil(products.length / chunkSize)}...`);

@@ -90,7 +90,7 @@ async function fetchAllEtsyListings(shopId: string, apiKey: string, initialAcces
 
     while (hasMore) {
         console.log(`Sayfa ${Math.floor(offset / limit) + 1}, offset ${offset} için istek gönderiliyor...`);
-        const url = `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}`;
+        const url = `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}&includes=images`;
         
         const response = await fetchFromEtsy(url, accessToken, apiKey, shopId);
 
@@ -105,6 +105,27 @@ async function fetchAllEtsyListings(shopId: string, apiKey: string, initialAcces
         const products = data.results || [];
         
         if (products.length > 0) {
+            // Her ürün için resim bilgilerini kontrol et
+            for (const product of products) {
+                if (!product.images || product.images.length === 0) {
+                    console.log(`Ürün ${product.listing_id} için resim bilgisi alınıyor...`);
+                    try {
+                        const imagesUrl = `https://openapi.etsy.com/v3/application/listings/${product.listing_id}/images`;
+                        const imagesResponse = await fetchFromEtsy(imagesUrl, accessToken, apiKey, shopId);
+                        
+                        if (imagesResponse.ok) {
+                            const imagesData = await imagesResponse.json();
+                            product.images = imagesData.results || [];
+                            console.log(`✅ Ürün ${product.listing_id} için ${product.images.length} resim alındı`);
+                        } else {
+                            console.error(`Ürün ${product.listing_id} için resim alınamadı: ${imagesResponse.status}`);
+                        }
+                    } catch (error) {
+                        console.error(`Ürün ${product.listing_id} için resim alınırken hata: ${error}`);
+                    }
+                }
+            }
+            
             allProducts.push(...products);
         }
         

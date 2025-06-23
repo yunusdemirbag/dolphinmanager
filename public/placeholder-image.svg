@@ -1,0 +1,7 @@
+<svg width="100%" height="100%" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#f3f4f6" />
+  <path d="M150,100 L200,175 L100,175 Z" fill="#d1d5db" />
+  <circle cx="200" cy="100" r="15" fill="#d1d5db" />
+  <path d="M70,50 L230,50 C242.15,50 252,59.85 252,72 L252,228 C252,240.15 242.15,250 230,250 L70,250 C57.85,250 48,240.15 48,228 L48,72 C48,59.85 57.85,50 70,50 Z" stroke="#d1d5db" stroke-width="4" fill="none" />
+  <text x="150" y="210" font-family="Arial" font-size="14" text-anchor="middle" fill="#9ca3af">Resim Bulunamadı</text>
+</svg>

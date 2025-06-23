@@ -123,9 +123,14 @@ export function ProductsPageClient({ initialProducts, initialNextCursor, userId 
                   {product.images && product.images.length > 0 ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img 
-                      src={product.images[0]?.url_570xN || product.images[0]?.url_fullxfull} 
+                      src={product.images[0]?.url_570xN || product.images[0]?.url_fullxfull || product.images[0]?.url} 
                       alt={product.title}
                       className="object-cover w-full h-full"
+                      onError={(e) => {
+                        console.error("Resim yüklenirken hata:", e);
+                        // Hata durumunda yedek resim göster
+                        e.currentTarget.src = "/placeholder-image.svg";
+                      }}
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full">

@@ -9,7 +9,7 @@ export async function GET() {
     // Firebase'den API bilgilerini al
     let shopId = null;
     let shopName = null;
-    let apiKey = process.env.ETSY_API_KEY;
+    let apiKey = process.env.ETSY_API_KEY || '';
     let accessToken = process.env.ETSY_ACCESS_TOKEN;
     let isConnected = false;
     
@@ -37,10 +37,52 @@ export async function GET() {
             
             if (apiKeyDoc.exists) {
               const apiKeyData = apiKeyDoc.data();
-              apiKey = apiKeyData?.api_key;
+              apiKey = apiKeyData?.api_key || '';
               accessToken = apiKeyData?.access_token;
               isConnected = true;
               console.log('Firebase\'den API anahtarları başarıyla alındı');
+              
+              // Etsy API'ye bağlantıyı test et
+              try {
+                console.log(`Etsy API bağlantısı test ediliyor - Shop ID: ${shopId}`);
+                const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}`, {
+                  headers: {
+                    'x-api-key': apiKey,
+                    'Authorization': `Bearer ${accessToken}`
+                  }
+                });
+
+                if (!response.ok) {
+                  console.error('Etsy API bağlantı hatası:', response.status);
+                  return NextResponse.json({
+                    isConnected: false,
+                    shopId: shopId,
+                    shopName: shopName,
+                    error: `Etsy API hatası: ${response.status}`
+                  });
+                }
+
+                const data = await response.json();
+                console.log('Etsy API bağlantısı başarılı:', data.shop_name);
+                
+                // Başarılı bağlantı
+                return NextResponse.json({
+                  isConnected: true,
+                  shopId: data.shop_id.toString(),
+                  shopName: data.shop_name,
+                  shopData: data
+                });
+              } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
+                console.error('Etsy API bağlantı kontrolü sırasında hata:', error);
+                
+                return NextResponse.json({
+                  isConnected: false,
+                  shopId: shopId,
+                  shopName: shopName,
+                  error: `Etsy API bağlantı hatası: ${errorMessage}`
+                });
+              }
             } else {
               console.log(`Mağaza ID ${shopId} için API anahtarları bulunamadı`);
             }
@@ -56,67 +98,13 @@ export async function GET() {
     }
 
     // API bilgileri tam değilse, bağlantı yok demektir
-    if (!apiKey || !accessToken || !shopId) {
-      return NextResponse.json({
-        isConnected: false,
-        shopId: null,
-        shopName: null,
-        error: 'Etsy bağlantısı bulunamadı'
-      });
-    }
-
-    // Shop ID'yi integer'a dönüştür
-    const shopIdInt = parseInt(shopId, 10);
-    if (isNaN(shopIdInt)) {
-      return NextResponse.json({
-        isConnected: false,
-        shopId: null,
-        shopName: null,
-        error: 'Geçersiz mağaza ID formatı'
-      });
-    }
-
-    // Etsy API'ye bağlantıyı test et
-    try {
-      console.log(`Etsy API bağlantısı test ediliyor - Shop ID: ${shopIdInt}`);
-      const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopIdInt}`, {
-        headers: {
-          'x-api-key': apiKey,
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-
-      if (!response.ok) {
-        console.error('Etsy API bağlantı hatası:', response.status);
-        return NextResponse.json({
-          isConnected: false,
-          shopId: shopId,
-          shopName: shopName,
-          error: `Etsy API hatası: ${response.status}`
-        });
-      }
-
-      const data = await response.json();
-      console.log('Etsy API bağlantısı başarılı:', data.shop_name);
-      
-      // Başarılı bağlantı
-      return NextResponse.json({
-        isConnected: true,
-        shopId: data.shop_id.toString(),
-        shopName: data.shop_name,
-        shopData: data
-      });
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
-      console.error('Etsy API bağlantı kontrolü sırasında hata:', error);
-      
-      return NextResponse.json({
-        isConnected: false,
-        shopId: shopId,
-        shopName: shopName,
-        error: `Etsy API bağlantı hatası: ${errorMessage}`
-      });
-    }
+    return NextResponse.json({
+      isConnected: false,
+      shopId: null,
+      shopName: null,
+      error: 'Etsy bağlantısı bulunamadı'
+    });
+    
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
     console.error('Etsy bağlantı durumu kontrol edilirken hata oluştu:', error);

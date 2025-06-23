@@ -31,8 +31,7 @@ export async function GET(request: NextRequest) {
         client_id: process.env.ETSY_CLIENT_ID!,
         client_secret: process.env.ETSY_CLIENT_SECRET!,
         code: code,
-        redirect_uri: process.env.ETSY_REDIRECT_URI!,
-        code_verifier: 'dummy-verifier', // Gerçek implementasyonda PKCE kullanılmalı
+        redirect_uri: process.env.ETSY_REDIRECT_URI!
       }),
     });
 

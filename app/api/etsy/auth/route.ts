@@ -19,16 +19,14 @@ export async function GET() {
     }
 
     const state = Math.random().toString(36).substring(7);
-    const codeChallenge = 'dummy-challenge'; // Gerçek implementasyonda PKCE kullanılmalı
-
+    
+    // Basitleştirilmiş Etsy OAuth - PKCE olmadan
     const authUrl = new URL('https://www.etsy.com/oauth/connect');
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', clientId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('scope', scope);
     authUrl.searchParams.set('state', state);
-    authUrl.searchParams.set('code_challenge', codeChallenge);
-    authUrl.searchParams.set('code_challenge_method', 'S256');
 
     console.log('Etsy yetkilendirme URL\'si oluşturuldu:', authUrl.toString());
 

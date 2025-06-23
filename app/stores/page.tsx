@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Store, Link as LinkIcon, RefreshCw, Unlink } from "lucide-react";
 
 export default function StoresPage() {
-  const [connectedStore, setConnectedStore] = useState<{shop_name: string, shop_id: string} | null>(null);
+  const [connectedStore, setConnectedStore] = useState<{shopName: string, shopId: string} | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -32,10 +32,10 @@ export default function StoresPage() {
       const response = await fetch('/api/etsy/status');
       if (response.ok) {
         const data = await response.json();
-        if (data.connected) {
+        if (data.isConnected) {
           setConnectedStore({
-            shop_name: data.shop_name,
-            shop_id: data.shop_id
+            shopName: data.shopName,
+            shopId: data.shopId
           });
         }
       }
@@ -83,7 +83,7 @@ export default function StoresPage() {
                   <Store className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl">{connectedStore.shop_name}</CardTitle>
+                  <CardTitle className="text-xl">{connectedStore.shopName}</CardTitle>
                   <CardDescription>Etsy Mağazası</CardDescription>
                 </div>
               </div>

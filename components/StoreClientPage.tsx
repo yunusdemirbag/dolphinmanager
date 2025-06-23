@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -19,6 +19,22 @@ interface StoreClientPageProps {
 export function StoreClientPage({ store }: StoreClientPageProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  useEffect(() => {
+    // URL'den success parametresini kontrol et
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const refresh = urlParams.get('refresh');
+    
+    if (success === 'connected' && refresh === 'true') {
+      // Bağlantı başarılı, sayfayı temiz URL ile yenile
+      const timeoutId = setTimeout(() => {
+        window.location.href = '/stores';
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, []);
 
   const handleConnectEtsy = async () => {
     setIsConnecting(true);

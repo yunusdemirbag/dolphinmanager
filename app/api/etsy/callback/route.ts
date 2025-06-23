@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
     await adminDb.collection('etsy_api_keys').doc(shopIdStr).set(apiKeysData);
     console.log('Mağaza ve API bilgileri Firebase\'e kaydedildi, ID:', shopIdStr);
 
-    return NextResponse.redirect(new URL('/stores?success=connected', request.url));
+    return NextResponse.redirect(new URL('/stores?success=connected&refresh=true', request.url));
   } catch (error: any) {
     console.error('Etsy callback genel hatası:', error);
     return NextResponse.redirect(new URL('/stores?error=general', request.url));

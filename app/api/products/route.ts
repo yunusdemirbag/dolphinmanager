@@ -89,6 +89,15 @@ export async function GET() {
     
     // Etsy API'ye istek gönder
     if (!apiKey || !accessToken || !shopId) {
+      // Yerel geliştirme ortamında mock API'ye yönlendir
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Etsy API kimlik bilgileri bulunamadı. Mock API kullanılıyor...');
+        const mockResponse = await fetch(new URL('/api/products/mock', new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')).toString());
+        if (mockResponse.ok) {
+          return mockResponse;
+        }
+      }
+      
       return NextResponse.json({ 
         error: 'Etsy API kimlik bilgileri bulunamadı',
         products: []
@@ -132,6 +141,15 @@ export async function GET() {
         if (!response.ok) {
           console.error(`Etsy API hatası: ${response.status}`);
           
+          // Yerel geliştirme ortamında API hatası olursa mock API'ye yönlendir
+          if (process.env.NODE_ENV === 'development' && allProducts.length === 0) {
+            console.log(`Etsy API hatası: ${response.status}. Mock API kullanılıyor...`);
+            const mockResponse = await fetch(new URL('/api/products/mock', new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')).toString());
+            if (mockResponse.ok) {
+              return mockResponse;
+            }
+          }
+          
           // Rate limit aşıldıysa bekleyelim
           if (response.status === 429) {
             console.log("Rate limit aşıldı, 2 saniye bekleniyor...");
@@ -165,6 +183,17 @@ export async function GET() {
           
           // Ürünleri normalize et
           const normalizedProducts = data.results.map((listing: any) => {
+            // Resimleri kontrol et ve düzenle
+            const processedImages = Array.isArray(listing.images) ? listing.images.map((image: any) => ({
+              listing_image_id: image.listing_image_id,
+              url_75x75: image.url_75x75,
+              url_170x135: image.url_170x135,
+              url_570xN: image.url_570xN,
+              url_fullxfull: image.url_fullxfull,
+              full_height: image.full_height,
+              full_width: image.full_width
+            })) : [];
+            
             return {
               listing_id: listing.listing_id,
               user_id: listing.user_id,
@@ -188,7 +217,7 @@ export async function GET() {
               price: listing.price,
               taxonomy_id: listing.taxonomy_id,
               views: listing.views || 0,
-              images: listing.images || []
+              images: processedImages
             };
           });
           
@@ -213,6 +242,15 @@ export async function GET() {
         const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
         console.error(`Sayfa ${page} alınırken hata:`, error);
         hasMore = false;
+        
+        // Yerel geliştirme ortamında hata olursa mock API'ye yönlendir
+        if (process.env.NODE_ENV === 'development' && allProducts.length === 0) {
+          console.log(`Ürünler alınırken hata: ${errorMessage}. Mock API kullanılıyor...`);
+          const mockResponse = await fetch(new URL('/api/products/mock', new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')).toString());
+          if (mockResponse.ok) {
+            return mockResponse;
+          }
+        }
         
         // Eğer hiç ürün alamadıysak hata döndür
         if (allProducts.length === 0) {
@@ -246,31 +284,44 @@ export async function GET() {
           console.log(`✅ ${draftData.results.length} taslak ürün alındı`);
           
           // Ürünleri normalize et
-          const draftProducts = draftData.results.map((listing: any) => ({
-            listing_id: listing.listing_id,
-            user_id: listing.user_id,
-            shop_id: listing.shop_id,
-            title: listing.title,
-            description: listing.description,
-            state: "draft",
-            creation_timestamp: listing.creation_timestamp,
-            created_timestamp: listing.created_timestamp,
-            ending_timestamp: listing.ending_timestamp,
-            original_creation_timestamp: listing.original_creation_timestamp,
-            last_modified_timestamp: listing.last_modified_timestamp,
-            updated_timestamp: listing.updated_timestamp,
-            state_timestamp: listing.state_timestamp,
-            quantity: listing.quantity,
-            shop_section_id: listing.shop_section_id,
-            featured_rank: listing.featured_rank,
-            url: listing.url,
-            num_favorers: listing.num_favorers,
-            tags: listing.tags || [],
-            price: listing.price,
-            taxonomy_id: listing.taxonomy_id,
-            views: 0,
-            images: listing.images || []
-          }));
+          const draftProducts = draftData.results.map((listing: any) => {
+            // Resimleri kontrol et ve düzenle
+            const processedImages = Array.isArray(listing.images) ? listing.images.map((image: any) => ({
+              listing_image_id: image.listing_image_id,
+              url_75x75: image.url_75x75,
+              url_170x135: image.url_170x135,
+              url_570xN: image.url_570xN,
+              url_fullxfull: image.url_fullxfull,
+              full_height: image.full_height,
+              full_width: image.full_width
+            })) : [];
+            
+            return {
+              listing_id: listing.listing_id,
+              user_id: listing.user_id,
+              shop_id: listing.shop_id,
+              title: listing.title,
+              description: listing.description,
+              state: "draft",
+              creation_timestamp: listing.creation_timestamp,
+              created_timestamp: listing.created_timestamp,
+              ending_timestamp: listing.ending_timestamp,
+              original_creation_timestamp: listing.original_creation_timestamp,
+              last_modified_timestamp: listing.last_modified_timestamp,
+              updated_timestamp: listing.updated_timestamp,
+              state_timestamp: listing.state_timestamp,
+              quantity: listing.quantity,
+              shop_section_id: listing.shop_section_id,
+              featured_rank: listing.featured_rank,
+              url: listing.url,
+              num_favorers: listing.num_favorers,
+              tags: listing.tags || [],
+              price: listing.price,
+              taxonomy_id: listing.taxonomy_id,
+              views: 0,
+              images: processedImages
+            };
+          });
           
           allProducts.push(...draftProducts);
         }
@@ -298,31 +349,44 @@ export async function GET() {
           console.log(`✅ ${inactiveData.results.length} pasif ürün alındı`);
           
           // Ürünleri normalize et
-          const inactiveProducts = inactiveData.results.map((listing: any) => ({
-            listing_id: listing.listing_id,
-            user_id: listing.user_id,
-            shop_id: listing.shop_id,
-            title: listing.title,
-            description: listing.description,
-            state: "inactive",
-            creation_timestamp: listing.creation_timestamp,
-            created_timestamp: listing.created_timestamp,
-            ending_timestamp: listing.ending_timestamp,
-            original_creation_timestamp: listing.original_creation_timestamp,
-            last_modified_timestamp: listing.last_modified_timestamp,
-            updated_timestamp: listing.updated_timestamp,
-            state_timestamp: listing.state_timestamp,
-            quantity: listing.quantity,
-            shop_section_id: listing.shop_section_id,
-            featured_rank: listing.featured_rank,
-            url: listing.url,
-            num_favorers: listing.num_favorers,
-            tags: listing.tags || [],
-            price: listing.price,
-            taxonomy_id: listing.taxonomy_id,
-            views: 0,
-            images: listing.images || []
-          }));
+          const inactiveProducts = inactiveData.results.map((listing: any) => {
+            // Resimleri kontrol et ve düzenle
+            const processedImages = Array.isArray(listing.images) ? listing.images.map((image: any) => ({
+              listing_image_id: image.listing_image_id,
+              url_75x75: image.url_75x75,
+              url_170x135: image.url_170x135,
+              url_570xN: image.url_570xN,
+              url_fullxfull: image.url_fullxfull,
+              full_height: image.full_height,
+              full_width: image.full_width
+            })) : [];
+            
+            return {
+              listing_id: listing.listing_id,
+              user_id: listing.user_id,
+              shop_id: listing.shop_id,
+              title: listing.title,
+              description: listing.description,
+              state: "inactive",
+              creation_timestamp: listing.creation_timestamp,
+              created_timestamp: listing.created_timestamp,
+              ending_timestamp: listing.ending_timestamp,
+              original_creation_timestamp: listing.original_creation_timestamp,
+              last_modified_timestamp: listing.last_modified_timestamp,
+              updated_timestamp: listing.updated_timestamp,
+              state_timestamp: listing.state_timestamp,
+              quantity: listing.quantity,
+              shop_section_id: listing.shop_section_id,
+              featured_rank: listing.featured_rank,
+              url: listing.url,
+              num_favorers: listing.num_favorers,
+              tags: listing.tags || [],
+              price: listing.price,
+              taxonomy_id: listing.taxonomy_id,
+              views: 0,
+              images: processedImages
+            };
+          });
           
           allProducts.push(...inactiveProducts);
         }
@@ -341,6 +405,15 @@ export async function GET() {
       });
     }
     
+    // Yerel geliştirme ortamında ürün bulunamazsa mock API'ye yönlendir
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Etsy API'den ürün bulunamadı. Mock API kullanılıyor...");
+      const mockResponse = await fetch(new URL('/api/products/mock', new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')).toString());
+      if (mockResponse.ok) {
+        return mockResponse;
+      }
+    }
+    
     console.error("Etsy API'den ürün bulunamadı");
     return NextResponse.json({ 
       success: false,
@@ -350,6 +423,20 @@ export async function GET() {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
     console.error('Ürün listesi alınırken hata oluştu:', error);
+    
+    // Yerel geliştirme ortamında hata olursa mock API'ye yönlendir
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Ürün listesi alınamadı: ${errorMessage}. Mock API kullanılıyor...`);
+      try {
+        const mockResponse = await fetch(new URL('/api/products/mock', new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')).toString());
+        if (mockResponse.ok) {
+          return mockResponse;
+        }
+      } catch (mockError) {
+        console.error('Mock API çağrısı başarısız:', mockError);
+      }
+    }
+    
     return NextResponse.json({ 
       error: `Ürün listesi alınamadı: ${errorMessage}`,
       products: []

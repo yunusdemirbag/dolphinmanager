@@ -11,26 +11,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    // Mock kullanıcı ID'si için her ortamda mock veri döndür
-    if (userId === 'local-user-123') {
-      console.log('Using mock store data for local-user-123');
-      return NextResponse.json({ 
-        store: {
-          shop_id: 56171647,
-          shop_name: "CyberDecorArt",
-          user_id: "local-user-123",
-          connected_at: new Date(),
-          last_sync_at: new Date(),
-          is_active: true
-        }
-      });
-    }
-
     try {
       // Firebase'den mağaza bilgisini al
       const store = await getConnectedStoreFromFirebase(userId);
       
       if (store) {
+        console.log(`Firebase'den mağaza bulundu: ${store.shop_name} (ID: ${store.shop_id})`);
         // Don't return sensitive data like tokens
         const safeStore = {
           shop_id: store.shop_id,
@@ -46,6 +32,7 @@ export async function GET(request: Request) {
       
       // Firebase'den veri alınamazsa Etsy API'den dene
       try {
+        console.log('Firebase\'de mağaza bulunamadı, Etsy API\'den alınıyor...');
         const response = await fetch('https://openapi.etsy.com/v3/application/users/me/shops', {
           headers: {
             'x-api-key': process.env.ETSY_API_KEY || '',
@@ -57,6 +44,7 @@ export async function GET(request: Request) {
           const data = await response.json();
           if (data.count > 0 && data.results && data.results[0]) {
             const shop = data.results[0];
+            console.log(`Etsy API'den mağaza bulundu: ${shop.shop_name} (ID: ${shop.shop_id})`);
             const storeData = {
               shop_id: shop.shop_id,
               shop_name: shop.shop_name,
@@ -68,6 +56,8 @@ export async function GET(request: Request) {
             
             return NextResponse.json({ store: storeData });
           }
+        } else {
+          console.error(`Etsy API hatası: ${response.status}`);
         }
       } catch (etsyError) {
         console.error('Etsy API error:', etsyError);
@@ -98,16 +88,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Mock kullanıcı ID'si için her ortamda mock başarılı yanıt döndür
-    if (user_id === 'local-user-123') {
-      console.log('Mock successful store sync for local-user-123');
-      return NextResponse.json({ 
-        message: 'Store synced to Firebase successfully (mock)',
-        shop_id,
-        shop_name
-      });
-    }
-
+    console.log(`Mağaza Firebase'e kaydediliyor: ${shop_name} (ID: ${shop_id})`);
     await syncEtsyStoreToFirebase({
       shop_id,
       shop_name,

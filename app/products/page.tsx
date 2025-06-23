@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, Clock, Play, Pause, Settings as SettingsIcon, Store, CheckCircle, AlertCircle } from "lucide-react";
+import { Plus, Package, Clock, Play, Pause, Settings as SettingsIcon, Store, CheckCircle, AlertCircle, Image } from "lucide-react";
 import ProductFormModal from "@/components/ProductFormModal";
 
 interface QueueItem {
@@ -97,8 +97,8 @@ export default function ProductsPage() {
       const response = await fetch('/api/products');
       if (response.ok) {
         const data = await response.json();
-        setProducts(data.products || []);
         console.log('Alınan ürünler:', data.products?.length || 0);
+        setProducts(data.products || []);
       } else {
         const errorData = await response.json();
         console.error('Ürünler yüklenirken API hatası:', errorData);
@@ -232,13 +232,18 @@ export default function ProductsPage() {
           {products.map(product => (
             <Card key={product.listing_id} className="overflow-hidden">
               <div className="aspect-square relative bg-gray-100">
-                {product.images && product.images.length > 0 && (
+                {product.images && product.images.length > 0 ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img 
                     src={product.images[0]?.url_570xN || product.images[0]?.url_fullxfull} 
                     alt={product.title}
                     className="object-cover w-full h-full"
                   />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <Image className="w-12 h-12 text-gray-400" />
+                    <p className="text-gray-400 text-sm">Resim yok</p>
+                  </div>
                 )}
               </div>
               <CardContent className="p-4">

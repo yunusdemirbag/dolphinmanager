@@ -2998,3 +2998,8 @@ https://nextjs.org/docs/messages/module-not-found
 
  ✓ Starting...
  ✓ Ready in 1816ms
+ ○ Compiling /api/etsy/status ...
+ ✓ Compiled /api/etsy/status in 1310ms
+Development mode: Using mock data instead of Firebase Admin
+ GET /api/etsy/status 401 in 1893ms
+[?25h

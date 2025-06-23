@@ -12,6 +12,7 @@ export async function GET() {
 
     if (adminDb) {
       try {
+        console.log('Firebase bağlantısı mevcut, mağaza bilgileri alınıyor...');
         // En son bağlanan mağaza bilgilerini al
         const storesRef = adminDb.collection('etsy_stores');
         const storeSnapshot = await storesRef.orderBy('connected_at', 'desc').limit(1).get();
@@ -20,6 +21,7 @@ export async function GET() {
           const storeData = storeSnapshot.docs[0].data();
           shopId = storeData?.shop_id?.toString();
           shopName = storeData?.shop_name;
+          console.log(`Firebase'den mağaza bulundu: ${shopName} (ID: ${shopId})`);
           
           // Mağaza ID'sine göre API anahtarlarını al
           if (shopId) {
@@ -31,12 +33,19 @@ export async function GET() {
               apiKey = apiKeyData?.api_key;
               accessToken = apiKeyData?.access_token;
               isConnected = true;
+              console.log('Firebase\'den API anahtarları başarıyla alındı');
+            } else {
+              console.log(`Mağaza ID ${shopId} için API anahtarları bulunamadı`);
             }
           }
+        } else {
+          console.log('Firebase\'de bağlı mağaza bulunamadı');
         }
       } catch (error) {
         console.error('Firebase\'den API bilgileri alınamadı:', error);
       }
+    } else {
+      console.log('Firebase bağlantısı yok, çevresel değişkenlerden API bilgileri kullanılacak');
     }
 
     // API bilgileri tam değilse, bağlantı yok demektir
@@ -62,6 +71,7 @@ export async function GET() {
 
     // Etsy API'ye bağlantıyı test et
     try {
+      console.log(`Etsy API bağlantısı test ediliyor - Shop ID: ${shopIdInt}`);
       const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopIdInt}`, {
         headers: {
           'x-api-key': apiKey,
@@ -80,6 +90,7 @@ export async function GET() {
       }
 
       const data = await response.json();
+      console.log('Etsy API bağlantısı başarılı:', data.shop_name);
       
       // Başarılı bağlantı
       return NextResponse.json({

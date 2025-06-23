@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Store, Link as LinkIcon, RefreshCw, Unlink } from "lucide-react";
+import { Store, Link as LinkIcon, RefreshCw, Unlink, Loader2 } from "lucide-react";
 
 export default function StoresPage() {
   const [connectedStore, setConnectedStore] = useState<{shopName: string, shopId: string} | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // URL'den success parametresini kontrol et
@@ -58,8 +59,29 @@ export default function StoresPage() {
   };
 
   const handleDisconnect = async () => {
-    // Mağaza bağlantısını kesme
-    setConnectedStore(null);
+    if (!connectedStore) return;
+    
+    setIsDisconnecting(true);
+    try {
+      const response = await fetch('/api/etsy/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ shop_id: connectedStore.shopId }),
+      });
+
+      if (response.ok) {
+        setConnectedStore(null);
+      } else {
+        console.error('Failed to disconnect the store.');
+        // Burada kullanıcıya bir hata mesajı gösterebilirsiniz.
+      }
+    } catch (error) {
+      console.error('Error disconnecting store:', error);
+    } finally {
+      setIsDisconnecting(false);
+    }
   };
 
   const handleRefreshToken = async () => {
@@ -92,9 +114,13 @@ export default function StoresPage() {
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Token Yenile
                 </Button>
-                <Button variant="destructive" onClick={handleDisconnect}>
-                  <Unlink className="w-4 h-4 mr-2" />
-                  Bağlantıyı Kes
+                <Button variant="destructive" onClick={handleDisconnect} disabled={isDisconnecting}>
+                  {isDisconnecting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Unlink className="w-4 h-4 mr-2" />
+                  )}
+                  {isDisconnecting ? 'Kesiliyor...' : 'Bağlantıyı Kes'}
                 </Button>
               </div>
             </div>

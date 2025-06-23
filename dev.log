@@ -2966,3 +2966,35 @@ https://nextjs.org/docs/messages/module-not-found
   syscall: 'open',
   path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
 }
+ ⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+   ▲ Next.js 15.3.4 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.113:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1337ms
+ ⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+   ▲ Next.js 15.3.4 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.113:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1298ms
+ ⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+   ▲ Next.js 15.3.4 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.113:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1808ms
+ ⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+   ▲ Next.js 15.3.4 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.113:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1816ms

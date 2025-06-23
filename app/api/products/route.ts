@@ -1,19 +1,30 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
+  const shopId = process.env.ETSY_SHOP_ID;
+  const apiKey = process.env.ETSY_API_KEY;
+  const accessToken = process.env.ETSY_ACCESS_TOKEN;
+
+  if (!shopId || !apiKey || !accessToken) {
+    console.error('Missing Etsy API credentials in environment variables.');
+    return NextResponse.json({ 
+      error: 'Eksik API kimlik bilgileri. Lütfen Vercel ortam değişkenlerini kontrol edin.'
+    }, { status: 500 });
+  }
+  
   try {
-    // Etsy API'den gerçek ürünleri çek
-    const shopId = process.env.ETSY_SHOP_ID || '12345678'; // Gerçek shop ID'nizi buraya ekleyin
     const apiUrl = `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/active`;
     
     const response = await fetch(apiUrl, {
       headers: {
-        'x-api-key': process.env.ETSY_API_KEY || '',
-        'Authorization': `Bearer ${process.env.ETSY_ACCESS_TOKEN || ''}`
+        'x-api-key': apiKey,
+        'Authorization': `Bearer ${accessToken}`
       }
     });
 
     if (!response.ok) {
+      const errorBody = await response.text();
+      console.error('Etsy API error:', errorBody);
       return NextResponse.json({ 
         error: 'Failed to fetch products from Etsy API',
         message: `Etsy API error: ${response.status}`
@@ -30,8 +41,8 @@ export async function GET() {
           `https://openapi.etsy.com/v3/application/listings/${product.listing_id}/images`,
           {
             headers: {
-              'x-api-key': process.env.ETSY_API_KEY || '',
-              'Authorization': `Bearer ${process.env.ETSY_ACCESS_TOKEN || ''}`
+              'x-api-key': apiKey,
+              'Authorization': `Bearer ${accessToken}`
             }
           }
         );
@@ -47,8 +58,8 @@ export async function GET() {
           `https://openapi.etsy.com/v3/application/listings/${product.listing_id}/inventory`,
           {
             headers: {
-              'x-api-key': process.env.ETSY_API_KEY || '',
-              'Authorization': `Bearer ${process.env.ETSY_ACCESS_TOKEN || ''}`
+              'x-api-key': apiKey,
+              'Authorization': `Bearer ${accessToken}`
             }
           }
         );

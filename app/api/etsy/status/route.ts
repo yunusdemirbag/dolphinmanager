@@ -2,11 +2,20 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
 export async function GET() {
+  const apiKey = process.env.ETSY_API_KEY;
+  const accessToken = process.env.ETSY_ACCESS_TOKEN;
+
+  if (!apiKey || !accessToken) {
+    console.error('Missing Etsy API credentials in environment variables.');
+    return NextResponse.json({ 
+      connected: false,
+      error: 'Eksik API kimlik bilgileri. Lütfen Vercel ortam değişkenlerini kontrol edin.'
+    }, { status: 500 });
+  }
+
   try {
-    // Test user ID - gerçek implementasyonda session'dan gelecek
     const testUserId = '1007541496';
     
-    // Firebase bağlantısı varsa, verileri oradan çek
     if (adminDb) {
       try {
         const storeDoc = await adminDb.collection('etsy_stores').doc(testUserId).get();
@@ -22,17 +31,14 @@ export async function GET() {
         }
       } catch (dbError) {
         console.error('Firebase bağlantı hatası:', dbError);
-        // Firebase hatası durumunda devam et ve API'den veri çekmeyi dene
       }
     }
     
-    // Gerçek Etsy API'den veri çek
     try {
-      // Etsy API'den mağaza bilgilerini çek
       const response = await fetch('https://openapi.etsy.com/v3/application/users/me/shops', {
         headers: {
-          'x-api-key': process.env.ETSY_API_KEY || '',
-          'Authorization': `Bearer ${process.env.ETSY_ACCESS_TOKEN || ''}`
+          'x-api-key': apiKey,
+          'Authorization': `Bearer ${accessToken}`
         }
       });
       
@@ -41,7 +47,6 @@ export async function GET() {
         if (data.count > 0 && data.results && data.results[0]) {
           const shop = data.results[0];
           
-          // Eğer Firebase bağlantısı varsa, mağaza bilgilerini kaydet
           if (adminDb) {
             try {
               await adminDb.collection('etsy_stores').doc(testUserId).set({
@@ -65,21 +70,21 @@ export async function GET() {
           });
         }
       } else {
-        console.error('Etsy API error:', await response.text());
+        const errorBody = await response.text();
+        console.error('Etsy API hatası (status):', errorBody);
         return NextResponse.json({ 
           connected: false, 
           error: `Etsy API error: ${response.status}`
         }, { status: response.status });
       }
     } catch (etsyError) {
-      console.error('Etsy API error:', etsyError);
+      console.error('Etsy API bağlantı hatası:', etsyError);
       return NextResponse.json({ 
         connected: false, 
         error: 'Etsy API connection failed'
       }, { status: 500 });
     }
     
-    // Hiçbir veri bulunamadıysa
     return NextResponse.json({ 
       connected: false,
       error: 'No shop data found'

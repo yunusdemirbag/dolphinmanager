@@ -187,3 +187,4 @@
   syscall: 'open',
   path: '/Users/yunusdemirbag/Documents/dolphinmanager/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
 }
+   Reload env: .env.local

@@ -1,13 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Store, Link as LinkIcon, RefreshCw, Unlink } from "lucide-react";
 
 export default function StoresPage() {
-  const [connectedStore, setConnectedStore] = useState<{shop_name: string} | null>(null);
+  const [connectedStore, setConnectedStore] = useState<{shop_name: string, shop_id: string} | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // URL'den success parametresini kontrol et
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    
+    if (success === 'connected') {
+      // Bağlantı başarılı mesajı göster
+      setTimeout(() => {
+        window.history.replaceState({}, '', '/stores');
+      }, 3000);
+    }
+    
+    // Firebase'den mağaza bilgisini kontrol et
+    checkConnectedStore();
+  }, []);
+
+  const checkConnectedStore = async () => {
+    try {
+      // Etsy mağaza bilgisini Firebase'den kontrol et
+      const response = await fetch('/api/etsy/status');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.connected) {
+          setConnectedStore({
+            shop_name: data.shop_name,
+            shop_id: data.shop_id
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Mağaza bilgisi kontrol edilemedi:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleConnectEtsy = async () => {
     setIsConnecting(true);
@@ -79,6 +116,20 @@ export default function StoresPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-black">Mağazalar</h1>
+          <p className="text-gray-600">Mağaza durumu kontrol ediliyor...</p>
+        </div>
+        <div className="flex justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+        </div>
       </div>
     );
   }

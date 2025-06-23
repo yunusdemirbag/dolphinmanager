@@ -44,8 +44,13 @@ export async function GET(request: NextRequest) {
     // Auth session bilgilerini al
     const sessionDoc = sessionsSnapshot.docs[0]
     const sessionData = sessionDoc.data()
-    const userId = sessionData.state // state = userId
+    const userId = sessionDoc.id // Döküman ID'si, Firebase UID'sidir.
     const codeVerifier = sessionData.code_verifier
+    
+    if (!userId) {
+      console.error('[etsy/callback] Auth session içinde user ID bulunamadı.')
+      return NextResponse.redirect(`${origin}/stores?error=no_uid_in_session`);
+    }
     
     // Token takası için Etsy API'ye istek gönder
     try {

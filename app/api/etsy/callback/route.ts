@@ -105,6 +105,15 @@ export async function GET(request: NextRequest) {
     const shopsData = await shopsResponse.json();
     console.log('Mağaza bilgileri alındı:', shopsData.results?.length, 'mağaza');
 
+    // Güvenlik kontrolü - mağaza bilgilerini kontrol et
+    if (!shopsData || !shopsData.results || shopsData.results.length === 0) {
+      console.error('Kullanıcının mağazası bulunamadı veya Etsy API boş cevap döndü');
+      return NextResponse.redirect(new URL('/stores?error=no_shop_found', request.url));
+    }
+
+    const shop = shopsData.results[0];
+    console.log('İlk mağaza seçildi:', shop.shop_name);
+
     // Firebase'e kaydet
     if (!adminDb) {
       console.error('Firebase admin başlatılamadı');
@@ -113,8 +122,8 @@ export async function GET(request: NextRequest) {
 
     const storeData = {
       user_id: userData.user_id,
-      shop_id: shopsData.results[0]?.shop_id,
-      shop_name: shopsData.results[0]?.shop_name,
+      shop_id: shop.shop_id,
+      shop_name: shop.shop_name,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
       expires_at: new Date(Date.now() + tokenData.expires_in * 1000),

@@ -2,20 +2,37 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
 export async function GET() {
-  const apiKey = process.env.ETSY_API_KEY;
-  const accessToken = process.env.ETSY_ACCESS_TOKEN;
-
-  if (!apiKey || !accessToken) {
-    console.error('Missing Etsy API credentials in environment variables.');
-    return NextResponse.json({ 
-      connected: false,
-      error: 'Eksik API kimlik bilgileri. Lütfen Vercel ortam değişkenlerini kontrol edin.'
-    }, { status: 500 });
-  }
-
   try {
     const testUserId = '1007541496';
+    let apiKey, accessToken;
     
+    // Firebase'den API bilgilerini çek
+    if (adminDb) {
+      try {
+        const apiKeysDoc = await adminDb.collection('etsy_api_keys').doc(testUserId).get();
+        if (apiKeysDoc.exists) {
+          const apiData = apiKeysDoc.data();
+          apiKey = apiData?.api_key;
+          accessToken = apiData?.access_token;
+        }
+      } catch (dbError) {
+        console.error('Firebase API bilgileri okuma hatası:', dbError);
+      }
+    }
+    
+    // Eğer Firebase'den bilgiler alınamadıysa, ortam değişkenlerini dene
+    if (!apiKey) apiKey = process.env.ETSY_API_KEY;
+    if (!accessToken) accessToken = process.env.ETSY_ACCESS_TOKEN;
+
+    if (!apiKey || !accessToken) {
+      console.error('Etsy API kimlik bilgileri bulunamadı.');
+      return NextResponse.json({ 
+        connected: false,
+        error: 'Etsy API kimlik bilgileri bulunamadı. Lütfen Etsy mağazanızı bağlayın.'
+      }, { status: 500 });
+    }
+    
+    // Firebase'den mağaza bilgilerini çek
     if (adminDb) {
       try {
         const storeDoc = await adminDb.collection('etsy_stores').doc(testUserId).get();
@@ -30,10 +47,11 @@ export async function GET() {
           });
         }
       } catch (dbError) {
-        console.error('Firebase bağlantı hatası:', dbError);
+        console.error('Firebase mağaza bilgileri okuma hatası:', dbError);
       }
     }
     
+    // Firebase'de mağaza bilgisi yoksa Etsy API'den çek
     try {
       const response = await fetch('https://openapi.etsy.com/v3/application/users/me/shops', {
         headers: {
@@ -47,6 +65,7 @@ export async function GET() {
         if (data.count > 0 && data.results && data.results[0]) {
           const shop = data.results[0];
           
+          // Mağaza bilgilerini Firebase'e kaydet
           if (adminDb) {
             try {
               await adminDb.collection('etsy_stores').doc(testUserId).set({
@@ -56,6 +75,13 @@ export async function GET() {
                 connected_at: new Date(),
                 last_sync_at: new Date(),
                 is_active: true
+              });
+              
+              // API bilgilerini de kaydet
+              await adminDb.collection('etsy_api_keys').doc(testUserId).set({
+                api_key: apiKey,
+                access_token: accessToken,
+                updated_at: new Date()
               });
             } catch (saveError) {
               console.error('Mağaza bilgilerini Firebase\'e kaydetme hatası:', saveError);

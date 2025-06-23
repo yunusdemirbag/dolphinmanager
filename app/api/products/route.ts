@@ -1,18 +1,46 @@
 import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebase-admin';
 
 export async function GET() {
-  const shopId = process.env.ETSY_SHOP_ID;
-  const apiKey = process.env.ETSY_API_KEY;
-  const accessToken = process.env.ETSY_ACCESS_TOKEN;
-
-  if (!shopId || !apiKey || !accessToken) {
-    console.error('Missing Etsy API credentials in environment variables.');
-    return NextResponse.json({ 
-      error: 'Eksik API kimlik bilgileri. Lütfen Vercel ortam değişkenlerini kontrol edin.'
-    }, { status: 500 });
-  }
-  
   try {
+    // Test user ID - gerçek implementasyonda session'dan gelecek
+    const testUserId = '1007541496';
+    let shopId, apiKey, accessToken;
+    
+    // Firebase'den Etsy mağaza bilgilerini çek
+    if (adminDb) {
+      try {
+        const storeDoc = await adminDb.collection('etsy_stores').doc(testUserId).get();
+        
+        if (storeDoc.exists) {
+          const storeData = storeDoc.data();
+          shopId = storeData?.shop_id;
+          
+          // API anahtarlarını al
+          const apiKeysDoc = await adminDb.collection('etsy_api_keys').doc(testUserId).get();
+          if (apiKeysDoc.exists) {
+            const apiData = apiKeysDoc.data();
+            apiKey = apiData?.api_key;
+            accessToken = apiData?.access_token;
+          }
+        }
+      } catch (dbError) {
+        console.error('Firebase bağlantı hatası:', dbError);
+      }
+    }
+    
+    // Eğer Firebase'den bilgiler alınamadıysa, ortam değişkenlerini dene
+    if (!shopId) shopId = process.env.ETSY_SHOP_ID;
+    if (!apiKey) apiKey = process.env.ETSY_API_KEY;
+    if (!accessToken) accessToken = process.env.ETSY_ACCESS_TOKEN;
+
+    if (!shopId || !apiKey || !accessToken) {
+      console.error('Etsy API kimlik bilgileri bulunamadı.');
+      return NextResponse.json({ 
+        error: 'Etsy API kimlik bilgileri bulunamadı. Lütfen Etsy mağazanızı bağlayın.'
+      }, { status: 500 });
+    }
+  
     const apiUrl = `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/active`;
     
     const response = await fetch(apiUrl, {

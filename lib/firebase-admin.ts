@@ -27,11 +27,10 @@ if (typeof window === 'undefined') {
       console.log('Firebase admin initialized successfully');
     } catch (error) {
       console.error('Firebase admin initialization error:', error);
-      console.log('Running without Firebase - using mock data');
       adminDb = null;
     }
   } else {
-    console.log('Firebase admin config incomplete - running without Firebase');
+    console.log('Firebase admin config incomplete');
     adminDb = null;
   }
 }

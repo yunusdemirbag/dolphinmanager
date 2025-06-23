@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getConnectedStoreFromFirebase, syncEtsyStoreToFirebase } from '@/lib/firebase-sync';
 
-// Yerel geliştirme için mock mağaza verisi
-const MOCK_STORE_DATA = {
-  shop_id: 12345678,
-  shop_name: "CyberDecorArt",
-  user_id: "1007541496",
-  connected_at: new Date(),
-  last_sync_at: new Date(),
-  is_active: true
-};
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -21,6 +11,7 @@ export async function GET(request: Request) {
     }
 
     try {
+      // Firebase'den mağaza bilgisini al
       const store = await getConnectedStoreFromFirebase(userId);
       
       if (store) {
@@ -36,18 +27,46 @@ export async function GET(request: Request) {
 
         return NextResponse.json({ store: safeStore });
       }
+      
+      // Firebase'den veri alınamazsa Etsy API'den dene
+      try {
+        const response = await fetch('https://openapi.etsy.com/v3/application/users/me/shops', {
+          headers: {
+            'x-api-key': process.env.ETSY_API_KEY || '',
+            'Authorization': `Bearer ${process.env.ETSY_ACCESS_TOKEN || ''}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.count > 0 && data.results && data.results[0]) {
+            const shop = data.results[0];
+            const storeData = {
+              shop_id: shop.shop_id,
+              shop_name: shop.shop_name,
+              user_id: userId,
+              connected_at: new Date(),
+              last_sync_at: new Date(),
+              is_active: true
+            };
+            
+            return NextResponse.json({ store: storeData });
+          }
+        }
+      } catch (etsyError) {
+        console.error('Etsy API error:', etsyError);
+      }
+      
+      // Mağaza bulunamadı
+      return NextResponse.json({ error: 'No connected store found' }, { status: 404 });
+      
     } catch (error) {
-      console.log('Firebase erişim hatası, mock veri kullanılıyor:', error);
+      console.error('Error fetching store data:', error);
+      return NextResponse.json({ error: 'Failed to fetch store data' }, { status: 500 });
     }
-    
-    // Firebase'den veri alınamadıysa mock veri döndür
-    console.log('Using mock store data for local development');
-    return NextResponse.json({ store: MOCK_STORE_DATA });
-    
   } catch (error) {
-    console.error('Error fetching store from Firebase:', error);
-    // Hata durumunda da mock veriyi döndür
-    return NextResponse.json({ store: MOCK_STORE_DATA });
+    console.error('Error processing request:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 

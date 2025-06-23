@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
-// Mock queue data için external reference
-declare global {
-  var mockQueueItems: any[] | undefined;
+// QueueItem arayüzü
+interface QueueItem {
+  id: string;
+  user_id: string;
+  product_data: any;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  created_at: string | Date;
+  updated_at: string | Date;
+  retry_count: number;
+  processing_started_at?: string | Date;
+  completed_at?: string | Date;
+  error_message?: string;
+  etsy_listing_id?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -14,76 +24,10 @@ export async function POST(request: NextRequest) {
     const testUserId = '1007541496';
 
     if (!adminDb) {
-      // Mock Firebase kullan
-      console.log('Using mock queue worker');
-      
-      // Global mock data kullan
-      if (!global.mockQueueItems) {
-        global.mockQueueItems = [];
-      }
-
-      if (action === 'start') {
-        const pendingItems = global.mockQueueItems.filter(item => 
-          item.user_id === testUserId && item.status === 'pending'
-        );
-
-        if (pendingItems.length === 0) {
-          return NextResponse.json({ 
-            message: 'Kuyrukte işlenecek ürün yok (mock)',
-            hasItems: false,
-            mock: true
-          });
-        }
-
-        const queueItem = pendingItems[0];
-        
-        // Durumu processing olarak güncelle
-        queueItem.status = 'processing';
-        queueItem.updated_at = new Date().toISOString();
-        queueItem.processing_started_at = new Date().toISOString();
-
-        // Simulated processing
-        setTimeout(() => {
-          // %90 başarı oranı
-          if (Math.random() < 0.9) {
-            queueItem.status = 'completed';
-            queueItem.completed_at = new Date().toISOString();
-            queueItem.etsy_listing_id = Math.random().toString(36).substr(2, 9);
-          } else {
-            queueItem.status = 'failed';
-            queueItem.error_message = 'Mock Etsy API hatası';
-            queueItem.retry_count = (queueItem.retry_count || 0) + 1;
-          }
-          queueItem.updated_at = new Date().toISOString();
-        }, 3000);
-
-        return NextResponse.json({
-          message: 'Ürün işleniyor (mock)',
-          productTitle: queueItem.product_data?.title,
-          hasItems: true,
-          status: 'processing',
-          mock: true
-        });
-      }
-
-      if (action === 'status') {
-        const pending = global.mockQueueItems.filter(item => 
-          item.user_id === testUserId && item.status === 'pending'
-        ).length;
-        
-        const processing = global.mockQueueItems.filter(item => 
-          item.user_id === testUserId && item.status === 'processing'
-        ).length;
-
-        return NextResponse.json({
-          pending,
-          processing,
-          hasItems: pending > 0 || processing > 0,
-          mock: true
-        });
-      }
-
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Database connection required',
+        hasItems: false
+      }, { status: 503 });
     }
 
     if (action === 'start') {
@@ -104,7 +48,7 @@ export async function POST(request: NextRequest) {
       }
 
       const doc = queueQuery.docs[0];
-      const queueItem = { id: doc.id, ...doc.data() };
+      const queueItem = { id: doc.id, ...doc.data() } as QueueItem;
 
       // Durumu processing olarak güncelle
       await doc.ref.update({

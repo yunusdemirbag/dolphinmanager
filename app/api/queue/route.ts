@@ -1,37 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 
-// Mock queue data için global reference
-declare global {
-  var mockQueueItems: any[] | undefined;
+// QueueItem arayüzü
+interface QueueItem {
+  id: string;
+  user_id: string;
+  product_data: any;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  created_at: string | Date;
+  updated_at: string | Date;
+  retry_count: number;
 }
 
 export async function GET() {
   try {
-    if (!adminDb) {
-      console.log('Using mock queue data');
-      
-      if (!global.mockQueueItems) {
-        global.mockQueueItems = [];
-      }
-      
-      // İstatistikler
-      const stats = {
-        pending: global.mockQueueItems.filter(item => item.status === 'pending').length,
-        processing: global.mockQueueItems.filter(item => item.status === 'processing').length,
-        completed: global.mockQueueItems.filter(item => item.status === 'completed').length,
-        failed: global.mockQueueItems.filter(item => item.status === 'failed').length,
-      };
-
-      return NextResponse.json({
-        items: global.mockQueueItems,
-        stats,
-        mock: true
-      });
-    }
-
     // Test user ID - gerçek implementasyonda session'dan gelecek
     const testUserId = '1007541496';
+    
+    if (!adminDb) {
+      return NextResponse.json({ 
+        error: 'Database connection required',
+        items: [],
+        stats: {
+          pending: 0,
+          processing: 0,
+          completed: 0,
+          failed: 0
+        }
+      }, { status: 503 });
+    }
     
     // Kuyruk ürünlerini al
     const queueQuery = await adminDb
@@ -44,6 +41,7 @@ export async function GET() {
       id: doc.id,
       ...doc.data(),
       created_at: doc.data().created_at?.toDate()?.toISOString(),
+      status: doc.data().status || 'pending',
     }));
 
     // İstatistikler
@@ -60,7 +58,16 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Queue fetch error:', error);
-    return NextResponse.json({ error: 'Failed to fetch queue' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to fetch queue',
+      items: [],
+      stats: {
+        pending: 0,
+        processing: 0,
+        completed: 0,
+        failed: 0
+      }
+    }, { status: 500 });
   }
 }
 
@@ -70,35 +77,9 @@ export async function POST(request: NextRequest) {
     const { product, action } = body;
 
     if (!adminDb) {
-      // Mock Firebase kullan
-      console.log('Using mock queue operations');
-      
-      if (!global.mockQueueItems) {
-        global.mockQueueItems = [];
-      }
-      
-      if (action === 'add') {
-        const queueItem = {
-          id: Math.random().toString(36).substr(2, 9),
-          user_id: '1007541496',
-          product_data: product,
-          status: 'pending',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          retry_count: 0,
-        };
-
-        global.mockQueueItems.unshift(queueItem);
-        
-        return NextResponse.json({ 
-          success: true, 
-          id: queueItem.id,
-          message: 'Ürün kuyruğa eklendi (mock)',
-          mock: true
-        });
-      }
-
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Database connection required' 
+      }, { status: 503 });
     }
 
     // Test user ID - gerçek implementasyonda session'dan gelecek

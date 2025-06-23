@@ -60,7 +60,7 @@ async function refreshEtsyToken(shopId: string): Promise<string | null> {
 }
 
 
-async function fetchFromEtsy(url: string, accessToken: string, apiKey: string, shopId: string, isRetry = false): Promise<Response> {
+async function fetchFromEtsy(url: string, accessToken: string, apiKey: string, shopId: string, isRetry = false): Promise<{response: Response, newAccessToken?: string}> {
     let response = await fetch(url, {
         headers: {
             'x-api-key': apiKey,
@@ -73,11 +73,12 @@ async function fetchFromEtsy(url: string, accessToken: string, apiKey: string, s
         const newAccessToken = await refreshEtsyToken(shopId);
         if (newAccessToken) {
             console.log("Retrying API call with new token...");
-            return fetchFromEtsy(url, newAccessToken, apiKey, shopId, true); // Retry once
+            const retryResult = await fetchFromEtsy(url, newAccessToken, apiKey, shopId, true);
+            return { response: retryResult.response, newAccessToken };
         }
     }
 
-    return response;
+    return { response };
 }
 
 
@@ -94,7 +95,12 @@ async function fetchAllEtsyListings(shopId: string, apiKey: string, initialAcces
         console.log(`Sayfa ${Math.floor(offset / limit) + 1}, offset ${offset} için istek gönderiliyor...`);
         const url = `https://openapi.etsy.com/v3/application/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}&includes=images`;
         
-        const response = await fetchFromEtsy(url, accessToken, apiKey, shopId);
+        const { response, newAccessToken } = await fetchFromEtsy(url, accessToken, apiKey, shopId);
+        
+        // Token yenilendiyse güncel token'ı kullan
+        if (newAccessToken) {
+            accessToken = newAccessToken;
+        }
 
         if (!response.ok) {
              const errorText = await response.text();
@@ -113,7 +119,12 @@ async function fetchAllEtsyListings(shopId: string, apiKey: string, initialAcces
                     console.log(`Ürün ${product.listing_id} için resim bilgisi alınıyor...`);
                     try {
                         const imagesUrl = `https://openapi.etsy.com/v3/application/listings/${product.listing_id}/images`;
-                        const imagesResponse = await fetchFromEtsy(imagesUrl, accessToken, apiKey, shopId);
+                        const { response: imagesResponse, newAccessToken: newImageToken } = await fetchFromEtsy(imagesUrl, accessToken, apiKey, shopId);
+                        
+                        // Token yenilendiyse güncel token'ı kullan
+                        if (newImageToken) {
+                            accessToken = newImageToken;
+                        }
                         
                         if (imagesResponse.ok) {
                             const imagesData = await imagesResponse.json();

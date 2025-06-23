@@ -1,18 +1,16 @@
 {
   "compilerOptions": {
-    // Temel Ayarlar
-    "target": "es5", // Daha geniş tarayıcı uyumluluğu için
+    "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
-    "strict": true, // Kod kalitesi için kesinlikle 'true' kalmalı
+    "strict": true,
+    "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true, // Next.js derlemeyi kendi yaptığı için bu 'true' olmalı
-
-    // Next.js & React Ayarları
     "jsx": "preserve",
     "incremental": true,
     "plugins": [
@@ -20,23 +18,10 @@
         "name": "next"
       }
     ],
-
-    // --- EN ÖNEMLİ KISIM: YOL KISAYOLLARI (ALIAS) ---
-    "moduleResolution": "bundler", // Modern projeler için en iyi seçenek
-    "baseUrl": ".", // Kısayolların başlayacağı kök dizini proje ana klasörüdür.
     "paths": {
-      "@/*": ["src/*"] // "@/" ile başlayan her yolu, "src/" klasörünün içinden itibaren çöz.
+      "@/*": ["./*"]
     }
   },
-  // TypeScript'in hangi dosyaları kontrol edeceğini belirtir
-  "include": [
-    "next-env.d.ts", 
-    "src/**/*.ts", // "src" klasörü altındaki tüm .ts dosyaları
-    "src/**/*.tsx", // "src" klasörü altındaki tüm .tsx dosyaları
-    ".next/types/**/*.ts"
-  ],
-  // TypeScript'in hangi dosyaları görmezden geleceğini belirtir
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

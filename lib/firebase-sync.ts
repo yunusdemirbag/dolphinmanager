@@ -358,7 +358,7 @@ export async function syncProductsToFirebaseAdmin(userId: string, products: any[
   
   console.log(`🔄 Syncing ${products.length} products to Firebase for user ${userId}...`);
 
-  const userProductsRef = adminDb.collection('users').doc(userId).collection('products');
+  const productsCollection = adminDb.collection('products');
   
   const chunkSize = 499;
 
@@ -367,15 +367,16 @@ export async function syncProductsToFirebaseAdmin(userId: string, products: any[
     const batch = adminDb.batch();
 
     chunk.forEach(product => {
-      const docRef = userProductsRef.doc(String(product.listing_id));
+      const docRef = productsCollection.doc(String(product.listing_id));
       
       const productData = {
         ...product,
+        userId: userId,
         images: product.images || [],
         synced_at: new Date()
       };
       
-      batch.set(docRef, productData);
+      batch.set(docRef, productData, { merge: true });
     });
     
     console.log(`Writing chunk ${Math.floor(i / chunkSize) + 1} of ${Math.ceil(products.length / chunkSize)}...`);
@@ -398,7 +399,9 @@ export async function countProductsInFirebaseAdmin(userId: string): Promise<numb
     console.error("Error: countProductsInFirebaseAdmin called with empty userId.");
     return 0;
   }
-  const productsCollRef = adminDb.collection('users').doc(userId).collection('products');
+  
+  // Ana 'products' koleksiyonunu kullanıyoruz ve 'userId' ile filtreliyoruz
+  const productsCollRef = adminDb.collection('products').where('userId', '==', userId);
   const snapshot = await productsCollRef.count().get();
   return snapshot.data().count;
 }
@@ -418,7 +421,9 @@ export async function getProductsFromFirebaseAdmin(
     return { products: [], nextCursor: null };
   }
 
-  let query = adminDb.collection('users').doc(userId).collection('products')
+  // Ana 'products' koleksiyonunu kullanıyoruz ve 'userId' ile filtreliyoruz
+  let query = adminDb.collection('products')
+    .where('userId', '==', userId)
     .orderBy('listing_id', 'desc')
     .limit(pageSize);
 

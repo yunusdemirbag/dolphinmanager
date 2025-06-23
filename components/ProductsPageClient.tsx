@@ -29,7 +29,7 @@ interface ProductsPageClientProps {
     userId: string;
 }
 
-export function ProductsPageClient({ initialProducts, initialNextCursor, userId }: ProductsPageClientProps) {
+export default function ProductsPageClient({ initialProducts, initialNextCursor, userId }: ProductsPageClientProps) {
   const [activeTab, setActiveTab] = useState('products');
   const [isQueueRunning, setIsQueueRunning] = useState(false);
   const [queueInterval, setQueueInterval] = useState<NodeJS.Timeout | null>(null);

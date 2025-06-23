@@ -4,7 +4,7 @@ import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, AlertCircle, Store } from 'lucide-react';
-import { ProductsPageClient } from '@/components/ProductsPageClient'; // We'll create this component
+import ProductsPageClient from '@/components/ProductsPageClient';
 import Link from 'next/link';
 
 // ASLA MOCK VERİ KULLANILMIYOR

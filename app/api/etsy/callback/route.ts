@@ -126,13 +126,24 @@ export async function GET(request: NextRequest) {
       user_id: userData.user_id,
       shop_id: shop.shop_id,
       shop_name: shop.shop_name,
+      connected_at: new Date(),
+      last_sync_at: new Date(),
+      is_active: true
+    };
+
+    // API anahtarlarını ayrı bir koleksiyonda sakla
+    const apiKeysData = {
+      api_key: process.env.ETSY_CLIENT_ID!,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
       expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-      connected_at: new Date(),
+      updated_at: new Date()
     };
 
-    await adminDb.collection('etsy_stores').doc(userData.user_id.toString()).set(storeData);
+    // Mağaza ve API bilgilerini kaydet
+    const shopIdStr = shop.shop_id.toString();
+    await adminDb.collection('etsy_stores').doc(shopIdStr).set(storeData);
+    await adminDb.collection('etsy_api_keys').doc(shopIdStr).set(apiKeysData);
     console.log('Mağaza Firebase\'e kaydedildi');
 
     return NextResponse.redirect(new URL('/stores?success=connected', request.url));

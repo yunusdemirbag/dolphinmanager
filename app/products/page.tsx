@@ -387,9 +387,6 @@ export default function ProductsPage() {
                   <span className="font-medium text-orange-800">
                     Etsy mağazası bağlı değil
                   </span>
-                  <p className="text-sm text-orange-600">
-                    Local çalışma için Firebase üzerinden mağaza verileri kullanılacak
-                  </p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">

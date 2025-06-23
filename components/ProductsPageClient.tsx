@@ -128,8 +128,6 @@ export function ProductsPageClient({ initialProducts, initialNextCursor, userId 
                         alt={product.title}
                         className="object-cover w-full h-full"
                         onError={(e) => {
-                          console.error("Resim yüklenirken hata:", e);
-                          // Hata durumunda yedek resim göster
                           e.currentTarget.src = "/placeholder-image.svg";
                         }}
                       />

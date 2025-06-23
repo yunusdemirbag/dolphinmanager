@@ -1,15 +1,147 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, Clock, Play, Pause, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Package, Clock, Play, Pause, Settings as SettingsIcon, Store, CheckCircle, AlertCircle } from "lucide-react";
 import ProductFormModal from "@/components/ProductFormModal";
+
+interface QueueItem {
+  id: string;
+  product_data: any;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  created_at: string;
+  updated_at: string;
+}
+
+interface QueueStats {
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+}
+
+interface ConnectedStore {
+  shop_id: number;
+  shop_name: string;
+  connected_at: Date;
+  last_sync_at: Date;
+  is_active: boolean;
+}
 
 export default function ProductsPage() {
   const [activeTab, setActiveTab] = useState('products');
   const [isQueueRunning, setIsQueueRunning] = useState(false);
+  const [queueInterval, setQueueInterval] = useState<NodeJS.Timeout | null>(null);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
+  const [queueStats, setQueueStats] = useState<QueueStats>({
+    pending: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0
+  });
+  const [isLoadingQueue, setIsLoadingQueue] = useState(false);
+  const [connectedStore, setConnectedStore] = useState<ConnectedStore | null>(null);
+  const [isLoadingStore, setIsLoadingStore] = useState(true);
+
+  // Bağlı mağaza bilgilerini yükle
+  const fetchConnectedStore = async () => {
+    setIsLoadingStore(true);
+    try {
+      const mockUserId = 'local-user-123'; // In real app, get from auth
+      const response = await fetch(`/api/store/firebase?user_id=${mockUserId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setConnectedStore({
+          ...data.store,
+          connected_at: new Date(data.store.connected_at),
+          last_sync_at: new Date(data.store.last_sync_at)
+        });
+      } else {
+        setConnectedStore(null);
+      }
+    } catch (error) {
+      console.error('Mağaza bilgileri yüklenirken hata:', error);
+      setConnectedStore(null);
+    } finally {
+      setIsLoadingStore(false);
+    }
+  };
+
+  // Kuyruk verilerini yükle
+  const fetchQueue = async () => {
+    setIsLoadingQueue(true);
+    try {
+      const response = await fetch('/api/queue');
+      if (response.ok) {
+        const data = await response.json();
+        setQueueItems(data.items);
+        setQueueStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Kuyruk yüklenirken hata:', error);
+    } finally {
+      setIsLoadingQueue(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConnectedStore(); // Load store info on mount
+    if (activeTab === 'queue') {
+      fetchQueue();
+    }
+  }, [activeTab]);
+
+  // Queue worker'ı başlat/durdur
+  const toggleQueue = async () => {
+    if (isQueueRunning) {
+      // Durdur
+      if (queueInterval) {
+        clearInterval(queueInterval);
+        setQueueInterval(null);
+      }
+      setIsQueueRunning(false);
+    } else {
+      // Başlat
+      setIsQueueRunning(true);
+      const interval = setInterval(async () => {
+        try {
+          const response = await fetch('/api/queue/worker', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start' })
+          });
+          
+          const result = await response.json();
+          console.log('Queue worker result:', result);
+          
+          // Kuyruk verilerini güncelle
+          fetchQueue();
+          
+          // Kuyruktaki ürün yoksa dur
+          if (!result.hasItems) {
+            if (queueInterval) clearInterval(queueInterval);
+            setIsQueueRunning(false);
+            setQueueInterval(null);
+          }
+        } catch (error) {
+          console.error('Queue worker error:', error);
+        }
+      }, 20000); // 20 saniyede bir çalıştır
+      
+      setQueueInterval(interval);
+    }
+  };
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (queueInterval) {
+        clearInterval(queueInterval);
+      }
+    };
+  }, [queueInterval]);
 
   const tabs = [
     { id: 'products', label: 'Ürünler', icon: Package },
@@ -56,7 +188,7 @@ export default function ProductsPage() {
           </Button>
           <Button 
             variant={isQueueRunning ? "destructive" : "default"}
-            onClick={() => setIsQueueRunning(!isQueueRunning)}
+            onClick={toggleQueue}
           >
             {isQueueRunning ? (
               <>
@@ -73,14 +205,93 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4">
+      {/* Kuyruk İstatistikleri */}
+      <div className="grid md:grid-cols-4 gap-4">
         <Card className="p-4">
-          <div className="text-center text-gray-500">
-            <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Kuyrukta ürün bulunmuyor</p>
-            <p className="text-sm">Ürün ekleme formundan &ldquo;Kuyruğa Ekle&rdquo; butonunu kullanın</p>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">{queueStats.pending}</div>
+            <div className="text-sm text-gray-600">Beklemede</div>
           </div>
         </Card>
+        <Card className="p-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-yellow-600">{queueStats.processing}</div>
+            <div className="text-sm text-gray-600">İşleniyor</div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">{queueStats.completed}</div>
+            <div className="text-sm text-gray-600">Tamamlandı</div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-red-600">{queueStats.failed}</div>
+            <div className="text-sm text-gray-600">Başarısız</div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Kuyruk Listesi */}
+      <div className="space-y-3">
+        {isLoadingQueue ? (
+          <Card className="p-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-2"></div>
+              <p className="text-gray-600">Kuyruk yükleniyor...</p>
+            </div>
+          </Card>
+        ) : queueItems.length === 0 ? (
+          <Card className="p-4">
+            <div className="text-center text-gray-500">
+              <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>Kuyrukta ürün bulunmuyor</p>
+              <p className="text-sm">Ürün ekleme formundan &ldquo;Kuyruğa Ekle&rdquo; butonunu kullanın</p>
+            </div>
+          </Card>
+        ) : (
+          queueItems.map((item) => (
+            <Card 
+              key={item.id} 
+              className={`p-4 ${
+                item.status === 'processing' ? 'border-yellow-200 bg-yellow-50' :
+                item.status === 'completed' ? 'border-green-200 bg-green-50' :
+                item.status === 'failed' ? 'border-red-200 bg-red-50' : ''
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                  <div>
+                    <h3 className="font-medium">{item.product_data?.title || 'Başlıksız Ürün'}</h3>
+                    <p className="text-sm text-gray-600">
+                      Eklendi: {new Date(item.created_at).toLocaleString('tr-TR')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2 py-1 rounded-full text-xs ${
+                    item.status === 'pending' ? 'bg-blue-100 text-blue-800' :
+                    item.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                    item.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {item.status === 'pending' ? 'Beklemede' :
+                     item.status === 'processing' ? 'İşleniyor' :
+                     item.status === 'completed' ? 'Tamamlandı' : 'Başarısız'}
+                  </span>
+                  {item.status === 'processing' && (
+                    <div className="w-4 h-4 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin"></div>
+                  )}
+                  <Button variant="outline" size="sm">
+                    Önizle
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
       </div>
 
       {isQueueRunning && (
@@ -88,7 +299,7 @@ export default function ProductsPage() {
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-green-800 font-medium">Kuyruk işleniyor...</span>
+              <span className="text-green-800 font-medium">Kuyruk işleniyor... (1/4 ürün)</span>
             </div>
           </CardContent>
         </Card>
@@ -137,6 +348,63 @@ export default function ProductsPage() {
         <h1 className="text-3xl font-bold text-black">Ürünler</h1>
         <p className="text-gray-600">Ürünlerinizi yönetin ve Etsy&apos;e yükleyin</p>
       </div>
+
+      {/* Store Connection Status */}
+      <Card className={`${
+        connectedStore ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'
+      }`}>
+        <CardContent className="p-4">
+          {isLoadingStore ? (
+            <div className="flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+              <span className="text-gray-600">Mağaza durumu kontrol ediliyor...</span>
+            </div>
+          ) : connectedStore ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <div>
+                  <span className="font-medium text-green-800">
+                    Etsy mağazası bağlı: {connectedStore.shop_name}
+                  </span>
+                  <p className="text-sm text-green-600">
+                    Son senkronizasyon: {connectedStore.last_sync_at.toLocaleString('tr-TR')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-green-600">ID: {connectedStore.shop_id}</span>
+                <Button variant="outline" size="sm" onClick={fetchConnectedStore}>
+                  Yenile
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+                <div>
+                  <span className="font-medium text-orange-800">
+                    Etsy mağazası bağlı değil
+                  </span>
+                  <p className="text-sm text-orange-600">
+                    Local çalışma için Firebase üzerinden mağaza verileri kullanılacak
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" onClick={fetchConnectedStore}>
+                  Kontrol Et
+                </Button>
+                <Button size="sm">
+                  <Store className="w-4 h-4 mr-2" />
+                  Mağaza Bağla
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="border-b border-gray-200">
         <nav className="flex space-x-8">

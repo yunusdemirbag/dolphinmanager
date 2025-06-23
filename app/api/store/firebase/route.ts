@@ -1,0 +1,71 @@
+import { NextResponse } from 'next/server';
+import { getConnectedStoreFromFirebase, syncEtsyStoreToFirebase } from '@/lib/firebase-sync';
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('user_id');
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    const store = await getConnectedStoreFromFirebase(userId);
+    
+    if (!store) {
+      return NextResponse.json({ error: 'No connected store found' }, { status: 404 });
+    }
+
+    // Don't return sensitive data like tokens
+    const safeStore = {
+      shop_id: store.shop_id,
+      shop_name: store.shop_name,
+      user_id: store.user_id,
+      connected_at: store.connected_at,
+      last_sync_at: store.last_sync_at,
+      is_active: store.is_active
+    };
+
+    return NextResponse.json({ store: safeStore });
+  } catch (error) {
+    console.error('Error fetching store from Firebase:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch store data' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { shop_id, shop_name, user_id, access_token, refresh_token } = body;
+
+    if (!shop_id || !shop_name || !user_id) {
+      return NextResponse.json(
+        { error: 'Missing required fields: shop_id, shop_name, user_id' },
+        { status: 400 }
+      );
+    }
+
+    await syncEtsyStoreToFirebase({
+      shop_id,
+      shop_name,
+      user_id,
+      access_token,
+      refresh_token
+    });
+
+    return NextResponse.json({ 
+      message: 'Store synced to Firebase successfully',
+      shop_id,
+      shop_name
+    });
+  } catch (error) {
+    console.error('Error syncing store to Firebase:', error);
+    return NextResponse.json(
+      { error: 'Failed to sync store data' },
+      { status: 500 }
+    );
+  }
+}

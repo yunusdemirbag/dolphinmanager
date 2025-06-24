@@ -85,7 +85,11 @@ export default function QueuePage() {
     try {
       const response = await fetch('/api/queue?user_id=local-user-123')
       const data = await response.json()
-      setQueueItems(data.items || [])
+      // Sadece pending ve processing statusları göster, tamamlanan ve hatalı olanları filtrele
+      const activeItems = (data.items || []).filter((item: QueueItem) => 
+        item.status === 'pending' || item.status === 'processing'
+      )
+      setQueueItems(activeItems)
     } catch (error) {
       console.error('Kuyruk verileri yüklenemedi:', error)
       toast({
@@ -246,19 +250,77 @@ export default function QueuePage() {
 
   // Seçili ürünleri sil
   const deleteSelectedItems = async () => {
-    // Bu endpoint'i sonra ekleyeceğiz
-    toast({
-      title: "Özellik Yakında",
-      description: "Seçili ürünleri silme özelliği yakında eklenecek"
-    })
+    if (selectedItems.length === 0) return
+    
+    try {
+      const response = await fetch('/api/queue', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'delete_selected',
+          itemIds: selectedItems,
+          user_id: 'local-user-123'
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        toast({
+          title: "Ürünler Silindi",
+          description: `${selectedItems.length} ürün başarıyla silindi`
+        })
+        setSelectedItems([])
+        await loadQueueItems()
+      } else {
+        throw new Error(result.error)
+      }
+    } catch (error) {
+      console.error('Silme hatası:', error)
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: "Seçili ürünler silinemedi"
+      })
+    }
   }
 
   // Kuyruğu temizle
   const clearQueue = async () => {
-    toast({
-      title: "Özellik Yakında", 
-      description: "Kuyruğu temizleme özelliği yakında eklenecek"
-    })
+    if (queueItems.length === 0) return
+    
+    if (!confirm('Tüm kuyruk temizlenecek. Emin misiniz?')) return
+    
+    try {
+      const response = await fetch('/api/queue', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'clear_all',
+          user_id: 'local-user-123'
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        toast({
+          title: "Kuyruk Temizlendi",
+          description: "Tüm ürünler başarıyla silindi"
+        })
+        setSelectedItems([])
+        await loadQueueItems()
+      } else {
+        throw new Error(result.error)
+      }
+    } catch (error) {
+      console.error('Temizleme hatası:', error)
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: "Kuyruk temizlenemedi"
+      })
+    }
   }
 
   // Otomatik işleme toggle
@@ -524,6 +586,24 @@ export default function QueuePage() {
                       }}
                       className="mt-1"
                     />
+
+                    {/* Ürün görseli */}
+                    <div className="flex-shrink-0">
+                      {item.product_data.images?.[0]?.base64 ? (
+                        <img 
+                          src={item.product_data.images[0].base64.startsWith('data:') 
+                            ? item.product_data.images[0].base64 
+                            : `data:${item.product_data.images[0].type || 'image/jpeg'};base64,${item.product_data.images[0].base64}`
+                          }
+                          alt={item.product_data.title}
+                          className="w-16 h-16 object-cover rounded-lg border"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-gray-200 rounded-lg border flex items-center justify-center">
+                          <Image className="w-6 h-6 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
 
                     {/* Ürün bilgileri */}
                     <div className="flex-1 min-w-0">

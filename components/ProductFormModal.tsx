@@ -35,7 +35,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
 import { PromptEditor } from './PromptEditor';
-import { createClientSupabase } from "@/lib/supabase";
+// Supabase kaldırıldı - sadece Firebase kullanıyoruz
 import { categoryPrompt, tagPrompt, titlePrompt, generateTitleWithFocus, selectCategory } from "@/lib/openai-yonetim";
 import { getPromptById } from "@/lib/prompts";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
@@ -224,6 +224,7 @@ export interface MediaFile {
   preview: string;
   uploading: boolean;
   error?: string;
+  id?: string; // Unique identifier
 }
 
 export function ProductFormModal({
@@ -301,6 +302,96 @@ export function ProductFormModal({
   // Progress tracking
   const [currentStep, setCurrentStep] = useState(1);
   const [formProgress, setFormProgress] = useState(0);
+
+  // Klasör batch processing state'leri
+  const [selectedFolderFiles, setSelectedFolderFiles] = useState<File[]>([]);
+  const [processedFileIndex, setProcessedFileIndex] = useState(0);
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const BATCH_SIZE = 6;
+
+  // LocalStorage anahtarları
+  const FOLDER_FILES_KEY = 'dolphinmanager_folder_files';
+  const PROCESSED_INDEX_KEY = 'dolphinmanager_processed_index';
+
+  // Klasör dosyalarını localStorage'dan yükle
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedFiles = localStorage.getItem(FOLDER_FILES_KEY);
+      const savedIndex = localStorage.getItem(PROCESSED_INDEX_KEY);
+      
+      if (savedFiles && savedIndex) {
+        try {
+          // Note: File objects can't be directly stored in localStorage
+          // We'll handle this differently by tracking file names and paths
+          setProcessedFileIndex(parseInt(savedIndex, 10));
+        } catch (error) {
+          console.error('localStorage verilerini yüklerken hata:', error);
+        }
+      }
+    }
+  }, []);
+
+  // Batch processing: Klasörden 6'şar resim seç
+  const processBatchFromFolder = useCallback((allFiles: File[]) => {
+    // Sadece resim dosyalarını al ve alfabetik sırala
+    const imageFiles = allFiles
+      .filter(file => file.type.startsWith('image/'))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    console.log('📁 Klasör içindeki tüm resimler:', imageFiles.map(f => f.name));
+    
+    // Mevcut batch'i al (6'şar)
+    const currentBatch = imageFiles.slice(processedFileIndex, processedFileIndex + BATCH_SIZE);
+    
+    console.log('📋 Şu anki batch:', {
+      startIndex: processedFileIndex,
+      endIndex: processedFileIndex + BATCH_SIZE,
+      fileNames: currentBatch.map(f => f.name)
+    });
+    
+    if (currentBatch.length === 0) {
+      toast({
+        title: "Tüm Resimler İşlendi",
+        description: "Klasördeki tüm resimler işlendi. Baştan başlamak için klasörü yeniden seçin.",
+        variant: "default"
+      });
+      
+      // Reset batch processing
+      setProcessedFileIndex(0);
+      setIsBatchMode(false);
+      setSelectedFolderFiles([]);
+      localStorage.removeItem(FOLDER_FILES_KEY);
+      localStorage.removeItem(PROCESSED_INDEX_KEY);
+      return;
+    }
+    
+    // Mevcut resimleri temizle (yeni batch için)
+    setProductImages([]);
+    
+    // Yeni batch'i ekle
+    const newImages = currentBatch.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      uploading: false,
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${file.name}`
+    }));
+    
+    setProductImages(newImages);
+    
+    // Sonraki batch için index'i güncelle
+    const nextIndex = processedFileIndex + BATCH_SIZE;
+    setProcessedFileIndex(nextIndex);
+    
+    // LocalStorage'a kaydet
+    localStorage.setItem(PROCESSED_INDEX_KEY, nextIndex.toString());
+    
+    toast({
+      title: "Batch Yüklendi",
+      description: `${currentBatch.length} resim yüklendi. (${processedFileIndex + 1}-${Math.min(processedFileIndex + BATCH_SIZE, imageFiles.length)})`,
+      variant: "default"
+    });
+    
+  }, [processedFileIndex, toast]);
 
   // Collapsible sections
   const [expandedSections, setExpandedSections] = useState({
@@ -466,16 +557,38 @@ export function ProductFormModal({
     }
   }, [isOpen, initialSectionId]);
 
-  // Dükkan bölümlerini API'den çekmek için useEffect
+  // Shop sections yüklendikten sonra default seçim yap
   useEffect(() => {
+    // Yeni ürün oluşturuluyorsa ve shop sections yüklendiyse, ilkini seç
+    if (isOpen && shopSections.length > 0 && !selectedShopSection && !product) {
+      const firstSectionId = shopSections[0].shop_section_id.toString();
+      setSelectedShopSection(firstSectionId);
+      console.log('🏪 Otomatik shop section seçildi:', {
+        id: firstSectionId,
+        title: shopSections[0].title,
+        total_sections: shopSections.length
+      });
+    }
+  }, [isOpen, shopSections, selectedShopSection, product]);
+
+  // Dükkan bölümlerini API'den çekmek için useEffect - eski çalışan versiyona uygun
+  useEffect(() => {
+    console.log('🔍 Shop sections useEffect çalıştı, isOpen:', isOpen);
     if (isOpen) {
       async function loadShopSections() {
         try {
-          // This is redundant since fetchStoreData already loads shop sections
-          // Just return early to avoid duplicate API calls
-          return;
+          console.log('🏪 Shop sections yükleniyor...');
+          const response = await fetch('/api/etsy/shop-sections');
+          const data = await response.json();
+          if (response.ok && data.sections) {
+            console.log('✅ Shop sections yüklendi:', data.sections.length, 'adet');
+            console.log('📋 Shop sections:', data.sections.map(s => ({ id: s.shop_section_id, title: s.title })));
+            setShopSections(data.sections);
+          } else {
+            console.error('❌ Shop sections API hatası:', response.status, data);
+          }
         } catch (error) { 
-          console.error("Dükkan bölümleri yüklenemedi:", error);
+          console.error("❌ Dükkan bölümleri yüklenemedi:", error);
           toast({
             variant: "destructive",
             title: "Hata",
@@ -654,6 +767,25 @@ export function ProductFormModal({
     setTags(tags.filter(tag => tag !== tagToRemove));
   }
 
+  // Duplicate resim kontrolü - çok güçlü
+  const isDuplicateImage = useCallback((newFile: File, existingImages: MediaFile[]) => {
+    // Dosya özelliklerine göre duplicate kontrolü
+    const isDuplicateByFileProperties = existingImages.some(existing => 
+      existing.file && 
+      existing.file.name === newFile.name && 
+      existing.file.size === newFile.size &&
+      existing.file.lastModified === newFile.lastModified &&
+      existing.file.type === newFile.type
+    );
+    
+    if (isDuplicateByFileProperties) {
+      console.log('🔄 Duplicate dosya tespit edildi:', newFile.name, newFile.size, 'bytes');
+      return true;
+    }
+    
+    return false;
+  }, []);
+
   // Resim yükleme işleyicileri
   const handleImageDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -661,28 +793,86 @@ export function ProductFormModal({
     const files = e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
     const videoFiles = files.filter(f => f.type.startsWith('video/'));
-    if ((productImages || []).length + (imageFiles || []).length > 10) {
+    
+    // Duplicate kontrolü
+    const uniqueImageFiles = imageFiles.filter(file => {
+      if (isDuplicateImage(file, productImages || [])) {
+        console.log('🔄 Duplicate resim atlandı:', file.name);
+        return false;
+      }
+      return true;
+    });
+    
+    if (uniqueImageFiles.length !== imageFiles.length) {
+      toast({ 
+        title: "Duplicate Resimler Atlandı", 
+        description: `${imageFiles.length - uniqueImageFiles.length} duplicate resim atlandı.`, 
+        variant: "default" 
+      });
+    }
+    
+    if ((productImages || []).length + uniqueImageFiles.length > 10) {
       toast({ title: "Maksimum Resim Limiti", description: "En fazla 10 resim yükleyebilirsiniz.", variant: "destructive" });
-    } else {
-      const newImages = imageFiles.map(file => ({ file, preview: URL.createObjectURL(file), uploading: false }));
-      setProductImages(prev => [...prev, ...newImages]);
+    } else if (uniqueImageFiles.length > 0) {
+      const newImages = uniqueImageFiles.map(file => ({ 
+        file, 
+        preview: URL.createObjectURL(file), 
+        uploading: false,
+        // Unique identifier için timestamp + random ekliyoruz
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${file.name}`
+      }));
+      setProductImages(prev => {
+        console.log('📷 Önceki resimler:', prev.length);
+        console.log('📷 Yeni resimler:', newImages.length);
+        console.log('📷 Toplam olacak:', prev.length + newImages.length);
+        return [...prev, ...newImages];
+      });
     }
     if ((videoFiles || []).length > 0) {
       if (videoFile) URL.revokeObjectURL(videoFile.preview);
       setVideoFile({ file: videoFiles[0], preview: URL.createObjectURL(videoFiles[0]), uploading: false });
     }
-  }, [(productImages || []).length, videoFile, toast]);
+  }, [(productImages || []).length, videoFile, toast, isDuplicateImage]);
 
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     const files = Array.from(e.target.files);
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
     const videoFiles = files.filter(f => f.type.startsWith('video/'));
-    if ((productImages || []).length + (imageFiles || []).length > 10) {
+    
+    // Duplicate kontrolü
+    const uniqueImageFiles = imageFiles.filter(file => {
+      if (isDuplicateImage(file, productImages || [])) {
+        console.log('🔄 Duplicate resim atlandı:', file.name);
+        return false;
+      }
+      return true;
+    });
+    
+    if (uniqueImageFiles.length !== imageFiles.length) {
+      toast({ 
+        title: "Duplicate Resimler Atlandı", 
+        description: `${imageFiles.length - uniqueImageFiles.length} duplicate resim atlandı.`, 
+        variant: "default" 
+      });
+    }
+    
+    if ((productImages || []).length + uniqueImageFiles.length > 10) {
       toast({ title: "Maksimum Resim Limiti", description: "En fazla 10 resim yükleyebilirsiniz.", variant: "destructive" });
-    } else {
-      const newImages = imageFiles.map(file => ({ file, preview: URL.createObjectURL(file), uploading: false }));
-      setProductImages(prev => [...prev, ...newImages]);
+    } else if (uniqueImageFiles.length > 0) {
+      const newImages = uniqueImageFiles.map(file => ({ 
+        file, 
+        preview: URL.createObjectURL(file), 
+        uploading: false,
+        // Unique identifier için timestamp + random ekliyoruz
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${file.name}`
+      }));
+      setProductImages(prev => {
+        console.log('📷 Önceki resimler:', prev.length);
+        console.log('📷 Yeni resimler:', newImages.length);
+        console.log('📷 Toplam olacak:', prev.length + newImages.length);
+        return [...prev, ...newImages];
+      });
     }
     if ((videoFiles || []).length > 0) {
       if (videoFile) URL.revokeObjectURL(videoFile.preview);
@@ -776,7 +966,8 @@ export function ProductFormModal({
 
   // Resim yüklendiğinde başlık üret
   useEffect(() => {
-    if (isOpen && (productImages || []).length > 0 && !title && !autoTitleUsed && !userEditedTitle) {
+    // Sadece ilk resim eklendiğinde AI analizi yap
+    if (isOpen && (productImages || []).length === 1 && !title && !autoTitleUsed && !userEditedTitle) {
       console.log('🤖 Otomatik başlık üretimi başlatılıyor...', {
         isOpen,
         imageCount: (productImages || []).length,
@@ -845,7 +1036,7 @@ export function ProductFormModal({
       };
       generateTitle();
     }
-  }, [productImages, isOpen, title, autoTitleUsed, userEditedTitle]);
+  }, [productImages.length > 0 ? productImages[0] : null, isOpen, title, autoTitleUsed, userEditedTitle]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -1005,6 +1196,11 @@ export function ProductFormModal({
 
   // KUYRUK SİSTEMİ İÇİN YENİ FONKSİYON
   const handleSubmitToQueue = async () => {
+    if (submitting) {
+      console.log('⚠️ Zaten submit ediliyor, tekrar gönderim engellendet');
+      return;
+    }
+    
     console.log('🚀 KUYRUK FONKSİYONU BAŞLADI');
     console.log('📊 Form state:', {
       title,
@@ -1044,7 +1240,6 @@ export function ProductFormModal({
         title: "Geçersiz Fiyat",
         description: message,
       });
-      setSubmitting(false);
       return;
     }
 
@@ -1093,12 +1288,20 @@ export function ProductFormModal({
         has_variations: hasVariations,
         variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
         state: "draft", // Kuyrukta her zaman draft olarak başlar
-        shop_section_id: Number(selectedShopSection) || undefined,
+        shop_section_id: (() => {
+          const shopSectionId = selectedShopSection ? Number(selectedShopSection) : null;
+          console.log('🏪 Frontend shop section:', {
+            selectedShopSection,
+            converted: shopSectionId,
+            type: typeof shopSectionId
+          });
+          return shopSectionId;
+        })(),
         
-        // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
-        is_personalizable: true,
-        personalization_is_required: false,
-        personalization_instructions: PERSONALIZATION_INSTRUCTIONS,
+        // --- Kişiselleştirme Ayarları (State'den Al) ---
+        is_personalizable: isPersonalizable,
+        personalization_is_required: personalizationRequired,
+        personalization_instructions: personalizationInstructions,
         personalization_char_count_max: 256, // <-- Etsy için kritik alan
 
         // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
@@ -1133,54 +1336,36 @@ export function ProductFormModal({
         }
       }
       
-      // Video'yu Supabase Storage'a yükle
-      let videoUrl: string | null = null;
+      // Video'yu base64'e çevir (Queue sisteminde saklamak için)
+      let videoData: any = null;
       if (videoFile?.file) {
-        console.log('🎥 Video Supabase Storage\'a yükleniyor:', videoFile.file.name, (videoFile.file.size / 1024 / 1024).toFixed(2), 'MB');
+        console.log('🎥 Video base64\'e çevriliyor:', videoFile.file.name, (videoFile.file.size / 1024 / 1024).toFixed(2), 'MB');
         
         try {
-          // Videoya benzersiz bir isim ver (Gemini önerisi)
-          const fileName = `${Date.now()}-${videoFile.file.name}`;
-          const filePath = fileName; // Sadece dosya adını kullan (Supabase otomatik public ekler)
-
-          console.log(`🔄 Video yükleniyor: ${fileName} (${(videoFile.file.size / 1024 / 1024).toFixed(2)} MB)`);
-
-          // Supabase Storage'a yükle (Gemini'nin önerdiği exact kod)
-          const { data: uploadData, error: uploadError } = await createClientSupabase().storage
-            .from('videos') // Policy oluşturduğunuz bucket adı
-            .upload(filePath, videoFile.file, {
-              cacheControl: '3600',
-              upsert: false, // Dosya varsa hata ver (üzerine yazma)
-            });
-
-          // Yükleme hatası kontrolü (Gemini önerisi)
-          if (uploadError) {
-            console.error('❌ Upload error:', uploadError);
-            throw new Error(`Video yüklenemedi: ${uploadError.message}`);
-          }
-
-          // Yüklenen videonun genel URL'sini al (Gemini'nin exact kodu)
-          const { data: urlData } = createClientSupabase().storage
-            .from('videos')
-            .getPublicUrl(filePath);
-
-          videoUrl = urlData.publicUrl;
-          console.log(`✅ Video başarıyla yüklendi! URL: ${videoUrl}`);
-
-          // Video yükleme başarılı bildirimini göster
-          toast({
-            title: "Video Yüklendi",
-            description: `${videoFile.file.name} başarıyla Supabase Storage'a yüklendi`,
+          // Video'yu base64'e çevir
+          const videoBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(videoFile.file);
           });
+          
+          videoData = {
+            base64: videoBase64,
+            type: videoFile.file.type,
+            filename: videoFile.file.name,
+            size: videoFile.file.size
+          };
+          
+          console.log(`✅ Video base64'e çevrildi: ${videoFile.file.name}`);
 
         } catch (error) {
-          console.error('❌ Supabase video yükleme hatası:', error);
+          console.error('❌ Video işleme hatası:', error);
           toast({
             variant: "destructive",
-            title: "Video Yükleme Hatası",
-            description: error instanceof Error ? error.message : 'Video yüklenirken beklenmeyen bir hata oluştu'
+            title: "Video İşleme Hatası",
+            description: error instanceof Error ? error.message : 'Video işlenirken beklenmeyen bir hata oluştu'
           });
-          throw error; // Hatayı yukarı fırlat ki form submission durdursun
+          throw error;
         }
       }
 
@@ -1189,7 +1374,7 @@ export function ProductFormModal({
         keys: Object.keys(listingData),
         title: listingData.title,
         imagesLength: (imageDataArray || []).length,
-        videoUrl: videoUrl
+        videoData: videoData ? `${videoData.filename} (${(videoData.size / 1024 / 1024).toFixed(2)} MB)` : null
       });
       
       // FormData'yı burada yeniden güvence altına al
@@ -1205,20 +1390,15 @@ export function ProductFormModal({
         }
       });
       
-      // listingData'ya video URL'sini ekle
+      // listingData'dan büyük verileri temizle
       const cleanListingData = { ...listingData };
       delete cleanListingData.images;
       delete cleanListingData.video;
       
-      // Video URL'sini ekle
-      if (videoUrl) {
-        cleanListingData.videoUrl = videoUrl;
-      }
-      
       const jsonString = JSON.stringify(cleanListingData);
       console.log('📝 Clean JSON string length:', jsonString.length);
       console.log('📝 Images count:', (imageDataArray || []).length);
-      console.log('📝 Video URL:', videoUrl);
+      console.log('📝 Video data:', videoData ? `${videoData.filename} (${(videoData.size / 1024 / 1024).toFixed(2)} MB)` : 'None');
       console.log('🎯 Varyasyon bilgileri:', {
         has_variations: hasVariations,
         total_variations: variations.length,
@@ -1228,14 +1408,23 @@ export function ProductFormModal({
       });
       
       formData.append('listingData', jsonString);
+      
+      // Video'yu FormData'ya ekle
+      if (videoData) {
+        const videoBlob = new Blob([Uint8Array.from(atob(videoData.base64.split(',')[1]), c => c.charCodeAt(0))], { 
+          type: videoData.type 
+        });
+        formData.append('videoFile', videoBlob, videoData.filename);
+        console.log('🎥 Video FormData\'ya eklendi:', videoData.filename);
+      }
 
-      // KUYRUK API'sine gönder (Gemini önerisi: JSON + FormData hybrid)
+      // KUYRUK API'sine gönder (Firebase Queue System)
       console.log('🌐 API çağrısı başlıyor: /api/etsy/listings/queue');
       console.log('📦 Gönderilecek veri:', {
         images: (imageDataArray || []).length,
-        videoUrl: videoUrl ? '✅ Supabase URL' : '❌ Yok',
+        video: videoData ? `✅ ${videoData.filename}` : '❌ Yok',
         title: listingData.title,
-        method: 'FormData + JSON hybrid'
+        method: 'FormData + Firebase Queue'
       });
 
       const controller = new AbortController();
@@ -1351,12 +1540,20 @@ export function ProductFormModal({
         has_variations: hasVariations, // Dinamik varyasyon durumu
         variations: hasVariations ? variations.filter((v: any) => v.is_active) : [], // Aktif varyasyonlar
         state: state, // Buton tarafından belirlenen durum (draft veya active)
-        shop_section_id: Number(selectedShopSection) || undefined,
+        shop_section_id: (() => {
+          const shopSectionId = selectedShopSection ? Number(selectedShopSection) : null;
+          console.log('🏪 Frontend shop section:', {
+            selectedShopSection,
+            converted: shopSectionId,
+            type: typeof shopSectionId
+          });
+          return shopSectionId;
+        })(),
         
-        // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
-        is_personalizable: true,
-        personalization_is_required: false,
-        personalization_instructions: PERSONALIZATION_INSTRUCTIONS,
+        // --- Kişiselleştirme Ayarları (State'den Al) ---
+        is_personalizable: isPersonalizable,
+        personalization_is_required: personalizationRequired,
+        personalization_instructions: personalizationInstructions,
         personalization_char_count_max: 256, // <-- Etsy için kritik alan
 
         // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
@@ -1449,14 +1646,50 @@ export function ProductFormModal({
       const endTime = Date.now();
       const duration = ((endTime - startTime) / 1000).toFixed(1);
 
-      // Başarı mesajı göster ve modal'ı kapat
+      // Başarı mesajı göster
       const stateText = state === 'draft' ? 'taslak olarak' : 'aktif olarak';
       toast({ 
         title: "✅ Etsy'e Yüklendi!", 
         description: `"${title}" ürünü ${duration} saniyede Etsy'e ${stateText} yüklendi!` 
       });
 
-      // Modal'ı kapat
+      // Batch processing kontrolü
+      if (isBatchMode && selectedFolderFiles.length > 0) {
+        const totalImages = selectedFolderFiles.filter(f => f.type.startsWith('image/')).length;
+        const remaining = totalImages - processedFileIndex;
+        
+        if (remaining > 0) {
+          // Sonraki batch'i göster
+          setTimeout(() => {
+            processBatchFromFolder(selectedFolderFiles);
+          }, 1000); // 1 saniye bekle
+          
+          toast({
+            title: "🔄 Sonraki Batch Hazırlanıyor",
+            description: `${remaining} resim daha var. Sonraki 6 resim yükleniyor...`,
+            variant: "default"
+          });
+          
+          // Modal'ı kapatma - açık bırak
+          return;
+        } else {
+          // Tüm batch'ler tamamlandı
+          toast({
+            title: "🎉 Tüm Batch'ler Tamamlandı",
+            description: "Klasördeki tüm resimler başarıyla işlendi!",
+            variant: "default"
+          });
+          
+          // Batch processing'i temizle
+          setIsBatchMode(false);
+          setSelectedFolderFiles([]);
+          setProcessedFileIndex(0);
+          localStorage.removeItem(FOLDER_FILES_KEY);
+          localStorage.removeItem(PROCESSED_INDEX_KEY);
+        }
+      }
+
+      // Modal'ı kapat (sadece batch mode değilse veya tamamlandıysa)
       onClose();
       router.refresh();
 
@@ -1506,20 +1739,46 @@ export function ProductFormModal({
         onChange={(e) => {
           if (e.target.files) {
             const files = Array.from(e.target.files);
-            files.forEach(file => {
-              if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  const newImage = {
-                    file,
-                    preview: reader.result as string,
-                    uploading: false
+            
+            // Çok fazla dosya seçildiyse batch mode'a geç
+            if (files.length > BATCH_SIZE) {
+              console.log('🔄 Batch mode aktif - Toplam dosya:', files.length);
+              
+              // Alfabetik sırala
+              const sortedFiles = files.sort((a, b) => a.name.localeCompare(b.name));
+              
+              // Batch processing başlat
+              setSelectedFolderFiles(sortedFiles);
+              setIsBatchMode(true);
+              
+              // İlk batch'i işle
+              processBatchFromFolder(sortedFiles);
+              
+              // LocalStorage'a dosya isimlerini kaydet (referans için)
+              const fileNames = sortedFiles.map(f => f.name);
+              localStorage.setItem(FOLDER_FILES_KEY, JSON.stringify(fileNames));
+              
+            } else {
+              // Normal mode: Az dosya varsa hepsini ekle
+              console.log('📁 Normal mode - Toplam dosya:', files.length);
+              
+              const imageFiles = files.filter(f => f.type.startsWith('image/'));
+              imageFiles.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const newImage = {
+                      file,
+                      preview: reader.result as string,
+                      uploading: false,
+                      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${file.name}`
+                    };
+                    setProductImages(prev => [...prev, newImage]);
                   };
-                  setProductImages(prev => [...prev, newImage]);
-                };
-                reader.readAsDataURL(file);
-              }
-            });
+                  reader.readAsDataURL(file);
+                }
+              });
+            }
           }
           // Reset input value so the same file can be selected again
           e.target.value = '';
@@ -1552,7 +1811,14 @@ export function ProductFormModal({
 
       {/* Medya Dosyaları Başlığı ve Sayaçları */}
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-base font-medium text-gray-900">Medya Dosyaları</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-medium text-gray-900">Medya Dosyaları</h3>
+          {isBatchMode && (
+            <Badge variant="secondary" className="text-xs">
+              Batch Mode: {processedFileIndex}/{selectedFolderFiles.filter(f => f.type.startsWith('image/')).length}
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center text-xs text-gray-700">
             <Image className="w-3.5 h-3.5 mr-1 text-gray-800" />
@@ -1667,6 +1933,27 @@ export function ProductFormModal({
                   <Image className="w-5 h-5 text-gray-400 mb-1" />
                   <span className="text-xs text-gray-700">Resim</span>
                 </button>
+                {isBatchMode && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBatchMode(false);
+                      setSelectedFolderFiles([]);
+                      setProcessedFileIndex(0);
+                      localStorage.removeItem(FOLDER_FILES_KEY);
+                      localStorage.removeItem(PROCESSED_INDEX_KEY);
+                      toast({
+                        title: "Batch Mode Sıfırlandı",
+                        description: "Klasör işleme modu kapatıldı.",
+                        variant: "default"
+                      });
+                    }}
+                    className="flex flex-col items-center justify-center border border-dashed border-orange-200 rounded-lg p-2 hover:bg-orange-50 hover:border-orange-400 transition-colors"
+                  >
+                    <RotateCcw className="w-4 h-4 text-orange-600 mb-1" />
+                    <span className="text-[10px] text-orange-700">Reset Batch</span>
+                  </button>
+                )}
                 {!videoFile && (
                   <button
                     type="button"

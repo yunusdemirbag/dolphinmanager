@@ -197,60 +197,104 @@ export async function POST(request: NextRequest) {
     if (listingData.return_policy_id && listingData.return_policy_id !== '') {
       etsyFormData.append('return_policy_id', listingData.return_policy_id.toString());
     }
-    // Etsy Materials Temizleme Fonksiyonu - BOŞLUK YOK!
+    // Etsy Materials Temizleme Fonksiyonu - eski çalışan versiyona uygun
     function cleanEtsyMaterials(materials: string[]): string[] {
       return materials
         .filter(material => material && material.trim().length > 0)
-        .map(material => material
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, '') // TÜM BOŞLUKLARI KALDIR
-          .replace(/[^a-z0-9]/g, '') // Sadece alfanumerik
-        )
-        .filter(material => material.length >= 2)
+        .map(material => material.trim())
         .slice(0, 13); // Etsy maksimum 13 material
     }
     
-    // TEST: Materials'ı tamamen kaldır
-    // etsyFormData.append('materials', JSON.stringify(['canvas'])); // Commented out
+    // Materials'ı direkt listing oluştururken ekle - eski çalışan yöntem
+    const materials = listingData.materials && listingData.materials.length > 0 
+      ? cleanEtsyMaterials(listingData.materials) 
+      : ['Cotton Canvas', 'Wood Frame', 'Hanger']; // Eski çalışan default materials
+    
+    // Materials'ı eski format ile ekle
+    materials.forEach(material => {
+      etsyFormData.append('materials[]', material);
+    });
     // shop_section_id sadece varsa ekle (Etsy integer bekliyor)
-    if (listingData.shop_section_id && listingData.shop_section_id !== '') {
-      etsyFormData.append('shop_section_id', listingData.shop_section_id.toString());
+    console.log('🏪 Shop section kontrolü:', {
+      shop_section_id: listingData.shop_section_id,
+      type: typeof listingData.shop_section_id,
+      isEmpty: listingData.shop_section_id === '',
+      isZero: listingData.shop_section_id === 0,
+      isNull: listingData.shop_section_id === null,
+      isUndefined: listingData.shop_section_id === undefined
+    });
+    
+    // Shop Section ID'yi sadece geçerliyse ekle - eski çalışan versiyona uygun
+    const sectionId = Number(listingData.shop_section_id);
+    if (sectionId && sectionId > 0) {
+      etsyFormData.append('shop_section_id', sectionId.toString());
+      console.log(`✅ Ürün, dükkan bölümü ${sectionId}'e eklenecek.`);
+    } else {
+      console.log(`⚠️ Dükkan bölümü belirtilmedi, ürün ana sayfada yer alacak. (Değer: ${listingData.shop_section_id})`);
     }
     etsyFormData.append('processing_min', '1');
     etsyFormData.append('processing_max', '3');
-    // Etsy Tags Temizleme Fonksiyonu - BOŞLUK YOK!
+    // Etsy Tags Temizleme Fonksiyonu - eski çalışan versiyona uygun  
     function cleanEtsyTags(tags: string[]): string[] {
       return tags
         .filter(tag => tag && tag.trim().length > 0)
-        .map(tag => tag
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, '') // TÜM BOŞLUKLARI KALDIR
-          .replace(/[^a-z0-9]/g, '') // Sadece alfanumerik
-        )
-        .filter(tag => tag.length >= 2 && tag.length <= 20) // Etsy tag limiti
+        .map(tag => tag.trim())
         .slice(0, 13); // Maksimum 13 tag
     }
     
-    // TEST: Tag'ları tamamen kaldır
-    const cleanTags = []; // Boş array
-    // etsyFormData.append('tags', JSON.stringify(['art'])); // Commented out
+    // Tags'ları direkt listing oluştururken ekle - eski çalışan yöntem
+    const cleanTags = listingData.tags && listingData.tags.length > 0 
+      ? cleanEtsyTags(listingData.tags) 
+      : ['art', 'canvas', 'print']; // Default tags - sadece alfanumerik
     
-    console.log('🧹 Temizlenmiş veriler:', {
+    // Tags'ları eski format ile ekle
+    cleanTags.forEach(tag => {
+      if (typeof tag === 'string' && tag.trim().length > 0) {
+        etsyFormData.append('tags[]', tag.trim());
+      }
+    });
+    
+    console.log('🧹 Tags ve Materials hazırlandı (listing ile birlikte ekleniyor):', {
       original_price: listingData.price,
       final_price: finalPrice,
       original_tags_count: listingData.tags?.length,
       clean_tags_count: cleanTags.length,
       clean_tags: cleanTags,
-      clean_materials: [],
-      original_tags: listingData.tags,
-      test_mode: 'NO_TAGS_NO_MATERIALS'
+      clean_materials: materials,
+      original_materials_count: listingData.materials?.length,
+      mode: 'TAGS_MATERIALS_WITH_LISTING'
     });
-    etsyFormData.append('is_personalizable', (listingData.is_personalizable || false).toString());
-    etsyFormData.append('personalization_is_required', (listingData.personalization_is_required || false).toString());
-    etsyFormData.append('personalization_char_count_max', (listingData.personalization_char_count_max || 0).toString());
-    etsyFormData.append('personalization_instructions', listingData.personalization_instructions || '');
+    console.log('🎨 Personalization ayarları:', {
+      is_personalizable: listingData.is_personalizable,
+      personalization_is_required: listingData.personalization_is_required,
+      personalization_char_count_max: listingData.personalization_char_count_max,
+      personalization_instructions: listingData.personalization_instructions
+    });
+    
+    // Personalization ayarları - eski çalışan versiyona uygun
+    if (typeof listingData.is_personalizable !== 'undefined') {
+      etsyFormData.append('is_personalizable', listingData.is_personalizable ? 'true' : 'false');
+    } else {
+      etsyFormData.append('is_personalizable', 'true'); // Default true
+    }
+    
+    if (typeof listingData.personalization_is_required !== 'undefined') {
+      etsyFormData.append('personalization_is_required', listingData.personalization_is_required ? 'true' : 'false');
+    } else {
+      etsyFormData.append('personalization_is_required', 'false'); // Default false
+    }
+    
+    if (typeof listingData.personalization_instructions === 'string' && listingData.personalization_instructions.length > 0) {
+      etsyFormData.append('personalization_instructions', listingData.personalization_instructions);
+    } else {
+      etsyFormData.append('personalization_instructions', 'Phone Number for Delivery'); // Default
+    }
+    
+    if (typeof listingData.personalization_char_count_max !== 'undefined') {
+      etsyFormData.append('personalization_char_count_max', listingData.personalization_char_count_max.toString());
+    } else {
+      etsyFormData.append('personalization_char_count_max', '255'); // Default
+    }
     etsyFormData.append('is_supply', (listingData.is_supply || false).toString());
     etsyFormData.append('is_customizable', 'true');
     etsyFormData.append('should_auto_renew', listingData.renewal_option === 'automatic' ? 'true' : 'false');
@@ -275,6 +319,9 @@ export async function POST(request: NextRequest) {
     for (const [key, value] of etsyFormData.entries()) {
       if (key === 'image') {
         console.log(`  ${key}: [File: ${value.name}, ${(value.size / 1024).toFixed(1)}KB]`);
+      } else if (key === 'tags' || key === 'materials') {
+        // Test mode: tags ve materials atlandı
+        console.log(`  ${key}: ATLANMIŞ (test mode)`);
       } else {
         console.log(`  ${key}: ${typeof value === 'string' ? value.slice(0, 100) : value}`);
       }
@@ -436,6 +483,14 @@ export async function POST(request: NextRequest) {
         // Varyasyon hatası olsa bile listing'i devam ettir
       }
     }
+    
+    // ADIM 2.9: Tags ve Materials artık listing oluştururken eklendi - PATCH'e gerek yok
+    console.log('✅ Tags ve materials listing ile birlikte eklendi:', {
+      tags_count: cleanTags.length,
+      materials_count: materials.length,
+      tags: cleanTags,
+      materials: materials
+    });
     
     // ADIM 3: Eğer kullanıcı active olarak kaydetmek istiyorsa activate et
     if (listingData.state === 'active' && uploadedImageCount > 0) {

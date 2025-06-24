@@ -79,8 +79,9 @@ export async function GET(request: NextRequest) {
                       
                       return {
                         name: imageData.name,
+                        filename: imageData.name,
                         type: imageData.type,
-                        data: combinedBase64
+                        base64: combinedBase64
                       };
                     }
                   }
@@ -122,8 +123,9 @@ export async function GET(request: NextRequest) {
                     
                     video = {
                       name: videoData.name,
+                      filename: videoData.name,
                       type: videoData.type,
-                      data: combinedBase64
+                      base64: combinedBase64
                     };
                   }
                 }
@@ -147,10 +149,11 @@ export async function GET(request: NextRequest) {
                 images: images,
                 video: video,
                 taxonomy_id: data.taxonomy_id || 1027,
+                shop_section_id: data.shop_section_id,
                 has_variations: data.has_variations,
                 variations: data.variations_json ? JSON.parse(data.variations_json) : [],
                 who_made: data.who_made || 'i_did',
-                when_made: data.when_made || '2020_2024',
+                when_made: data.when_made || 'made_to_order',
                 shipping_profile_id: data.shipping_profile_id,
                 is_personalizable: data.is_personalizable || false,
                 personalization_is_required: data.personalization_is_required || false,
@@ -221,5 +224,68 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Queue POST error:', error);
     return NextResponse.json({ error: 'Failed to add item to queue' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { action, itemIds, user_id } = body;
+
+    // Firebase bağlantısını başlat
+    initializeAdminApp();
+    
+    if (!adminDb) {
+      console.error('Firebase Admin not initialized');
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+
+    if (!user_id) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    if (action === 'delete_selected') {
+      if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+        return NextResponse.json({ error: 'Item IDs are required' }, { status: 400 });
+      }
+
+      // Seçili ürünleri sil
+      const batch = adminDb.batch();
+      for (const itemId of itemIds) {
+        const docRef = adminDb.collection('queue').doc(itemId);
+        batch.delete(docRef);
+      }
+      await batch.commit();
+
+      return NextResponse.json({ 
+        success: true, 
+        message: `${itemIds.length} items deleted successfully`
+      });
+    }
+
+    if (action === 'clear_all') {
+      // Kullanıcının tüm kuyruk ürünlerini sil
+      const queueSnapshot = await adminDb.collection('queue')
+        .where('user_id', '==', user_id)
+        .get();
+
+      if (!queueSnapshot.empty) {
+        const batch = adminDb.batch();
+        queueSnapshot.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        message: `All queue items deleted successfully`
+      });
+    }
+
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error) {
+    console.error('Queue DELETE error:', error);
+    return NextResponse.json({ error: 'Failed to delete items' }, { status: 500 });
   }
 }

@@ -118,10 +118,24 @@ Return only valid JSON, no explanations.
       throw new Error('AI yanıt vermedi');
     }
 
-    // JSON parse et
+    // JSON parse et - markdown code block'ları temizle
+    let cleanedAiResult = aiResult;
+    
+    // ```json ... ``` formatını temizle
+    if (cleanedAiResult.includes('```json')) {
+      cleanedAiResult = cleanedAiResult.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    }
+    
+    // ``` ... ``` formatını temizle  
+    if (cleanedAiResult.includes('```')) {
+      cleanedAiResult = cleanedAiResult.replace(/```\s*/g, '');
+    }
+    
+    cleanedAiResult = cleanedAiResult.trim();
+    
     let parsedResult;
     try {
-      parsedResult = JSON.parse(aiResult);
+      parsedResult = JSON.parse(cleanedAiResult);
     } catch (parseError) {
       console.error('JSON parse hatası:', parseError);
       console.error('Raw AI result:', aiResult);

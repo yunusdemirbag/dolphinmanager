@@ -184,18 +184,39 @@ export async function POST(request: NextRequest) {
       price: listingData.price || 0,
       tags: listingData.tags || [],
       taxonomy_id: listingData.taxonomy_id || 1027,
+      shop_section_id: listingData.shop_section_id,
       has_variations: listingData.has_variations || false,
       variations_count: cleanVariations.length,
       variations_json: variationsJson,
       images_count: imageRefs.length,
       image_refs: imageRefs, // Sadece ID referansları
       video_ref: videoRef, // Sadece ID referansı
+      // Personalization fields
+      is_personalizable: listingData.is_personalizable || false,
+      personalization_is_required: listingData.personalization_is_required || false,
+      personalization_char_count_max: listingData.personalization_char_count_max || 0,
+      personalization_instructions: listingData.personalization_instructions || '',
+      // Other Etsy fields
+      who_made: listingData.who_made || 'i_did',
+      when_made: listingData.when_made || 'made_to_order',
+      shipping_profile_id: listingData.shipping_profile_id,
+      is_supply: listingData.is_supply || false,
+      renewal_option: listingData.renewal_option || 'automatic',
       // product_data_json kaldırıldı - gereksiz ve büyük
       status: 'pending',
       created_at: new Date(),
       updated_at: new Date(),
       retry_count: 0,
     };
+
+    // Debug: Kaydedilen verileri logla
+    console.log('🔍 Kuyruğa kaydedilen veriler:', {
+      shop_section_id: queueItem.shop_section_id,
+      is_personalizable: queueItem.is_personalizable,
+      personalization_is_required: queueItem.personalization_is_required,
+      personalization_instructions: queueItem.personalization_instructions,
+      personalization_char_count_max: queueItem.personalization_char_count_max
+    });
 
     // Firebase'e kaydet - Flattened structure
     const docRef = await adminDb.collection('queue').add(queueItem);

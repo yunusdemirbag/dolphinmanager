@@ -920,6 +920,46 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     }
   }, [toast]);
 
+  const deleteSelectedItems = useCallback(async () => {
+    if (selectedItems.length === 0) return;
+    
+    if (!confirm(`${selectedItems.length} seçili ürün silinecek. Bu işlem geri alınamaz. Emin misiniz?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/queue', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'delete_selected',
+          itemIds: selectedItems,
+          user_id: 'local-user-123'
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: "Ürünler Silindi",
+          description: `${selectedItems.length} ürün başarıyla silindi`
+        });
+        setSelectedItems([]);
+        await loadQueueItems();
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Silme hatası:', error);
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: "Seçili ürünler silinemedi"
+      });
+    }
+  }, [selectedItems, toast]);
+
   const saveEdit = async (itemId: string, field: string, newValue?: string | string[]) => {
     try {
       let valueToSave = newValue;
@@ -1233,6 +1273,17 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                 }}
               />
               <Label className="text-sm">Tümünü Seç</Label>
+              {selectedItems.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={deleteSelectedItems}
+                  className="ml-2"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Seçilenleri Sil ({selectedItems.length})
+                </Button>
+              )}
             </div>
           </CardTitle>
         </CardHeader>

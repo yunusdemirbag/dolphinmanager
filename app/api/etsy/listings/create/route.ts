@@ -300,6 +300,10 @@ export async function POST(request: NextRequest) {
         try {
           const imageFormData = new FormData();
           imageFormData.append('image', imageFile);
+          imageFormData.append('rank', (i + 1).toString()); // Resim sıralaması için rank ekle
+          imageFormData.append('alt_text', `Image ${i + 1} of ${listingData.title}`); // SEO için alt text
+          
+          console.log(`🔢 Resim ${i + 1} rank'ı:`, i + 1);
           
           const imageUploadUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${etsyResult.listing_id}/images`;
           

@@ -1,0 +1,35 @@
+
+> dolphinmanager@0.1.0 dev
+> next dev --turbopack
+
+   ▲ Next.js 15.3.4 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.113:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1642ms
+ ○ Compiling /_not-found/page ...
+ ✓ Compiled /_not-found/page in 3.5s
+ GET /api/etsy/stores 404 in 3864ms
+ ○ Compiling /api/shipping-profiles/firebase ...
+ ✓ Compiled /api/shipping-profiles/firebase in 1504ms
+Firebase Admin Config kontrol ediliyor:
+- Project ID: ✅ Mevcut
+- Client Email: ✅ Mevcut
+- Private Key: ✅ Doğru format
+Firebase admin initialized successfully
+ GET /api/shipping-profiles/firebase 400 in 2110ms
+ GET /api/shipping-profiles/firebase?shopId=56171647 400 in 50ms
+ ○ Compiling /api/etsy/stores ...
+ ✓ Compiled /api/etsy/stores in 1172ms
+🏪 Fetching store info for user: local-user-123
+🔍 local-user-123 kullanıcısı için mağaza bilgileri alınıyor...
+ GET /api/etsy/stores 200 in 1749ms
+ ○ Compiling /products ...
+ ✓ Compiled /products in 3.7s
+🔍 local-user-123 kullanıcısı için mağaza bilgileri alınıyor...
+📦 Found 499 products in Firebase for user local-user-123. Fetching from DB.
+ GET /products 200 in 4902ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 494ms
+ ○ Compiling /favicon.ico ...

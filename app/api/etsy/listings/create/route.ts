@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
+import { addInventoryWithVariations } from '@/lib/etsy-api';
 
 export async function POST(request: NextRequest) {
   try {
@@ -207,17 +208,7 @@ export async function POST(request: NextRequest) {
     etsyFormData.append('should_auto_renew', listingData.renewal_option === 'automatic' ? 'true' : 'false');
     etsyFormData.append('state', 'draft'); // Her zaman draft olarak başla, sonra resim ekleyip activate ederiz
     
-    // Varyasyonları ekle
-    if (listingData.has_variations && listingData.variations?.length > 0) {
-      const variations = listingData.variations.map((variation: any, idx: number) => ({
-        property_id: 513, // Size property ID
-        value_id: null,
-        value: variation.size,
-        price: variation.price,
-        is_active: variation.is_active
-      }));
-      etsyFormData.append('inventory', JSON.stringify(variations));
-    }
+    // NOT: Varyasyonlar draft listing oluşturduktan sonra ayrı API call'la eklenecek
     
     // NOT: Resimler ayrı endpoint'e upload edilecek - burada eklenmez
     
@@ -381,6 +372,20 @@ export async function POST(request: NextRequest) {
         }
       } catch (videoError) {
         console.error(`❌ Video upload exception:`, videoError);
+      }
+    }
+    
+    // ADIM 2.8: Varyasyonları ekle (yeni sistem)
+    if (listingData.has_variations && listingData.variations?.length > 0) {
+      console.log('📤 ADIM 2.8: Varyasyonlar ekleniyor...');
+      console.log(`🎯 Toplam varyasyon sayısı:`, listingData.variations.length);
+      
+      try {
+        await addInventoryWithVariations(access_token, etsyResult.listing_id, listingData.variations);
+        console.log('✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu');
+      } catch (variationError) {
+        console.error('❌ Varyasyon ekleme hatası:', variationError);
+        // Varyasyon hatası olsa bile listing'i devam ettir
       }
     }
     

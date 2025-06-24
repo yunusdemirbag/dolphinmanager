@@ -253,4 +253,103 @@ export async function fetchEtsyShopSections(shopId: string, apiKey: string, acce
     }
 }
 
-export { fetchAllEtsyListings, refreshEtsyToken }; 
+/**
+ * Adds inventory with variations to an Etsy listing
+ * Creates all possible size x pattern combinations (48 variations)
+ */
+async function addInventoryWithVariations(accessToken: string, listingId: number, variations: any[]) {
+    const ETSY_API_BASE = 'https://openapi.etsy.com/v3';
+    const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID;
+    
+    console.log(`🎯 Adding inventory with variations for listing ${listingId}`);
+    console.log(`📊 Input variations: ${variations.length}`);
+    
+    try {
+        // Extract unique sizes from variations
+        const sizes = [...new Set(variations.map((v: any) => v.size))];
+        console.log(`📏 Unique sizes found: ${sizes.length}`, sizes);
+        
+        // Fixed patterns for all products
+        const patterns = ['Roll', 'Standard Canvas', 'White Frame', 'Gold Frame', 'Silver Frame', 'Black Frame'];
+        console.log(`🎨 Patterns: ${patterns.length}`, patterns);
+        
+        const allVariations = [];
+        
+        // Create all size x pattern combinations
+        for (const size of sizes) {
+            for (const pattern of patterns) {
+                // Find matching variation from input
+                const existingVariation = variations.find((v: any) => 
+                    v.size === size && v.pattern === pattern
+                );
+                
+                const price = existingVariation?.price || 0;
+                const isEnabled = existingVariation?.is_active || false;
+                
+                // Validate price (Etsy maximum)
+                const finalPrice = Math.min(price, 50000);
+                
+                allVariations.push({
+                    property_values: [
+                        {
+                            property_id: 513,
+                            property_name: "Size",
+                            values: [size]
+                        },
+                        {
+                            property_id: 514,
+                            property_name: "Pattern",
+                            values: [pattern]
+                        }
+                    ],
+                    offerings: [
+                        {
+                            price: finalPrice,
+                            quantity: 4,
+                            is_enabled: isEnabled
+                        }
+                    ]
+                });
+            }
+        }
+        
+        console.log(`✨ Generated ${allVariations.length} total variations (${sizes.length} sizes × ${patterns.length} patterns)`);
+        
+        // Send to Etsy API
+        const response = await fetch(`${ETSY_API_BASE}/application/listings/${listingId}/inventory`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'x-api-key': ETSY_CLIENT_ID!,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                products: allVariations,
+                price_on_property: [513, 514], // Enable "Prices vary for each Size and Pattern"
+                quantity_on_property: [],
+                sku_on_property: []
+            })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Etsy inventory API error:', response.status, errorText);
+            throw new Error(`Etsy inventory API error: ${response.status} - ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Inventory with variations added successfully');
+        console.log('📊 Result summary:', {
+            products_count: result.products?.length || 0,
+            price_on_property: result.price_on_property
+        });
+        
+        return result;
+        
+    } catch (error) {
+        console.error('❌ Error adding inventory with variations:', error);
+        throw error;
+    }
+}
+
+export { fetchAllEtsyListings, refreshEtsyToken, addInventoryWithVariations }; 

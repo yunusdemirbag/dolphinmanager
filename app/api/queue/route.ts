@@ -14,12 +14,16 @@ interface QueueItem {
 
 export async function GET(request: NextRequest) {
   try {
+    const startTime = Date.now();
+    
     // URL parametrelerini al
     const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('user_id');
+    const userId = searchParams.get('user_id') || 'local-user-123';
     const status = searchParams.get('status');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const lastCreatedAt = searchParams.get('lastCreatedAt');
     
-    console.log('🔥 Dinamik Kuyruk Sistemi başlatıldı', { userId, status });
+    console.log('🚀 Optimize Kuyruk Sistemi başlatıldı', { userId, status, limit });
     
     // Firebase bağlantısını başlat
     initializeAdminApp();
@@ -29,73 +33,99 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
     }
     
-    // BASİT KUYRUK SİSTEMİ - INDEX GEREKMİYOR
+    // OPTİMİZE EDİLMİŞ KUYRUK SİSTEMİ - FIREBASE QUERY İLE FİLTRELEME
     try {
-      // Tüm queue collection'ını al (index gerekmez)
-      const queueSnapshot = await adminDb.collection('queue').get();
+      // Optimize edilmiş query - Firebase seviyesinde filtreleme
+      let query = adminDb.collection('queue')
+        .where('user_id', '==', userId);
+      
+      // Status filtresi
+      if (status) {
+        query = query.where('status', '==', status);
+      }
+      
+      // Sıralama ve limit
+      query = query.orderBy('created_at', 'desc').limit(limit);
+      
+      // Pagination desteği
+      if (lastCreatedAt) {
+        query = query.startAfter(new Date(lastCreatedAt));
+      }
+      
+      console.log('📊 Firebase optimized query çalıştırılıyor...');
+      const queueSnapshot = await query.get();
       
       if (queueSnapshot.empty) {
         console.log('📋 Kuyruk boş');
-        return NextResponse.json({ items: [] });
+        return NextResponse.json({ 
+          items: [], 
+          totalTime: Date.now() - startTime,
+          optimized: true 
+        });
       }
       
-      // Manuel filtreleme + resim verilerini yükle
-      const allItems: any[] = [];
+      console.log(`📦 ${queueSnapshot.size} queue item bulundu, resim verileri yükleniyor...`);
       
-      for (const doc of queueSnapshot.docs) {
-        const data = doc.data();
-        // Manuel userId filtresi
-        if (!userId || data.user_id === userId) {
-          // Manuel status filtresi  
-          if (!status || data.status === status) {
+      // Parallel işleme için Promise.all kullan
+      const allItems = await Promise.all(
+        queueSnapshot.docs.map(async (doc) => {
+          const data = doc.data();
+          
+          try {
             
-            // Resimleri ayrı koleksiyondan yükle
+            // HIZLI RESİM YÜKLEMESİ - Optimize edilmiş chunk loading
             let images: any[] = [];
             if (data.image_refs && data.image_refs.length > 0) {
               try {
-                const imagePromises = data.image_refs.map(async (imageId: string) => {
-                  const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
-                  if (imageDoc.exists) {
-                    const imageData = imageDoc.data()!;
+                // İlk sadece metadata'ları al - batch işlemi
+                const imageMetadataPromises = data.image_refs.map((imageId: string) => 
+                  adminDb.collection('queue_images').doc(imageId).get()
+                );
+                
+                const imageMetadataDocs = await Promise.all(imageMetadataPromises);
+                
+                // Metadata'sı olan resimler için chunk'ları paralel yükle
+                const imageLoadPromises = imageMetadataDocs.map(async (imageDoc, index) => {
+                  if (!imageDoc.exists) return null;
+                  
+                  const imageData = imageDoc.data()!;
+                  const imageId = data.image_refs[index];
+                  
+                  if (imageData.chunks_count > 0) {
+                    // Chunk'ları sıralı yükle - orderBy ile daha hızlı
+                    const chunkQuery = await adminDb.collection('queue_image_chunks')
+                      .where('image_id', '==', imageId)
+                      .orderBy('chunk_index')
+                      .get();
                     
-                    // Parçaları yükle ve birleştir
-                    if (imageData.chunks_count > 0) {
-                      const chunkQuery = await adminDb.collection('queue_image_chunks')
-                        .where('image_id', '==', imageId)
-                        .get();
-                      
-                      const chunks: { [key: number]: string } = {};
-                      chunkQuery.forEach(chunkDoc => {
-                        const chunkData = chunkDoc.data();
-                        chunks[chunkData.chunk_index] = chunkData.chunk_data;
-                      });
-                      
-                      // Sıralı parçaları birleştir
-                      const sortedChunks = Object.keys(chunks)
-                        .sort((a, b) => Number(a) - Number(b))
-                        .map(key => chunks[Number(key)]);
-                      
-                      const combinedBase64 = sortedChunks.join('');
-                      
-                      return {
-                        name: imageData.name,
-                        filename: imageData.name,
-                        type: imageData.type,
-                        data: combinedBase64,
-                        base64: combinedBase64  // Hem data hem base64 property'si için
-                      };
-                    }
+                    // Chunk'ları doğrudan sırayla birleştir
+                    const combinedBase64 = chunkQuery.docs
+                      .map(doc => doc.data().chunk_data)
+                      .join('');
+                    
+                    return {
+                      name: imageData.name,
+                      filename: imageData.name,
+                      type: imageData.type,
+                      data: combinedBase64,
+                      base64: combinedBase64,
+                      size: combinedBase64.length
+                    };
                   }
                   return null;
                 });
-                const imageResults = await Promise.all(imagePromises);
+                
+                const imageResults = await Promise.all(imageLoadPromises);
                 images = imageResults.filter(img => img !== null);
+                
+                console.log(`📷 ${images.length} resim yüklendi (${doc.id})`);
               } catch (imageError) {
                 console.error('Error loading images for queue item:', doc.id, imageError);
+                images = []; // Hata durumunda boş array
               }
             }
             
-            // Video'yu ayrı koleksiyondan yükle
+            // HIZLI VİDEO YÜKLEMESİ - Optimize edilmiş
             let video = null;
             if (data.video_ref) {
               try {
@@ -103,85 +133,87 @@ export async function GET(request: NextRequest) {
                 if (videoDoc.exists) {
                   const videoData = videoDoc.data()!;
                   
-                  // Parçaları yükle ve birleştir
                   if (videoData.chunks_count > 0) {
+                    // Video chunk'larını sıralı yükle
                     const chunkQuery = await adminDb.collection('queue_video_chunks')
                       .where('video_id', '==', data.video_ref)
+                      .orderBy('chunk_index')
                       .get();
                     
-                    const chunks: { [key: number]: string } = {};
-                    chunkQuery.forEach(chunkDoc => {
-                      const chunkData = chunkDoc.data();
-                      chunks[chunkData.chunk_index] = chunkData.chunk_data;
-                    });
-                    
-                    // Sıralı parçaları birleştir
-                    const sortedChunks = Object.keys(chunks)
-                      .sort((a, b) => Number(a) - Number(b))
-                      .map(key => chunks[Number(key)]);
-                    
-                    const combinedBase64 = sortedChunks.join('');
+                    // Chunk'ları doğrudan birleştir
+                    const combinedBase64 = chunkQuery.docs
+                      .map(doc => doc.data().chunk_data)
+                      .join('');
                     
                     video = {
                       name: videoData.name,
                       filename: videoData.name,
                       type: videoData.type,
                       data: combinedBase64,
-                      base64: combinedBase64  // Hem data hem base64 property'si için
+                      base64: combinedBase64,
+                      size: combinedBase64.length
                     };
+                    
+                    console.log(`🎬 Video yüklendi (${doc.id})`);
                   }
                 }
               } catch (videoError) {
                 console.error('Error loading video for queue item:', doc.id, videoError);
+                video = null;
               }
             }
             
-            allItems.push({
+            return {
               id: doc.id,
               user_id: data.user_id,
               status: data.status,
               created_at: data.created_at ? data.created_at.toDate().toISOString() : new Date().toISOString(),
               updated_at: data.updated_at ? data.updated_at.toDate().toISOString() : new Date().toISOString(),
               retry_count: data.retry_count || 0,
-              product_data: {
-                title: data.title || 'Unnamed Product',
-                description: data.description || '',
-                price: data.price || 0,
-                tags: data.tags || [],
-                images: images,
-                video: video,
-                taxonomy_id: data.taxonomy_id || 1027,
-                shop_section_id: data.shop_section_id,
-                has_variations: data.has_variations,
-                variations: data.variations_json ? JSON.parse(data.variations_json) : [],
-                who_made: data.who_made || 'i_did',
-                when_made: data.when_made || 'made_to_order',
-                shipping_profile_id: data.shipping_profile_id,
-                is_personalizable: data.is_personalizable || false,
-                personalization_is_required: data.personalization_is_required || false,
-                personalization_char_count_max: data.personalization_char_count_max || 0,
-                personalization_instructions: data.personalization_instructions || '',
-                is_supply: data.is_supply || false,
-                renewal_option: data.renewal_option || 'automatic'
-              }
-            });
+              title: data.title || 'Unnamed Product',
+              description: data.description || '',
+              price: data.price || 0,
+              tags: data.tags || [],
+              images: images,
+              video: video,
+              imageCount: images.length,
+              hasVideo: !!video,
+              // Firebase timestamp'leri
+              created_timestamp: data.created_at ? data.created_at.toDate() : new Date(),
+              updated_timestamp: data.updated_at ? data.updated_at.toDate() : new Date()
+            };
+          } catch (itemError) {
+            console.error(`Error processing queue item ${doc.id}:`, itemError);
+            return null;
           }
-        }
-      }
+        })
+      );
       
-      // Manuel sıralama (created_at DESC)
-      allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      // Null değerleri filtrele (Promise.all sonucu)
+      const validItems = allItems.filter(item => item !== null);
       
-      console.log(`✅ Kuyruk bulundu: ${allItems.length} item (toplam: ${queueSnapshot.size})`);
+      const totalTime = Date.now() - startTime;
+      
+      console.log(`✅ Optimize kuyruk tamamlandı: ${validItems.length} item, ${totalTime}ms`);
       
       // Debug: Status dağılımını logla
-      const statusCounts = allItems.reduce((acc: any, item: any) => {
+      const statusCounts = validItems.reduce((acc: any, item: any) => {
         acc[item.status] = (acc[item.status] || 0) + 1;
         return acc;
       }, {});
       console.log('📊 Status dağılımı:', statusCounts);
       
-      return NextResponse.json({ items: allItems });
+      return NextResponse.json({ 
+        items: validItems,
+        metadata: {
+          totalItems: validItems.length,
+          loadTime: totalTime,
+          optimized: true,
+          statusDistribution: statusCounts,
+          hasMorePages: validItems.length === limit,
+          timestamp: new Date().toISOString()
+        }
+      });
       
     } catch (error) {
       console.error('🔥 Firebase kuyruk hatası:', error);

@@ -6557,3 +6557,67 @@ Firebase'den API anahtarları başarıyla alındı
 Etsy API bağlantısı test ediliyor - Shop ID: 56171647
 Etsy API bağlantısı başarılı: CyberDecorArt
  GET /api/etsy/status 200 in 1397ms
+ ○ Compiling /api/queue ...
+ ✓ Compiled /api/queue in 1007ms
+ ⨯ ./app/api/queue/route.ts:187:7
+Parsing ecmascript source code failed
+[0m [90m 185 |[39m           }[0m
+[0m [90m 186 |[39m         }[0m
+[0m[31m[1m>[22m[39m[90m 187 |[39m       }[0m
+[0m [90m     |[39m       [31m[1m^[22m[39m[0m
+[0m [90m 188 |[39m       [0m
+[0m [90m 189 |[39m       [90m// Null değerleri filtrele (Promise.all sonucu)[39m[0m
+[0m [90m 190 |[39m       [36mconst[39m validItems [33m=[39m allItems[33m.[39mfilter(item [33m=>[39m item [33m!==[39m [36mnull[39m)[33m;[39m[0m
+
+Expected ',', got '}'
+
+
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 2.2s
+ GET /api/queue?user_id=local-user-123&limit=5 500 in 3472ms
+ ⨯ ./app/api/queue/route.ts:187:7
+Parsing ecmascript source code failed
+[0m [90m 185 |[39m           }[0m
+[0m [90m 186 |[39m         }[0m
+[0m[31m[1m>[22m[39m[90m 187 |[39m       }[0m
+[0m [90m     |[39m       [31m[1m^[22m[39m[0m
+[0m [90m 188 |[39m       [0m
+[0m [90m 189 |[39m       [90m// Null değerleri filtrele (Promise.all sonucu)[39m[0m
+[0m [90m 190 |[39m       [36mconst[39m validItems [33m=[39m allItems[33m.[39mfilter(item [33m=>[39m item [33m!==[39m [36mnull[39m)[33m;[39m[0m
+
+Expected ',', got '}'
+
+
+ GET /api/queue?user_id=local-user-123&limit=2 500 in 86ms
+🚀 Optimize Kuyruk Sistemi başlatıldı { userId: 'local-user-123', status: null, limit: 3 }
+📊 Firebase optimized query çalıştırılıyor...
+🔥 Firebase kuyruk hatası: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:56:40)
+  54 |       
+  55 |       console.log('📊 Firebase optimized query çalıştırılıyor...');
+> 56 |       const queueSnapshot = await query.get();
+     |                                        ^
+  57 |       
+  58 |       if (queueSnapshot.empty) {
+  59 |         console.log('📋 Kuyruk boş'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123&limit=3 200 in 650ms
+🚀 Optimize Kuyruk Sistemi başlatıldı { userId: 'local-user-123', status: null, limit: 3 }
+📊 Firebase optimized query çalıştırılıyor...
+🔥 Firebase kuyruk hatası: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:56:40)
+  54 |       
+  55 |       console.log('📊 Firebase optimized query çalıştırılıyor...');
+> 56 |       const queueSnapshot = await query.get();
+     |                                        ^
+  57 |       
+  58 |       if (queueSnapshot.empty) {
+  59 |         console.log('📋 Kuyruk boş'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123&limit=3 200 in 192ms

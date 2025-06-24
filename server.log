@@ -6526,3 +6526,34 @@ Error fetching queue items from Firebase: RangeError: Invalid string length
  ✓ Starting...
  ✓ Ready in 1082ms
    Reload env: .env.local
+ ○ Compiling /api/etsy/status ...
+ ✓ Compiled /api/etsy/status in 1183ms
+Firebase Admin Config kontrol ediliyor:
+- Project ID: ✅ Mevcut
+- Client Email: ✅ Mevcut
+- Private Key: ✅ Doğru format
+Firebase admin initialized successfully
+Firebase bağlantısı mevcut, kullanıcı local-user-123 için mağaza bilgileri alınıyor...
+Firebase'den mağaza bulundu: CyberDecorArt (ID: 56171647)
+Firebase'den API anahtarları başarıyla alındı
+Etsy API bağlantısı test ediliyor - Shop ID: 56171647
+Etsy API bağlantı hatası: 401
+ GET /api/etsy/status 200 in 2726ms
+ ✓ Compiled /api/etsy/refresh-token in 415ms
+♻️ Manual refresh request for shop 56171647...
+🕒 New token expires at: 2025-06-24T22:07:01.452Z
+✅ Successfully refreshed and saved new token for shop 56171647.
+ POST /api/etsy/refresh-token 200 in 1337ms
+Firebase bağlantısı mevcut, kullanıcı local-user-123 için mağaza bilgileri alınıyor...
+Firebase'den mağaza bulundu: CyberDecorArt (ID: 56171647)
+Firebase'den API anahtarları başarıyla alındı
+🕒 Token expires at: 2025-06-24T22:07:01.452Z
+⏰ Time until expiry: 60 minutes
+🔄 Token expiring soon, proactively refreshing...
+♻️ Refreshing Etsy token for shop 56171647...
+🕒 New token expires at: 2025-06-24T22:07:07.455Z
+✅ Successfully refreshed and saved new token for shop 56171647.
+✅ Proactive token refresh successful
+Etsy API bağlantısı test ediliyor - Shop ID: 56171647
+Etsy API bağlantısı başarılı: CyberDecorArt
+ GET /api/etsy/status 200 in 1397ms

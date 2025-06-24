@@ -1,6 +1,68 @@
 import { NextResponse } from 'next/server';
 import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 
+// Token refresh fonksiyonu
+async function refreshEtsyToken(shopId: string): Promise<string | null> {
+  console.log(`♻️ Refreshing Etsy token for shop ${shopId}...`);
+
+  if (!adminDb) {
+    console.error("Firebase Admin DB not initialized for token refresh.");
+    return null;
+  }
+
+  const apiKeyDoc = await adminDb.collection('etsy_api_keys').doc(shopId).get();
+  if (!apiKeyDoc.exists) {
+    console.error(`API keys for shop ${shopId} not found.`);
+    return null;
+  }
+
+  const { refresh_token } = apiKeyDoc.data()!;
+  if (!refresh_token) {
+    console.error(`No refresh token found for shop ${shopId}.`);
+    return null;
+  }
+
+  const ETSY_CLIENT_ID = process.env.ETSY_CLIENT_ID;
+  if (!ETSY_CLIENT_ID) {
+    console.error("ETSY_CLIENT_ID environment variable is not set.");
+    return null;
+  }
+
+  const tokenUrl = 'https://api.etsy.com/v3/public/oauth/token';
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: ETSY_CLIENT_ID,
+      refresh_token: refresh_token,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Failed to refresh Etsy token for shop ${shopId}: ${errorText}`);
+    return null;
+  }
+
+  const newTokens = await response.json();
+  const newAccessToken = newTokens.access_token;
+
+  // Token'ı Firebase'e kaydet - expires_at hesaplamasını düzelt
+  const expiresAt = new Date(Date.now() + (newTokens.expires_in * 1000));
+  console.log(`🕒 New token expires at: ${expiresAt.toISOString()}`);
+
+  await adminDb.collection('etsy_api_keys').doc(shopId).update({
+    access_token: newAccessToken,
+    refresh_token: newTokens.refresh_token || refresh_token, // Etsy might send a new refresh token
+    expires_at: expiresAt,
+    updated_at: new Date()
+  });
+
+  console.log(`✅ Successfully refreshed and saved new token for shop ${shopId}.`);
+  return newAccessToken;
+}
+
 export async function GET() {
   try {
     // Firebase'i başlat
@@ -39,18 +101,57 @@ export async function GET() {
               const apiKeyData = apiKeyDoc.data();
               apiKey = apiKeyData?.api_key || '';
               accessToken = apiKeyData?.access_token;
+              const expiresAt = apiKeyData?.expires_at;
               isConnected = true;
               console.log('Firebase\'den API anahtarları başarıyla alındı');
               
-              // Etsy API'ye bağlantıyı test et
+              // Proaktif token refresh - expires_at'dan 1 saat önce refresh yap
+              if (expiresAt) {
+                const expiresTime = expiresAt.toDate ? expiresAt.toDate() : new Date(expiresAt);
+                const timeUntilExpiry = expiresTime.getTime() - Date.now();
+                const oneHourInMs = 60 * 60 * 1000;
+                
+                console.log(`🕒 Token expires at: ${expiresTime.toISOString()}`);
+                console.log(`⏰ Time until expiry: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes`);
+                
+                if (timeUntilExpiry < oneHourInMs) {
+                  console.log('🔄 Token expiring soon, proactively refreshing...');
+                  const newToken = await refreshEtsyToken(shopId);
+                  if (newToken) {
+                    accessToken = newToken;
+                    console.log('✅ Proactive token refresh successful');
+                  }
+                }
+              }
+              
+              // Etsy API'ye bağlantıyı test et - token refresh ile
               try {
                 console.log(`Etsy API bağlantısı test ediliyor - Shop ID: ${shopId}`);
-                const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}`, {
-                  headers: {
-                    'x-api-key': apiKey,
-                    'Authorization': `Bearer ${accessToken}`
+                let currentAccessToken = accessToken;
+                
+                const testApiCall = async (token: string, isRetry = false): Promise<Response> => {
+                  const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}`, {
+                    headers: {
+                      'x-api-key': apiKey,
+                      'Authorization': `Bearer ${token}`
+                    }
+                  });
+
+                  // 401 hatası ve ilk deneme ise token refresh yap
+                  if (response.status === 401 && !isRetry) {
+                    console.warn(`Token expired for shop ${shopId}. Attempting to refresh...`);
+                    const newAccessToken = await refreshEtsyToken(shopId);
+                    if (newAccessToken) {
+                      console.log("Retrying API call with new token...");
+                      currentAccessToken = newAccessToken;
+                      return testApiCall(newAccessToken, true); // Retry ile çağır
+                    }
                   }
-                });
+
+                  return response;
+                };
+
+                const response = await testApiCall(currentAccessToken);
 
                 if (!response.ok) {
                   console.error('Etsy API bağlantı hatası:', response.status);
@@ -59,7 +160,8 @@ export async function GET() {
                     store: shopId ? { shop_id: parseInt(shopId), shop_name: shopName } : null,
                     shopId: shopId,
                     shopName: shopName,
-                    error: `Etsy API hatası: ${response.status}`
+                    error: `Etsy API hatası: ${response.status}`,
+                    tokenRefreshAttempted: currentAccessToken !== accessToken
                   });
                 }
 

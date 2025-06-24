@@ -69,9 +69,40 @@ export function StoreClientPage({ store }: StoreClientPageProps) {
     }
   };
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const handleRefreshToken = async () => {
+    if (!store) return;
+    
+    setIsRefreshing(true);
     console.log('Token yenileniyor...');
-    alert('Bu özellik henüz tamamlanmadı.');
+    
+    try {
+      const response = await fetch('/api/etsy/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shop_id: store.shop_id,
+          user_id: 'local-user-123'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert('✅ Token başarıyla yenilendi!');
+        console.log('Token yenilendi, yeni süre:', result.expires_at);
+      } else {
+        alert(`❌ Token yenilenemedi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Token yenileme hatası:', error);
+      alert('❌ Bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   if (store) {
@@ -89,9 +120,9 @@ export function StoreClientPage({ store }: StoreClientPageProps) {
               </div>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" onClick={handleRefreshToken}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Token Yenile
+              <Button variant="outline" onClick={handleRefreshToken} disabled={isRefreshing}>
+                {isRefreshing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                {isRefreshing ? 'Yenileniyor...' : 'Token Yenile'}
               </Button>
               <Button variant="destructive" onClick={handleDisconnect} disabled={isDisconnecting}>
                 {isDisconnecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Unlink className="w-4 h-4 mr-2" />}

@@ -245,7 +245,7 @@ export function ProductFormModal({
   const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
   
   const [hasVariations, setHasVariations] = useState<boolean>(true);
-  const [variations, setVariations] = useState(product?.variations || predefinedVariations)
+  const [variations, setVariations] = useState(product?.variations || predefinedVariations.map(v => ({ ...v, is_active: true })))
   const [shopSections, setShopSections] = useState<{ shop_section_id: number; title: string }[]>([]);
   const [selectedShopSection, setSelectedShopSection] = useState<string>('');
   
@@ -434,7 +434,7 @@ export function ProductFormModal({
       setHasVariations(product?.variations ? (product.variations || []).length > 0 : true);
       const initialVariations = product?.variations && (product.variations || []).length > 0 
         ? (product.variations || [])
-        : predefinedVariations;
+        : predefinedVariations.map(v => ({ ...v, is_active: true })); // Tüm varyasyonları otomatik aktif et
       setVariations(initialVariations);
       if (product?.images && (product.images || []).length) {
         setProductImages(product.images.map(img => ({
@@ -646,7 +646,9 @@ export function ProductFormModal({
     }));
     setVariations(activatedVariations);
     setHasVariations(true);
-    console.log('✅ Tüm varyasyonlar aktifleştirildi:', activatedVariations.length);
+    console.log('✅ Tüm varyasyonlar aktifleştirildi:', activatedVariations.length, 'adet varyasyon');
+    const activeCount = activatedVariations.filter(v => v.is_active).length;
+    console.log('📊 Aktif varyasyon sayısı:', activeCount);
   };
 
   const handleResetVariations = () => {

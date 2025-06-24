@@ -1185,12 +1185,12 @@ export function ProductFormModal({
         formData.append('videoFile', videoFile.file);
       }
 
-      // Timeout controller
+      // Timeout controller - Video upload için uzun süre
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-        console.error('⏰ Request timeout - 15 seconds');
-      }, 15000); // 15 saniye timeout
+        console.error('⏰ Request timeout - 3 minutes');
+      }, 180000); // 3 dakika timeout (video upload için)
       
       const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',

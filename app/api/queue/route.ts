@@ -32,10 +32,10 @@ export async function GET(request: NextRequest) {
     try {
       console.log('Fetching queue items from Firebase');
       
-      // Temel sorguyu oluştur
+      // Temel sorguyu oluştur - Şimdilik sadece collection'ı al
       let queueRef: CollectionReference | Query<DocumentData> = adminDb.collection('queue');
       
-      // Filtrelemeleri uygula
+      // Filtrelemeleri uygula - Sadece userId ile filtrele, sorting'i kaldır
       if (userId) {
         queueRef = queueRef.where('user_id', '==', userId);
       }
@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
         queueRef = queueRef.where('status', '==', status);
       }
       
-      // Oluşturma tarihine göre sırala (en yeniden en eskiye)
-      queueRef = queueRef.orderBy('created_at', 'desc');
+      // Firebase index olmadığı için sorting'i kaldır
+      // queueRef = queueRef.orderBy('created_at', 'desc');
       
       // Sorguyu çalıştır
       const snapshot = await queueRef.get();

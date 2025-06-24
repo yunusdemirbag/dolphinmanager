@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Store, Package, Settings } from 'lucide-react';
+import { Store, Package, Settings, Clock } from 'lucide-react';
 
 const Navigation = () => {
   const pathname = usePathname();
@@ -20,6 +20,12 @@ const Navigation = () => {
       label: 'Ürünler',
       icon: Package,
       active: pathname.startsWith('/products'),
+    },
+    {
+      href: '/queue',
+      label: 'Kuyruk Yönetimi',
+      icon: Clock,
+      active: pathname.startsWith('/queue'),
     },
     {
       href: '/settings',

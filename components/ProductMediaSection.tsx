@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 
 export interface MediaFile {
   file: File;

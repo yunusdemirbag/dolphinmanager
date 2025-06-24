@@ -158,9 +158,9 @@ Return only valid JSON, no explanations.
       console.error('AI result type:', typeof aiResult);
       console.error('AI result length:', aiResult?.length);
       
-      // Fallback: Basit parsing
+      // Fallback: Basit parsing - generic başlık verme, boş bırak
       parsedResult = {
-        title: "Beautiful Canvas Wall Art Print - Modern Home Decor",
+        title: null, // Generic başlık verme
         tags: ["wall art", "canvas print", "home decor", "modern art", "wall decoration", "living room", "bedroom art", "office decor", "abstract art", "contemporary", "minimalist", "housewarming", "gift idea"],
         suggestedCategory: availableCategories[0]?.title || "Modern Art",
         imageAnalysis: "Unable to analyze image",
@@ -169,13 +169,83 @@ Return only valid JSON, no explanations.
       };
     }
 
+    // Generic başlık kontrolü
+    const isGenericTitle = parsedResult.title && (
+      parsedResult.title.includes("Beautiful Canvas Wall Art Print") ||
+      parsedResult.title.includes("Modern Home Decor") ||
+      parsedResult.title.includes("Canvas Wall Art Print") ||
+      parsedResult.title === "Beautiful Canvas Wall Art Print - Modern Home Decor"
+    );
+
+    // Eğer generic başlık tespit edilirse, tekrar başlık üret
+    if (isGenericTitle || !parsedResult.title) {
+      console.log('🔄 Generic başlık tespit edildi, tekrar deneniyor...');
+      
+      try {
+        // Yeni başlık üretme prompt'u - daha spesifik
+        const retryPrompt = `
+URGENT: Analyze this SPECIFIC image and create a UNIQUE, DESCRIPTIVE Etsy title.
+
+DO NOT use generic phrases like "Beautiful Canvas Wall Art Print" or "Modern Home Decor".
+
+Look at the ACTUAL image content:
+- What SPECIFIC subject/theme do you see?
+- What colors are dominant?
+- What style is it (abstract, realistic, minimalist, etc.)?
+- What mood/feeling does it convey?
+
+Create a title that describes what you ACTUALLY see in THIS specific image.
+
+FORMAT: [Descriptive Subject] [Style] Canvas Wall Art Print | [Color/Mood] [Room] Decor | [Value Phrase]
+
+Return ONLY the title text, nothing else.
+`;
+
+        const retryResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: retryPrompt
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: imageDataUrl,
+                    detail: "high" // Daha yüksek detay
+                  }
+                }
+              ]
+            }
+          ],
+          max_tokens: 150,
+          temperature: 0.8, // Daha yaratıcı
+        });
+
+        const newTitle = retryResponse.choices[0]?.message?.content?.trim();
+        if (newTitle && !newTitle.includes("Beautiful Canvas Wall Art Print")) {
+          parsedResult.title = newTitle;
+          console.log('✅ Yeni spesifik başlık üretildi:', newTitle);
+        } else {
+          parsedResult.title = null;
+          console.log('⚠️ Tekrar generic başlık üretildi, boş bırakılıyor');
+        }
+      } catch (retryError) {
+        console.error('❌ Retry başlık üretme hatası:', retryError);
+        parsedResult.title = null;
+      }
+    }
+
     // Kategori ID'sini bul
     const selectedCategory = availableCategories.find((cat: any) => 
       cat.title.toLowerCase() === parsedResult.suggestedCategory?.toLowerCase()
     );
 
     const result = {
-      title: parsedResult.title || "Beautiful Canvas Wall Art Print - Modern Home Decor",
+      title: parsedResult.title, // Artık fallback yok
       tags: Array.isArray(parsedResult.tags) ? parsedResult.tags.slice(0, 13) : [],
       suggestedCategory: parsedResult.suggestedCategory || availableCategories[0]?.title,
       suggestedCategoryId: selectedCategory?.shop_section_id || null,
@@ -183,13 +253,15 @@ Return only valid JSON, no explanations.
       dominantColors: parsedResult.dominantColors || [],
       detectedStyle: parsedResult.detectedStyle || [],
       processingTime: Date.now(),
-      success: true
+      success: true,
+      retryAttempted: isGenericTitle || !parsedResult.title // Retry yapıldığını belirt
     };
 
     console.log('✅ Unified AI analizi tamamlandı:', {
-      title: result.title.substring(0, 50) + '...',
+      title: result.title ? (result.title.substring(0, 50) + '...') : 'Başlık üretilemedi',
       tagCount: result.tags.length,
-      category: result.suggestedCategory
+      category: result.suggestedCategory,
+      retryAttempted: result.retryAttempted
     });
 
     return NextResponse.json(result);

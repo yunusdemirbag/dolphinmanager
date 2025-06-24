@@ -65,3 +65,36 @@ if (typeof window === 'undefined') {
 }
 
 export { adminDb };
+
+// Bağlı Etsy mağaza bilgisini getir
+export async function getConnectedStoreFromFirebaseAdmin() {
+  try {
+    initializeAdminApp();
+    
+    if (!adminDb) {
+      throw new Error('Firebase Admin not initialized');
+    }
+
+    const userId = 'local-user-123'; // Bu gerçek auth context'den gelecek
+    
+    // Aktif mağazayı bul
+    const storesSnapshot = await adminDb
+      .collection('etsy_stores')
+      .where('user_id', '==', userId)
+      .where('is_active', '==', true)
+      .get();
+
+    if (storesSnapshot.empty) {
+      return null;
+    }
+
+    const storeDoc = storesSnapshot.docs[0];
+    return {
+      id: storeDoc.id,
+      ...storeDoc.data()
+    };
+  } catch (error) {
+    console.error('Store bilgisi alınırken hata:', error);
+    return null;
+  }
+}

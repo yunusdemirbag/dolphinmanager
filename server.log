@@ -46,3 +46,6 @@ No queue items found in Firebase
 Fetching queue items from Firebase
 No queue items found in Firebase
  GET /api/queue?user_id=local-user-123 200 in 277ms
+Fetching queue items from Firebase
+No queue items found in Firebase
+ GET /api/queue?user_id=local-user-123 200 in 549ms

@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
 
     const userId = 'local-user-123'; // Bu gerçek auth context'den gelecek
 
-    // Görselleri base64'e çevir ve sakla
-    const imageFiles: any[] = [];
+    // Görselleri ayrı koleksiyonda sakla - Firebase limit için
+    const imageRefs: string[] = [];
     let index = 0;
     while (true) {
       const imageFile = formData.get(`imageFile_${index}`) as File;
@@ -42,37 +42,43 @@ export async function POST(request: NextRequest) {
       const arrayBuffer = await imageFile.arrayBuffer();
       const base64 = Buffer.from(arrayBuffer).toString('base64');
       
-      imageFiles.push({
+      // Resmi ayrı koleksiyonda sakla
+      const imageDoc = await adminDb.collection('queue_images').add({
         base64: base64,
         type: imageFile.type,
         filename: imageFile.name,
         position: index,
-        size: imageFile.size
+        size: imageFile.size,
+        created_at: new Date()
       });
       
+      imageRefs.push(imageDoc.id);
       index++;
     }
 
-    console.log('🖼️ Toplam resim sayısı:', imageFiles.length);
+    console.log('🖼️ Toplam resim sayısı:', imageRefs.length);
 
-    // Video dosyasını işle (eğer varsa)
-    let videoData = null;
+    // Video dosyasını ayrı koleksiyonda sakla (eğer varsa)
+    let videoRef = null;
     const videoFile = formData.get('videoFile') as File;
     if (videoFile) {
       const arrayBuffer = await videoFile.arrayBuffer();
       const base64 = Buffer.from(arrayBuffer).toString('base64');
       
-      videoData = {
+      // Video'yu ayrı koleksiyonda sakla
+      const videoDoc = await adminDb.collection('queue_videos').add({
         base64: base64,
         type: videoFile.type,
         filename: videoFile.name,
-        size: videoFile.size
-      };
+        size: videoFile.size,
+        created_at: new Date()
+      });
       
+      videoRef = videoDoc.id;
       console.log('🎥 Video dosyası:', videoFile.name, (videoFile.size / 1024 / 1024).toFixed(2), 'MB');
     }
 
-    // Kuyruk öğesi oluştur - Nested objeler Firebase için basitleştirildi
+    // Kuyruk öğesi oluştur - Referanslarla, büyük veri yok
     const queueItem = {
       user_id: userId,
       title: listingData.title,
@@ -83,9 +89,9 @@ export async function POST(request: NextRequest) {
       has_variations: listingData.has_variations || false,
       variations_count: listingData.variations?.length || 0,
       variations_json: JSON.stringify(listingData.variations || []),
-      images_count: imageFiles.length,
-      images_json: JSON.stringify(imageFiles),
-      video_json: videoData ? JSON.stringify(videoData) : null,
+      images_count: imageRefs.length,
+      image_refs: imageRefs, // Sadece ID referansları
+      video_ref: videoRef, // Sadece ID referansı
       product_data_json: JSON.stringify(listingData),
       status: 'pending',
       created_at: new Date(),

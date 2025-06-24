@@ -55,25 +55,53 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ items: [] });
       }
       
-      // Sonuçları dönüştür - Flattened yapıdan normal yapıya
+      // Sonuçları dönüştür - Referanslardan veriyi yükle
       const items: QueueItem[] = [];
-      snapshot.forEach(doc => {
+      
+      for (const doc of snapshot.docs) {
         const data = doc.data();
         
         // JSON string'leri parse et
         let productData;
-        let images = [];
-        let video = null;
         let variations = [];
         
         try {
           productData = JSON.parse(data.product_data_json || '{}');
-          images = JSON.parse(data.images_json || '[]');
-          video = data.video_json ? JSON.parse(data.video_json) : null;
           variations = JSON.parse(data.variations_json || '[]');
         } catch (parseError) {
           console.error('JSON parse error for queue item:', doc.id, parseError);
           productData = {};
+        }
+        
+        // Resimleri ayrı koleksiyondan yükle
+        let images = [];
+        if (data.image_refs && data.image_refs.length > 0) {
+          try {
+            const imagePromises = data.image_refs.map(async (imageId: string) => {
+              const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+              if (imageDoc.exists) {
+                return imageDoc.data();
+              }
+              return null;
+            });
+            const imageResults = await Promise.all(imagePromises);
+            images = imageResults.filter(img => img !== null);
+          } catch (imageError) {
+            console.error('Error loading images for queue item:', doc.id, imageError);
+          }
+        }
+        
+        // Video'yu ayrı koleksiyondan yükle
+        let video = null;
+        if (data.video_ref) {
+          try {
+            const videoDoc = await adminDb.collection('queue_videos').doc(data.video_ref).get();
+            if (videoDoc.exists) {
+              video = videoDoc.data();
+            }
+          } catch (videoError) {
+            console.error('Error loading video for queue item:', doc.id, videoError);
+          }
         }
         
         items.push({
@@ -99,7 +127,7 @@ export async function GET(request: NextRequest) {
           error_message: data.error_message,
           etsy_listing_id: data.etsy_listing_id
         });
-      });
+      }
       
       console.log(`Found ${items.length} queue items in Firebase`);
       return NextResponse.json({ items });

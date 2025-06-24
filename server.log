@@ -4283,3 +4283,2245 @@ Error loading images for queue item: aI4RCKaRx5C6omLr8D2F Error: 8 RESOURCE_EXHA
   details: 'Quota exceeded.',
   metadata: [Metadata]
 }
+Error loading images for queue item: aJIT5lD8iAdodmvBmrlc Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aLXrFh78NHKjzxJTOc5C Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aMDLA2JKbwyVRg3aUflj Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aNiADghRKLW3v2qezm12 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aOUteK8zScuyGCBrYBJt Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aSl7NkRseRu1E3o1ufV2 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aSz2bneM4nNjL9PH57GV Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aTwgN23hpZLrRKRvuu9z Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aZ9D6SO6Ep7Sj0YNeUS0 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aZpJfwvzydO9H48c9EfM Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aZtXa5yiNSs4s8bfIgqe Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: acZtLaSbYhcl16acNDWW Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aqMpeNxEQLu4Q8ZaTbrU Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aqOppDGRO8NdttXVeGmk Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: avQhJ23hAxhTPzJ5eCBz Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: b0tqsS93SCfekWcp1qd1 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: b4hndJIyq4ovQWPTuwWn Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: bWAk4ay52d7uHRwkrl2D Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: bXUMujEmdbQmsdVMEB8N Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: bd7NedaABzWpu2SOhPQC Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: beIN0assOpr7wGKafLfx Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: bjiqZLTpBgRlSYzoAbxk Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: bnpa0buDHAUTYrzYNfRl Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: bvSkgM556TLkCTlHnBAh Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: c0JnUcb2gyHeNiXDH4D3 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: cBbwVgwd1KehAhwZUtkH Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: cGqkgrxHSPdPDrlZQQCi Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: cKAXh9fIYRlwasv6MvCE Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: cPLZLgwWQYVoFY9tvcgN Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: cPr74lYMuXGqJuez1FQa Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: cllCLJPkhnLKZpyXd6zk Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: cqWqZVG79jtFAN0h88Be Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: csniEKTHp8VcXfTXuJ0P Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ctIQaZSSIHrzSxFhbjLe Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ctlbd0O7DQx0O0UjATUH Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: cz63dIqqdxqj8ARUkFHq Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: d2ozYnXnesqX6UPELamT Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: d51aV8gI7lb55mnfFKPG Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dA27trROSZNL3W9n6jN9 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dBqgrJzNZmEJuSSzywvg Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dCqLHnJ0HpsqeMoxrJ1s Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dDhyFwKqKxvXHE6F23VJ Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dIQo9RF1wG2FBib432FA Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dNa7HNlSz3hBxnTWAqKV Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: db4lVh5uThOnBxrN0iwv Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dbXcu5CFVdve90AqdDOG Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: di3SeKhK7N4OPwM05EME Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dkV9YaDizLM3mRMVOtSY Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dnHzfLj1FCQqaw3Qjicb Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: dpElrmREWotMtEoEdTVn Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: e19j1vdBCoz4bOLtxOKD Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: eFUKeGJOmN0XUuC3lJXa Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: eHES56z8AinJgfXPKYoE Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: eLYpvyAJj3pw2O8aIeQT Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: eQmqO8kFjmkaGSPpHpjk Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: eVTWgXnAioPwJkrEn2r3 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ebx5An0i2oiX3xbB23rD Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: en8wTj39fZOmDtR5T0vn Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: eoc34qNmtLQ25EigTPWX Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: esdNXH5db10Q9SyRIkdk Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: etT3srpZUREdNiRjifLh Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ewQ56NxviDI42a49do3S Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fALelCGsSsgNn3d94tQI Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fOJtn53StaT82KHeUH65 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fS6uyHzAmGXuuVc4boev Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fSVKhOAtD0LdvGwmvPrD Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fTiqsXweXnGC2NbGPhU2 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fVoKfFqXxZuOvmtdXoyr Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fYMSiVqN0eCTfReFTFiR Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fZRQmt5eBO72RBDLgj1J Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fgZUmso3hyTb4hmZ9fbD Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fh25trkhSyKHsWFH8QIQ Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fkgCISednTtQBGHOUOn6 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fm1CnXYyzCoAfxadVRe8 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fn6gQN4Ul0qRsWVLeCBR Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ft0Qe6oXhdARyKESWNgO Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fuWFneUrI2S8MSbEjs9Y Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: futVr3yXd4DNKM4X5LKz Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: fxps5u18IwYqsSsdvQsU Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: g0YLSJwQWHGy5OHeZCGQ Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: g957O0UakfK3yKg6Vi5B Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: g9tyErS8h8rPiTBoKcAX Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: gIb52ljxM5YeftsJ7bJN Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: gOsWL2N2fm9PFGoLXTrh Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ggsxLBhXMsJDqV2IG6jj Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: giHX13QSQkpv7T47flpl Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: goobLEJOlhhoiuFpYe3K Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: grqUuGbIRNhKtshPqYYA Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: gwvjMQA0rSRcKgjVqQ4h Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: hATKZdpGVftAqsuwAyw7 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: hF5NL8UYOoGTsAdYXRCq Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: hW0UqQc57UrwPQ4fe1KM Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: hXgSGm6jyTxIGg4MFIMl Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: hg22RoF0uw440nwSL1nt Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: hlCxCGS4hBsiZ2BV0uLp Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: hsdADrXSmDg7BQtQGRTs Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: hw8nScDgAMqJWrnIp33T Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: hxIfiYCECKvfiabHx5pO Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: i0ysUrZV6xTLESg2ByON Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: i70yvcgYkfOYfkMAGJrL Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: iB5aWxsVdKNZydYbvku2 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: iST0ogxRYpGrzDzD5Dzx Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: iUYUvKd19txtl2tWvjGt Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ibljZbeCDtoM4MyMzfte Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ikRCbd0ecYPm2phebhHX Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: j0xVpmVHyAFGdllBjZgK Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: jCqhxF7fgcdCdW8sRt5S Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: jGXmhzcsKfLvPh9jserq Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: jY8UtdroWeKvI3U8uV5w Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: jbHctsiRCLukZfuo5TWv Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: jbJpQuIT3uOByGx6Y66H Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: jrFBHOPAJMHoT45W6q2C Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: jyZrxoBkccXEgLoH1lj4 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: jzNFv2D4HueqBo14OWE7 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: kEDuT5cdBwGmkDq0DjfK Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: kHnWlyUc8PiWnkjtCloq Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: kOp8h7qvNCWn3PWCptP7 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: keZoNCHV8lElBNVUWxrX Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: kldYSgHVfa2U9AYkRHb9 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: kmXsgkeWqw0jywwdbooI Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: krvqLEZfY8xSWytmF6a5 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lBjmKkj85Ov0H3DnXmj2 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lDGDtyD4s1zQMIPwtv8D Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lKYMtyCNs5fYOexrknR5 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lMrXJJOmtYrXPBJ4JEzB Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lfQBT485iuK8wENPaKfv Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lfve0IwajAXA3p1b034v Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lvln9PZG6wUqEOSnpq7p Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lwdG48EfuUtU229byQhj Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lxnXw410xATaCMv7p58J Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lzdDYMMnBrGMb5I4JEYO Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: lzqouIFNE13M9qOpdQIr Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: m116FdSVFO4oUnmuCplh Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: m9sPwasqlckanGW2ceQw Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: mAC68sE4WcPgZDXgaPmp Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: mLLXdpXSefXmVf2ITs5h Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: mY328D06pXHuMMCcQOPB Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: me0CeMDk1gmriS9LvubU Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: me9fuNfE7aGoNopzQj6t Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: mj7JcaaD1iMgdkMAorHn Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: mmQZQ7quVuJd9uanx8fE Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: moWhspmr13JNQnxDNKLd Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: muyzJowGCzim4BGv0xtV Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: mvbNuXfLdiFFd88A853s Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: myoALRpryvQNjEFQ9RHt Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: mzlLsWINLm74qIiX4MYQ Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: n1WLm1rfJxugQnmVmbgT Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: n6FzrGjOmd42IkvXi6rg Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:89:21)
+    at async GET (app/api/queue/route.ts:115:33)
+  87 |                   const chunkQuery = await adminDb.collection('queue_image_chunks')
+  88 |                     .where('image_id', '==', imageId)
+> 89 |                     .get();
+     |                     ^
+  90 |                   
+  91 |                   const chunks: { [key: number]: string } = {};
+  92 |                   chunkQuery.forEach(chunkDoc => { {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: nLqUCGVAi1QCh9VgWOan Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+ ✓ Compiled in 401ms
+Found 717 queue items in Firebase
+Error fetching queue items from Firebase: RangeError: Invalid string length
+    at JSON.stringify (<anonymous>)
+    at GET (app/api/queue/route.ts:189:26)
+  187 |       
+  188 |       console.log(`Found ${items.length} queue items in Firebase`);
+> 189 |       return NextResponse.json({ items });
+      |                          ^
+  190 |     } catch (error) {
+  191 |       console.error('Error fetching queue items from Firebase:', error);
+  192 |       return NextResponse.json({ error: 'Failed to fetch queue items' }, { status: 500 });
+ ⚠ Server is approaching the used memory threshold, restarting...
+   ▲ Next.js 15.3.4 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.113:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1082ms

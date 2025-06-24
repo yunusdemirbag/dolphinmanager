@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     etsyFormData.append('title', listingData.title);
     etsyFormData.append('description', listingData.description);
     // Price kontrolü - Variation kullanıyorsak base price'ı en düşük variation'dan al
-    let finalPrice = 29.99; // Fallback price
+    let finalPrice = 0; // Default 0
     
     if (listingData.has_variations && listingData.variations?.length > 0) {
       // Variation kullanıyorsa en düşük variation price'ını base price yap
@@ -117,15 +117,26 @@ export async function POST(request: NextRequest) {
       
       if (activePrices.length > 0) {
         finalPrice = Math.min(...activePrices);
+        console.log('✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor:', finalPrice);
+      } else {
+        // Aktif varyasyon yoksa, predefined variations'dan en düşük fiyatı al
+        finalPrice = 80; // En düşük predefined price (Roll 8"x12")
+        console.log('⚠️ Aktif varyasyon yok, predefined en düşük fiyat kullanılıyor:', finalPrice);
       }
       console.log('📊 Variation price sistemi:', {
+        has_variations: true,
         active_variations: activePrices.length,
-        min_price: finalPrice,
-        all_prices: activePrices
+        final_price: finalPrice,
+        all_active_prices: activePrices
       });
     } else {
-      // Variation yoksa user input price'ını kullan
-      finalPrice = listingData.price && listingData.price > 0 ? listingData.price : 29.99;
+      // Variation yoksa user input price'ını kullan, yoksa predefined en düşük
+      finalPrice = listingData.price && listingData.price > 0 ? listingData.price : 80;
+      console.log('📊 Tek fiyat sistemi:', {
+        has_variations: false,
+        user_price: listingData.price,
+        final_price: finalPrice
+      });
     }
     
     etsyFormData.append('price', finalPrice.toString());

@@ -638,6 +638,40 @@ export function ProductFormModal({
     setVariations(newVariations);
   };
 
+  // Otomatik varyasyon yönetim fonksiyonları
+  const handleAddAllVariations = () => {
+    const activatedVariations = predefinedVariations.map(variation => ({
+      ...variation,
+      is_active: true
+    }));
+    setVariations(activatedVariations);
+    setHasVariations(true);
+    console.log('✅ Tüm varyasyonlar aktifleştirildi:', activatedVariations.length);
+  };
+
+  const handleResetVariations = () => {
+    setVariations([...predefinedVariations]);
+    console.log('🔄 Varyasyonlar sıfırlandı');
+  };
+
+  const handleActivatePattern = (pattern: string) => {
+    const newVariations = variations.map(variation => ({
+      ...variation,
+      is_active: variation.pattern === pattern ? true : variation.is_active
+    }));
+    setVariations(newVariations);
+    console.log(`🎯 ${pattern} varyasyonları aktifleştirildi`);
+  };
+
+  const handleDeactivateAll = () => {
+    const deactivatedVariations = variations.map(variation => ({
+      ...variation,
+      is_active: false
+    }));
+    setVariations(deactivatedVariations);
+    console.log('❌ Tüm varyasyonlar deaktifleştirildi');
+  };
+
   // productImages değiştiğinde autoTitleUsed'u sıfırla
   useEffect(() => {
     setAutoTitleUsed(false);
@@ -1479,6 +1513,61 @@ export function ProductFormModal({
             <ChevronDown className="h-4 w-4" />
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-2">
+            {/* Otomatik Varyasyon Yönetimi */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-3">
+              <h4 className="text-sm font-medium text-gray-700">Hızlı Varyasyon Yönetimi</h4>
+              
+              {/* Ana İşlemler */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddAllVariations}
+                  className="text-green-700 border-green-200 hover:bg-green-50"
+                >
+                  ✅ Tümünü Aktifleştir
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeactivateAll}
+                  className="text-red-700 border-red-200 hover:bg-red-50"
+                >
+                  ❌ Tümünü Kapat
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetVariations}
+                  className="text-blue-700 border-blue-200 hover:bg-blue-50"
+                >
+                  🔄 Sıfırla
+                </Button>
+              </div>
+              
+              {/* Pattern Bazlı İşlemler */}
+              <div className="space-y-2">
+                <p className="text-xs text-gray-600">Pattern bazlı aktifleştir:</p>
+                <div className="flex flex-wrap gap-1">
+                  {['Roll', 'Standard Canvas', 'White Frame', 'Gold Frame', 'Silver Frame', 'Black Frame'].map(pattern => (
+                    <Button
+                      key={pattern}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleActivatePattern(pattern)}
+                      className="text-xs px-2 py-1 h-auto"
+                    >
+                      {pattern}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
             <Table>
               <TableHeader>
                 <TableRow>

@@ -8,28 +8,41 @@
    - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 1642ms
- ○ Compiling /_not-found/page ...
- ✓ Compiled /_not-found/page in 3.5s
- GET /api/etsy/stores 404 in 3864ms
- ○ Compiling /api/shipping-profiles/firebase ...
- ✓ Compiled /api/shipping-profiles/firebase in 1504ms
+ ✓ Ready in 1216ms
+ ○ Compiling /products ...
+ ✓ Compiled /products in 5.8s
 Firebase Admin Config kontrol ediliyor:
 - Project ID: ✅ Mevcut
 - Client Email: ✅ Mevcut
 - Private Key: ✅ Doğru format
 Firebase admin initialized successfully
- GET /api/shipping-profiles/firebase 400 in 2110ms
- GET /api/shipping-profiles/firebase?shopId=56171647 400 in 50ms
- ○ Compiling /api/etsy/stores ...
- ✓ Compiled /api/etsy/stores in 1172ms
-🏪 Fetching store info for user: local-user-123
-🔍 local-user-123 kullanıcısı için mağaza bilgileri alınıyor...
- GET /api/etsy/stores 200 in 1749ms
- ○ Compiling /products ...
- ✓ Compiled /products in 3.7s
 🔍 local-user-123 kullanıcısı için mağaza bilgileri alınıyor...
 📦 Found 499 products in Firebase for user local-user-123. Fetching from DB.
- GET /products 200 in 4902ms
- GET /.well-known/appspecific/com.chrome.devtools.json 404 in 494ms
- ○ Compiling /favicon.ico ...
+ GET /products 200 in 7400ms
+ ✓ Compiled in 1192ms
+ ○ Compiling /queue ...
+ ✓ Compiled /queue in 1754ms
+ GET /queue 200 in 2231ms
+ ○ Compiling /api/queue ...
+ ✓ Compiled /api/queue in 876ms
+Fetching queue items from Firebase
+Error fetching queue items from Firebase: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:51:38)
+  49 |       
+  50 |       // Sorguyu çalıştır
+> 51 |       const snapshot = await queueRef.get();
+     |                                      ^
+  52 |       
+  53 |       if (snapshot.empty) {
+  54 |         console.log('No queue items found in Firebase'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123 500 in 1501ms
+Fetching queue items from Firebase
+No queue items found in Firebase
+ GET /api/queue?user_id=local-user-123 200 in 758ms
+Fetching queue items from Firebase
+No queue items found in Firebase
+ GET /api/queue?user_id=local-user-123 200 in 277ms

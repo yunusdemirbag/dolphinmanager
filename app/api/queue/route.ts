@@ -55,18 +55,49 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ items: [] });
       }
       
-      // Sonuçları dönüştür
+      // Sonuçları dönüştür - Flattened yapıdan normal yapıya
       const items: QueueItem[] = [];
       snapshot.forEach(doc => {
         const data = doc.data();
+        
+        // JSON string'leri parse et
+        let productData;
+        let images = [];
+        let video = null;
+        let variations = [];
+        
+        try {
+          productData = JSON.parse(data.product_data_json || '{}');
+          images = JSON.parse(data.images_json || '[]');
+          video = data.video_json ? JSON.parse(data.video_json) : null;
+          variations = JSON.parse(data.variations_json || '[]');
+        } catch (parseError) {
+          console.error('JSON parse error for queue item:', doc.id, parseError);
+          productData = {};
+        }
+        
         items.push({
           id: doc.id,
           user_id: data.user_id,
-          product_data: data.product_data,
+          product_data: {
+            title: data.title,
+            description: data.description,
+            price: data.price,
+            tags: data.tags || [],
+            images: images,
+            video: video,
+            taxonomy_id: data.taxonomy_id,
+            has_variations: data.has_variations,
+            variations: variations,
+            created_at: data.created_at.toDate().toISOString(),
+            ...productData
+          },
           status: data.status,
           created_at: data.created_at.toDate().toISOString(),
           updated_at: data.updated_at.toDate().toISOString(),
-          retry_count: data.retry_count || 0
+          retry_count: data.retry_count || 0,
+          error_message: data.error_message,
+          etsy_listing_id: data.etsy_listing_id
         });
       });
       

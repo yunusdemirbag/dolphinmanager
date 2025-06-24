@@ -98,6 +98,17 @@ export default function QueuePage() {
     }
   }
 
+  // Base64'ten File objesine dönüştürme
+  const base64ToFile = (base64: string, filename: string, mimeType: string): File => {
+    const byteCharacters = atob(base64.split(',')[1] || base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new File([byteArray], filename, { type: mimeType });
+  };
+
   // Otomatik işleme sistemi
   const processNextItem = async () => {
     const pendingItems = queueItems.filter(item => item.status === 'pending')
@@ -128,18 +139,24 @@ export default function QueuePage() {
         state: 'draft' // Her zaman taslak olarak gönder
       }))
 
-      // Görselleri ekle
+      // Görselleri ekle - Base64'ten File'a dönüştür
       if (nextItem.product_data.images) {
         nextItem.product_data.images.forEach((image: any, index: number) => {
-          if (image.file) {
-            formData.append(`imageFile_${index}`, image.file)
+          if (image.base64) {
+            const file = base64ToFile(image.base64, image.filename, image.type);
+            formData.append(`imageFile_${index}`, file);
           }
         })
       }
 
-      // Video ekle
-      if (nextItem.product_data.video) {
-        formData.append('videoFile', nextItem.product_data.video)
+      // Video ekle - Base64'ten File'a dönüştür  
+      if (nextItem.product_data.video && nextItem.product_data.video.base64) {
+        const videoFile = base64ToFile(
+          nextItem.product_data.video.base64, 
+          nextItem.product_data.video.filename, 
+          nextItem.product_data.video.type
+        );
+        formData.append('videoFile', videoFile);
       }
 
       const etsyResponse = await fetch('/api/etsy/listings/create', {

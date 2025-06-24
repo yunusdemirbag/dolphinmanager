@@ -72,22 +72,28 @@ export async function POST(request: NextRequest) {
       console.log('🎥 Video dosyası:', videoFile.name, (videoFile.size / 1024 / 1024).toFixed(2), 'MB');
     }
 
-    // Kuyruk öğesi oluştur
+    // Kuyruk öğesi oluştur - Nested objeler Firebase için basitleştirildi
     const queueItem = {
       user_id: userId,
-      product_data: {
-        ...listingData,
-        images: imageFiles,
-        video: videoData,
-        created_at: new Date().toISOString()
-      },
+      title: listingData.title,
+      description: listingData.description || '',
+      price: listingData.price || 0,
+      tags: listingData.tags || [],
+      taxonomy_id: listingData.taxonomy_id || 1027,
+      has_variations: listingData.has_variations || false,
+      variations_count: listingData.variations?.length || 0,
+      variations_json: JSON.stringify(listingData.variations || []),
+      images_count: imageFiles.length,
+      images_json: JSON.stringify(imageFiles),
+      video_json: videoData ? JSON.stringify(videoData) : null,
+      product_data_json: JSON.stringify(listingData),
       status: 'pending',
       created_at: new Date(),
       updated_at: new Date(),
       retry_count: 0,
     };
 
-    // Firebase'e kaydet
+    // Firebase'e kaydet - Flattened structure
     const docRef = await adminDb.collection('queue').add(queueItem);
     
     console.log('✅ Kuyruk öğesi oluşturuldu:', docRef.id);

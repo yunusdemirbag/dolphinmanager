@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -290,30 +290,29 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
     });
   }, [settings.imageFiles.length, settings.imagesPerProduct, toast, STORAGE_KEY]);
 
-  // Get current product files
+  // Get current product files - YENİ MANTIK: Her zaman ilk 6 dosya + kaynak dosyalar
   const getCurrentProductFiles = useCallback(() => {
-    const startImageIndex = currentProductIndex * settings.imagesPerProduct;
-    const endImageIndex = startImageIndex + settings.imagesPerProduct;
-    const currentProductImages = settings.imageFiles.slice(startImageIndex, endImageIndex);
+    // Artık index hesaplamaya gerek yok - her zaman ilk 6 dosyayı al
+    const currentProductImages = settings.imageFiles.slice(0, settings.imagesPerProduct);
     
-    // Her ürün için: İlk N resim + TÜM kaynak dosyaları (logo, watermark vs.)
-    // Bu şekilde her ürün kendi resimlerine + ortak kaynak dosyalarına sahip olur
+    // Her ürün için: İlk 6 resim + TÜM kaynak dosyaları (logo, watermark vs.)
     const allFiles = [...currentProductImages, ...settings.resourceFiles];
     
-    console.log(`🔍 DETAYLI DEBUG - Ürün ${currentProductIndex + 1}:`, {
-      currentProductIndex,
-      imagesPerProduct: settings.imagesPerProduct,
-      startImageIndex,
-      endImageIndex,
-      toplamResimSayısı: settings.imageFiles.length,
-      alınanResimSayısı: currentProductImages.length,
-      alınanResimAdları: currentProductImages.map(f => f.name),
+    console.log(`🔍 GÜNCEL DOSYA LİSTESİ:`, {
+      toplamDosyaSayısı: settings.imageFiles.length,
+      alınacakResimSayısı: currentProductImages.length,
+      alınacakResimAdları: currentProductImages.map(f => f.name),
       kaynakDosyaları: settings.resourceFiles.map(f => f.name),
-      toplamDosyaSayısı: allFiles.length
+      toplamGönderilecek: allFiles.length
     });
     
     return allFiles;
-  }, [currentProductIndex, settings.imageFiles, settings.resourceFiles, settings.imagesPerProduct]);
+  }, [settings.imageFiles, settings.resourceFiles, settings.imagesPerProduct]);
+
+  // Memoize edilmiş dosya listesi - infinite loop önlemi
+  const memoizedProductFiles = useMemo(() => {
+    return getCurrentProductFiles();
+  }, [settings.imageFiles.length, settings.resourceFiles.length, settings.imagesPerProduct]);
 
   // Generate product title from image name
   const generateProductTitle = useCallback((imageName: string): string => {
@@ -359,26 +358,58 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
       }));
     }
     
+    // 🗑️ YENİ MANTIK: İlk 6 dosyayı çöp kutusuna at
+    console.log('🗑️ Form başarıyla gönderildi, ilk 6 resmi silme işlemi başlıyor...');
+    const filesToDelete = settings.imageFiles.slice(0, settings.imagesPerProduct); // İlk 6 dosya
+    
+    try {
+      // Dosyaları çöp kutusuna taşı (macOS için)
+      for (const file of filesToDelete) {
+        const filePath = file.webkitRelativePath || file.name;
+        console.log(`🗑️ Çöp kutusuna taşınıyor: ${file.name}`);
+        
+        // Web API ile dosya silme (sadece referansı kaldırır)
+        // Gerçek dosya silme browser'da mümkün değil, ama listeden çıkarabiliriz
+      }
+      
+      // Dosya listesini güncelle - ilk 6'yı çıkar
+      const remainingFiles = settings.imageFiles.slice(settings.imagesPerProduct);
+      setSettings(prev => ({
+        ...prev,
+        imageFiles: remainingFiles
+      }));
+      
+      console.log(`🗑️ ${filesToDelete.length} dosya listeden çıkarıldı, kalan: ${remainingFiles.length}`);
+      
+      toast({
+        title: "Dosyalar Temizlendi",
+        description: `${filesToDelete.length} işlenen dosya listeden çıkarıldı`
+      });
+      
+    } catch (error) {
+      console.error('❌ Dosya silme hatası:', error);
+    }
+    
     // Close current form
     setShowProductForm(false);
     
-    // Move to next product
-    const nextProductIndex = currentProductIndex + 1;
-    const totalProducts = Math.floor(settings.imageFiles.length / settings.imagesPerProduct);
+    // Yeni toplam hesapla (dosyalar silindikten sonra)
+    const newRemainingFiles = settings.imageFiles.length - settings.imagesPerProduct;
+    const newTotalProducts = Math.floor(newRemainingFiles / settings.imagesPerProduct);
     
-    if (nextProductIndex < totalProducts) {
-      // Wait 5 seconds before opening next form (as requested)
+    if (newRemainingFiles >= settings.imagesPerProduct) {
+      // Hala işlenecek dosya var - sonraki ürüne geç (ama index sıfırla)
       console.log('⏰ Form kapandı, 5 saniye bekleniyor...');
       setTimeout(() => {
-        console.log(`🔄 Sonraki ürün için form açılıyor... ${currentProductIndex} → ${nextProductIndex}`);
-        setCurrentProductIndex(nextProductIndex);
+        console.log(`🔄 Sonraki ürün için form açılıyor... (index sıfırlanıyor: 0)`);
+        setCurrentProductIndex(0); // Index'i sıfırla çünkü dosyalar silindi
         setShowProductForm(true);
         
         toast({
           title: "Sonraki Ürün",
-          description: `Ürün ${nextProductIndex + 1}/${totalProducts} otomatik işleniyor...`
+          description: `Kalan ${newRemainingFiles} dosyadan sonraki 6'sı işleniyor...`
         });
-      }, 5000); // 5 saniye bekle (kullanıcının isteği)
+      }, 5000); // 5 saniye bekle
     } else {
       // All products completed
       setProcessing(prev => ({
@@ -389,10 +420,10 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
       
       toast({
         title: "Tamamlandı!",
-        description: `${totalProducts} ürün başarıyla kuyruğa eklendi.`
+        description: `Tüm dosyalar işlendi! Kalan ${newRemainingFiles} dosya 6'dan az.`
       });
     }
-  }, [currentProductIndex, settings.imageFiles.length, settings.imagesPerProduct, processing.totalProducts, toast, getCurrentProductFiles, generateProductTitle]);
+  }, [currentProductIndex, settings.imageFiles, settings.imagesPerProduct, processing.totalProducts, toast, getCurrentProductFiles, generateProductTitle]);
 
   // Handle form close
   const handleFormClose = useCallback(() => {
@@ -621,12 +652,12 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
 
       {/* Simple ProductFormModal - opens directly when processing starts */}
       <ProductFormModal
-        key={`product-${currentProductIndex}`} // Her ürün için yeni instance
+        key={`product-${settings.imageFiles.length}`} // Dosya sayısı değişince yeni instance
         isOpen={showProductForm}
         onClose={handleFormClose}
         userId="auto-processing"
         isAutoMode={true}
-        autoFiles={getCurrentProductFiles()}
+        autoFiles={memoizedProductFiles}
         autoTitle=""
         onSubmitSuccess={handleFormSubmitSuccess}
       />

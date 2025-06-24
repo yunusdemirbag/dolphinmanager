@@ -722,23 +722,34 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   };
 
   const processQueueItem = useCallback(async (itemId: string) => {
+    console.log('🚀 processQueueItem başlatılıyor:', itemId);
     try {
       // İşlem süresini ölçmek için timer başlat
       window.processingStartTime = performance.now();
       setCurrentlyProcessing(itemId);
       
       // Kuyruk öğesini al
+      console.log('📡 API çağrısı yapılıyor:', `/api/queue?user_id=${userId}`);
       const queueResponse = await fetch(`/api/queue?user_id=${userId}`);
+      console.log('📡 API yanıtı alındı:', queueResponse.status, queueResponse.statusText);
+      
       if (!queueResponse.ok) {
-        throw new Error('Kuyruk verisi alınamadı');
+        const errorText = await queueResponse.text();
+        console.error('❌ API yanıt hatası:', errorText);
+        throw new Error(`Kuyruk verisi alınamadı: ${queueResponse.status} - ${errorText}`);
       }
       
       const queueData = await queueResponse.json();
+      console.log('📋 Kuyruk verisi alındı:', queueData.items?.length, 'öğe');
+      
       const queueItem = queueData.items.find((item: any) => item.id === itemId);
       
       if (!queueItem) {
-        throw new Error('Kuyruk öğesi bulunamadı');
+        console.error('❌ Öğe bulunamadı:', itemId, 'mevcut öğeler:', queueData.items.map((i: any) => i.id));
+        throw new Error(`Kuyruk öğesi bulunamadı: ${itemId}`);
       }
+      
+      console.log('✅ Kuyruk öğesi bulundu:', queueItem.product_data?.title);
 
       // Base64 resimlerini File objelerine dönüştür
       const formData = new FormData();
@@ -829,8 +840,18 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
           // İşlem süresini hesapla
           const processingTime = performance.now() - (window.processingStartTime || 0);
           
-          // Tamamlananlar sayacını localStorage'da tut ve state'i güncelle
-          const newCompletedCount = completedCount + 1;
+          // Tamamlananlar sayacını localStorage'dan gerçek sayıyı alarak hesapla
+          const currentCompletedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
+          const currentValidCompleted = currentCompletedKeys.filter(key => {
+            try {
+              const data = JSON.parse(localStorage.getItem(key) || '{}');
+              return data.title && data.completed_at && !isNaN(new Date(data.completed_at).getTime());
+            } catch {
+              localStorage.removeItem(key);
+              return false;
+            }
+          });
+          const newCompletedCount = currentValidCompleted.length + 1;
           const completedData = {
             title: queueItem.product_data.title,
             completed_at: new Date().toISOString(),
@@ -899,10 +920,17 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         throw new Error(errorData.message || errorData.error || 'Gönderim başarısız');
       }
     } catch (error) {
+      // Error objesini farklı şekillerde yazdırmaya çalış
+      console.error('🚨 RAW ERROR:', error);
+      console.error('🚨 ERROR STRING:', String(error));
+      console.error('🚨 ERROR JSON:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+      
       console.error('🚨 DETAYLI KUYRUK İŞLEME HATASI:', {
-        error,
+        error: error.toString(),
         errorMessage: error instanceof Error ? error.message : 'Bilinmeyen hata',
         errorStack: error instanceof Error ? error.stack : 'Stack yok',
+        errorType: typeof error,
+        errorConstructor: error.constructor?.name,
         itemId,
         userId
       });
@@ -1062,6 +1090,65 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       });
     }
   }, [selectedItems, toast]);
+
+  // Reset List function - clears both Firebase queue and localStorage completed items
+  const resetList = useCallback(async () => {
+    if (!confirm('Bu işlem tüm kuyruk ve tamamlanan ürün listesini sıfırlayacak. Bu işlem geri alınamaz. Emin misiniz?')) {
+      return;
+    }
+
+    try {
+      // Clear Firebase queue
+      const response = await fetch('/api/queue', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'clear_all',
+          user_id: 'local-user-123'
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Clear localStorage completed items
+        if (typeof window !== 'undefined') {
+          const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
+          completedKeys.forEach(key => localStorage.removeItem(key));
+          localStorage.removeItem('completed_count');
+        }
+        
+        // Reset all state
+        setQueueItems([]);
+        setSelectedItems([]);
+        setCompletedCount(0);
+        setCompletedItems([]);
+        setQueueStats({
+          pending: 0,
+          processing: 0,
+          completed: 0,
+          failed: 0
+        });
+        
+        toast({
+          title: "Liste Sıfırlandı",
+          description: "Tüm kuyruk ve tamamlanan ürün listesi temizlendi"
+        });
+        
+        // Reload queue to sync with backend
+        await loadQueueItems();
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Reset hatası:', error);
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: "Liste sıfırlanamadı"
+      });
+    }
+  }, [toast]);
 
   const saveEdit = async (itemId: string, field: string, newValue?: string | string[]) => {
     try {
@@ -1252,11 +1339,11 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
 
             <Button
               variant="destructive"
-              onClick={clearQueue}
-              disabled={isLoadingQueue || queueItems.length === 0}
+              onClick={resetList}
+              disabled={isLoadingQueue || (queueItems.length === 0 && completedCount === 0)}
             >
               <Trash className="w-4 h-4 mr-2" />
-              Kuyruğu Temizle
+              Listeyi Sıfırla
             </Button>
 
             <Button

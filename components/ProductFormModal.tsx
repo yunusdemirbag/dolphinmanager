@@ -1430,8 +1430,8 @@ export function ProductFormModal({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-        console.error('⏰ API call timeout - 60 seconds');
-      }, 60000); // 60 second timeout
+        console.error('⏰ API call timeout - 300 seconds');
+      }, 300000); // 5 minute timeout (büyük video/resim dosyaları için)
       
       console.log('📡 Fetch başlatılıyor...');
       const response = await fetch('/api/etsy/listings/queue', {

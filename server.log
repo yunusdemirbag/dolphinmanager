@@ -49,3 +49,844 @@ No queue items found in Firebase
 Fetching queue items from Firebase
 No queue items found in Firebase
  GET /api/queue?user_id=local-user-123 200 in 549ms
+Fetching queue items from Firebase
+No queue items found in Firebase
+ GET /api/queue?user_id=local-user-123 200 in 276ms
+ ✓ Compiled in 1655ms
+ ○ Compiling /api/etsy/listings/queue ...
+ ✓ Compiled /api/etsy/listings/queue in 639ms
+🚀 Kuyruk API çağrısı başlatıldı
+❌ Kuyruk API hatası: TypeError: Request.formData: Could not parse content as FormData.
+    at async POST (app/api/etsy/listings/queue/route.ts:23:21)
+  21 |     
+  22 |     // FormData'dan veriyi al
+> 23 |     const formData = await request.formData();
+     |                     ^
+  24 |     const listingDataString = formData.get('listingData') as string;
+  25 |     
+  26 |     console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
+ POST /api/etsy/listings/queue 500 in 950ms
+ ○ Compiling /api/etsy/listings/create ...
+ ✓ Compiled /api/etsy/listings/create in 1223ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 JSON formatında veri alındı
+📋 Listing data alındı: {
+  title: 'Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom',
+  state: undefined,
+  hasImages: true,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+❌ Direkt Etsy listing hatası: ReferenceError: formData is not defined
+    at POST (app/api/etsy/listings/create/route.ts:104:24)
+  102 |     let index = 0;
+  103 |     while (true) {
+> 104 |       const imageFile = formData.get(`imageFile_${index}`) as File;
+      |                        ^
+  105 |       if (!imageFile) break;
+  106 |       imageFiles.push(imageFile);
+  107 |       index++;
+ POST /api/etsy/listings/create 500 in 1933ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+(node:45973) ExperimentalWarning: buffer.File is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+📋 Alınan listingData string: {"title":"Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom","description":"🌟 Made Ju...
+📋 Listing data alındı: {
+  title: 'Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 0,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',    'canvas print',
+    'surrealist',  'floral',
+    'whimsical',   'bedroom',
+    'living room', 'modern',
+    'abstract',    'art print',
+    'home decor',  'unique',
+    'butterfly'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T09:58:18.143Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom
+  description: 🌟 Made Just for You – Fast & Safe Delivery 🌟
+
+💡 Looking to personalize your wall art? We offer cu
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 1
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 404 false (0.5s)
+📋 Response data keys: [ 'error' ]
+❌ Etsy API hatası: {
+  status: 404,
+  statusText: 'Not Found',
+  response_body: {
+    error: "Could not find shipping_profile_id='1' associated with shop '56171647'"
+  },
+  sent_data_keys: [
+    'quantity',
+    'title',
+    'description',
+    'price',
+    'who_made',
+    'when_made',
+    'taxonomy_id',
+    'shipping_profile_id',
+    'processing_min',
+    'processing_max',
+    'is_personalizable',
+    'personalization_is_required',
+    'personalization_char_count_max',
+    'personalization_instructions',
+    'is_supply',
+    'is_customizable',
+    'should_auto_renew',
+    'state'
+  ]
+}
+ POST /api/etsy/listings/create 404 in 1169ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom","description":"🌟 Made Ju...
+📋 Listing data alındı: {
+  title: 'Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',    'canvas print',
+    'surrealist',  'floral',
+    'whimsical',   'bedroom',
+    'living room', 'modern',
+    'abstract',    'art print',
+    'home decor',  'unique',
+    'butterfly'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T09:59:27.799Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom
+  description: 🌟 Made Just for You – Fast & Safe Delivery 🌟
+
+💡 Looking to personalize your wall art? We offer cu
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 243485569
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 404 false (0.4s)
+📋 Response data keys: [ 'error' ]
+❌ Etsy API hatası: {
+  status: 404,
+  statusText: 'Not Found',
+  response_body: {
+    error: "Could not find shipping_profile_id='243485569' associated with shop '56171647'"
+  },
+  sent_data_keys: [
+    'quantity',
+    'title',
+    'description',
+    'price',
+    'who_made',
+    'when_made',
+    'taxonomy_id',
+    'shipping_profile_id',
+    'processing_min',
+    'processing_max',
+    'is_personalizable',
+    'personalization_is_required',
+    'personalization_char_count_max',
+    'personalization_instructions',
+    'is_supply',
+    'is_customizable',
+    'should_auto_renew',
+    'state'
+  ]
+}
+ POST /api/etsy/listings/create 404 in 699ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom","description":"🌟 Made Ju...
+📋 Listing data alındı: {
+  title: 'Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',    'canvas print',
+    'surrealist',  'floral',
+    'whimsical',   'bedroom',
+    'living room', 'modern',
+    'abstract',    'art print',
+    'home decor',  'unique',
+    'butterfly'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T09:59:36.536Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom
+  description: 🌟 Made Just for You – Fast & Safe Delivery 🌟
+
+💡 Looking to personalize your wall art? We offer cu
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 243485569
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 404 false (0.3s)
+📋 Response data keys: [ 'error' ]
+❌ Etsy API hatası: {
+  status: 404,
+  statusText: 'Not Found',
+  response_body: {
+    error: "Could not find shipping_profile_id='243485569' associated with shop '56171647'"
+  },
+  sent_data_keys: [
+    'quantity',
+    'title',
+    'description',
+    'price',
+    'who_made',
+    'when_made',
+    'taxonomy_id',
+    'shipping_profile_id',
+    'processing_min',
+    'processing_max',
+    'is_personalizable',
+    'personalization_is_required',
+    'personalization_char_count_max',
+    'personalization_instructions',
+    'is_supply',
+    'is_customizable',
+    'should_auto_renew',
+    'state'
+  ]
+}
+ POST /api/etsy/listings/create 404 in 659ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom","description":"🌟 Made Ju...
+📋 Listing data alındı: {
+  title: 'Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',    'canvas print',
+    'surrealist',  'floral',
+    'whimsical',   'bedroom',
+    'living room', 'modern',
+    'abstract',    'art print',
+    'home decor',  'unique',
+    'butterfly'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:00:17.880Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Surrealist Canvas Wall Art - Whimsical Floral Decor for Bedroom
+  description: 🌟 Made Just for You – Fast & Safe Delivery 🌟
+
+💡 Looking to personalize your wall art? We offer cu
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 1
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 404 false (0.3s)
+📋 Response data keys: [ 'error' ]
+❌ Etsy API hatası: {
+  status: 404,
+  statusText: 'Not Found',
+  response_body: {
+    error: "Could not find shipping_profile_id='1' associated with shop '56171647'"
+  },
+  sent_data_keys: [
+    'quantity',
+    'title',
+    'description',
+    'price',
+    'who_made',
+    'when_made',
+    'taxonomy_id',
+    'shipping_profile_id',
+    'processing_min',
+    'processing_max',
+    'is_personalizable',
+    'personalization_is_required',
+    'personalization_char_count_max',
+    'personalization_instructions',
+    'is_supply',
+    'is_customizable',
+    'should_auto_renew',
+    'state'
+  ]
+}
+ POST /api/etsy/listings/create 404 in 630ms
+ ✓ Compiled in 226ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Abstract Bird Canvas Wall Art - Colorful Modern Decor for Living Room","description":"🌟 L...
+📋 Listing data alındı: {
+  title: 'Abstract Bird Canvas Wall Art - Colorful Modern Decor for Living Room',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',        'canvas print',
+    'bird art',        'modern decor',
+    'abstract art',    'living room',
+    'colorful',        'bird decor',
+    'canvas wall art', 'home decor',
+    'abstract print',  'modern wall art',
+    'bird painting'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:09:41.433Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Abstract Bird Canvas Wall Art - Colorful Modern Decor for Living Room
+  description: 🌟 Let's Create Something Unique – Delivered Safely 🌟
+
+🎨 If you need a custom size or want your ow
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 1
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 404 false (0.4s)
+📋 Response data keys: [ 'error' ]
+❌ Etsy API hatası: {
+  status: 404,
+  statusText: 'Not Found',
+  response_body: {
+    error: "Could not find shipping_profile_id='1' associated with shop '56171647'"
+  },
+  sent_data_keys: [
+    'quantity',
+    'title',
+    'description',
+    'price',
+    'who_made',
+    'when_made',
+    'taxonomy_id',
+    'shipping_profile_id',
+    'processing_min',
+    'processing_max',
+    'is_personalizable',
+    'personalization_is_required',
+    'personalization_char_count_max',
+    'personalization_instructions',
+    'is_supply',
+    'is_customizable',
+    'should_auto_renew',
+    'state'
+  ]
+}
+ POST /api/etsy/listings/create 404 in 1093ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Emotional Woman Art Canvas Print - Abstract Wall Decor for Bedroom","description":"🌟 Made...
+📋 Listing data alındı: {
+  title: 'Emotional Woman Art Canvas Print - Abstract Wall Decor for Bedroom',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',   'canvas print',
+    'abstract',   'woman art',
+    'bedroom',    'emotional',
+    'modern',     'artistic',
+    'face',       'portrait',
+    'home decor', 'living room',
+    'unique'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:11:59.164Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Emotional Woman Art Canvas Print - Abstract Wall Decor for Bedroom
+  description: 🌟 Made Just for You – Fast & Safe Delivery 🌟
+
+💡 Looking to personalize your wall art? We offer cu
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.7s)
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325348753
+📋 Etsy listing URL: https://www.etsy.com/listing/4325348753/emotional-woman-art-canvas-print
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 2.08 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 7013831791
+📊 Resim upload özeti: 1/1 başarılı
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325348753
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 3923ms

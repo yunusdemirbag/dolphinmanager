@@ -1,26 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 
+// Base64'ü küçük parçalara böl (1MB altı)
+const chunkBase64 = (base64: string, chunkSize: number = 900000): string[] => {
+  const chunks = [];
+  for (let i = 0; i < base64.length; i += chunkSize) {
+    chunks.push(base64.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
+
+// Parçaları birleştir
+const combineChunks = (chunks: string[]): string => {
+  return chunks.join('');
+};
+
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Kuyruk API çağrısı başlatıldı');
     
-    // FormData'dan veriyi al
-    const formData = await request.formData();
-    const listingDataString = formData.get('listingData') as string;
+    let listingData;
+    let formData: FormData | null = null;
+    const contentType = request.headers.get('content-type') || '';
     
-    console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
-    
-    if (!listingDataString) {
-      return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
+    if (contentType.includes('application/json')) {
+      // JSON formatında veri
+      const body = await request.json();
+      listingData = body.product || body;
+      console.log('📋 JSON formatında veri alındı');
+    } else if (contentType.includes('multipart/form-data')) {
+      // FormData formatında veri
+      formData = await request.formData();
+      const listingDataString = formData.get('listingData') as string;
+      
+      console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
+      
+      if (!listingDataString) {
+        return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
+      }
+      
+      try {
+        listingData = JSON.parse(listingDataString);
+      } catch (parseError) {
+        console.error('❌ JSON parse hatası:', parseError);
+        return NextResponse.json({ error: 'Invalid listing data format' }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ error: 'Unsupported content type' }, { status: 400 });
     }
     
-    let listingData;
-    try {
-      listingData = JSON.parse(listingDataString);
-    } catch (parseError) {
-      console.error('❌ JSON parse hatası:', parseError);
-      return NextResponse.json({ error: 'Invalid listing data format' }, { status: 400 });
+    if (!listingData) {
+      return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
     }
 
     // Firebase Admin'i initialize et
@@ -33,49 +63,83 @@ export async function POST(request: NextRequest) {
 
     // Görselleri ayrı koleksiyonda sakla - Firebase limit için
     const imageRefs: string[] = [];
-    let index = 0;
-    while (true) {
-      const imageFile = formData.get(`imageFile_${index}`) as File;
-      if (!imageFile) break;
+    if (formData) {
+      let index = 0;
+      while (true) {
+        const imageFile = formData.get(`imageFile_${index}`) as File;
+        if (!imageFile) break;
       
       // File'ı base64'e çevir
       const arrayBuffer = await imageFile.arrayBuffer();
       const base64 = Buffer.from(arrayBuffer).toString('base64');
       
-      // Resmi ayrı koleksiyonda sakla
+      // Base64'ü parçalara böl
+      const chunks = chunkBase64(base64);
+      console.log(`📷 Resim ${index + 1}: ${chunks.length} parçaya bölündü`);
+      
+      // Ana resim meta bilgisini sakla
       const imageDoc = await adminDb.collection('queue_images').add({
-        base64: base64,
         type: imageFile.type,
         filename: imageFile.name,
         position: index,
         size: imageFile.size,
+        chunks_count: chunks.length,
         created_at: new Date()
       });
       
-      imageRefs.push(imageDoc.id);
-      index++;
+      // Her parçayı ayrı dokümanda sakla
+      const chunkPromises = chunks.map(async (chunk, chunkIndex) => {
+        return adminDb.collection('queue_image_chunks').add({
+          image_id: imageDoc.id,
+          chunk_index: chunkIndex,
+          chunk_data: chunk,
+          created_at: new Date()
+        });
+      });
+      
+        await Promise.all(chunkPromises);
+        imageRefs.push(imageDoc.id);
+        index++;
+      }
     }
 
     console.log('🖼️ Toplam resim sayısı:', imageRefs.length);
 
     // Video dosyasını ayrı koleksiyonda sakla (eğer varsa)
     let videoRef = null;
-    const videoFile = formData.get('videoFile') as File;
-    if (videoFile) {
-      const arrayBuffer = await videoFile.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString('base64');
-      
-      // Video'yu ayrı koleksiyonda sakla
-      const videoDoc = await adminDb.collection('queue_videos').add({
-        base64: base64,
-        type: videoFile.type,
-        filename: videoFile.name,
-        size: videoFile.size,
-        created_at: new Date()
-      });
-      
-      videoRef = videoDoc.id;
-      console.log('🎥 Video dosyası:', videoFile.name, (videoFile.size / 1024 / 1024).toFixed(2), 'MB');
+    if (formData) {
+      const videoFile = formData.get('videoFile') as File;
+      if (videoFile) {
+        const arrayBuffer = await videoFile.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        
+        // Base64'ü parçalara böl
+        const videoChunks = chunkBase64(base64);
+        console.log(`🎥 Video: ${videoChunks.length} parçaya bölündü`);
+        
+        // Ana video meta bilgisini sakla
+        const videoDoc = await adminDb.collection('queue_videos').add({
+          type: videoFile.type,
+          filename: videoFile.name,
+          size: videoFile.size,
+          chunks_count: videoChunks.length,
+          created_at: new Date()
+        });
+        
+        // Her parçayı ayrı dokümanda sakla
+        const videoChunkPromises = videoChunks.map(async (chunk, chunkIndex) => {
+          return adminDb.collection('queue_video_chunks').add({
+            video_id: videoDoc.id,
+            chunk_index: chunkIndex,
+            chunk_data: chunk,
+            created_at: new Date()
+          });
+        });
+        
+        await Promise.all(videoChunkPromises);
+        videoRef = videoDoc.id;
+        console.log('🎥 Video dosyası:', videoFile.name, (videoFile.size / 1024 / 1024).toFixed(2), 'MB');
+      }
     }
 
     // Kuyruk öğesi oluştur - Referanslarla, büyük veri yok

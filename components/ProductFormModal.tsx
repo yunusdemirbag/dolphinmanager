@@ -93,6 +93,9 @@ interface ProductFormModalProps {
   isOpen: boolean
   onClose: () => void
   product?: Product
+  initialData?: any
+  isEditMode?: boolean
+  queueItemId?: string
 }
 
 // Drag and drop için item tipleri
@@ -221,31 +224,34 @@ export function ProductFormModal({
   isOpen,
   onClose,
   product,
+  initialData,
+  isEditMode = false,
+  queueItemId,
 }: ProductFormModalProps) {
   // All useState declarations at the top
   const { toast } = useToast()
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false)
-  const [title, setTitle] = useState(product?.title || "")
+  const [title, setTitle] = useState(initialData?.title || product?.title || "")
   const [titleInput, setTitleInput] = useState("")
-  const [description, setDescription] = useState(product?.description || "")
-  const [price, setPrice] = useState(product?.price?.amount || 0)
+  const [description, setDescription] = useState(initialData?.description || product?.description || "")
+  const [price, setPrice] = useState(initialData?.price || product?.price?.amount || 0)
   const [quantity, setQuantity] = useState(4)
   const [shippingProfileId, setShippingProfileId] = useState(
     product?.shipping_profile_id?.toString() || ""
   )
 
   // Additional fields to match Etsy
-  const [tags, setTags] = useState<string[]>(product?.tags || [])
+  const [tags, setTags] = useState<string[]>(initialData?.tags || product?.tags || [])
   const [newTag, setNewTag] = useState("")
   const [isPersonalizable, setIsPersonalizable] = useState(true)
   const [personalizationRequired, setPersonalizationRequired] = useState(false)
   const [personalizationInstructions, setPersonalizationInstructions] = useState(
     'Phone Number for Delivery'
   )
-  const [taxonomyId, setTaxonomyId] = useState(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
+  const [taxonomyId, setTaxonomyId] = useState(initialData?.taxonomy_id || product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
   
-  const [hasVariations, setHasVariations] = useState<boolean>(true);
-  const [variations, setVariations] = useState(product?.variations || predefinedVariations.map(v => ({ ...v, is_active: true })))
+  const [hasVariations, setHasVariations] = useState<boolean>(initialData?.has_variations ?? true);
+  const [variations, setVariations] = useState(initialData?.variations || product?.variations || predefinedVariations.map(v => ({ ...v, is_active: true })))
   const [shopSections, setShopSections] = useState<{ shop_section_id: number; title: string }[]>([]);
   const [selectedShopSection, setSelectedShopSection] = useState<string>('');
   
@@ -308,6 +314,59 @@ export function ProductFormModal({
       [section]: !prev[section as keyof typeof prev]
     }));
   };
+
+  // Initialize media files from initialData (for queue editing)
+  useEffect(() => {
+    if (initialData?.images && initialData.images.length > 0) {
+      const mediaFiles: MediaFile[] = initialData.images.map((img: any, index: number) => {
+        // Base64'ten File objesi oluştur
+        const base64Data = img.base64;
+        const mimeType = img.type || 'image/jpeg';
+        const filename = img.name || `image_${index + 1}.jpg`;
+        
+        // Base64'ü blob'a çevir
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+        const file = new File([blob], filename, { type: mimeType });
+        
+        return {
+          file: file,
+          preview: `data:${mimeType};base64,${base64Data}`,
+          uploading: false
+        };
+      });
+      
+      setProductImages(mediaFiles);
+    }
+    
+    if (initialData?.video) {
+      const video = initialData.video;
+      const base64Data = video.base64;
+      const mimeType = video.type || 'video/mp4';
+      const filename = video.name || 'video.mp4';
+      
+      // Base64'ü blob'a çevir
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mimeType });
+      const file = new File([blob], filename, { type: mimeType });
+      
+      setVideoFile({
+        file: file,
+        preview: `data:${mimeType};base64,${base64Data}`,
+        uploading: false
+      });
+    }
+  }, [initialData]);
 
   // Form progress calculation
   useEffect(() => {
@@ -902,7 +961,7 @@ export function ProductFormModal({
         description: "Lütfen bekleyin, ürün kuyrukta sisteme ekleniyor." 
       });
       
-      const formData = new FormData();
+      let formData = new FormData();
 
       const listingData = {
         // Formdan gelen dinamik değerler
@@ -1012,6 +1071,12 @@ export function ProductFormModal({
         imagesLength: (imageDataArray || []).length,
         videoUrl: videoUrl
       });
+      
+      // FormData'yı burada yeniden güvence altına al
+      if (!formData) {
+        console.error('❌ FormData undefined, yeniden oluşturuluyor');
+        formData = new FormData();
+      }
       
       // Resimleri doğrudan File obje olarak gönder (Base64 yerine)
       productImages.forEach((image, index) => {
@@ -2011,7 +2076,10 @@ Return only the title, no quotes, no explanations.`
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle className="flex items-center justify-between">
-                <span>{product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}</span>
+                <span>
+                  {isEditMode ? `Kuyruk Ürünü Düzenle: ${initialData?.title || 'Ürün'}` : 
+                   product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}
+                </span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-700">İlerleme:</span>
                   <div className="w-32 bg-gray-200 rounded-full h-2">

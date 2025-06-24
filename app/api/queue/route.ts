@@ -73,14 +73,42 @@ export async function GET(request: NextRequest) {
           productData = {};
         }
         
-        // Resimleri ayrı koleksiyondan yükle
+        // Resimleri ayrı koleksiyondan yükle - chunking ile
         let images = [];
         if (data.image_refs && data.image_refs.length > 0) {
           try {
             const imagePromises = data.image_refs.map(async (imageId: string) => {
               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
               if (imageDoc.exists) {
-                return imageDoc.data();
+                const imageData = imageDoc.data()!;
+                
+                // Parçaları yükle ve birleştir
+                if (imageData.chunks_count > 0) {
+                  const chunkQuery = await adminDb.collection('queue_image_chunks')
+                    .where('image_id', '==', imageId)
+                    .get();
+                  
+                  const chunks: { [key: number]: string } = {};
+                  chunkQuery.forEach(chunkDoc => {
+                    const chunkData = chunkDoc.data();
+                    chunks[chunkData.chunk_index] = chunkData.chunk_data;
+                  });
+                  
+                  // Sıralı parçaları birleştir
+                  const sortedChunks = Object.keys(chunks)
+                    .sort((a, b) => Number(a) - Number(b))
+                    .map(key => chunks[Number(key)]);
+                  
+                  const combinedBase64 = sortedChunks.join('');
+                  
+                  return {
+                    ...imageData,
+                    base64: combinedBase64
+                  };
+                } else {
+                  // Eski format için backward compatibility
+                  return imageData;
+                }
               }
               return null;
             });
@@ -91,13 +119,41 @@ export async function GET(request: NextRequest) {
           }
         }
         
-        // Video'yu ayrı koleksiyondan yükle
+        // Video'yu ayrı koleksiyondan yükle - chunking ile
         let video = null;
         if (data.video_ref) {
           try {
             const videoDoc = await adminDb.collection('queue_videos').doc(data.video_ref).get();
             if (videoDoc.exists) {
-              video = videoDoc.data();
+              const videoData = videoDoc.data()!;
+              
+              // Parçaları yükle ve birleştir
+              if (videoData.chunks_count > 0) {
+                const chunkQuery = await adminDb.collection('queue_video_chunks')
+                  .where('video_id', '==', data.video_ref)
+                  .get();
+                
+                const chunks: { [key: number]: string } = {};
+                chunkQuery.forEach(chunkDoc => {
+                  const chunkData = chunkDoc.data();
+                  chunks[chunkData.chunk_index] = chunkData.chunk_data;
+                });
+                
+                // Sıralı parçaları birleştir
+                const sortedChunks = Object.keys(chunks)
+                  .sort((a, b) => Number(a) - Number(b))
+                  .map(key => chunks[Number(key)]);
+                
+                const combinedBase64 = sortedChunks.join('');
+                
+                video = {
+                  ...videoData,
+                  base64: combinedBase64
+                };
+              } else {
+                // Eski format için backward compatibility
+                video = videoData;
+              }
             }
           } catch (videoError) {
             console.error('Error loading video for queue item:', doc.id, videoError);

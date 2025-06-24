@@ -6,23 +6,39 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Direkt Etsy listing oluşturma başlatılıyor...');
     
-    // FormData'dan veriyi al
-    const formData = await request.formData();
-    const listingDataString = formData.get('listingData') as string;
+    let listingData;
+    let requestFormData: FormData | null = null;
+    const contentType = request.headers.get('content-type') || '';
     
-    console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
-    
-    if (!listingDataString) {
-      return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
+    if (contentType.includes('application/json')) {
+      // JSON formatında veri
+      const body = await request.json();
+      listingData = body.product || body;
+      console.log('📋 JSON formatında veri alındı');
+    } else if (contentType.includes('multipart/form-data')) {
+      // FormData formatında veri
+      requestFormData = await request.formData();
+      const listingDataString = requestFormData.get('listingData') as string;
+      
+      console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
+      
+      if (!listingDataString) {
+        return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
+      }
+      
+      try {
+        listingData = JSON.parse(listingDataString);
+      } catch (parseError) {
+        console.error('❌ JSON parse hatası:', parseError);
+        console.error('❌ Problematik string:', listingDataString);
+        return NextResponse.json({ error: 'Invalid listing data format' }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ error: 'Unsupported content type' }, { status: 400 });
     }
     
-    let listingData;
-    try {
-      listingData = JSON.parse(listingDataString);
-    } catch (parseError) {
-      console.error('❌ JSON parse hatası:', parseError);
-      console.error('❌ Problematik string:', listingDataString);
-      return NextResponse.json({ error: 'Invalid listing data format' }, { status: 400 });
+    if (!listingData) {
+      return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
     }
     console.log('📋 Listing data alındı:', {
       title: listingData.title,
@@ -82,21 +98,25 @@ export async function POST(request: NextRequest) {
     
     console.log('🔑 Etsy credentials alındı, shop_id:', shop_id, 'shop_name:', storeData.shop_name);
     
-    // Görselleri FormData'dan al
-    const imageFiles: File[] = [];
-    let index = 0;
-    while (true) {
-      const imageFile = formData.get(`imageFile_${index}`) as File;
-      if (!imageFile) break;
-      imageFiles.push(imageFile);
-      index++;
+    // Görselleri FormData'dan al (sadece multipart/form-data için)
+    const imageFiles: (File | Blob)[] = [];
+    let videoFile: File | Blob | null = null;
+    
+    if (requestFormData) {
+      let index = 0;
+      while (true) {
+        const imageFile = requestFormData.get(`imageFile_${index}`) as File | Blob;
+        if (!imageFile) break;
+        imageFiles.push(imageFile);
+        index++;
+      }
+      
+      // Video dosyasını FormData'dan al
+      videoFile = requestFormData.get('videoFile') as File | Blob;
     }
     
     console.log('🖼️ Toplam resim sayısı:', imageFiles.length);
-    
-    // Video dosyasını FormData'dan al
-    const videoFile = formData.get('videoFile') as File;
-    console.log('🎥 Video dosyası:', videoFile ? `${videoFile.name} (${(videoFile.size / 1024 / 1024).toFixed(2)} MB)` : 'Yok');
+    console.log('🎥 Video dosyası:', videoFile ? `${videoFile.constructor.name} (${(videoFile.size / 1024 / 1024).toFixed(2)} MB)` : 'Yok');
     
     // Etsy API'sine listing oluştur
     const etsyListingUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings`;

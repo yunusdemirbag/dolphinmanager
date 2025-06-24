@@ -2,8 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { DndProvider, useDrag, useDrop } from "react-dnd"
-import { HTML5Backend } from "react-dnd-html5-backend"
+import { useDrag, useDrop } from "react-dnd"
 import {
   Dialog,
   DialogContent,
@@ -1912,7 +1911,6 @@ Return only the title, no quotes, no explanations.`
           {/* DialogTrigger content */}
         </DialogTrigger>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DndProvider backend={HTML5Backend}>
             <DialogHeader className="flex-shrink-0">
               <DialogTitle className="flex items-center justify-between">
                 <span>{product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}</span>
@@ -2507,7 +2505,6 @@ Return only the title, no quotes, no explanations.`
                 </div>
               </DialogFooter>
             </div>
-          </DndProvider>
         </DialogContent>
       </Dialog>
 

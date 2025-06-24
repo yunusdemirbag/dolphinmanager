@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Package, Clock, Play, Pause, Settings as SettingsIcon, Image, Loader2 } from "lucide-react";
 import ProductFormModal from "@/components/ProductFormModal";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 // Assuming these interfaces are defined somewhere accessible, e.g., in a types file.
 // For now, let's define them here.
@@ -173,8 +175,9 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   const renderAutoAdd = () => <div>Otomatik ekleme özelliği yakında...</div>;
 
   return (
-    <>
-      <div className="border-b border-gray-200">
+    <DndProvider backend={HTML5Backend}>
+      <>
+        <div className="border-b border-gray-200">
         <nav className="flex space-x-8">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -202,10 +205,11 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         {activeTab === 'auto-add' && renderAutoAdd()}
       </div>
 
-      <ProductFormModal 
-        isOpen={isProductFormOpen} 
-        onClose={() => setIsProductFormOpen(false)} 
-      />
-    </>
+        <ProductFormModal 
+          isOpen={isProductFormOpen} 
+          onClose={() => setIsProductFormOpen(false)} 
+        />
+      </>
+    </DndProvider>
   );
 } 

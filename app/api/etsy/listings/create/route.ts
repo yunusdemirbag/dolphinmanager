@@ -93,6 +93,10 @@ export async function POST(request: NextRequest) {
     
     console.log('🖼️ Toplam resim sayısı:', imageFiles.length);
     
+    // Video dosyasını FormData'dan al
+    const videoFile = formData.get('videoFile') as File;
+    console.log('🎥 Video dosyası:', videoFile ? `${videoFile.name} (${(videoFile.size / 1024 / 1024).toFixed(2)} MB)` : 'Yok');
+    
     // Etsy API'sine listing oluştur
     const etsyListingUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings`;
     
@@ -206,16 +210,13 @@ export async function POST(request: NextRequest) {
     
     // NOT: Resimler ayrı endpoint'e upload edilecek - burada eklenmez
     
-    // Video ekle (eğer varsa)
-    if (listingData.videoUrl) {
-      etsyFormData.append('video_url', listingData.videoUrl);
-    }
+    // NOT: Video da ayrı endpoint'e upload edilecek - burada eklenmez
     
     console.log('📤 ADIM 1: Draft listing oluşturuluyor...');
     console.log('⏰ Başlangıç zamanı:', new Date().toISOString());
     console.log('📋 Listing state:', 'draft'); // Her zaman draft olarak başla
     console.log('📋 Sonra upload edilecek resim sayısı:', imageFiles.length);
-    console.log('📋 Video URL:', !!listingData.videoUrl);
+    console.log('📋 Sonra upload edilecek video:', videoFile ? 'Var' : 'Yok');
     console.log('📋 API URL:', etsyListingUrl);
     console.log('📋 Form data keys:', Array.from(etsyFormData.keys()));
     
@@ -327,6 +328,40 @@ export async function POST(request: NextRequest) {
       console.log(`📊 Resim upload özeti: ${uploadedImageCount}/${imageFiles.length} başarılı`);
     }
     
+    // ADIM 2.5: Video upload et (eğer varsa)
+    let videoUploaded = false;
+    if (videoFile) {
+      console.log('📤 ADIM 2.5: Video upload ediliyor...');
+      console.log(`🎥 Video upload ediliyor:`, videoFile.name, (videoFile.size / 1024 / 1024).toFixed(2), 'MB');
+      
+      try {
+        const videoFormData = new FormData();
+        videoFormData.append('video', videoFile);
+        
+        const videoUploadUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${etsyResult.listing_id}/videos`;
+        
+        const videoResponse = await fetch(videoUploadUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'x-api-key': api_key,
+          },
+          body: videoFormData,
+        });
+        
+        if (videoResponse.ok) {
+          const videoResult = await videoResponse.json();
+          videoUploaded = true;
+          console.log(`✅ Video başarıyla upload edildi:`, videoResult.video_id);
+        } else {
+          const errorText = await videoResponse.text();
+          console.error(`❌ Video upload hatası:`, videoResponse.status, errorText);
+        }
+      } catch (videoError) {
+        console.error(`❌ Video upload exception:`, videoError);
+      }
+    }
+    
     // ADIM 3: Eğer kullanıcı active olarak kaydetmek istiyorsa activate et
     if (listingData.state === 'active' && uploadedImageCount > 0) {
       console.log('📤 ADIM 3: Listing aktif hale getiriliyor...');
@@ -371,8 +406,9 @@ export async function POST(request: NextRequest) {
       listing_id: etsyResult.listing_id,
       listing: etsyResult,
       uploaded_images: uploadedImageCount,
+      uploaded_video: videoUploaded,
       final_state: listingData.state === 'active' && uploadedImageCount > 0 ? 'active' : 'draft',
-      message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim yüklendi, durum: ${listingData.state === 'active' && uploadedImageCount > 0 ? 'aktif' : 'taslak'}`
+      message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim${videoUploaded ? ', 1 video' : ''} yüklendi, durum: ${listingData.state === 'active' && uploadedImageCount > 0 ? 'aktif' : 'taslak'}`
     });
     
     } catch (fetchError) {

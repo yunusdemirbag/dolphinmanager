@@ -142,21 +142,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Kuyruk öğesi oluştur - Referanslarla, büyük veri yok
+    // Description'dan base64 data'yı temizle
+    const cleanDescription = typeof listingData.description === 'string' 
+      ? listingData.description.replace(/data:image\/[^;]+;base64,[\w+/=]+/g, '[IMAGE_REMOVED]')
+      : '';
+
+    console.log('🧹 Description temizlendi:', {
+      original_length: listingData.description?.length || 0,
+      cleaned_length: cleanDescription.length,
+      contains_base64: listingData.description?.includes('base64') || false
+    });
+
+    // Variations'daki base64 data'yı da temizle
+    let cleanVariations = [];
+    if (listingData.variations && Array.isArray(listingData.variations)) {
+      cleanVariations = listingData.variations.map((variation: any) => {
+        const cleanVar = { ...variation };
+        // Variation içindeki herhangi bir string alanından base64 temizle
+        Object.keys(cleanVar).forEach(key => {
+          if (typeof cleanVar[key] === 'string') {
+            cleanVar[key] = cleanVar[key].replace(/data:image\/[^;]+;base64,[\w+/=]+/g, '[IMAGE_REMOVED]');
+            cleanVar[key] = cleanVar[key].replace(/[A-Za-z0-9+/]{100,}={0,2}/g, '[LONG_STRING_REMOVED]');
+          }
+        });
+        return cleanVar;
+      });
+    }
+
+    const variationsJson = JSON.stringify(cleanVariations);
+    console.log('🧹 Variations temizlendi:', {
+      original_count: listingData.variations?.length || 0,
+      cleaned_count: cleanVariations.length,
+      json_length: variationsJson.length
+    });
+
+    // Kuyruk öğesi oluştur - Base64 data olmadan
     const queueItem = {
       user_id: userId,
       title: listingData.title,
-      description: listingData.description || '',
+      description: cleanDescription,
       price: listingData.price || 0,
       tags: listingData.tags || [],
       taxonomy_id: listingData.taxonomy_id || 1027,
       has_variations: listingData.has_variations || false,
-      variations_count: listingData.variations?.length || 0,
-      variations_json: JSON.stringify(listingData.variations || []),
+      variations_count: cleanVariations.length,
+      variations_json: variationsJson,
       images_count: imageRefs.length,
       image_refs: imageRefs, // Sadece ID referansları
       video_ref: videoRef, // Sadece ID referansı
-      product_data_json: JSON.stringify(listingData),
+      // product_data_json kaldırıldı - gereksiz ve büyük
       status: 'pending',
       created_at: new Date(),
       updated_at: new Date(),

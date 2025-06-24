@@ -24,6 +24,16 @@ export async function POST(request: NextRequest) {
     }
 
     const queueData = queueDoc.data()!;
+    
+    // Queue data'nın boyutunu kontrol et
+    console.log('🔍 Queue data field sizes:');
+    Object.entries(queueData).forEach(([key, value]) => {
+      const valueString = typeof value === 'string' ? value : JSON.stringify(value);
+      console.log(`  ${key}: ${valueString.length} karakter`);
+      if (valueString.length > 1000) {
+        console.log(`    ⚠️ ${key} büyük! İlk 100 karakter:`, valueString.substring(0, 100));
+      }
+    });
 
     // Kuyruk durumunu processing olarak güncelle
     await adminDb.collection('queue').doc(queueItemId).update({
@@ -200,16 +210,41 @@ export async function POST(request: NextRequest) {
         throw new Error('Geçerli bir shipping profile bulunamadı. Lütfen Etsy\'de en az bir kargo profili oluşturun.');
       }
 
-      // Listing verisini JSON string olarak ekle
+      // Description'dan base64 data'yı agresif şekilde temizle (eski queue item'ları için)
+      let cleanDescription = queueData.description || '';
+      
+      if (typeof cleanDescription === 'string') {
+        // 1. Standart data:image base64 formatını temizle
+        cleanDescription = cleanDescription.replace(/data:image\/[^;]+;base64,[\w+/=]+/g, '[IMAGE_REMOVED]');
+        
+        // 2. Herhangi bir uzun base64 string'i temizle (100+ karakter)
+        cleanDescription = cleanDescription.replace(/[A-Za-z0-9+/]{100,}={0,2}/g, '[LONG_STRING_REMOVED]');
+        
+        // 3. JSON içindeki base64 alanlarını temizle
+        cleanDescription = cleanDescription.replace(/"base64"\s*:\s*"[^"]{100,}"/g, '"base64":"[REMOVED]"');
+        
+        // 4. Eğer hala çok büyükse, ilk 500 karaktere kırp
+        if (cleanDescription.length > 1000) {
+          cleanDescription = cleanDescription.substring(0, 500) + '... [TRUNCATED]';
+        }
+      }
+
+      console.log('🧹 Process endpoint - Description temizlendi:', {
+        original_length: queueData.description?.length || 0,
+        cleaned_length: cleanDescription.length,
+        contains_base64: queueData.description?.includes('base64') || false
+      });
+
+      // Listing verisini JSON string olarak ekle - BASE64 DATA TEMİZLENDİ!
       const listingData = {
         title: queueData.title,
-        description: queueData.description,
+        description: cleanDescription,
         price: Math.max(queueData.price || 10, 10), // Minimum 10 cent
         quantity: 1,
         tags: queueData.tags || [],
         taxonomy_id: queueData.taxonomy_id,
         who_made: 'i_did',
-        when_made: '2020_2024',
+        when_made: 'made_to_order',
         shipping_profile_id: shippingProfileId,
         return_policy_id: '', // Empty string if not set
         shop_section_id: '', // Empty string if not set
@@ -221,10 +256,70 @@ export async function POST(request: NextRequest) {
         renewal_option: 'automatic',
         state: isDraft ? 'draft' : 'active',
         has_variations: queueData.has_variations || false,
-        variations: JSON.parse(queueData.variations_json || '[]')
+        variations: (() => {
+          try {
+            const originalVariations = JSON.parse(queueData.variations_json || '[]');
+            // Variations'daki base64 data'yı temizle
+            return originalVariations.map((variation: any) => {
+              const cleanVar = { ...variation };
+              Object.keys(cleanVar).forEach(key => {
+                if (typeof cleanVar[key] === 'string') {
+                  cleanVar[key] = cleanVar[key].replace(/data:image\/[^;]+;base64,[\w+/=]+/g, '[IMAGE_REMOVED]');
+                  cleanVar[key] = cleanVar[key].replace(/[A-Za-z0-9+/]{100,}={0,2}/g, '[LONG_STRING_REMOVED]');
+                  if (cleanVar[key].length > 200) {
+                    cleanVar[key] = cleanVar[key].substring(0, 100) + '... [TRUNCATED]';
+                  }
+                }
+              });
+              return cleanVar;
+            });
+          } catch (error) {
+            console.error('❌ Variations parse hatası:', error);
+            return [];
+          }
+        })()
+        // NOT: images ve video base64 data'sı burada DEĞİL, FormData'da ayrı olarak ekleniyor
       };
       
-      formData.append('listingData', JSON.stringify(listingData));
+      // Her alanı kontrol et ve büyük olanları temizle
+      console.log('🔍 ListingData alanlarının boyutları:');
+      Object.entries(listingData).forEach(([key, value]) => {
+        const valueString = typeof value === 'string' ? value : JSON.stringify(value);
+        console.log(`  ${key}: ${valueString.length} karakter`);
+        if (valueString.length > 10000) {
+          console.log(`    ⚠️ ${key} çok büyük! İlk 100 karakter:`, valueString.substring(0, 100));
+          console.log(`    ⚠️ ${key} son 100 karakter:`, valueString.slice(-100));
+          
+          // Büyük alanları temizle
+          if (typeof value === 'string') {
+            let cleanValue = value;
+            cleanValue = cleanValue.replace(/data:image\/[^;]+;base64,[\w+/=]+/g, '[IMAGE_REMOVED]');
+            cleanValue = cleanValue.replace(/[A-Za-z0-9+/]{100,}={0,2}/g, '[LONG_STRING_REMOVED]');
+            if (cleanValue.length > 1000) {
+              cleanValue = cleanValue.substring(0, 500) + '... [TRUNCATED]';
+            }
+            listingData[key] = cleanValue;
+            console.log(`    ✅ ${key} temizlendi, yeni boyut:`, cleanValue.length);
+          }
+        }
+      });
+      
+      const listingDataString = JSON.stringify(listingData);
+      console.log('📋 Listing data string length:', listingDataString.length);
+      console.log('📋 Listing data preview:', listingDataString.substring(0, 200));
+      console.log('📋 String truncation check - son 50 karakter:', listingDataString.slice(-50));
+      
+      // String length kontrolü
+      if (listingDataString.length > 100000) { // 100KB limit
+        console.error('❌ Listing data string çok büyük!', {
+          length: listingDataString.length,
+          limit: 100000,
+          keys: Object.keys(listingData)
+        });
+        throw new Error(`Listing data çok büyük: ${listingDataString.length} karakter (limit: 100,000)`);
+      }
+      
+      formData.append('listingData', listingDataString);
       
       // Resimleri Blob olarak ekle
       if (images && images.length > 0) {
@@ -232,6 +327,7 @@ export async function POST(request: NextRequest) {
           if (image.base64) {
             const blob = base64ToBlob(image.base64, `image_${index}.${image.type.split('/')[1]}`, image.type);
             formData.append(`imageFile_${index}`, blob);
+            console.log(`📸 Added image ${index}:`, blob.size, 'bytes');
           }
         });
       }
@@ -240,10 +336,18 @@ export async function POST(request: NextRequest) {
       if (video && video.base64) {
         const videoBlob = base64ToBlob(video.base64, `video.${video.type.split('/')[1]}`, video.type);
         formData.append('videoFile', videoBlob);
+        console.log('🎥 Added video:', videoBlob.size, 'bytes');
       }
+      
+      console.log('📦 FormData keys:', Array.from(formData.keys()));
 
-      // Mevcut Etsy listing creation API'sini kullan
-      const etsyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/etsy/listings/create`, {
+      // Mevcut Etsy listing creation API'sini kullan - localhost için içeride çağır
+      const apiUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:3002' 
+        : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002');
+      console.log('🌐 Calling create API:', `${apiUrl}/api/etsy/listings/create`);
+      
+      const etsyResponse = await fetch(`${apiUrl}/api/etsy/listings/create`, {
         method: 'POST',
         body: formData
       });

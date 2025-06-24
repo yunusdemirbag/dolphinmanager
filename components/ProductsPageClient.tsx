@@ -695,7 +695,32 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
 
       // Base64 resimlerini File objelerine dönüştür
       const formData = new FormData();
-      formData.append('listingData', JSON.stringify(queueItem.product_data));
+      
+      // Product data'dan base64 image/video data'yı temizle
+      const cleanProductData = { ...queueItem.product_data };
+      
+      // Images ve video'yu product data'dan çıkar (FormData'ya ayrı ekleyeceğiz)
+      if (cleanProductData.images) {
+        delete cleanProductData.images;
+      }
+      if (cleanProductData.video) {
+        delete cleanProductData.video;
+      }
+      
+      // Description'dan base64 data'yı temizle
+      if (cleanProductData.description && typeof cleanProductData.description === 'string') {
+        cleanProductData.description = cleanProductData.description.replace(/data:image\/[^;]+;base64,[\w+/=]+/g, '[IMAGE_REMOVED]');
+        cleanProductData.description = cleanProductData.description.replace(/[A-Za-z0-9+/]{100,}={0,2}/g, '[LONG_STRING_REMOVED]');
+      }
+      
+      console.log('🧹 Frontend temizlik:', {
+        original_size: JSON.stringify(queueItem.product_data).length,
+        cleaned_size: JSON.stringify(cleanProductData).length,
+        has_images: !!(queueItem.product_data.images?.length),
+        has_video: !!queueItem.product_data.video
+      });
+      
+      formData.append('listingData', JSON.stringify(cleanProductData));
 
       // Resimler
       if (queueItem.product_data.images && queueItem.product_data.images.length > 0) {

@@ -6,39 +6,23 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Direkt Etsy listing oluşturma başlatılıyor...');
     
-    let listingData;
-    let requestFormData: FormData | null = null;
-    const contentType = request.headers.get('content-type') || '';
+    // FormData'dan veriyi al
+    const formData = await request.formData();
+    const listingDataString = formData.get('listingData') as string;
     
-    if (contentType.includes('application/json')) {
-      // JSON formatında veri
-      const body = await request.json();
-      listingData = body.product || body;
-      console.log('📋 JSON formatında veri alındı');
-    } else if (contentType.includes('multipart/form-data')) {
-      // FormData formatında veri
-      requestFormData = await request.formData();
-      const listingDataString = requestFormData.get('listingData') as string;
-      
-      console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
-      
-      if (!listingDataString) {
-        return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
-      }
-      
-      try {
-        listingData = JSON.parse(listingDataString);
-      } catch (parseError) {
-        console.error('❌ JSON parse hatası:', parseError);
-        console.error('❌ Problematik string:', listingDataString);
-        return NextResponse.json({ error: 'Invalid listing data format' }, { status: 400 });
-      }
-    } else {
-      return NextResponse.json({ error: 'Unsupported content type' }, { status: 400 });
+    console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
+    
+    if (!listingDataString) {
+      return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
     }
     
-    if (!listingData) {
-      return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
+    let listingData;
+    try {
+      listingData = JSON.parse(listingDataString);
+    } catch (parseError) {
+      console.error('❌ JSON parse hatası:', parseError);
+      console.error('❌ Problematik string:', listingDataString);
+      return NextResponse.json({ error: 'Invalid listing data format' }, { status: 400 });
     }
     console.log('📋 Listing data alındı:', {
       title: listingData.title,
@@ -98,35 +82,79 @@ export async function POST(request: NextRequest) {
     
     console.log('🔑 Etsy credentials alındı, shop_id:', shop_id, 'shop_name:', storeData.shop_name);
     
-    // Görselleri FormData'dan al (sadece multipart/form-data için)
-    const imageFiles: (File | Blob)[] = [];
-    let videoFile: File | Blob | null = null;
-    
-    if (requestFormData) {
-      let index = 0;
-      while (true) {
-        const imageFile = requestFormData.get(`imageFile_${index}`) as File | Blob;
-        if (!imageFile) break;
-        imageFiles.push(imageFile);
-        index++;
-      }
+    // Shipping profile ID'yi Firebase'den al
+    let shippingProfileId = null;
+    try {
+      const shippingProfilesSnapshot = await adminDb
+        .collection('shipping_profiles')
+        .where('user_id', '==', userId)
+        .limit(1)
+        .get();
       
-      // Video dosyasını FormData'dan al
-      videoFile = requestFormData.get('videoFile') as File | Blob;
+      if (!shippingProfilesSnapshot.empty) {
+        const shippingProfile = shippingProfilesSnapshot.docs[0].data();
+        shippingProfileId = shippingProfile.profile_id;
+        console.log('✅ Shipping profile bulundu:', shippingProfileId);
+      } else {
+        console.log('⚠️ Firebase\'de shipping profile bulunamadı, Etsy API\'den alınacak');
+        
+        // Firebase'de yoksa, Etsy API'den mevcut shipping profile'ları al
+        try {
+          const shippingResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${shop_id}/shipping-profiles`, {
+            headers: {
+              'Authorization': `Bearer ${access_token}`,
+              'x-api-key': api_key,
+            }
+          });
+          
+          if (shippingResponse.ok) {
+            const shippingData = await shippingResponse.json();
+            if (shippingData.results && shippingData.results.length > 0) {
+              shippingProfileId = shippingData.results[0].shipping_profile_id;
+              console.log('✅ Etsy API\'den shipping profile alındı:', shippingProfileId);
+            }
+          }
+        } catch (etsyApiError) {
+          console.error('❌ Etsy API\'den shipping profile alınamadı:', etsyApiError);
+        }
+      }
+    } catch (shippingError) {
+      console.error('❌ Shipping profile alınırken hata:', shippingError);
+    }
+    
+    // Hala bulunamadıysa hata fırlat
+    if (!shippingProfileId) {
+      return NextResponse.json({ 
+        error: 'Geçerli bir shipping profile bulunamadı. Lütfen Etsy\'de en az bir kargo profili oluşturun.',
+        code: 'NO_SHIPPING_PROFILE'
+      }, { status: 400 });
+    }
+    
+    // Görselleri FormData'dan al
+    const imageFiles: File[] = [];
+    let index = 0;
+    while (true) {
+      const imageFile = formData.get(`imageFile_${index}`) as File;
+      if (!imageFile) break;
+      imageFiles.push(imageFile);
+      index++;
     }
     
     console.log('🖼️ Toplam resim sayısı:', imageFiles.length);
-    console.log('🎥 Video dosyası:', videoFile ? `${videoFile.constructor.name} (${(videoFile.size / 1024 / 1024).toFixed(2)} MB)` : 'Yok');
+    
+    // Video dosyasını FormData'dan al
+    const videoFile = formData.get('videoFile') as File;
+    console.log('🎥 Video dosyası:', videoFile ? `${videoFile.name} (${(videoFile.size / 1024 / 1024).toFixed(2)} MB)` : 'Yok');
     
     // Etsy API'sine listing oluştur
     const etsyListingUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings`;
     
     const etsyFormData = new FormData();
     
-    // Listing verisini ekle
-    etsyFormData.append('quantity', listingData.quantity.toString());
-    etsyFormData.append('title', listingData.title);
-    etsyFormData.append('description', listingData.description);
+    // Listing verisini ekle - eksik field'lar için default değerler
+    etsyFormData.append('quantity', (listingData.quantity || 1).toString());
+    etsyFormData.append('title', listingData.title || 'Untitled Product');
+    etsyFormData.append('description', listingData.description || 'No description provided');
     // Price kontrolü - Variation kullanıyorsak base price'ı en düşük variation'dan al
     let finalPrice = 0; // Default 0
     
@@ -161,10 +189,10 @@ export async function POST(request: NextRequest) {
     }
     
     etsyFormData.append('price', finalPrice.toString());
-    etsyFormData.append('who_made', listingData.who_made);
-    etsyFormData.append('when_made', listingData.when_made);
-    etsyFormData.append('taxonomy_id', listingData.taxonomy_id.toString());
-    etsyFormData.append('shipping_profile_id', listingData.shipping_profile_id.toString());
+    etsyFormData.append('who_made', listingData.who_made || 'i_did');
+    etsyFormData.append('when_made', listingData.when_made || 'made_to_order');
+    etsyFormData.append('taxonomy_id', (listingData.taxonomy_id || 1027).toString());
+    etsyFormData.append('shipping_profile_id', shippingProfileId.toString());
     // return_policy_id sadece varsa ekle (Etsy integer bekliyor)
     if (listingData.return_policy_id && listingData.return_policy_id !== '') {
       etsyFormData.append('return_policy_id', listingData.return_policy_id.toString());
@@ -219,11 +247,11 @@ export async function POST(request: NextRequest) {
       original_tags: listingData.tags,
       test_mode: 'NO_TAGS_NO_MATERIALS'
     });
-    etsyFormData.append('is_personalizable', listingData.is_personalizable.toString());
-    etsyFormData.append('personalization_is_required', listingData.personalization_is_required.toString());
-    etsyFormData.append('personalization_char_count_max', listingData.personalization_char_count_max.toString());
-    etsyFormData.append('personalization_instructions', listingData.personalization_instructions);
-    etsyFormData.append('is_supply', listingData.is_supply.toString());
+    etsyFormData.append('is_personalizable', (listingData.is_personalizable || false).toString());
+    etsyFormData.append('personalization_is_required', (listingData.personalization_is_required || false).toString());
+    etsyFormData.append('personalization_char_count_max', (listingData.personalization_char_count_max || 0).toString());
+    etsyFormData.append('personalization_instructions', listingData.personalization_instructions || '');
+    etsyFormData.append('is_supply', (listingData.is_supply || false).toString());
     etsyFormData.append('is_customizable', 'true');
     etsyFormData.append('should_auto_renew', listingData.renewal_option === 'automatic' ? 'true' : 'false');
     etsyFormData.append('state', 'draft'); // Her zaman draft olarak başla, sonra resim ekleyip activate ederiz
@@ -237,8 +265,6 @@ export async function POST(request: NextRequest) {
     console.log('📤 ADIM 1: Draft listing oluşturuluyor...');
     console.log('⏰ Başlangıç zamanı:', new Date().toISOString());
     console.log('📋 Listing state:', 'draft'); // Her zaman draft olarak başla
-    
-    let rateLimitHeaders = {}; // Rate limit bilgilerini sakla
     console.log('📋 Sonra upload edilecek resim sayısı:', imageFiles.length);
     console.log('📋 Sonra upload edilecek video:', videoFile ? 'Var' : 'Yok');
     console.log('📋 API URL:', etsyListingUrl);
@@ -278,32 +304,6 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeoutId);
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log('📥 Etsy API yanıtı:', etsyResponse.status, etsyResponse.ok, `(${duration}s)`);
-
-      // API Rate Limit Durumu - Tüm header'ları kontrol et
-      console.log('🔍 Tüm Response Header\'ları:');
-      etsyResponse.headers.forEach((value, key) => {
-        if (key.toLowerCase().includes('rate') || key.toLowerCase().includes('limit') || key.toLowerCase().includes('quota')) {
-          console.log(`📋 ${key}: ${value}`);
-        }
-      });
-      
-      rateLimitHeaders = {
-        dailyLimit: etsyResponse.headers.get('x-limit-per-day'),
-        secondLimit: etsyResponse.headers.get('x-limit-per-second'),
-        remaining: etsyResponse.headers.get('x-ratelimit-remaining') || 
-                  etsyResponse.headers.get('ratelimit-remaining') ||
-                  etsyResponse.headers.get('x-rate-limit-remaining'),
-        reset: etsyResponse.headers.get('x-ratelimit-reset') || 
-               etsyResponse.headers.get('ratelimit-reset') ||
-               etsyResponse.headers.get('x-rate-limit-reset')
-      };
-
-      console.log('🔧 Etsy API Rate Limit Durumu:', {
-        gunluk_limit: rateLimitHeaders.dailyLimit || 'bilinmiyor',
-        saniye_limit: rateLimitHeaders.secondLimit || 'bilinmiyor',
-        kalan_istek: rateLimitHeaders.remaining || 'hesaplanamadı',
-        reset_zamani: rateLimitHeaders.reset ? new Date(parseInt(rateLimitHeaders.reset) * 1000).toLocaleString('tr-TR') : 'bilinmiyor'
-      });
     
       const etsyResult = await etsyResponse.json();
       console.log('📋 Response data keys:', Object.keys(etsyResult));
@@ -366,12 +366,6 @@ export async function POST(request: NextRequest) {
             body: imageFormData,
           });
           
-          // Resim upload rate limit durumu
-          const imageRateLimit = imageResponse.headers.get('x-ratelimit-remaining');
-          if (imageRateLimit) {
-            console.log(`🔧 Resim ${i + 1} sonrası kalan API limit:`, imageRateLimit);
-          }
-
           if (imageResponse.ok) {
             const imageResult = await imageResponse.json();
             uploadedImageCount++;
@@ -386,15 +380,6 @@ export async function POST(request: NextRequest) {
       }
       
       console.log(`📊 Resim upload özeti: ${uploadedImageCount}/${imageFiles.length} başarılı`);
-      
-      // API kullanım özeti
-      console.log('📈 API KULLANIM ÖZETİ:', {
-        toplam_api_cagrisi: 1 + imageFiles.length + (videoFile ? 1 : 0) + (listingData.state === 'active' ? 1 : 0),
-        listing_olusturma: '1 çağrı',
-        resim_upload: `${imageFiles.length} çağrı`,
-        video_upload: videoFile ? '1 çağrı' : '0 çağrı',
-        aktifleştirme: listingData.state === 'active' ? '1 çağrı' : '0 çağrı'
-      });
     }
     
     // ADIM 2.5: Video upload et (eğer varsa)
@@ -485,8 +470,8 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       shop_id: shop_id,
       listing_id: etsyResult.listing_id,
-      title: listingData.title,
-      state: listingData.state,
+      title: listingData.title || 'Untitled Product',
+      state: listingData.state || 'draft',
       created_at: new Date(),
       etsy_data: etsyResult
     });
@@ -498,13 +483,7 @@ export async function POST(request: NextRequest) {
       uploaded_images: uploadedImageCount,
       uploaded_video: videoUploaded,
       final_state: listingData.state === 'active' && uploadedImageCount > 0 ? 'active' : 'draft',
-      message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim${videoUploaded ? ', 1 video' : ''} yüklendi, durum: ${listingData.state === 'active' && uploadedImageCount > 0 ? 'aktif' : 'taslak'}`,
-      rate_limit: {
-        daily_limit: rateLimitHeaders.dailyLimit ? parseInt(rateLimitHeaders.dailyLimit) : null,
-        second_limit: rateLimitHeaders.secondLimit ? parseInt(rateLimitHeaders.secondLimit) : null,
-        api_calls_used: 1 + imageFiles.length + (videoFile ? 1 : 0) + (listingData.state === 'active' ? 1 : 0),
-        timestamp: new Date().toISOString()
-      }
+      message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim${videoUploaded ? ', 1 video' : ''} yüklendi, durum: ${listingData.state === 'active' && uploadedImageCount > 0 ? 'aktif' : 'taslak'}`
     });
     
     } catch (fetchError) {

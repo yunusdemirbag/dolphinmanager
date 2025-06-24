@@ -337,6 +337,13 @@ export async function POST(request: NextRequest) {
       try {
         const videoFormData = new FormData();
         videoFormData.append('video', videoFile);
+        const videoName = videoFile.name.replace(/\.[^/.]+$/, ""); // Dosya adını uzantısız
+        videoFormData.append('name', videoName);
+        console.log('🔍 Video FormData:', { 
+          name: videoName, 
+          fileSize: videoFile.size, 
+          fileType: videoFile.type 
+        });
         
         const videoUploadUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${etsyResult.listing_id}/videos`;
         

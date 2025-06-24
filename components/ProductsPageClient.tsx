@@ -389,7 +389,6 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
               Etsy hesabı bağlı değil
             </div>
           )}
-        </div>
           <p className="text-gray-800">Etsy&apos;e yüklenmiş veya taslak ürünleriniz</p>
         </div>
         <Button onClick={() => setIsProductFormOpen(true)}>

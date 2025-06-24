@@ -87,6 +87,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   // Client-side mount kontrolü
   useEffect(() => {
     setMounted(true);
+    
     // localStorage'dan completed verileri yükle
     if (typeof window !== 'undefined') {
       const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
@@ -108,6 +109,12 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       setCompletedItems(validCompletedData.sort((a, b) => 
         new Date(b.data.completed_at).getTime() - new Date(a.data.completed_at).getTime()
       ));
+    }
+    
+    // Eğer sayfa açılırken queue tabı aktifse direkt yükle
+    if (activeTab === 'queue') {
+      console.log('🚀 Component mount - Queue tab aktif, kuyruk yükleniyor...');
+      setTimeout(fetchQueue, 100); // Mikro delay ile
     }
   }, []);
   
@@ -207,15 +214,37 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     }
   };
 
-  // Kuyruk verilerini yükle
+  // 🔥 HAYVAN GİBİ HIZLI Kuyruk verilerini yükle
   const loadQueueItems = async () => {
     try {
+      console.log('🚀 Kuyruk verileri yükleniyor...');
       setIsLoadingQueue(true);
-      const response = await fetch('/api/queue?user_id=local-user-123')
-      const data = await response.json()
+      
+      const startTime = Date.now();
+      const response = await fetch('/api/queue?user_id=local-user-123');
+      const loadTime = Date.now() - startTime;
+      
+      console.log(`📈 API yanıtı alındı: ${response.status} - ${loadTime}ms`);
+      
+      if (!response.ok) {
+        throw new Error(`API hatası: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📋 API veri detayı:', {
+        totalItems: data.items?.length || 0,
+        metadata: data.metadata,
+        items: data.items?.map((item: any) => ({
+          id: item.id,
+          title: item.product_data?.title?.substring(0, 50) + '...',
+          status: item.status
+        }))
+      });
       
       // Tüm ürünleri al ama state hesaplaması için
       const allItems = data.items || [];
+      
+      console.log(`💾 State gúncelleniyor: ${allItems.length} item`);
       setQueueItems(allItems);
       
       // Stats'ı güncelle - tüm statusları dahil et
@@ -225,10 +254,22 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         completed: allItems.filter((item: any) => item.status === 'completed').length,
         failed: allItems.filter((item: any) => item.status === 'failed').length
       };
+      
+      console.log('📊 Stats güncellendi:', newStats);
+      console.log('🎯 Aktif öğeler (pending/processing):', allItems.filter((item: any) => 
+        item.status !== 'completed' && item.status !== 'failed'
+      ).map((item: any) => ({
+        id: item.id,
+        status: item.status,
+        title: item.product_data?.title?.substring(0, 30) + '...'
+      })));
+      
       setQueueStats(newStats);
       
+      console.log(`✅ Kuyruk yükleme tamamlandı: ${allItems.length} item, ${loadTime}ms`);
+      
     } catch (error) {
-      console.error('Kuyruk verileri yüklenemedi:', error)
+      console.error('❌ Kuyruk verileri yüklenemedi:', error)
       toast({
         variant: "destructive",
         title: "Hata",
@@ -239,9 +280,10 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     }
   }
 
-  const fetchQueue = async () => { 
+  const fetchQueue = useCallback(async () => { 
+    console.log('🔄 Manuel Yenile butonu tıklandı!');
     await loadQueueItems();
-  };
+  }, []);
   
   const toggleQueue = async () => { 
     setIsAutoProcessing(!isAutoProcessing);
@@ -249,11 +291,61 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
 
   useEffect(() => {
     if (activeTab === 'queue') {
+      console.log('🎯 Queue tabı açıldı, kuyruk verileri yükleniyor...');
       fetchQueue();
     }
     // Store bilgilerini sayfa açıldığında yükle
     loadStoreInfo();
+  }, [activeTab, fetchQueue]);
+
+  // 🔥 REAL-TIME LISTENER VE CUSTOM EVENT SİSTEMİ
+  useEffect(() => {
+    console.log('🎯 Real-time kuyruk listener sistemi başlatılıyor...');
+    
+    // Custom event listener for instant queue updates
+    const handleQueueUpdate = () => {
+      console.log('📨 Custom queue update event alındı!');
+      fetchQueue();
+    };
+    
+    // Add custom event listener
+    window.addEventListener('queueUpdated', handleQueueUpdate);
+    
+    // Fallback polling system - REDUCED FREQUENCY
+    const pollInterval = setInterval(() => {
+      if (activeTab === 'queue') {
+        console.log('🔄 Periodic kuyruk güncellemesi...');
+        fetchQueue();
+      }
+    }, 15000); // Her 15 saniyede poll (azaltıldı)
+    
+    return () => {
+      window.removeEventListener('queueUpdated', handleQueueUpdate);
+      clearInterval(pollInterval);
+      console.log('🛑 Real-time listener sistemi temizlendi');
+    };
   }, [activeTab]);
+
+  // Debug hook to track queueItems state changes
+  useEffect(() => {
+    const activeItems = queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed');
+    console.log('🔄 queueItems State Changed:', {
+      timestamp: new Date().toISOString(),
+      totalItems: queueItems.length,
+      activeItems: activeItems.length,
+      allStatuses: queueItems.reduce((acc: any, item) => {
+        acc[item.status] = (acc[item.status] || 0) + 1;
+        return acc;
+      }, {}),
+      activeItemDetails: activeItems.map(item => ({
+        id: item.id,
+        status: item.status,
+        title: item.product_data?.title?.substring(0, 40) + '...',
+        hasProductData: !!item.product_data,
+        hasTitle: !!item.product_data?.title
+      }))
+    });
+  }, [queueItems]);
 
   useEffect(() => {
     return () => {
@@ -330,8 +422,8 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       // İlk işlemi hemen başlat
       processNext();
       
-      // Her 2 saniyede kontrol et (daha sık)
-      const interval = setInterval(processNext, 2000);
+      // Her 5 saniyede kontrol et 
+      const interval = setInterval(processNext, 5000);
       setQueueInterval(interval);
 
     } else {
@@ -525,7 +617,12 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('tr-TR')
+    try {
+      return new Date(dateString).toLocaleString('tr-TR')
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return dateString || 'Tarih bilinmiyor';
+    }
   }
 
   const getCategoryName = (taxonomyId: number) => {
@@ -780,30 +877,54 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       
       formData.append('listingData', JSON.stringify(cleanProductData));
 
-      // Resimler
+      // Resimler - API'den gelen base64 formatını kontrol et
       if (queueItem.product_data.images && queueItem.product_data.images.length > 0) {
+        console.log('🖼️ Processing images for upload:', queueItem.product_data.images.length);
         queueItem.product_data.images.forEach((image: any, index: number) => {
-          if (image.data) {
-            const file = base64ToFile(image.data, image.name, image.type);
+          const imageData = image.data || image.base64; // API'den base64 field'ı gelebilir
+          if (imageData) {
+            console.log(`🖼️ Converting image ${index + 1}: ${image.name} (${image.type})`);
+            const file = base64ToFile(imageData, image.name || `image_${index + 1}.jpg`, image.type || 'image/jpeg');
             formData.append(`imageFile_${index}`, file);
+          } else {
+            console.warn(`⚠️ Image ${index + 1} missing data/base64 field:`, image);
           }
         });
+      } else {
+        console.log('🖼️ No images to upload');
       }
 
-      // Video
-      if (queueItem.product_data.video && queueItem.product_data.video.data) {
-        const videoFile = base64ToFile(
-          queueItem.product_data.video.data,
-          queueItem.product_data.video.name,
-          queueItem.product_data.video.type
-        );
-        formData.append('videoFile', videoFile);
+      // Video - API'den gelen base64 formatını kontrol et  
+      if (queueItem.product_data.video) {
+        console.log('🎥 Processing video for upload:', {
+          hasVideo: true,
+          hasData: !!queueItem.product_data.video.data,
+          hasBase64: !!queueItem.product_data.video.base64,
+          name: queueItem.product_data.video.name,
+          type: queueItem.product_data.video.type
+        });
+        
+        const videoData = queueItem.product_data.video.data || queueItem.product_data.video.base64;
+        if (videoData) {
+          console.log('🎥 Converting video:', queueItem.product_data.video.name || 'video.mp4');
+          const videoFile = base64ToFile(
+            videoData,
+            queueItem.product_data.video.name || 'video.mp4',
+            queueItem.product_data.video.type || 'video/mp4'
+          );
+          formData.append('videoFile', videoFile);
+        } else {
+          console.warn('⚠️ Video object exists but missing data/base64 field:', queueItem.product_data.video);
+        }
+      } else {
+        console.log('🎥 No video to upload');
       }
 
       console.log('📤 Etsy API\'sine gönderiliyor...', {
         endpoint: '/api/etsy/listings/create',
         hasImages: queueItem.product_data.images?.length || 0,
         hasVideo: !!queueItem.product_data.video,
+        videoHasData: queueItem.product_data.video?.data ? 'YES' : 'NO',
         title: queueItem.product_data.title
       });
 
@@ -836,6 +957,10 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         
         const deleteResult = await deleteResponse.json();
         
+        // Değişkenleri üst scope'ta tanımla
+        let newCompletedCount = 0;
+        let completedData = null;
+        
         if (deleteResult.success) {
           // İşlem süresini hesapla
           const processingTime = performance.now() - (window.processingStartTime || 0);
@@ -851,8 +976,8 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
               return false;
             }
           });
-          const newCompletedCount = currentValidCompleted.length + 1;
-          const completedData = {
+          newCompletedCount = currentValidCompleted.length + 1;
+          completedData = {
             title: queueItem.product_data.title,
             completed_at: new Date().toISOString(),
             etsy_listing_id: result.listing_id,
@@ -867,9 +992,9 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
           setCompletedCount(newCompletedCount);
           setCompletedItems(prev => [{ key: `completed_${itemId}`, data: completedData }, ...prev]);
           
-          // API limit bilgisi
-          const apiLimitInfo = result.rate_limit ? 
-            `${(result.rate_limit.daily_limit - (result.rate_limit.api_calls_used || 1)).toLocaleString()}/${result.rate_limit.daily_limit.toLocaleString()}` : 
+          // API limit bilgisi - SAFE
+          const apiLimitInfo = (result.rate_limit && result.rate_limit.daily_limit) ? 
+            `${((result.rate_limit.daily_limit || 0) - (result.rate_limit.api_calls_used || 1)).toLocaleString()}/${(result.rate_limit.daily_limit || 0).toLocaleString()}` : 
             'Bilinmiyor';
           
           // Harika emojili log
@@ -884,7 +1009,8 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
 ═══════════════════════════════════════════`);
           
         } else {
-          console.error('❌ Database\'den silinirken hata:', deleteResult.error);
+          console.error('❌ Database\'den silinirken hata:', deleteResult.error || deleteResult.message || 'Bilinmeyen hata');
+          console.error('❌ DELETE response detayı:', deleteResult);
         }
 
         // Local state'i güncelle (artık sadece filtreli görünüm için)
@@ -892,13 +1018,13 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
           items.filter(item => item.id !== itemId) // Silinen ürünü listeden çıkar
         );
         
-        // Rate limit bilgisi varsa göster
-        let toastDescription = `Ürün Etsy'e gönderildi ve tamamlandı (${newCompletedCount}) - ID: ${result.listing_id}`;
+        // Rate limit bilgisi varsa göster - SAFE
+        let toastDescription = `Ürün Etsy'e gönderildi ve tamamlandı (${newCompletedCount || 0}) - ID: ${result.listing_id}`;
         if (result.rate_limit && result.rate_limit.daily_limit) {
           const usedCalls = result.rate_limit.api_calls_used || 1;
-          const dailyLimit = result.rate_limit.daily_limit;
-          const remainingCalls = dailyLimit - usedCalls;
-          toastDescription += `\n📊 API Limit: ${remainingCalls.toLocaleString()}/${dailyLimit.toLocaleString()} kaldı`;
+          const dailyLimit = result.rate_limit.daily_limit || 0;
+          const remainingCalls = Math.max(0, dailyLimit - usedCalls);
+          toastDescription += `\n📊 API Limit: ${(remainingCalls || 0).toLocaleString()}/${(dailyLimit || 0).toLocaleString()} kaldı`;
         }
         
         toast({
@@ -1093,11 +1219,12 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
 
   // Reset List function - clears both Firebase queue and localStorage completed items
   const resetList = useCallback(async () => {
-    if (!confirm('Bu işlem tüm kuyruk ve tamamlanan ürün listesini sıfırlayacak. Bu işlem geri alınamaz. Emin misiniz?')) {
-      return;
-    }
-
     try {
+      if (!confirm('Bu işlem tüm kuyruk ve tamamlanan ürün listesini sıfırlayacak. Bu işlem geri alınamaz. Emin misiniz?')) {
+        return;
+      }
+
+      console.log('🧹 Liste sıfırlama başlatılıyor...');
       // Clear Firebase queue
       const response = await fetch('/api/queue', {
         method: 'DELETE',
@@ -1138,17 +1265,21 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         // Reload queue to sync with backend
         await loadQueueItems();
       } else {
-        throw new Error(result.error);
+        console.error('🔴 Reset result:', result);
+        throw new Error(result.error || result.message || 'Reset işlemi başarısız');
       }
     } catch (error) {
-      console.error('Reset hatası:', error);
+      console.error('🔴 RESET LİST HATASI:', error);
+      console.error('🔴 Error stack:', error instanceof Error ? error.stack : 'No stack');
+      console.error('🔴 Error message:', error instanceof Error ? error.message : String(error));
+      
       toast({
         variant: "destructive",
-        title: "Hata",
-        description: "Liste sıfırlanamadı"
+        title: "Liste Sıfırlama Hatası",
+        description: error instanceof Error ? (error.message || "Error mesajı boş") : (String(error) || "Bilinmeyen hata oluştu")
       });
     }
-  }, [toast]);
+  }, [toast, loadQueueItems, setQueueItems, setSelectedItems, setCompletedCount, setCompletedItems, setQueueStats]);
 
   const saveEdit = async (itemId: string, field: string, newValue?: string | string[]) => {
     try {
@@ -1224,8 +1355,9 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     }
   };
 
-  const renderQueue = () => (
-    <div className="space-y-6">
+  const renderQueue = () => {
+    return (
+      <div className="space-y-6">
       {/* İstatistikler */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
@@ -1340,7 +1472,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
             <Button
               variant="destructive"
               onClick={resetList}
-              disabled={isLoadingQueue || (queueItems.length === 0 && completedCount === 0)}
+              disabled={isLoadingQueue || (queueItems.length === 0 && (completedCount || 0) === 0)}
             >
               <Trash className="w-4 h-4 mr-2" />
               Listeyi Sıfırla
@@ -1396,47 +1528,61 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
 
       {/* Kuyruk Sekme Navigation */}
       <div className="border-b border-gray-200 mb-6">
-        <nav className="flex space-x-8">
-          <button
-            className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeQueueTab === 'live'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-            onClick={() => setActiveQueueTab('live')}
-          >
-            <Clock className="w-4 h-4" />
-            <span>Canlı Kuyruk ({queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed').length})</span>
-          </button>
-          
-          {stats.completed > 0 && (
+        <div className="flex items-center justify-between">
+          <nav className="flex space-x-8">
             <button
               className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeQueueTab === 'completed'
-                  ? 'border-green-500 text-green-600'
+                activeQueueTab === 'live'
+                  ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-              onClick={() => setActiveQueueTab('completed')}
+              onClick={() => setActiveQueueTab('live')}
             >
-              <CheckCircle className="w-4 h-4" />
-              <span>Tamamlananlar ({stats.completed})</span>
+              <Clock className="w-4 h-4" />
+              <span>Canlı Kuyruk ({queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed').length})</span>
             </button>
-          )}
+            
+            {stats.completed > 0 && (
+              <button
+                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeQueueTab === 'completed'
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                onClick={() => setActiveQueueTab('completed')}
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Tamamlananlar ({stats.completed})</span>
+              </button>
+            )}
 
-          {stats.failed > 0 && (
-            <button
-              className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeQueueTab === 'failed'
-                  ? 'border-red-500 text-red-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => setActiveQueueTab('failed')}
-            >
-              <XCircle className="w-4 h-4" />
-              <span>Hatalılar ({stats.failed})</span>
-            </button>
-          )}
-        </nav>
+            {stats.failed > 0 && (
+              <button
+                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeQueueTab === 'failed'
+                    ? 'border-red-500 text-red-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                onClick={() => setActiveQueueTab('failed')}
+              >
+                <XCircle className="w-4 h-4" />
+                <span>Hatalılar ({stats.failed})</span>
+              </button>
+            )}
+          </nav>
+          
+          {/* Refresh Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchQueue}
+            disabled={isLoadingQueue}
+            className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-300"
+          >
+            <RotateCcw className={`w-4 h-4 ${isLoadingQueue ? 'animate-spin' : ''}`} />
+            <span>Yenile</span>
+          </Button>
+        </div>
       </div>
 
       {/* Canlı Kuyruk Listesi */}
@@ -1478,11 +1624,16 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
           </CardTitle>
         </CardHeader>
         <CardContent>
+          
           {isLoadingQueue ? (
             <div className="text-center py-8">Kuyruk yükleniyor...</div>
           ) : queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed').length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               Canlı kuyrukta ürün bulunmuyor
+              {/* Additional debug info when no items shown */}
+              <div className="mt-2 text-xs text-gray-400">
+                Debug: Toplam {queueItems.length} öğe, Aktif {queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed').length} öğe
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -1626,11 +1777,23 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                             <div className="flex items-center gap-1 text-sm text-gray-600 mb-2">
                               <Image className="w-4 h-4" />
                               {item.product_data.images?.length || 0} resim
+                              {/* Debug info */}
+                              <span className="text-xs text-red-500">
+                                (API: {item.imageCount || 0})
+                              </span>
                               {item.product_data.video && (
                                 <>
                                   <Video className="w-4 h-4 ml-2" />
                                   1 video
+                                  <span className="text-xs text-blue-500">
+                                    ({item.product_data.video.data ? 'Data ✓' : 'No Data'})
+                                  </span>
                                 </>
+                              )}
+                              {item.hasVideo && !item.product_data.video && (
+                                <span className="text-xs text-orange-500 ml-2">
+                                  (Video: API says YES, but not loaded)
+                                </span>
                               )}
                             </div>
                             
@@ -1710,25 +1873,44 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                             ) : (
                               <div className="flex gap-1">
                                 {/* Küçük thumbnail'ler - tıklanabilir */}
-                                {item.product_data.images?.slice(0, 4).map((img: any, idx: number) => (
-                                  <div 
-                                    key={idx} 
-                                    className="w-8 h-8 rounded border overflow-hidden bg-gray-100 cursor-pointer hover:shadow-md hover:border-blue-300 transition-all"
-                                    onClick={() => startMediaEdit(item.id)}
-                                    title="Medyaları düzenlemek için tıklayın"
-                                  >
-                                    {img.base64 && (
-                                      <img 
-                                        src={`data:${img.type};base64,${img.base64}`}
-                                        alt={`Resim ${idx + 1}`}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    )}
-                                  </div>
-                                ))}
+                                {(() => {
+                                  console.log(`🖼️ UI Debug - ${item.id}:`, {
+                                    hasImages: !!item.product_data.images,
+                                    imageCount: item.product_data.images?.length || 0,
+                                    firstImage: item.product_data.images?.[0] ? {
+                                      hasBase64: !!item.product_data.images[0].base64,
+                                      type: item.product_data.images[0].type,
+                                      base64Length: item.product_data.images[0].base64?.length || 0,
+                                      isPartial: item.product_data.images[0].isPartial
+                                    } : null
+                                  });
+                                  return item.product_data.images?.slice(0, 4).map((img: any, idx: number) => (
+                                    <div 
+                                      key={idx} 
+                                      className="w-40 h-40 rounded border overflow-hidden bg-gray-100 cursor-pointer hover:shadow-md hover:border-blue-300 transition-all"
+                                      onClick={() => startMediaEdit(item.id)}
+                                      title="Medyaları düzenlemek için tıklayın"
+                                    >
+                                      {img.base64 && (
+                                        <img 
+                                          src={`data:${img.type};base64,${img.base64}`}
+                                          alt={`Resim ${idx + 1}`}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            console.error(`❌ Image load error for ${item.id}:`, {
+                                              src: e.currentTarget.src.substring(0, 100) + '...',
+                                              type: img.type,
+                                              base64Length: img.base64?.length
+                                            });
+                                          }}
+                                        />
+                                      )}
+                                    </div>
+                                  ));
+                                })()}
                                 {(item.product_data.images?.length || 0) > 4 && (
                                   <div 
-                                    className="w-8 h-8 rounded border bg-gray-100 flex items-center justify-center text-xs text-gray-500 cursor-pointer hover:shadow-md hover:border-blue-300 transition-all"
+                                    className="w-40 h-40 rounded border bg-gray-100 flex items-center justify-center text-xs text-gray-500 cursor-pointer hover:shadow-md hover:border-blue-300 transition-all"
                                     onClick={() => startMediaEdit(item.id)}
                                     title="Tüm medyaları görmek için tıklayın"
                                   >
@@ -1757,7 +1939,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                                 {/* Eğer hiç medya yoksa tıklanabilir alan */}
                                 {(!item.product_data.images || item.product_data.images.length === 0) && !item.product_data.video && (
                                   <div 
-                                    className="w-8 h-8 rounded border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-all"
+                                    className="w-40 h-40 rounded border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-all"
                                     onClick={() => startMediaEdit(item.id)}
                                     title="Medya eklemek için tıklayın"
                                   >
@@ -2164,8 +2346,10 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
           </CardContent>
         </Card>
       )}
-    </div>
-  );
+      </div>
+    );
+  };
+  
   const renderAutoAdd = () => <AutoProductPanel />;
 
   return (

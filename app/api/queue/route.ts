@@ -29,267 +29,366 @@ export async function GET(request: NextRequest) {
     initializeAdminApp();
     
     if (!adminDb) {
-      console.error('Firebase Admin not initialized');
+      console.error('🔍 DEBUG: Firebase Admin not initialized');
       return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
+    
+    // DEBUG: Firebase'de toplam kaç ürün var?
+    try {
+      const allDocsSnapshot = await adminDb.collection('queue').get();
+      console.log('🔍 DEBUG: Firebase\'de toplam queue items:', allDocsSnapshot.size);
+      
+      if (allDocsSnapshot.size > 0) {
+        console.log('🔍 DEBUG: İlk 3 item:');
+        allDocsSnapshot.docs.slice(0, 3).forEach((doc, index) => {
+          const data = doc.data();
+          console.log(`🔍 DEBUG: Item ${index + 1}:`, {
+            id: doc.id,
+            user_id: data.user_id,
+            status: data.status,
+            title: data.title?.substring(0, 50) + '...'
+          });
+        });
+      }
+    } catch (debugError) {
+      console.error('🔍 DEBUG: Firebase debug query hatası:', debugError);
     }
     
     // OPTİMİZE EDİLMİŞ KUYRUK SİSTEMİ - FIREBASE QUERY İLE FİLTRELEME
     try {
-      // Optimize edilmiş query - Firebase seviyesinde filtreleme
-      let query = adminDb.collection('queue')
-        .where('user_id', '==', userId);
+      // 🚀 INDEX HATASI ÇÖZÜMÜ - Basit query kullan
+      console.log('🔧 INDEX hatası için basit query kullanılıyor...');
       
-      // Status filtresi
+      let query;
       if (status) {
-        query = query.where('status', '==', status);
+        // Status var ise sadece user_id + status (index gerektirmez)
+        query = adminDb.collection('queue')
+          .where('user_id', '==', userId)
+          .where('status', '==', status)
+          .limit(limit);
+      } else {
+        // Status yok ise sadece user_id (index gerektirmez)
+        query = adminDb.collection('queue')
+          .where('user_id', '==', userId)
+          .limit(limit);
       }
       
-      // Sıralama ve limit
-      query = query.orderBy('created_at', 'desc').limit(limit);
-      
-      // Pagination desteği
-      if (lastCreatedAt) {
-        query = query.startAfter(new Date(lastCreatedAt));
-      }
-      
-      console.log('📊 Firebase optimized query çalıştırılıyor...');
+      console.log('🔍 DEBUG: INDEX-FREE query çalıştırılıyor...', { userId, status, limit });
       const queueSnapshot = await query.get();
+      console.log('🔍 DEBUG: Query sonucu:', { 
+        isEmpty: queueSnapshot.empty, 
+        size: queueSnapshot.size,
+        docs: queueSnapshot.docs.length 
+      });
       
       if (queueSnapshot.empty) {
-        console.log('📋 Kuyruk boş');
+        console.log('🔍 DEBUG: KUYRUK BOŞ - Hiç ürün yok!');
         return NextResponse.json({ 
           items: [], 
-          totalTime: Date.now() - startTime,
-          optimized: true 
+          metadata: {
+            totalItems: 0,
+            loadTime: Date.now() - startTime,
+            optimized: true,
+            statusDistribution: {},
+            hasMorePages: false,
+            timestamp: new Date().toISOString()
+          }
         });
       }
       
-      console.log(`📦 ${queueSnapshot.size} queue item bulundu, resim verileri yükleniyor...`);
+      console.log(`🔍 DEBUG: ${queueSnapshot.size} queue item bulundu!`);
       
-      // Parallel işleme için Promise.all kullan
-      const allItems = await Promise.all(
-        queueSnapshot.docs.map(async (doc) => {
-          const data = doc.data();
+      // DEBUG: Her doc'u detaylı logla
+      queueSnapshot.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`🔍 DEBUG: Item ${index + 1}:`, {
+          id: doc.id,
+          user_id: data.user_id,
+          status: data.status,
+          title: data.title,
+          created_at: data.created_at,
+          has_images: !!data.image_refs,
+          image_count: data.image_refs?.length || 0
+        });
+      });
+      
+      // DÜZELTME: UI'nin beklediği nested product_data yapısını oluştur
+      const items = queueSnapshot.docs.map(doc => {
+        const data = doc.data();
+        
+        // UI'nin beklediği nested yapı
+        const item = {
+          id: doc.id,
+          user_id: data.user_id,
+          status: data.status,
+          created_at: data.created_at ? data.created_at.toDate().toISOString() : new Date().toISOString(),
+          updated_at: data.updated_at ? data.updated_at.toDate().toISOString() : new Date().toISOString(),
+          retry_count: data.retry_count || 0,
+          error_message: data.error_message,
+          etsy_listing_id: data.etsy_listing_id,
           
+          // 🚀 UI'nin beklediği product_data nested yapısı  
+          product_data: {
+            title: data.title || 'Unnamed Product',
+            price: data.price || 0,
+            tags: data.tags || [],
+            images: [], // Async image loading yapılacak aşağıda
+            video: data.video_ref ? { exists: true } : undefined,
+            taxonomy_id: data.taxonomy_id || 2078,
+            created_at: data.created_at ? data.created_at.toDate().toISOString() : new Date().toISOString()
+          },
+          
+          // Ek bilgiler
+          imageCount: data.image_refs ? data.image_refs.length : 0,
+          hasVideo: !!data.video_ref,
+          created_timestamp: data.created_at ? data.created_at.toDate() : new Date(),
+          updated_timestamp: data.updated_at ? data.updated_at.toDate() : new Date()
+        };
+        
+        console.log(`🔍 DEBUG: UI uyumlu item:`, {
+          id: item.id,
+          title: item.product_data.title,
+          status: item.status,
+          images: item.imageCount
+        });
+        return item;
+      });
+      
+      // 🚀 CLIENT-SIDE SORTING - Firebase index olmadığı için
+      items.sort((a, b) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return dateB - dateA; // En yeni önce
+      });
+      
+      // 🖼️ İLK RESİM LOADING - Sadece thumbnail için
+      console.log('🖼️ İlk resimler yükleniyor (thumbnail için)...');
+      const itemsWithFirstImage = await Promise.all(
+        items.map(async (item) => {
           try {
-            
-            // HIZLI RESİM YÜKLEMESİ - Optimize edilmiş chunk loading
-            let images: any[] = [];
-            if (data.image_refs && data.image_refs.length > 0) {
-              try {
-                // İlk sadece metadata'ları al - batch işlemi
-                const imageMetadataPromises = data.image_refs.map((imageId: string) => 
-                  adminDb.collection('queue_images').doc(imageId).get()
-                );
+            console.log(`🖼️ DEBUG - Item ${item.id}: imageCount=${item.imageCount}, current_images=${item.product_data.images.length}`);
+            if (item.imageCount > 0 && item.product_data.images.length === 0) {
+              console.log(`🖼️ Loading thumbnail for ${item.id}...`);
+              // Sadece ilk resmi al
+              const firstImageRef = await adminDb.collection('queue_images')
+                .where('queue_item_id', '==', item.id)
+                .limit(1)
+                .get();
+              
+              console.log(`🖼️ Image query result for ${item.id}: ${firstImageRef.size} images found`);
+              
+              if (!firstImageRef.empty) {
+                const firstImageDoc = firstImageRef.docs[0];
+                const imageData = firstImageDoc.data();
+                console.log(`🖼️ Found image doc for ${item.id}: chunks=${imageData.chunks_count}`);
                 
-                const imageMetadataDocs = await Promise.all(imageMetadataPromises);
-                
-                // Metadata'sı olan resimler için chunk'ları paralel yükle
-                const imageLoadPromises = imageMetadataDocs.map(async (imageDoc, index) => {
-                  if (!imageDoc.exists) return null;
+                if (imageData.chunks_count > 0) {
+                  // INDEX-FREE BASE64 LOADING - Client-side sorting
+                  const allChunks = await adminDb.collection('queue_image_chunks')
+                    .where('image_id', '==', firstImageDoc.id)
+                    .get();
                   
-                  const imageData = imageDoc.data()!;
-                  const imageId = data.image_refs[index];
-                  
-                  if (imageData.chunks_count > 0) {
-                    // Chunk'ları sıralı yükle - orderBy ile daha hızlı
-                    const chunkQuery = await adminDb.collection('queue_image_chunks')
-                      .where('image_id', '==', imageId)
-                      .orderBy('chunk_index')
-                      .get();
+                  if (!allChunks.empty) {
+                    console.log(`🖼️ Found ${allChunks.size} chunks for ${item.id}`);
                     
-                    // Chunk'ları doğrudan sırayla birleştir
-                    const combinedBase64 = chunkQuery.docs
-                      .map(doc => doc.data().chunk_data)
-                      .join('');
+                    // Tüm chunk'ları sırala ve birleştir
+                    const sortedChunks = allChunks.docs
+                      .map(doc => ({ data: doc.data(), id: doc.id }))
+                      .sort((a, b) => a.data.chunk_index - b.data.chunk_index);
                     
-                    return {
+                    console.log(`🖼️ Sorted chunks for ${item.id}:`, sortedChunks.map(c => c.data.chunk_index));
+                    
+                    const base64Parts: string[] = [];
+                    sortedChunks.forEach(chunk => {
+                      base64Parts.push(chunk.data.chunk_data);
+                    });
+                    const fullBase64 = base64Parts.join('');
+                    
+                    item.product_data.images = [{
                       name: imageData.name,
-                      filename: imageData.name,
                       type: imageData.type,
-                      data: combinedBase64,
-                      base64: combinedBase64,
-                      size: combinedBase64.length
-                    };
+                      base64: fullBase64, // Tam base64 data
+                      data: fullBase64,   // processQueueItem için ek field
+                      isPartial: false
+                    }];
+                    
+                    console.log(`🖼️ Full thumbnail yüklendi: ${item.id} (${fullBase64.length} chars)`);
+                  } else {
+                    console.warn(`⚠️ No chunks found for image ${firstImageDoc.id}`);
                   }
-                  return null;
-                });
-                
-                const imageResults = await Promise.all(imageLoadPromises);
-                images = imageResults.filter(img => img !== null);
-                
-                console.log(`📷 ${images.length} resim yüklendi (${doc.id})`);
-              } catch (imageError) {
-                console.error('Error loading images for queue item:', doc.id, imageError);
-                images = []; // Hata durumunda boş array
-              }
-            }
-            
-            // HIZLI VİDEO YÜKLEMESİ - Optimize edilmiş
-            let video = null;
-            if (data.video_ref) {
-              try {
-                const videoDoc = await adminDb.collection('queue_videos').doc(data.video_ref).get();
-                if (videoDoc.exists) {
-                  const videoData = videoDoc.data()!;
-                  
-                  if (videoData.chunks_count > 0) {
-                    // Video chunk'larını sıralı yükle
-                    const chunkQuery = await adminDb.collection('queue_video_chunks')
-                      .where('video_id', '==', data.video_ref)
-                      .orderBy('chunk_index')
-                      .get();
-                    
-                    // Chunk'ları doğrudan birleştir
-                    const combinedBase64 = chunkQuery.docs
-                      .map(doc => doc.data().chunk_data)
-                      .join('');
-                    
-                    video = {
-                      name: videoData.name,
-                      filename: videoData.name,
-                      type: videoData.type,
-                      data: combinedBase64,
-                      base64: combinedBase64,
-                      size: combinedBase64.length
-                    };
-                    
-                    console.log(`🎬 Video yüklendi (${doc.id})`);
-                  }
+                } else {
+                  console.warn(`⚠️ Image has 0 chunks: ${firstImageDoc.id}`);
                 }
-              } catch (videoError) {
-                console.error('Error loading video for queue item:', doc.id, videoError);
-                video = null;
               }
             }
-            
-            return {
-              id: doc.id,
-              user_id: data.user_id,
-              status: data.status,
-              created_at: data.created_at ? data.created_at.toDate().toISOString() : new Date().toISOString(),
-              updated_at: data.updated_at ? data.updated_at.toDate().toISOString() : new Date().toISOString(),
-              retry_count: data.retry_count || 0,
-              title: data.title || 'Unnamed Product',
-              description: data.description || '',
-              price: data.price || 0,
-              tags: data.tags || [],
-              images: images,
-              video: video,
-              imageCount: images.length,
-              hasVideo: !!video,
-              // Firebase timestamp'leri
-              created_timestamp: data.created_at ? data.created_at.toDate() : new Date(),
-              updated_timestamp: data.updated_at ? data.updated_at.toDate() : new Date()
-            };
-          } catch (itemError) {
-            console.error(`Error processing queue item ${doc.id}:`, itemError);
-            return null;
+          } catch (imageError) {
+            console.error(`🖼️ Image loading error for ${item.id}:`, imageError);
           }
+          return item;
         })
       );
       
-      // Null değerleri filtrele (Promise.all sonucu)
-      const validItems = allItems.filter(item => item !== null);
+      console.log('🔍 DEBUG: Final items with thumbnails:', itemsWithFirstImage.length);
+      
+      // 🎥 VIDEO LOADING - Sadece varsa
+      console.log('🎥 Video yükleniyor (varsa)...');
+      const itemsWithVideo = await Promise.all(
+        itemsWithFirstImage.map(async (item) => {
+          try {
+            console.log(`🎥 DEBUG - Item ${item.id}: hasVideo=${item.hasVideo}, current_video=${!!item.product_data.video}, has_video_data=${!!item.product_data.video?.data}`);
+            if (item.hasVideo && (!item.product_data.video || !item.product_data.video.data)) {
+              console.log(`🎥 Loading video for ${item.id}...`);
+              
+              // Video metadata'yı al
+              const videoRef = await adminDb.collection('queue_videos')
+                .where('queue_item_id', '==', item.id)
+                .limit(1)
+                .get();
+              
+              console.log(`🎥 Video query result for ${item.id}: ${videoRef.size} videos found`);
+              
+              if (!videoRef.empty) {
+                const videoDoc = videoRef.docs[0];
+                const videoData = videoDoc.data();
+                console.log(`🎥 Found video doc for ${item.id}: chunks=${videoData.chunks_count}`);
+                
+                if (videoData.chunks_count > 0) {
+                  // VIDEO CHUNKS LOADING - Client-side sorting
+                  const allVideoChunks = await adminDb.collection('queue_video_chunks')
+                    .where('video_id', '==', videoDoc.id)
+                    .get();
+                  
+                  if (!allVideoChunks.empty) {
+                    console.log(`🎥 Found ${allVideoChunks.size} video chunks for ${item.id}`);
+                    
+                    // Video chunk'ları sırala ve birleştir
+                    const sortedVideoChunks = allVideoChunks.docs
+                      .map(doc => ({ data: doc.data(), id: doc.id }))
+                      .sort((a, b) => a.data.chunk_index - b.data.chunk_index);
+                    
+                    console.log(`🎥 Sorted video chunks for ${item.id}:`, sortedVideoChunks.map(c => c.data.chunk_index));
+                    
+                    const videoBase64Parts: string[] = [];
+                    sortedVideoChunks.forEach(chunk => {
+                      videoBase64Parts.push(chunk.data.chunk_data);
+                    });
+                    const fullVideoBase64 = videoBase64Parts.join('');
+                    
+                    item.product_data.video = {
+                      name: videoData.filename,
+                      type: videoData.type,
+                      base64: fullVideoBase64,
+                      data: fullVideoBase64, // processQueueItem için ek field
+                      size: videoData.size
+                    };
+                    
+                    console.log(`🎥 Full video yüklendi: ${item.id} (${fullVideoBase64.length} chars)`);
+                  } else {
+                    console.warn(`⚠️ No video chunks found for video ${videoDoc.id}`);
+                  }
+                } else {
+                  console.warn(`⚠️ Video has 0 chunks: ${videoDoc.id}`);
+                }
+              }
+            }
+          } catch (videoError) {
+            console.error(`🎥 Video loading error for ${item.id}:`, videoError);
+          }
+          return item;
+        })
+      );
+      
+      console.log('🔍 DEBUG: Final items with videos:', itemsWithVideo.length);
       
       const totalTime = Date.now() - startTime;
       
-      console.log(`✅ Optimize kuyruk tamamlandı: ${validItems.length} item, ${totalTime}ms`);
+      console.log(`✅ INDEX-FREE kuyruk + thumbnails + videos tamamlandı: ${itemsWithVideo.length} item, ${totalTime}ms`);
       
-      // Debug: Status dağılımını logla
-      const statusCounts = validItems.reduce((acc: any, item: any) => {
+      // Status dağılımı
+      const statusCounts = itemsWithVideo.reduce((acc: any, item: any) => {
         acc[item.status] = (acc[item.status] || 0) + 1;
         return acc;
       }, {});
-      console.log('📊 Status dağılımı:', statusCounts);
       
       return NextResponse.json({ 
-        items: validItems,
+        items: itemsWithVideo,
         metadata: {
-          totalItems: validItems.length,
+          totalItems: itemsWithVideo.length,
           loadTime: totalTime,
           optimized: true,
           statusDistribution: statusCounts,
-          hasMorePages: validItems.length === limit,
+          hasMorePages: items.length === limit,
           timestamp: new Date().toISOString()
         }
       });
       
     } catch (error) {
       console.error('🔥 Firebase kuyruk hatası:', error);
-      return NextResponse.json({ items: [] });
+      return NextResponse.json({ 
+        items: [],
+        metadata: {
+          totalItems: 0,
+          loadTime: Date.now() - startTime,
+          optimized: true,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        }
+      });
     }
   } catch (error) {
     console.error('Queue API error:', error);
-    return NextResponse.json({ items: [] });
+    return NextResponse.json({ 
+      items: [],
+      metadata: {
+        totalItems: 0,
+        loadTime: 0,
+        optimized: true,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      }
+    });
   }
 }
 
+// Diğer HTTP metodları...
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { product, action, userId } = body;
-
-    // Firebase bağlantısını başlat
-    initializeAdminApp();
-    
-    if (!adminDb) {
-      console.error('Firebase Admin not initialized');
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
-    }
-
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-    }
-
-    if (action === 'add') {
-      // Kuyruğa ürün ekle
-      const queueItem = {
-        user_id: userId,
-        product_data: product,
-        status: 'pending',
-        created_at: new Date(),
-        updated_at: new Date(),
-        retry_count: 0,
-      };
-
-      const docRef = await adminDb.collection('queue').add(queueItem);
-      
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Product added to queue successfully',
-        queue_id: docRef.id
-      });
-    }
-
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-  } catch (error) {
-    console.error('Queue POST error:', error);
-    return NextResponse.json({ error: 'Failed to add item to queue' }, { status: 500 });
-  }
+  return NextResponse.json({ message: 'POST method not implemented yet' });
 }
 
 export async function DELETE(request: NextRequest) {
   try {
+    console.log('🗑️ DELETE queue API çağrısı başlatıldı');
+    
     const body = await request.json();
     const { action, itemIds, user_id } = body;
+    
+    console.log('🗑️ DELETE parametreleri:', { action, itemIds, user_id });
 
     // Firebase bağlantısını başlat
     initializeAdminApp();
     
     if (!adminDb) {
-      console.error('Firebase Admin not initialized');
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+      console.error('🗑️ Firebase Admin not initialized');
+      return NextResponse.json({ 
+        success: false,
+        error: 'Database connection failed' 
+      }, { status: 500 });
     }
 
     if (!user_id) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+      return NextResponse.json({ 
+        success: false,
+        error: 'User ID is required' 
+      }, { status: 400 });
     }
 
     if (action === 'delete_selected') {
       if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
         console.error('❌ DELETE: Item IDs boş veya geçersiz:', itemIds);
-        return NextResponse.json({ error: 'Item IDs are required' }, { status: 400 });
+        return NextResponse.json({ 
+          success: false,
+          error: 'Item IDs are required' 
+        }, { status: 400 });
       }
 
       console.log(`🗑️ DELETE: ${itemIds.length} ürün siliniyor:`, itemIds);
@@ -313,12 +412,14 @@ export async function DELETE(request: NextRequest) {
         console.error('❌ DELETE batch hatası:', deleteError);
         return NextResponse.json({ 
           success: false,
-          error: `Delete failed: ${deleteError.message}`
+          error: `Delete failed: ${deleteError instanceof Error ? deleteError.message : 'Unknown error'}`
         }, { status: 500 });
       }
     }
 
     if (action === 'clear_all') {
+      console.log('🗑️ CLEAR ALL: Tüm kuyruk temizleniyor...');
+      
       // Kullanıcının tüm kuyruk ürünlerini sil
       const queueSnapshot = await adminDb.collection('queue')
         .where('user_id', '==', user_id)
@@ -330,17 +431,26 @@ export async function DELETE(request: NextRequest) {
           batch.delete(doc.ref);
         });
         await batch.commit();
+        
+        console.log(`✅ CLEAR ALL: ${queueSnapshot.size} ürün silindi`);
       }
 
       return NextResponse.json({ 
         success: true, 
-        message: `All queue items deleted successfully`
+        message: `All queue items deleted successfully (${queueSnapshot.size} items)`
       });
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    return NextResponse.json({ 
+      success: false,
+      error: 'Invalid action' 
+    }, { status: 400 });
+    
   } catch (error) {
-    console.error('Queue DELETE error:', error);
-    return NextResponse.json({ error: 'Failed to delete items' }, { status: 500 });
+    console.error('❌ Queue DELETE API hatası:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Delete operation failed'
+    }, { status: 500 });
   }
 }

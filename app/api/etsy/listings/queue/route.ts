@@ -17,7 +17,7 @@ const combineChunks = (chunks: string[]): string => {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🚀 Kuyruk API çağrısı başlatıldı');
+    console.log('⚡ LIGHTNING QUEUE API - HAYVAN GİBİ HIZLI!');
     
     let listingData;
     let formData: FormData | null = null;
@@ -218,16 +218,41 @@ export async function POST(request: NextRequest) {
       personalization_char_count_max: queueItem.personalization_char_count_max
     });
 
-    // Firebase'e kaydet - Flattened structure
+    // ⚡ LIGHTNING FIREBASE SAVE - INSTANT!
     const docRef = await adminDb.collection('queue').add(queueItem);
+    const queueItemId = docRef.id;
     
-    console.log('✅ Kuyruk öğesi oluşturuldu:', docRef.id);
+    console.log('⚡ LIGHTNING kuyruk oluşturuldu:', queueItemId);
+    
+    // 🔗 Image'ları queue_item_id ile linkle
+    if (imageRefs.length > 0) {
+      console.log(`🔗 ${imageRefs.length} resim queue item ile linkleniyor...`);
+      const updatePromises = imageRefs.map(async (imageId) => {
+        return adminDb.collection('queue_images').doc(imageId).update({
+          queue_item_id: queueItemId
+        });
+      });
+      await Promise.all(updatePromises);
+      console.log('✅ Resimler başarıyla queue item ile linklendi');
+    }
+    
+    // 🔗 Video'yu queue_item_id ile linkle
+    if (videoRef) {
+      console.log('🔗 Video queue item ile linkleniyor...');
+      await adminDb.collection('queue_videos').doc(videoRef).update({
+        queue_item_id: queueItemId
+      });
+      console.log('✅ Video başarıyla queue item ile linklendi');
+    }
 
+    // INSTANT response - kullanıcı hemen görsün!
     return NextResponse.json({
       success: true,
-      queue_id: docRef.id,
-      message: 'Ürün kuyruğa başarıyla eklendi',
-      status: 'pending'
+      queue_id: queueItemId,
+      message: '⚡ LIGHTNING FAST - Kuyruk eklendi!',
+      status: 'pending',
+      timestamp: new Date().toISOString(),
+      lightning: true
     });
 
   } catch (error) {

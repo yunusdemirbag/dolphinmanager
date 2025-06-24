@@ -84,6 +84,33 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   const editingRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const { toast } = useToast();
   
+  // Client-side mount kontrolü
+  useEffect(() => {
+    setMounted(true);
+    // localStorage'dan completed verileri yükle
+    if (typeof window !== 'undefined') {
+      const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
+      const validCompletedData = completedKeys.map(key => {
+        try {
+          const data = JSON.parse(localStorage.getItem(key) || '{}');
+          if (data.title && data.completed_at && !isNaN(new Date(data.completed_at).getTime())) {
+            return { key, data };
+          }
+          return null;
+        } catch {
+          localStorage.removeItem(key); // Bozuk veriyi temizle
+          return null;
+        }
+      }).filter(item => item !== null);
+      
+      localStorage.setItem('completed_count', validCompletedData.length.toString());
+      setCompletedCount(validCompletedData.length);
+      setCompletedItems(validCompletedData.sort((a, b) => 
+        new Date(b.data.completed_at).getTime() - new Date(a.data.completed_at).getTime()
+      ));
+    }
+  }, []);
+  
   // Etsy store bilgileri
   const [storeInfo, setStoreInfo] = useState<{
     shopId: string | null;
@@ -99,6 +126,11 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     shopName: null,
     isConnected: false
   });
+  
+  // Client-side only state
+  const [mounted, setMounted] = useState(false);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [completedItems, setCompletedItems] = useState<any[]>([]);
 
   const fetchMoreProducts = useCallback(async () => {
     if (!nextCursor || isLoadingProducts) return;
@@ -181,7 +213,20 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       setIsLoadingQueue(true);
       const response = await fetch('/api/queue?user_id=local-user-123')
       const data = await response.json()
-      setQueueItems(data.items || [])
+      
+      // Tüm ürünleri al ama state hesaplaması için
+      const allItems = data.items || [];
+      setQueueItems(allItems);
+      
+      // Stats'ı güncelle - tüm statusları dahil et
+      const newStats = {
+        pending: allItems.filter((item: any) => item.status === 'pending').length,
+        processing: allItems.filter((item: any) => item.status === 'processing').length,
+        completed: allItems.filter((item: any) => item.status === 'completed').length,
+        failed: allItems.filter((item: any) => item.status === 'failed').length
+      };
+      setQueueStats(newStats);
+      
     } catch (error) {
       console.error('Kuyruk verileri yüklenemedi:', error)
       toast({
@@ -470,13 +515,13 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     return new File([byteArray], filename, { type: mimeType });
   };
 
-  // Kuyruk istatistikleri
+  // Kuyruk istatistikleri - Client-side only
   const stats = {
     pending: queueItems.filter(item => item.status === 'pending').length,
     processing: queueItems.filter(item => item.status === 'processing').length,
-    completed: queueItems.filter(item => item.status === 'completed').length,
+    completed: completedCount, // State'ten al
     failed: queueItems.filter(item => item.status === 'failed').length,
-    total: queueItems.length
+    total: queueItems.length + completedCount
   };
 
   const formatDate = (dateString: string) => {
@@ -678,6 +723,8 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
 
   const processQueueItem = useCallback(async (itemId: string) => {
     try {
+      // İşlem süresini ölçmek için timer başlat
+      window.processingStartTime = performance.now();
       setCurrentlyProcessing(itemId);
       
       // Kuyruk öğesini al
@@ -765,22 +812,67 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         const result = await response.json();
         console.log('✅ Başarılı yanıt:', result);
         
-        // Local state'i güncelle
+        // Database'den ürünü sil ve localStorage'a tamamlanan olarak ekle
+        const deleteResponse = await fetch('/api/queue', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            action: 'delete_selected',
+            itemIds: [itemId],
+            user_id: 'local-user-123'
+          })
+        });
+        
+        const deleteResult = await deleteResponse.json();
+        
+        if (deleteResult.success) {
+          // İşlem süresini hesapla
+          const processingTime = performance.now() - (window.processingStartTime || 0);
+          
+          // Tamamlananlar sayacını localStorage'da tut ve state'i güncelle
+          const newCompletedCount = completedCount + 1;
+          const completedData = {
+            title: queueItem.product_data.title,
+            completed_at: new Date().toISOString(),
+            etsy_listing_id: result.listing_id,
+            processing_time: Math.round(processingTime / 1000) // saniye olarak
+          };
+          
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('completed_count', newCompletedCount.toString());
+            localStorage.setItem(`completed_${itemId}`, JSON.stringify(completedData));
+          }
+          
+          setCompletedCount(newCompletedCount);
+          setCompletedItems(prev => [{ key: `completed_${itemId}`, data: completedData }, ...prev]);
+          
+          // API limit bilgisi
+          const apiLimitInfo = result.rate_limit ? 
+            `${(result.rate_limit.daily_limit - (result.rate_limit.api_calls_used || 1)).toLocaleString()}/${result.rate_limit.daily_limit.toLocaleString()}` : 
+            'Bilinmiyor';
+          
+          // Harika emojili log
+          console.log(`
+🎉 ═══════════════════════════════════════════
+✅ ÜRÜN BAŞARIYLA GÖNDERİLDİ!
+📦 Ürün Adı: ${queueItem.product_data.title}
+⏱️  Süre: ${Math.round(processingTime / 1000)} saniye
+🔢 Kalan API Limit: ${apiLimitInfo}
+🆔 Etsy ID: ${result.listing_id}
+📊 Toplam Tamamlanan: ${completedCount}
+═══════════════════════════════════════════`);
+          
+        } else {
+          console.error('❌ Database\'den silinirken hata:', deleteResult.error);
+        }
+
+        // Local state'i güncelle (artık sadece filtreli görünüm için)
         setQueueItems(items => 
-          items.map(item => 
-            item.id === itemId 
-              ? {
-                  ...item,
-                  status: 'completed' as const,
-                  etsy_listing_id: result.listing_id,
-                  error_message: undefined // Hata mesajını temizle
-                }
-              : item
-          )
+          items.filter(item => item.id !== itemId) // Silinen ürünü listeden çıkar
         );
         
         // Rate limit bilgisi varsa göster
-        let toastDescription = `Ürün Etsy'e draft olarak gönderildi (ID: ${result.listing_id})`;
+        let toastDescription = `Ürün Etsy'e gönderildi ve tamamlandı (${newCompletedCount}) - ID: ${result.listing_id}`;
         if (result.rate_limit && result.rate_limit.daily_limit) {
           const usedCalls = result.rate_limit.api_calls_used || 1;
           const dailyLimit = result.rate_limit.daily_limit;
@@ -789,7 +881,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         }
         
         toast({
-          title: "Başarılı",
+          title: "Ürün Tamamlandı",
           description: toastDescription
         });
       } else {
@@ -888,7 +980,9 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   }, [toast]);
 
   const clearQueue = useCallback(async () => {
-    if (!confirm('Tüm kuyruk silinecek. Bu işlem geri alınamaz. Emin misiniz?')) {
+    const totalItems = queueItems.length + stats.completed;
+    
+    if (!confirm(`Tüm kuyruk temizlenecek (${queueItems.length} aktif + ${stats.completed} tamamlanan = ${totalItems} toplam). Bu işlem geri alınamaz. Emin misiniz?`)) {
       return;
     }
 
@@ -903,9 +997,18 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         // Local state'i temizle
         setQueueItems([]);
         
+        // localStorage'daki tamamlanan ürünleri de temizle ve state'i sıfırla
+        if (typeof window !== 'undefined') {
+          const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
+          completedKeys.forEach(key => localStorage.removeItem(key));
+          localStorage.removeItem('completed_count');
+        }
+        setCompletedCount(0);
+        setCompletedItems([]);
+        
         toast({
-          title: "Kuyruk Temizlendi",
-          description: `${result.deleted_count} öğe başarıyla silindi`
+          title: "Kuyruk Tamamen Temizlendi",
+          description: `${totalItems} ürün (aktif + tamamlanan) başarıyla silindi`
         });
       } else {
         throw new Error('Kuyruk temizlenemedi');
@@ -918,7 +1021,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         description: "Kuyruk temizlenemedi"
       });
     }
-  }, [toast]);
+  }, [queueItems.length, stats.completed, toast]);
 
   const deleteSelectedItems = useCallback(async () => {
     if (selectedItems.length === 0) return;
@@ -1814,103 +1917,32 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                 <p>Henüz tamamlanan ürün bulunmuyor</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {queueItems
-                  .filter(item => item.status === 'completed')
-                  .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-                  .map((item) => (
-                <div
-                  key={item.id}
-                  className="border rounded-lg p-4 bg-green-50 border-green-200"
-                >
-                  <div className="flex items-start gap-4">
-                    <CheckCircle className="w-5 h-5 text-green-500 mt-1" />
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="font-semibold text-lg mb-1 text-green-800">
-                            {item.product_data.title}
-                          </div>
-                          
-                          <div className="flex items-center gap-4 text-sm text-green-700 mb-2">
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium">
-                                ${item.product_data.price?.toFixed(2) || '0.00'}
-                              </span>
-                            </div>
-                            <div>
-                              {getCategoryName(item.product_data.taxonomy_id)}
-                            </div>
-                            <div>
-                              {formatDate(item.created_at)}
-                            </div>
-                          </div>
-
-                          <div className="mb-2">
-                            <div className="flex items-center gap-1 text-sm text-green-600 mb-2">
-                              <Image className="w-4 h-4" />
-                              {item.product_data.images?.length || 0} resim
-                              {item.product_data.video && (
-                                <>
-                                  <Video className="w-4 h-4 ml-2" />
-                                  1 video
-                                </>
-                              )}
-                            </div>
-                            
-                            {/* Küçük thumbnail'ler */}
-                            <div className="flex gap-1">
-                              {item.product_data.images?.slice(0, 4).map((img: any, idx: number) => (
-                                <div 
-                                  key={idx} 
-                                  className="w-8 h-8 rounded border overflow-hidden bg-gray-100"
-                                >
-                                  {img.base64 && (
-                                    <img 
-                                      src={`data:${img.type};base64,${img.base64}`}
-                                      alt={`Resim ${idx + 1}`}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  )}
-                                </div>
-                              ))}
-                              {(item.product_data.images?.length || 0) > 4 && (
-                                <div className="w-8 h-8 rounded border bg-gray-100 flex items-center justify-center text-xs text-gray-500">
-                                  +{(item.product_data.images?.length || 0) - 4}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {item.product_data.tags?.slice(0, 6).map((tag: string, index: number) => (
-                              <Badge key={index} variant="secondary" className="text-xs">
-                                #{tag}
-                              </Badge>
-                            ))}
-                            {(item.product_data.tags?.length || 0) > 6 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{(item.product_data.tags?.length || 0) - 6} daha
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col items-end gap-2">
-                          <Badge className="bg-green-100 text-green-800 border-green-300">
-                            ✅ Tamamlandı
-                          </Badge>
-
-                          {item.etsy_listing_id && (
-                            <div className="text-xs text-green-600 font-medium">
-                              Etsy ID: {item.etsy_listing_id}
-                            </div>
-                          )}
+              <div className="space-y-3">
+                {mounted && completedItems.map(({ key, data }) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="w-6 h-6 text-green-500" />
+                      <div>
+                        <div className="font-semibold text-green-800">{data.title}</div>
+                        <div className="text-sm text-green-600 space-x-4">
+                          <span>📅 {new Date(data.completed_at).toLocaleString('tr-TR')}</span>
+                          <span>⏱️ {data.processing_time || 0} saniye</span>
                         </div>
                       </div>
                     </div>
-                  </div>
+                    {data.etsy_listing_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open(`https://www.etsy.com/listing/${data.etsy_listing_id}`, '_blank')}
+                        className="border-green-300 text-green-700 hover:bg-green-100"
+                      >
+                        Etsy'de Gör
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>

@@ -75,9 +75,33 @@ export default function QueuePage() {
   const stats: QueueStats = {
     pending: queueItems.filter(item => item.status === 'pending').length,
     processing: queueItems.filter(item => item.status === 'processing').length,
-    completed: queueItems.filter(item => item.status === 'completed').length,
+    completed: (() => {
+      const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
+      const validCompleted = completedKeys.filter(key => {
+        try {
+          const data = JSON.parse(localStorage.getItem(key) || '{}');
+          return data.title && data.completed_at && !isNaN(new Date(data.completed_at).getTime());
+        } catch {
+          localStorage.removeItem(key); // Bozuk veriyi temizle
+          return false;
+        }
+      });
+      localStorage.setItem('completed_count', validCompleted.length.toString());
+      return validCompleted.length;
+    })(),
     failed: queueItems.filter(item => item.status === 'failed').length,
-    total: queueItems.length
+    total: queueItems.length + (() => {
+      const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
+      const validCompleted = completedKeys.filter(key => {
+        try {
+          const data = JSON.parse(localStorage.getItem(key) || '{}');
+          return data.title && data.completed_at && !isNaN(new Date(data.completed_at).getTime());
+        } catch {
+          return false;
+        }
+      });
+      return validCompleted.length;
+    })()
   }
 
   // Kuyruk verilerini yükle
@@ -85,11 +109,8 @@ export default function QueuePage() {
     try {
       const response = await fetch('/api/queue?user_id=local-user-123')
       const data = await response.json()
-      // Sadece pending ve processing statusları göster, tamamlanan ve hatalı olanları filtrele
-      const activeItems = (data.items || []).filter((item: QueueItem) => 
-        item.status === 'pending' || item.status === 'processing'
-      )
-      setQueueItems(activeItems)
+      // Tüm ürünleri al, filtreleme UI seviyesinde yapılacak
+      setQueueItems(data.items || [])
     } catch (error) {
       console.error('Kuyruk verileri yüklenemedi:', error)
       toast({
@@ -146,21 +167,25 @@ export default function QueuePage() {
       // Görselleri ekle - Base64'ten File'a dönüştür
       if (nextItem.product_data.images) {
         nextItem.product_data.images.forEach((image: any, index: number) => {
-          if (image.base64) {
-            const file = base64ToFile(image.base64, image.filename, image.type);
+          const base64Data = image.base64 || image.data;
+          if (base64Data) {
+            const file = base64ToFile(base64Data, image.filename || image.name, image.type);
             formData.append(`imageFile_${index}`, file);
           }
         })
       }
 
       // Video ekle - Base64'ten File'a dönüştür  
-      if (nextItem.product_data.video && nextItem.product_data.video.base64) {
-        const videoFile = base64ToFile(
-          nextItem.product_data.video.base64, 
-          nextItem.product_data.video.filename, 
-          nextItem.product_data.video.type
-        );
-        formData.append('videoFile', videoFile);
+      if (nextItem.product_data.video) {
+        const videoBase64Data = nextItem.product_data.video.base64 || nextItem.product_data.video.data;
+        if (videoBase64Data) {
+          const videoFile = base64ToFile(
+            videoBase64Data, 
+            nextItem.product_data.video.filename || nextItem.product_data.video.name, 
+            nextItem.product_data.video.type
+          );
+          formData.append('videoFile', videoFile);
+        }
       }
 
       const etsyResponse = await fetch('/api/etsy/listings/create', {
@@ -169,52 +194,100 @@ export default function QueuePage() {
       })
 
       const etsyResult = await etsyResponse.json()
+      
+      console.log('🔍 Etsy sonucu:', {
+        success: etsyResult.success,
+        listing_id: etsyResult.listing_id,
+        error: etsyResult.error
+      })
 
       if (etsyResult.success) {
-        // Başarılı
-        await fetch('/api/queue/worker', {
-          method: 'POST',
+        console.log('✅ Etsy başarılı, DELETE işlemi başlatılıyor...')
+        // Başarılı - Ürünü direkt sil ve tamamlananlar sayacını artır
+        const deleteResponse = await fetch('/api/queue', {
+          method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            action: 'complete', 
-            itemId: nextItem.id,
-            etsy_listing_id: etsyResult.listing_id
+            action: 'delete_selected',
+            itemIds: [nextItem.id],
+            user_id: 'local-user-123'
           })
         })
 
-        toast({
-          title: "Ürün Gönderildi",
-          description: `"${nextItem.product_data.title}" Etsy'ye taslak olarak gönderildi`
-        })
+        const deleteResult = await deleteResponse.json()
+        
+        if (deleteResult.success) {
+          // Tamamlananlar sayacını localStorage'da tut
+          const completedCount = parseInt(localStorage.getItem('completed_count') || '0') + 1
+          localStorage.setItem('completed_count', completedCount.toString())
+          localStorage.setItem(`completed_${nextItem.id}`, JSON.stringify({
+            title: nextItem.product_data.title,
+            completed_at: new Date().toISOString(),
+            etsy_listing_id: etsyResult.listing_id,
+            processing_time: Math.round(processingDelay) // İşlem süresi saniye olarak
+          }))
+
+          toast({
+            title: "Ürün Gönderildi",
+            description: `"${nextItem.product_data.title}" Etsy'ye gönderildi ve tamamlandı (${completedCount})`
+          })
+        } else {
+          console.error('DELETE işlemi başarısız:', deleteResult.error)
+          toast({
+            variant: "destructive", 
+            title: "Uyarı",
+            description: `Ürün Etsy'ye gönderildi ama kuyruktan silinemedi: ${deleteResult.error}`
+          })
+        }
       } else {
-        // Hatalı
-        await fetch('/api/queue/worker', {
-          method: 'POST',
+        console.log('❌ Etsy başarısız, hata:', etsyResult.error)
+        // Hatalı - Ürünü direkt sil (hatalıları da kuyruktaki karmaşayı önlemek için)
+        const deleteResponse = await fetch('/api/queue', {
+          method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            action: 'fail', 
-            itemId: nextItem.id,
-            error: etsyResult.error || 'Bilinmeyen hata'
+            action: 'delete_selected',
+            itemIds: [nextItem.id],
+            user_id: 'local-user-123'
           })
         })
 
+        const deleteResult = await deleteResponse.json()
+        
         toast({
           variant: "destructive",
           title: "Gönderim Hatası",
-          description: etsyResult.error || 'Bilinmeyen hata'
+          description: `${etsyResult.error || 'Bilinmeyen hata'}${deleteResult.success ? '' : ' (Kuyruktan da silinemedi)'}`
         })
       }
     } catch (error) {
       console.error('İşleme hatası:', error)
-      await fetch('/api/queue/worker', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'fail', 
-          itemId: nextItem.id,
-          error: 'İşleme hatası'
+      // Hata durumunda da ürünü sil
+      try {
+        const deleteResponse = await fetch('/api/queue', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            action: 'delete_selected',
+            itemIds: [nextItem.id],
+            user_id: 'local-user-123'
+          })
         })
-      })
+        const deleteResult = await deleteResponse.json()
+        
+        toast({
+          variant: "destructive",
+          title: "İşleme Hatası", 
+          description: `Ürün işlenemedi${deleteResult.success ? ' ve kuyruktan silindi' : ' (kuyruktan da silinemedi)'}`
+        })
+      } catch (deleteError) {
+        console.error('Delete işlemi de başarısız:', deleteError)
+        toast({
+          variant: "destructive",
+          title: "Kritik Hata",
+          description: "Ürün işlenemedi ve kuyruktan da silinemedi"
+        })
+      }
     }
 
     setCurrentlyProcessing(null)
@@ -287,11 +360,14 @@ export default function QueuePage() {
 
   // Kuyruğu temizle
   const clearQueue = async () => {
-    if (queueItems.length === 0) return
+    const totalItems = queueItems.length + stats.completed
     
-    if (!confirm('Tüm kuyruk temizlenecek. Emin misiniz?')) return
+    if (totalItems === 0) return
+    
+    if (!confirm(`Tüm kuyruk temizlenecek (${queueItems.length} aktif + ${stats.completed} tamamlanan = ${totalItems} toplam). Bu işlem geri alınamaz. Emin misiniz?`)) return
     
     try {
+      // Database'deki tüm ürünleri sil
       const response = await fetch('/api/queue', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -304,9 +380,14 @@ export default function QueuePage() {
       const result = await response.json()
       
       if (result.success) {
+        // localStorage'daki tamamlanan ürünleri de temizle
+        const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'))
+        completedKeys.forEach(key => localStorage.removeItem(key))
+        localStorage.removeItem('completed_count')
+        
         toast({
-          title: "Kuyruk Temizlendi",
-          description: "Tüm ürünler başarıyla silindi"
+          title: "Kuyruk Tamamen Temizlendi",
+          description: `${totalItems} ürün (aktif + tamamlanan) başarıyla silindi`
         })
         setSelectedItems([])
         await loadQueueItems()
@@ -536,7 +617,7 @@ export default function QueuePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Canlı Kuyruk ({stats.total})</span>
+            <span>Canlı Kuyruk ({stats.pending + stats.processing})</span>
             <div className="flex items-center gap-2">
               {selectedItems.length > 0 && (
                 <span className="text-sm text-gray-600">
@@ -544,10 +625,14 @@ export default function QueuePage() {
                 </span>
               )}
               <Checkbox
-                checked={selectedItems.length === queueItems.length && queueItems.length > 0}
+                checked={(() => {
+                  const activeItems = queueItems.filter(item => item.status === 'pending' || item.status === 'processing');
+                  return selectedItems.length === activeItems.length && activeItems.length > 0;
+                })()}
                 onCheckedChange={(checked) => {
+                  const activeItems = queueItems.filter(item => item.status === 'pending' || item.status === 'processing');
                   if (checked) {
-                    setSelectedItems(queueItems.map(item => item.id))
+                    setSelectedItems(activeItems.map(item => item.id))
                   } else {
                     setSelectedItems([])
                   }
@@ -560,13 +645,15 @@ export default function QueuePage() {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-8">Kuyruk yükleniyor...</div>
-          ) : queueItems.length === 0 ? (
+          ) : queueItems.filter(item => item.status === 'pending' || item.status === 'processing').length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              Kuyrukta ürün bulunmuyor
+              Canlı kuyrukta ürün bulunmuyor
             </div>
           ) : (
             <div className="space-y-4">
-              {queueItems.map((item) => (
+              {queueItems
+                .filter(item => item.status === 'pending' || item.status === 'processing')
+                .map((item) => (
                 <div
                   key={item.id}
                   className={`border rounded-lg p-4 transition-all hover:shadow-md ${
@@ -589,20 +676,30 @@ export default function QueuePage() {
 
                     {/* Ürün görseli */}
                     <div className="flex-shrink-0">
-                      {item.product_data.images?.[0]?.base64 ? (
-                        <img 
-                          src={item.product_data.images[0].base64.startsWith('data:') 
-                            ? item.product_data.images[0].base64 
-                            : `data:${item.product_data.images[0].type || 'image/jpeg'};base64,${item.product_data.images[0].base64}`
-                          }
-                          alt={item.product_data.title}
-                          className="w-16 h-16 object-cover rounded-lg border"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 bg-gray-200 rounded-lg border flex items-center justify-center">
-                          <Image className="w-6 h-6 text-gray-400" />
-                        </div>
-                      )}
+                      {(() => {
+                        const firstImage = item.product_data.images?.[0];
+                        const imageData = firstImage?.base64 || firstImage?.data;
+                        
+                        if (imageData) {
+                          const imageSrc = imageData.startsWith('data:') 
+                            ? imageData 
+                            : `data:${firstImage.type || 'image/jpeg'};base64,${imageData}`;
+                          
+                          return (
+                            <img 
+                              src={imageSrc}
+                              alt={item.product_data.title}
+                              className="w-32 h-32 object-cover rounded-lg border"
+                            />
+                          );
+                        }
+                        
+                        return (
+                          <div className="w-32 h-32 bg-gray-200 rounded-lg border flex items-center justify-center">
+                            <Image className="w-12 h-12 text-gray-400" />
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Ürün bilgileri */}
@@ -723,6 +820,68 @@ export default function QueuePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Tamamlananlar Sekmesi */}
+      {stats.completed > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              Tamamlananlar ({stats.completed})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {(() => {
+                // Geçerli tamamlanan ürünleri al ve doğrula
+                const completedKeys = Object.keys(localStorage)
+                  .filter(key => key.startsWith('completed_'));
+                
+                const validCompleted = completedKeys.filter(key => {
+                  try {
+                    const data = JSON.parse(localStorage.getItem(key) || '{}');
+                    return data.title && data.completed_at && !isNaN(new Date(data.completed_at).getTime());
+                  } catch {
+                    localStorage.removeItem(key); // Bozuk veriyi temizle
+                    return false;
+                  }
+                }).sort().reverse();
+
+                // stats.completed sayısını güncelle
+                localStorage.setItem('completed_count', validCompleted.length.toString());
+
+                return validCompleted.map((completedId) => {
+                  const data = JSON.parse(localStorage.getItem(completedId) || '{}');
+                  
+                  return (
+                    <div key={completedId} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <div>
+                          <div className="font-semibold text-green-800">{data.title}</div>
+                          <div className="text-sm text-green-600 space-x-4">
+                            <span>📅 {new Date(data.completed_at).toLocaleString('tr-TR')}</span>
+                            <span>⏱️ {data.processing_time || 0} saniye</span>
+                          </div>
+                        </div>
+                      </div>
+                      {data.etsy_listing_id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(`https://www.etsy.com/listing/${data.etsy_listing_id}`, '_blank')}
+                        >
+                          Etsy'de Gör
+                        </Button>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

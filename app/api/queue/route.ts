@@ -81,7 +81,8 @@ export async function GET(request: NextRequest) {
                         name: imageData.name,
                         filename: imageData.name,
                         type: imageData.type,
-                        base64: combinedBase64
+                        data: combinedBase64,
+                        base64: combinedBase64  // Hem data hem base64 property'si için
                       };
                     }
                   }
@@ -125,7 +126,8 @@ export async function GET(request: NextRequest) {
                       name: videoData.name,
                       filename: videoData.name,
                       type: videoData.type,
-                      base64: combinedBase64
+                      data: combinedBase64,
+                      base64: combinedBase64  // Hem data hem base64 property'si için
                     };
                   }
                 }
@@ -171,6 +173,14 @@ export async function GET(request: NextRequest) {
       allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       console.log(`✅ Kuyruk bulundu: ${allItems.length} item (toplam: ${queueSnapshot.size})`);
+      
+      // Debug: Status dağılımını logla
+      const statusCounts = allItems.reduce((acc: any, item: any) => {
+        acc[item.status] = (acc[item.status] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('📊 Status dağılımı:', statusCounts);
+      
       return NextResponse.json({ items: allItems });
       
     } catch (error) {
@@ -246,21 +256,34 @@ export async function DELETE(request: NextRequest) {
 
     if (action === 'delete_selected') {
       if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+        console.error('❌ DELETE: Item IDs boş veya geçersiz:', itemIds);
         return NextResponse.json({ error: 'Item IDs are required' }, { status: 400 });
       }
 
-      // Seçili ürünleri sil
-      const batch = adminDb.batch();
-      for (const itemId of itemIds) {
-        const docRef = adminDb.collection('queue').doc(itemId);
-        batch.delete(docRef);
-      }
-      await batch.commit();
+      console.log(`🗑️ DELETE: ${itemIds.length} ürün siliniyor:`, itemIds);
 
-      return NextResponse.json({ 
-        success: true, 
-        message: `${itemIds.length} items deleted successfully`
-      });
+      try {
+        // Seçili ürünleri sil
+        const batch = adminDb.batch();
+        for (const itemId of itemIds) {
+          const docRef = adminDb.collection('queue').doc(itemId);
+          batch.delete(docRef);
+          console.log(`🗑️ Silme işlemi eklendi: ${itemId}`);
+        }
+        await batch.commit();
+        
+        console.log(`✅ DELETE: ${itemIds.length} ürün başarıyla silindi`);
+        return NextResponse.json({ 
+          success: true, 
+          message: `${itemIds.length} items deleted successfully`
+        });
+      } catch (deleteError) {
+        console.error('❌ DELETE batch hatası:', deleteError);
+        return NextResponse.json({ 
+          success: false,
+          error: `Delete failed: ${deleteError.message}`
+        }, { status: 500 });
+      }
     }
 
     if (action === 'clear_all') {

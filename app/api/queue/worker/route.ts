@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 import { CollectionReference, Query, DocumentData, Timestamp } from 'firebase-admin/firestore';
 
 // QueueItem arayüzü
@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, itemId } = body;
 
+    // Firebase Admin'i initialize et
+    initializeAdminApp();
+    
     const testUserId = '1007541496';
 
     if (!adminDb) {

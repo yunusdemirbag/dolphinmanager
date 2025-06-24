@@ -6525,3 +6525,4 @@ Error fetching queue items from Firebase: RangeError: Invalid string length
 
  ✓ Starting...
  ✓ Ready in 1082ms
+   Reload env: .env.local

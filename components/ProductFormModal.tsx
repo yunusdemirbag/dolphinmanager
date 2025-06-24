@@ -1118,7 +1118,7 @@ export function ProductFormModal({
         tags,
         has_variations: hasVariations,
         variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
-        state: "draft", // Her ürün draft olarak oluşturulur
+        state: state, // Buton tarafından belirlenen durum (draft veya active)
         shop_section_id: Number(selectedShopSection) || undefined,
         
         // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
@@ -1203,9 +1203,10 @@ export function ProductFormModal({
       const duration = ((endTime - startTime) / 1000).toFixed(1);
 
       // Başarı mesajı göster ve modal'ı kapat
+      const stateText = state === 'draft' ? 'taslak olarak' : 'aktif olarak';
       toast({ 
-        title: "✅ İşlem Başarılı!", 
-        description: `"${title}" ürünü ${duration} saniyede yüklendi.` 
+        title: "✅ Etsy'e Yüklendi!", 
+        description: `"${title}" ürünü ${duration} saniyede Etsy'e ${stateText} yüklendi!` 
       });
 
       // Modal'ı kapat

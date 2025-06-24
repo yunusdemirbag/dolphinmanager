@@ -890,3 +890,3396 @@ No queue items found in Firebase
 📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
 ✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
  POST /api/etsy/listings/create 200 in 3923ms
+ ✓ Compiled in 157ms
+ ✓ Compiled in 148ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Elegant Dance Canvas Wall Art - Modern Ballet Decor for Living Room","description":"🌟 Cus...
+📋 Listing data alındı: {
+  title: 'Elegant Dance Canvas Wall Art - Modern Ballet Decor for Living Room',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',    'canvas print',
+    'modern',      'ballet',
+    'dance',       'elegant',
+    'living room', 'decor',
+    'art',         'home',
+    'office',      'red',
+    'graceful'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:27:25.730Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Elegant Dance Canvas Wall Art - Modern Ballet Decor for Living Room
+  description: 🌟 Customize Your Canvas with Confidence 🌟
+
+🖼️ Whether you're interested in a specific size or a p
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.7s)
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325353297
+📋 Etsy listing URL: https://www.etsy.com/listing/4325353297/elegant-dance-canvas-wall-art-modern
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 1.83 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 7013859689
+📊 Resim upload özeti: 1/1 başarılı
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325353297
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 5089ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Beautiful Canvas Wall Art Print - Modern Home Decor","description":"🌟 Custom Orders Made ...
+📋 Listing data alındı: {
+  title: 'Beautiful Canvas Wall Art Print - Modern Home Decor',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',        'canvas print',
+    'home decor',      'modern art',
+    'wall decoration', 'living room',
+    'bedroom art',     'office decor',
+    'abstract art',    'contemporary',
+    'minimalist',      'housewarming',
+    'gift idea'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:27:32.445Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Beautiful Canvas Wall Art Print - Modern Home Decor
+  description: 🌟 Custom Orders Made Simple 🌟
+
+🖌️ Want a different size or your own image turned into canvas art?
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.6s)
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325353080
+📋 Etsy listing URL: https://www.etsy.com/listing/4325353080/beautiful-canvas-wall-art-print-modern
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 0.61 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 7013859905
+📊 Resim upload özeti: 1/1 başarılı
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325353080
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 3066ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Modern Minimalist Canvas Wall Art - Pink Gradient Decor for Bedroom or Office","descriptio...
+📋 Listing data alındı: {
+  title: 'Modern Minimalist Canvas Wall Art - Pink Gradient Decor for Bedroom or Office',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',        'canvas print',
+    'modern',          'minimalist',
+    'pink',            'gradient',
+    'bedroom',         'office',
+    'living room',     'home decor',
+    'abstract',        'art print',
+    'interior design'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:27:37.869Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Modern Minimalist Canvas Wall Art - Pink Gradient Decor for Bedroom or Office
+  description: 🌟 Customize Your Canvas with Confidence 🌟
+
+🖼️ Whether you're interested in a specific size or a p
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.7s)
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325353102
+📋 Etsy listing URL: https://www.etsy.com/listing/4325353102/modern-minimalist-canvas-wall-art-pink
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 1.43 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 6965889372
+📊 Resim upload özeti: 1/1 başarılı
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325353102
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 3426ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Emotional Abstract Canvas Wall Art - Modern Portrait Decor for Bedroom","description":"🌟 ...
+📋 Listing data alındı: {
+  title: 'Emotional Abstract Canvas Wall Art - Modern Portrait Decor for Bedroom',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',
+    'canvas print',
+    'abstract art',
+    'modern decor',
+    'bedroom art',
+    'portrait print',
+    'emotional art',
+    'living room',
+    'office decor',
+    'home decoration',
+    'artistic design',
+    'canvas wall',
+    'abstract painting'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:27:43.722Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Emotional Abstract Canvas Wall Art - Modern Portrait Decor for Bedroom
+  description: 🌟 Made Just for You – Fast & Safe Delivery 🌟
+
+💡 Looking to personalize your wall art? We offer cu
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.6s)
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325353136
+📋 Etsy listing URL: https://www.etsy.com/listing/4325353136/emotional-abstract-canvas-wall-art
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 2.08 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 7013860197
+📊 Resim upload özeti: 1/1 başarılı
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325353136
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 3111ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Colorful Modern Canvas Wall Art - Abstract Floral Decor for Living Room","description":"🌟...
+📋 Listing data alındı: {
+  title: 'Colorful Modern Canvas Wall Art - Abstract Floral Decor for Living Room',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',     'canvas print',
+    'modern',       'abstract',
+    'floral',       'living room',
+    'colorful',     'home decor',
+    'art print',    'vibrant',
+    'flowers',      'interior',
+    'contemporary'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:32:37.189Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Colorful Modern Canvas Wall Art - Abstract Floral Decor for Living Room
+  description: 🌟 Made Just for You – Fast & Safe Delivery 🌟
+
+💡 Looking to personalize your wall art? We offer cu
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.7s)
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325354835
+📋 Etsy listing URL: https://www.etsy.com/listing/4325354835/colorful-modern-canvas-wall-art-abstract
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 2.22 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 6965898468
+📊 Resim upload özeti: 1/1 başarılı
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325354835
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 3873ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Surreal Floral Canvas Wall Art - Abstract Decor for Living Room","description":"🌟 Persona...
+📋 Listing data alındı: {
+  title: 'Surreal Floral Canvas Wall Art - Abstract Decor for Living Room',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',     'canvas print',
+    'surreal art',  'floral decor',
+    'living room',  'abstract art',
+    'modern wall',  'home decor',
+    'art print',    'unique decor',
+    'flower art',   'butterfly art',
+    'desert scene'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:32:57.921Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Surreal Floral Canvas Wall Art - Abstract Decor for Living Room
+  description: 🌟 Personalized Artwork & Fast Shipping 🌟
+
+🎨 Want a custom size or have a personal image in mind?
+
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.8s)
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325354937
+📋 Etsy listing URL: https://www.etsy.com/listing/4325354937/surreal-floral-canvas-wall-art-abstract
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 1.06 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 7013869517
+📊 Resim upload özeti: 1/1 başarılı
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325354937
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 3948ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Modern Abstract Canvas Wall Art - Vibrant Color Block Decor for Living Room","description"...
+📋 Listing data alındı: {
+  title: 'Modern Abstract Canvas Wall Art - Vibrant Color Block Decor for Living Room',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',        'canvas print',
+    'abstract',        'modern',
+    'living room',     'vibrant',
+    'color block',     'bold',
+    'home decor',      'contemporary',
+    'interior design', 'art print',
+    'bright'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:45:08.517Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Modern Abstract Canvas Wall Art - Vibrant Color Block Decor for Living Room
+  description: 🌟 Let's Create Something Unique – Delivered Safely 🌟
+
+🎨 If you need a custom size or want your ow
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.8s)
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325358378
+📋 Etsy listing URL: https://www.etsy.com/listing/4325358378/modern-abstract-canvas-wall-art-vibrant
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 2.06 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 6965918996
+📊 Resim upload özeti: 1/1 başarılı
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325358378
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 5251ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Whimsical Bigfoot Canvas Wall Art - Rustic Decor for Living Room or Office","description":...
+📋 Listing data alındı: {
+  title: 'Whimsical Bigfoot Canvas Wall Art - Rustic Decor for Living Room or Office',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'canvas wall art', 'whimsical decor',
+    'rustic wall art', 'living room',
+    'office',          'bigfoot art',
+    'canvas print',    'fishing art',
+    'unique decor',    'nature art',
+    'pipe smoking',    'canoe art',
+    'calm colors'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T10:45:31.166Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Whimsical Bigfoot Canvas Wall Art - Rustic Decor for Living Room or Office
+  description: 🌟 Personalized Artwork & Fast Shipping 🌟
+
+🎨 Want a custom size or have a personal image in mind?
+
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.8s)
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325358875
+📋 Etsy listing URL: https://www.etsy.com/listing/4325358875/whimsical-bigfoot-canvas-wall-art-rustic
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 1.35 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 7013890313
+📊 Resim upload özeti: 1/1 başarılı
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325358875
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 3827ms
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./components/AutoProductPanel.tsx:8:1
+Module not found: Can't resolve '@/components/ui/progress'
+[0m [90m  6 |[39m [36mimport[39m { [33mInput[39m } [36mfrom[39m [32m'@/components/ui/input'[39m[33m;[39m[0m
+[0m [90m  7 |[39m [36mimport[39m { [33mLabel[39m } [36mfrom[39m [32m'@/components/ui/label'[39m[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { [33mProgress[39m } [36mfrom[39m [32m'@/components/ui/progress'[39m[33m;[39m[0m
+[0m [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m  9 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m'@/components/ui/badge'[39m[33m;[39m[0m
+[0m [90m 10 |[39m [36mimport[39m { [0m
+[0m [90m 11 |[39m   [33mPlay[39m[33m,[39m [0m
+
+Import map: aliased to relative './components/ui/progress' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ✓ Compiled in 493ms
+ ✓ Compiled in 323ms
+ ✓ Compiled in 211ms
+Fetching queue items from Firebase
+ GET /api/queue?user_id=local-user-123 200 in 120001ms
+ ✓ Compiled in 234ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Elegant Ballerina Canvas Wall Art - Modern Dance Decor for Living Room","description":"🌟 ...
+📋 Listing data alındı: {
+  title: 'Elegant Ballerina Canvas Wall Art - Modern Dance Decor for Living Room',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'wall art',    'canvas print',
+    'modern',      'dance',
+    'living room', 'elegant',
+    'ballerina',   'red dress',
+    'art print',   'home decor',
+    'artistic',    'graceful',
+    'movement'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T13:02:35.981Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Elegant Ballerina Canvas Wall Art - Modern Dance Decor for Living Room
+  description: 🌟 Customize Your Canvas with Confidence 🌟
+
+🖼️ Whether you're interested in a specific size or a p
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (0.9s)
+🔍 Tüm Response Header'ları:
+📋 x-etsy-generated: 1750770156.89
+📋 x-limit-per-day: 100000
+📋 x-limit-per-second: 150
+🔧 Etsy API Rate Limit Durumu: {
+  gunluk_limit: '100000',
+  saniye_limit: '150',
+  kalan_istek: 'hesaplanamadı',
+  reset_zamani: 'bilinmiyor'
+}
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325403562
+📋 Etsy listing URL: https://www.etsy.com/listing/4325403562/elegant-ballerina-canvas-wall-art-modern
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 2.99 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 6966157560
+📊 Resim upload özeti: 1/1 başarılı
+📈 API KULLANIM ÖZETİ: {
+  toplam_api_cagrisi: 2,
+  listing_olusturma: '1 çağrı',
+  resim_upload: '1 çağrı',
+  video_upload: '0 çağrı',
+  'aktifleştirme': '0 çağrı'
+}
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325403562
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 5886ms
+🚀 Direkt Etsy listing oluşturma başlatılıyor...
+📋 Alınan listingData string: {"title":"Elegant Ballet Canvas Wall Art - Modern Dance Decor for Living Room","description":"🌟 Cus...
+📋 Listing data alındı: {
+  title: 'Elegant Ballet Canvas Wall Art - Modern Dance Decor for Living Room',
+  state: 'draft',
+  hasImages: false,
+  hasVideo: false,
+  has_variations: true,
+  variation_count: 48
+}
+🔑 Etsy credentials alındı, shop_id: 56171647 shop_name: CyberDecorArt
+🖼️ Toplam resim sayısı: 1
+🎥 Video dosyası: Yok
+✅ Varyasyonlu ürün - En düşük aktif fiyat kullanılıyor: 80
+📊 Variation price sistemi: {
+  has_variations: true,
+  active_variations: 43,
+  final_price: 80,
+  all_active_prices: [
+      80,   90, 130, 230,  230,  230,  230,
+     100,  164, 280, 280,  280,  280,  150,
+     250,  380, 380, 380,  380,  166,  290,
+     574,  574, 574, 574,  220,  420,  780,
+     780,  780, 780, 260,  540, 1140, 1140,
+    1140, 1140, 320, 980, 1440, 1440, 1440,
+    1440
+  ]
+}
+🧹 Temizlenmiş veriler: {
+  original_price: 10,
+  final_price: 80,
+  original_tags_count: 13,
+  clean_tags_count: 0,
+  clean_tags: [],
+  clean_materials: [],
+  original_tags: [
+    'canvas wall art', 'modern decor',
+    'ballet art',      'dance print',
+    'living room',     'elegant art',
+    'canvas print',    'wall decor',
+    'art print',       'home decor',
+    'dance art',       'red dress art',
+    'artistic print'
+  ],
+  test_mode: 'NO_TAGS_NO_MATERIALS'
+}
+📤 ADIM 1: Draft listing oluşturuluyor...
+⏰ Başlangıç zamanı: 2025-06-24T13:06:02.838Z
+📋 Listing state: draft
+📋 Sonra upload edilecek resim sayısı: 1
+📋 Sonra upload edilecek video: Yok
+📋 API URL: https://openapi.etsy.com/v3/application/shops/56171647/listings
+📋 Form data keys: [
+  'quantity',
+  'title',
+  'description',
+  'price',
+  'who_made',
+  'when_made',
+  'taxonomy_id',
+  'shipping_profile_id',
+  'processing_min',
+  'processing_max',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'is_supply',
+  'is_customizable',
+  'should_auto_renew',
+  'state'
+]
+🔍 Gönderilen veriler detayı:
+  quantity: 1
+  title: Elegant Ballet Canvas Wall Art - Modern Dance Decor for Living Room
+  description: 🌟 Custom Orders Made Simple 🌟
+
+🖌️ Want a different size or your own image turned into canvas art?
+  price: 80
+  who_made: i_did
+  when_made: 2020_2024
+  taxonomy_id: 1027
+  shipping_profile_id: 268126394473
+  processing_min: 1
+  processing_max: 3
+  is_personalizable: false
+  personalization_is_required: false
+  personalization_char_count_max: 0
+  personalization_instructions: 
+  is_supply: false
+  is_customizable: true
+  should_auto_renew: true
+  state: draft
+📥 Etsy API yanıtı: 201 true (1.0s)
+🔍 Tüm Response Header'ları:
+📋 x-etsy-generated: 1750770363.85
+📋 x-limit-per-day: 100000
+📋 x-limit-per-second: 150
+🔧 Etsy API Rate Limit Durumu: {
+  gunluk_limit: '100000',
+  saniye_limit: '150',
+  kalan_istek: 'hesaplanamadı',
+  reset_zamani: 'bilinmiyor'
+}
+📋 Response data keys: [
+  'listing_id',
+  'user_id',
+  'shop_id',
+  'title',
+  'description',
+  'state',
+  'creation_timestamp',
+  'created_timestamp',
+  'ending_timestamp',
+  'original_creation_timestamp',
+  'last_modified_timestamp',
+  'updated_timestamp',
+  'state_timestamp',
+  'quantity',
+  'shop_section_id',
+  'featured_rank',
+  'url',
+  'num_favorers',
+  'non_taxable',
+  'is_taxable',
+  'is_customizable',
+  'is_personalizable',
+  'personalization_is_required',
+  'personalization_char_count_max',
+  'personalization_instructions',
+  'listing_type',
+  'tags',
+  'materials',
+  'shipping_profile_id',
+  'return_policy_id',
+  'processing_min',
+  'processing_max',
+  'who_made',
+  'when_made',
+  'is_supply',
+  'item_weight',
+  'item_weight_unit',
+  'item_length',
+  'item_width',
+  'item_height',
+  'item_dimensions_unit',
+  'is_private',
+  'style',
+  'file_data',
+  'has_variations',
+  'should_auto_renew',
+  'language',
+  'price',
+  'taxonomy_id',
+  'production_partners',
+  'skus',
+  'views',
+  'readiness_state_id'
+]
+✅ ADIM 1 tamamlandı - Draft listing oluşturuldu: 4325404899
+📋 Etsy listing URL: https://www.etsy.com/listing/4325404899/elegant-ballet-canvas-wall-art-modern
+📤 ADIM 2: 1 resim upload ediliyor...
+📷 Resim 1/1 upload ediliyor: blob 2.99 MB
+🔢 Resim 1 rank'ı: 1
+✅ Resim 1 başarıyla upload edildi: 6966163432
+📊 Resim upload özeti: 1/1 başarılı
+📈 API KULLANIM ÖZETİ: {
+  toplam_api_cagrisi: 2,
+  listing_olusturma: '1 çağrı',
+  resim_upload: '1 çağrı',
+  video_upload: '0 çağrı',
+  'aktifleştirme': '0 çağrı'
+}
+📤 ADIM 2.8: Varyasyonlar ekleniyor...
+🎯 Toplam varyasyon sayısı: 48
+🎯 Adding inventory with variations for listing 4325404899
+📊 Input variations: 48
+📏 Unique sizes found: 8 [
+  '8"x12" - 20x30 cm',
+  '14"x20" - 35x50cm',
+  '16"x24" - 40x60cm',
+  '20"x28" - 50x70cm',
+  '24"x36" - 60x90cm',
+  '28"x40" - 70x100cm',
+  '32"x48" - 80x120cm',
+  '36"x51" - 90x130cm'
+]
+🎨 Patterns: 6 [
+  'Roll',
+  'Standard Canvas',
+  'White Frame',
+  'Gold Frame',
+  'Silver Frame',
+  'Black Frame'
+]
+✨ Generated 48 total variations (8 sizes × 6 patterns)
+✅ Inventory with variations added successfully
+📊 Result summary: { products_count: 48, price_on_property: [ 513, 514 ] }
+✅ Varyasyonlar başarıyla eklendi - 48 kombinasyon oluşturuldu
+ POST /api/etsy/listings/create 200 in 5671ms
+Error loading images for queue item: TFpZNCg5Qd11uaIjkRAK Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: THPZWAwat9okfjKPOrct Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: TI8EnR2cUNrIAJGo10sc Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: TOetVFsb57OwaUO0sqT4 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: TTGOmknCzKCTxyQMKNLF Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: TUoM3t4hq9RegSciUaVp Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: TajXECavBlG9KpRSDNHL Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: TfwzY8INhFchZxCZp4Vd Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: TlA2pyUk0rRyWi9Hgq89 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: TqJF4Ln5XmlWbNdDWmtW Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: TzeWLRAj7skSPtsuj9xm Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: UJ1GIDIyZlUknOxsZNAC Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: UQtpL97afKqtafXJzHqC Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: UtV1tdO6EAbpB2hkdjF1 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: UvL08FqNmKrVrpgpZBCu Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: V913cKG64Vbo7J41tbPL Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: VGI4jtf7UNfqUKp66xsv Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: VHJCjEpWk7qfYNylrfHx Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: VQhmWzsv7kRqn5EF8yhN Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: VYEjQiGCSPPcECyUNMwG Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: VZSdz2Z1cdrWPtzSrMlb Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: VZlvZNLdR0AazFpp18kd Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Vg9jMbLsN5pszGIPbUIu Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: VkvxTzEOisjuwYc7hAdb Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Vm0KKHOZYk1j2KbnkaGZ Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: W0es1ALVI3R7hZnnhpel Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: W2fELpHH5sxYe6kso48I Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: WAQicZpWLA4ODsf29Q1v Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: WDMfiFZuxxTcFIgnh5DE Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: WHKm2OORxVpllKiz3wak Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: WLzAO2UaX5oV4zt0bvIc Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: WkZwLewn2XWa2uLTibpH Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: WqrJZiz9HCClm77jvUXn Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: WxOIEpCyO1aGn5HLW0yS Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: X0oXuXJrJ5XJ6M0CFtrE Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: X1Zbr53Qd4RIsGyYtA5J Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XCaAD08TD9PVLo5RQvcc Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XDdU5aQdbDf8nCWmwRY5 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XIIOVUDcA0NhEDwpjBda Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XIg2I61DxQwdDf0Qvgom Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XJMVs7lD0GTaJI4QkrER Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XOrNSNnjFSaGZJjubelz Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XVT9nWezoAUfeU6RAGHS Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XbvoC1kDeOwQZWr7fFHv Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XlqYFPM3ssmZEShh0ZW1 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Xmuyop0dbZCY9NMWoyWl Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XnmhlQFrqClA2mmV7AIB Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Xqu3iAmQh01wzmBn5eO8 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Xs6CO1gbUaQ5sNNzkNSS Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: XwNTUo7ieOFrz8m6dPJd Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Y18Hbd4qZ7d7hoIXjdOz Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Y4zkrcJmo25nG36Aasde Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Y9opEiDYXGTXhZG2WJ1g Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: YKGI6lHyhjyFWg16R5H0 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: YRuJtWbNarwklrqCjL4G Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: YdzdSs0gQrx54xmbWLuc Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Ykar302Kpe9HNSUpJNob Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: YtfTiRKfsiDVYb1pRdSd Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Yy8WYcv7QhqhHgHEaVqk Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: YzIAeIinK5tQtYS9RDD5 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ZAZsKM39L5xufR26B9rq Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ZAgA9jg7xdDO0P4suEyh Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ZI1Ou3QfRpmekbvGMLK8 Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ZSE7H20dJBB4kPeHJnrh Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: ZYUw4llE5kZNe2nvMuCc Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: Zw88oiXJ4JY2UvT8aEIQ Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: a67TtEMqmCAuj1FJKItz Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aBXzdi71l5yQeYBrxphy Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aDT8mMpMfvOtpvwKh5jm Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aFKboApNhlOHZDDHsUBZ Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}
+Error loading images for queue item: aI4RCKaRx5C6omLr8D2F Error: 8 RESOURCE_EXHAUSTED: Quota exceeded.
+    at <unknown> (app/api/queue/route.ts:81:85)
+    at Array.map (<anonymous>)
+    at GET (app/api/queue/route.ts:80:50)
+  79 |           try {
+  80 |             const imagePromises = data.image_refs.map(async (imageId: string) => {
+> 81 |               const imageDoc = await adminDb.collection('queue_images').doc(imageId).get();
+     |                                                                                     ^
+  82 |               if (imageDoc.exists) {
+  83 |                 const imageData = imageDoc.data()!;
+  84 |                  {
+  code: 8,
+  details: 'Quota exceeded.',
+  metadata: [Metadata]
+}

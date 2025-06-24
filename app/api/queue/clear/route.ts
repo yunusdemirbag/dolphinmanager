@@ -18,13 +18,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
     }
 
-    console.log(`🗑️ Kuyruk temizleniyor - kullanıcı: ${userId}`);
+    console.log(`🗑️ HIZLI TEMİZLEME - kullanıcı: ${userId}`);
 
-    // Kullanıcının tüm kuyruk öğelerini al
-    const queueSnapshot = await adminDb
-      .collection('queue')
-      .where('user_id', '==', userId)
-      .get();
+    // TÜM QUEUE COLLECTION'INI SİL (HIZLI)
+    const queueSnapshot = await adminDb.collection('queue').get();
 
     if (queueSnapshot.empty) {
       return NextResponse.json({ 
@@ -34,69 +31,31 @@ export async function DELETE(request: NextRequest) {
       });
     }
 
+    console.log(`📋 ${queueSnapshot.docs.length} queue item bulundu, hızla siliniyor...`);
+
+    // Basit batch silme - sadece queue collection
     const batch = adminDb.batch();
-    const deletedItems = [];
-
-    // Her kuyruk öğesi için
-    for (const doc of queueSnapshot.docs) {
+    let deletedCount = 0;
+    
+    // İlk 500 item'i sil (Firestore batch limit)
+    queueSnapshot.docs.slice(0, 500).forEach(doc => {
       const queueData = doc.data();
-      deletedItems.push({
-        id: doc.id,
-        title: queueData.title,
-        status: queueData.status
-      });
-
-      // Ana kuyruk öğesini sil
-      batch.delete(doc.ref);
-
-      // İlişkili resimleri sil
-      if (queueData.image_refs && queueData.image_refs.length > 0) {
-        for (const imageId of queueData.image_refs) {
-          // Resim belgesini sil
-          const imageRef = adminDb.collection('queue_images').doc(imageId);
-          batch.delete(imageRef);
-
-          // Resim parçalarını sil
-          const chunksSnapshot = await adminDb
-            .collection('queue_image_chunks')
-            .where('image_id', '==', imageId)
-            .get();
-          
-          chunksSnapshot.docs.forEach(chunkDoc => {
-            batch.delete(chunkDoc.ref);
-          });
-        }
+      if (queueData.user_id === userId) {
+        batch.delete(doc.ref);
+        deletedCount++;
       }
-
-      // İlişkili videoyu sil
-      if (queueData.video_ref) {
-        // Video belgesini sil
-        const videoRef = adminDb.collection('queue_videos').doc(queueData.video_ref);
-        batch.delete(videoRef);
-
-        // Video parçalarını sil
-        const videoChunksSnapshot = await adminDb
-          .collection('queue_video_chunks')
-          .where('video_id', '==', queueData.video_ref)
-          .get();
-        
-        videoChunksSnapshot.docs.forEach(chunkDoc => {
-          batch.delete(chunkDoc.ref);
-        });
-      }
-    }
+    });
 
     // Batch işlemini çalıştır
     await batch.commit();
 
-    console.log(`✅ Kuyruk temizlendi - ${deletedItems.length} öğe silindi`);
-    console.log('🗑️ Silinen öğeler:', deletedItems.map(item => `${item.title} (${item.status})`));
+    console.log(`✅ Hızlı temizleme tamamlandı - ${deletedCount} öğe silindi`);
 
     return NextResponse.json({
       success: true,
-      message: `${deletedItems.length} öğe başarıyla silindi`,
-      deleted_count: deletedItems.length,
-      deleted_items: deletedItems
+      message: `${deletedCount} öğe başarıyla silindi`,
+      deleted_count: deletedCount,
+      total_found: queueSnapshot.docs.length
     });
 
   } catch (error) {

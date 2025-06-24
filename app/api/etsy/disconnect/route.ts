@@ -8,40 +8,67 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Firebase admin not initialized' }, { status: 500 });
     }
 
-    const { shop_id, user_id } = await request.json();
+    const { shop_id, user_id, userId } = await request.json();
+    const finalUserId = userId || user_id || 'local-user-123';
 
-    if (!shop_id) {
-      return NextResponse.json({ error: 'Shop ID is required' }, { status: 400 });
-    }
-
-    if (!user_id) {
+    if (!finalUserId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    console.log(`Mağaza bağlantısı kesiliyor: ${shop_id} (Kullanıcı: ${user_id})`);
+    console.log(`Kullanıcı ${finalUserId} için tüm Etsy bağlantıları kesiliyor...`);
 
-    // Shop ID'yi string olarak kullan (callback'te nasıl kaydedildiyse)
-    const shopIdStr = shop_id.toString();
+    // Kullanıcının bağlı mağazalarını bul
+    const storesSnapshot = await adminDb
+      .collection('etsy_stores')
+      .where('user_id', '==', finalUserId)
+      .where('is_active', '==', true)
+      .get();
 
-    // Doğru Firebase koleksiyonlarını güncelle
-    const storeRef = adminDb.collection('etsy_stores').doc(shopIdStr);
-    const apiKeysRef = adminDb.collection('etsy_api_keys').doc(shopIdStr);
+    if (storesSnapshot.empty) {
+      return NextResponse.json({ 
+        success: true,
+        message: 'Zaten bağlı mağaza yok' 
+      });
+    }
 
-    // Mağaza durumunu pasif yap
-    await storeRef.update({
-      is_active: false,
-      disconnected_at: new Date(),
-      disconnected_by: user_id
-    });
+    // Batch işlem ile tüm mağaza bağlantılarını kaldır
+    const batch = adminDb.batch();
+    let deletedStores = 0;
+    let deletedApiKeys = 0;
 
-    // API anahtarlarını sil (güvenlik için)
-    await apiKeysRef.delete();
+    for (const storeDoc of storesSnapshot.docs) {
+      const shopIdStr = storeDoc.id;
+      const storeData = storeDoc.data();
+      
+      console.log(`Mağaza bağlantısı kesiliyor: ${storeData.shop_name} (ID: ${shopIdStr})`);
+      
+      // Store'u pasif yap
+      batch.update(storeDoc.ref, {
+        is_active: false,
+        disconnected_at: new Date(),
+        disconnected_by: finalUserId
+      });
+      deletedStores++;
+      
+      // API anahtarlarını sil
+      const apiKeyRef = adminDb.collection('etsy_api_keys').doc(shopIdStr);
+      const apiKeyDoc = await apiKeyRef.get();
+      if (apiKeyDoc.exists) {
+        batch.delete(apiKeyRef);
+        deletedApiKeys++;
+      }
+    }
 
-    console.log(`Mağaza ${shop_id} bağlantısı başarıyla kesildi ve token'lar temizlendi.`);
+    // Batch'i çalıştır
+    await batch.commit();
+
+    console.log(`✅ ${deletedStores} mağaza bağlantısı kesildi, ${deletedApiKeys} API anahtarı temizlendi`);
     
     return NextResponse.json({ 
       success: true,
-      message: 'Mağaza bağlantısı başarıyla kesildi' 
+      message: `${deletedStores} mağaza bağlantısı başarıyla kesildi`,
+      deleted_stores: deletedStores,
+      deleted_api_keys: deletedApiKeys
     });
 
   } catch (error: unknown) {

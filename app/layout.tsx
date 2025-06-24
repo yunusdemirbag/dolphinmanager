@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr">
-      <body className={`${inter.className} antialiased`} style={{backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))' }}>
+      <body className={`${inter.className} antialiased`} style={{backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))' }} suppressHydrationWarning={true}>
         <div className="min-h-screen bg-gray-50">
           <Navigation />
           <main className="container mx-auto py-8 px-4">

@@ -237,6 +237,8 @@ export async function POST(request: NextRequest) {
     console.log('📤 ADIM 1: Draft listing oluşturuluyor...');
     console.log('⏰ Başlangıç zamanı:', new Date().toISOString());
     console.log('📋 Listing state:', 'draft'); // Her zaman draft olarak başla
+    
+    let rateLimitHeaders = {}; // Rate limit bilgilerini sakla
     console.log('📋 Sonra upload edilecek resim sayısı:', imageFiles.length);
     console.log('📋 Sonra upload edilecek video:', videoFile ? 'Var' : 'Yok');
     console.log('📋 API URL:', etsyListingUrl);
@@ -276,6 +278,32 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeoutId);
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log('📥 Etsy API yanıtı:', etsyResponse.status, etsyResponse.ok, `(${duration}s)`);
+
+      // API Rate Limit Durumu - Tüm header'ları kontrol et
+      console.log('🔍 Tüm Response Header\'ları:');
+      etsyResponse.headers.forEach((value, key) => {
+        if (key.toLowerCase().includes('rate') || key.toLowerCase().includes('limit') || key.toLowerCase().includes('quota')) {
+          console.log(`📋 ${key}: ${value}`);
+        }
+      });
+      
+      rateLimitHeaders = {
+        dailyLimit: etsyResponse.headers.get('x-limit-per-day'),
+        secondLimit: etsyResponse.headers.get('x-limit-per-second'),
+        remaining: etsyResponse.headers.get('x-ratelimit-remaining') || 
+                  etsyResponse.headers.get('ratelimit-remaining') ||
+                  etsyResponse.headers.get('x-rate-limit-remaining'),
+        reset: etsyResponse.headers.get('x-ratelimit-reset') || 
+               etsyResponse.headers.get('ratelimit-reset') ||
+               etsyResponse.headers.get('x-rate-limit-reset')
+      };
+
+      console.log('🔧 Etsy API Rate Limit Durumu:', {
+        gunluk_limit: rateLimitHeaders.dailyLimit || 'bilinmiyor',
+        saniye_limit: rateLimitHeaders.secondLimit || 'bilinmiyor',
+        kalan_istek: rateLimitHeaders.remaining || 'hesaplanamadı',
+        reset_zamani: rateLimitHeaders.reset ? new Date(parseInt(rateLimitHeaders.reset) * 1000).toLocaleString('tr-TR') : 'bilinmiyor'
+      });
     
       const etsyResult = await etsyResponse.json();
       console.log('📋 Response data keys:', Object.keys(etsyResult));
@@ -338,6 +366,12 @@ export async function POST(request: NextRequest) {
             body: imageFormData,
           });
           
+          // Resim upload rate limit durumu
+          const imageRateLimit = imageResponse.headers.get('x-ratelimit-remaining');
+          if (imageRateLimit) {
+            console.log(`🔧 Resim ${i + 1} sonrası kalan API limit:`, imageRateLimit);
+          }
+
           if (imageResponse.ok) {
             const imageResult = await imageResponse.json();
             uploadedImageCount++;
@@ -352,6 +386,15 @@ export async function POST(request: NextRequest) {
       }
       
       console.log(`📊 Resim upload özeti: ${uploadedImageCount}/${imageFiles.length} başarılı`);
+      
+      // API kullanım özeti
+      console.log('📈 API KULLANIM ÖZETİ:', {
+        toplam_api_cagrisi: 1 + imageFiles.length + (videoFile ? 1 : 0) + (listingData.state === 'active' ? 1 : 0),
+        listing_olusturma: '1 çağrı',
+        resim_upload: `${imageFiles.length} çağrı`,
+        video_upload: videoFile ? '1 çağrı' : '0 çağrı',
+        aktifleştirme: listingData.state === 'active' ? '1 çağrı' : '0 çağrı'
+      });
     }
     
     // ADIM 2.5: Video upload et (eğer varsa)
@@ -455,7 +498,13 @@ export async function POST(request: NextRequest) {
       uploaded_images: uploadedImageCount,
       uploaded_video: videoUploaded,
       final_state: listingData.state === 'active' && uploadedImageCount > 0 ? 'active' : 'draft',
-      message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim${videoUploaded ? ', 1 video' : ''} yüklendi, durum: ${listingData.state === 'active' && uploadedImageCount > 0 ? 'aktif' : 'taslak'}`
+      message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim${videoUploaded ? ', 1 video' : ''} yüklendi, durum: ${listingData.state === 'active' && uploadedImageCount > 0 ? 'aktif' : 'taslak'}`,
+      rate_limit: {
+        daily_limit: rateLimitHeaders.dailyLimit ? parseInt(rateLimitHeaders.dailyLimit) : null,
+        second_limit: rateLimitHeaders.secondLimit ? parseInt(rateLimitHeaders.secondLimit) : null,
+        api_calls_used: 1 + imageFiles.length + (videoFile ? 1 : 0) + (listingData.state === 'active' ? 1 : 0),
+        timestamp: new Date().toISOString()
+      }
     });
     
     } catch (fetchError) {

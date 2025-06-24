@@ -96,6 +96,12 @@ interface ProductFormModalProps {
   initialData?: any
   isEditMode?: boolean
   queueItemId?: string
+  userId?: string
+  isAutoMode?: boolean
+  isEmbedded?: boolean
+  autoFiles?: File[]
+  autoTitle?: string
+  onSubmitSuccess?: () => void
 }
 
 // Drag and drop için item tipleri
@@ -227,6 +233,12 @@ export function ProductFormModal({
   initialData,
   isEditMode = false,
   queueItemId,
+  userId,
+  isAutoMode = false,
+  isEmbedded = false,
+  autoFiles,
+  autoTitle,
+  onSubmitSuccess,
 }: ProductFormModalProps) {
   // All useState declarations at the top
   const { toast } = useToast()
@@ -262,6 +274,8 @@ export function ProductFormModal({
   
   // Ürün görselleri için state
   const [productImages, setProductImages] = useState<MediaFile[]>([])
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
   const [videoFile, setVideoFile] = useState<MediaFile | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -537,10 +551,26 @@ export function ProductFormModal({
         
         const storeData = await storeResponse.json();
         console.log('Store data received:', storeData);
-        const shopId = storeData.store?.shop_id;
+        
+        // API'den shopId veya store.shop_id'yi al
+        const shopId = storeData.shopId || storeData.store?.shop_id;
         
         if (!shopId) {
-          console.error('No shop ID found', { storeData, shopId });
+          console.error('No shop ID found', { 
+            storeData, 
+            shopId,
+            isConnected: storeData.isConnected,
+            error: storeData.error 
+          });
+          
+          // Etsy bağlantısı yoksa kullanıcıyı bilgilendir
+          if (!storeData.isConnected) {
+            toast({
+              variant: "destructive",
+              title: "Etsy Bağlantısı Yok",
+              description: storeData.error || "Etsy hesabınızı bağlamanız gerekiyor. Ayarlar menüsünden Etsy hesabınızı bağlayın."
+            });
+          }
           return;
         }
         
@@ -883,6 +913,96 @@ export function ProductFormModal({
     }
   }, [isOpen]);
 
+  // Mount kontrolü - hydration fix
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // TAM OTOMATİK SİSTEM - Resimler otomatik sürüklensin, 10 saniye bekle, submit et
+  useEffect(() => {
+    if (isAutoMode && isOpen) {
+      console.log('🤖 TAM OTOMATİK MOD BAŞLADI', { autoFiles: autoFiles?.length, autoTitle });
+      
+      // Başlık işi yok - sadece resimler sürüklenecek
+      
+      // 2. Resimleri otomatik sürükle (sadece bir kez, çift ekleme önlemi)
+      if (autoFiles && autoFiles.length > 0 && productImages.length === 0 && countdown === null) {
+        console.log('📸 Resimler otomatik sürükleniyor...', autoFiles.length, 'dosya');
+        
+        // Dosyaları tek tek ekle (video + resim) - MAX 10 dosya
+        const addFilesSequentially = async () => {
+          // Etsy limiti: max 10 dosya
+          const maxFiles = Math.min(autoFiles.length, 10);
+          console.log(`📁 ${autoFiles.length} dosya var, ${maxFiles} tanesini ekleyeceğiz (Etsy limiti: 10)`);
+          
+          for (let i = 0; i < maxFiles; i++) {
+            const file = autoFiles[i];
+            const preview = URL.createObjectURL(file);
+            const isVideo = file.type.startsWith('video/');
+            
+            // Her dosyayı 500ms arayla ekle (gerçekçi sürükleme efekti)
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            if (isVideo) {
+              // Video dosyası
+              const newVideo: MediaFile = {
+                file,
+                preview,
+                uploading: false
+              };
+              setVideoFile(newVideo);
+              console.log(`🎥 Video ${i + 1}/${maxFiles} eklendi:`, file.name);
+            } else {
+              // Resim dosyası
+              const newImage: MediaFile = {
+                file,
+                preview,
+                uploading: false
+              };
+              setProductImages(prev => {
+                const updated = [...prev, newImage];
+                console.log(`📷 Resim ${i + 1}/${maxFiles} eklendi:`, file.name);
+                return updated;
+              });
+            }
+          }
+          
+          console.log('✅ Tüm resimler eklendi, 10 saniye geri sayım başlıyor...');
+          
+          // 3. 10 saniye geri sayım başlat
+          setCountdown(10);
+          
+          const countdownInterval = setInterval(() => {
+            setCountdown(prev => {
+              if (prev === null || prev <= 1) {
+                clearInterval(countdownInterval);
+                
+                // Geri sayım bitince otomatik submit
+                setTimeout(() => {
+                  console.log('⏰ Geri sayım bitti, otomatik submit başlıyor...');
+                  const submitButton = document.querySelector('[data-submit-button]') as HTMLButtonElement;
+                  if (submitButton && !submitButton.disabled) {
+                    console.log('🚀 Kuyruğa Gönder butonuna otomatik tıklanıyor...');
+                    submitButton.click();
+                  } else {
+                    console.log('❌ Submit butonu bulunamadı veya disabled');
+                  }
+                  setCountdown(null);
+                }, 100);
+                
+                return null;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        };
+        
+        // Sıralı dosya ekleme işlemini başlat
+        addFilesSequentially();
+      }
+    }
+  }, [isAutoMode, isOpen, autoFiles, autoTitle, title, productImages.length, countdown]);
+
   // KUYRUK SİSTEMİ İÇİN YENİ FONKSİYON
   const handleSubmitToQueue = async () => {
     console.log('🚀 KUYRUK FONKSİYONU BAŞLADI');
@@ -1159,6 +1279,11 @@ export function ProductFormModal({
 
       // Modal'ı kapat
       onClose();
+      
+      // Call success callback if provided (for auto mode)
+      if (onSubmitSuccess) {
+        onSubmitSuccess();
+      }
       router.refresh();
 
     } catch (error: any) {
@@ -2060,7 +2185,7 @@ Return only the title, no quotes, no explanations.`
       </div>
 
       <Dialog
-        open={isOpen}
+        open={isOpen && !isEmbedded}
         onOpenChange={(isOpen) => {
           if (!isOpen) {
             handleCloseModal();
@@ -2604,12 +2729,15 @@ Return only the title, no quotes, no explanations.`
                     onClick={handleSubmitToQueue} 
                     disabled={submitting}
                     className="bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
+                    data-submit-button
                   >
                     {submitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Kuyrukta Ekleniyor...
                       </>
+                    ) : (isMounted && countdown !== null) ? (
+                      <>⏰ Otomatik Submit: {countdown}s</>
                     ) : (
                       "📋 Kuyrukta Gönder"
                     )}

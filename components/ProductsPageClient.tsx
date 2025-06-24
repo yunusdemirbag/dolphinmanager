@@ -1,10 +1,14 @@
 'use client';
 
+// Hydration hatalarını önlemek için
+import dynamic from 'next/dynamic';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Package, Clock, Play, Pause, Settings as SettingsIcon, Image, Loader2, RotateCcw, Timer, CheckCircle, XCircle, Upload, Trash2, Edit3, Video, Trash } from "lucide-react";
 import ProductFormModal from "@/components/ProductFormModal";
+import AutoProductPanel from "@/components/AutoProductPanel";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +50,7 @@ interface ProductsPageClientProps {
 
 export default function ProductsPageClient({ initialProducts, initialNextCursor, userId }: ProductsPageClientProps) {
   const [activeTab, setActiveTab] = useState('products');
+  const [activeQueueTab, setActiveQueueTab] = useState('live'); // 'live' veya 'completed'
   const [isQueueRunning, setIsQueueRunning] = useState(false);
   const [queueInterval, setQueueInterval] = useState<NodeJS.Timeout | null>(null);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
@@ -65,7 +70,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   // Queue management states
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
-  const [processingDelay, setProcessingDelay] = useState(20);
+  const [processingDelay, setProcessingDelay] = useState(15);
   const [currentlyProcessing, setCurrentlyProcessing] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -78,6 +83,22 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const editingRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const { toast } = useToast();
+  
+  // Etsy store bilgileri
+  const [storeInfo, setStoreInfo] = useState<{
+    shopId: string | null;
+    shopName: string | null;
+    isConnected: boolean;
+    apiLimit?: {
+      daily_limit?: number;
+      remaining?: number;
+      reset?: string;
+    };
+  }>({
+    shopId: null,
+    shopName: null,
+    isConnected: false
+  });
 
   const fetchMoreProducts = useCallback(async () => {
     if (!nextCursor || isLoadingProducts) return;
@@ -103,6 +124,56 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     }
   }, [nextCursor, isLoadingProducts, userId]);
 
+
+  // Store bilgilerini yükle
+  const loadStoreInfo = async () => {
+    try {
+      const response = await fetch('/api/etsy/status');
+      if (response.ok) {
+        const data = await response.json();
+        setStoreInfo({
+          shopId: data.shopId,
+          shopName: data.shopName,
+          isConnected: data.isConnected,
+          apiLimit: data.apiLimit
+        });
+      }
+    } catch (error) {
+      console.error('Store bilgileri yüklenemedi:', error);
+    }
+  };
+
+  // Etsy bağlantısını kes
+  const disconnectEtsy = async () => {
+    try {
+      const response = await fetch('/api/etsy/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: 'local-user-123' })
+      });
+      
+      if (response.ok) {
+        setStoreInfo({
+          shopId: null,
+          shopName: null,
+          isConnected: false
+        });
+        toast({
+          title: "Başarılı",
+          description: "Etsy bağlantısı kesildi"
+        });
+      } else {
+        throw new Error('Bağlantı kesilemedi');
+      }
+    } catch (error) {
+      console.error('Etsy bağlantısı kesme hatası:', error);
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: "Etsy bağlantısı kesilemedi"
+      });
+    }
+  };
 
   // Kuyruk verilerini yükle
   const loadQueueItems = async () => {
@@ -135,6 +206,8 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     if (activeTab === 'queue') {
       fetchQueue();
     }
+    // Store bilgilerini sayfa açıldığında yükle
+    loadStoreInfo();
   }, [activeTab]);
 
   useEffect(() => {
@@ -142,6 +215,96 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       if (queueInterval) clearInterval(queueInterval);
     };
   }, [queueInterval]);
+
+  // Otomatik işleme sistemi
+  useEffect(() => {
+    if (isAutoProcessing) {
+      console.log('🚀 Otomatik işleme başlatılıyor...');
+      
+      const processNext = async () => {
+        try {
+          // Countdown aktifse bekle
+          if (countdown > 0) {
+            console.log(`⏳ Countdown aktif: ${countdown}s - bekleniyor...`);
+            return;
+          }
+
+          // Bekleyen ürünleri eskiden yeniye sırala
+          const pendingItems = queueItems
+            .filter(item => item.status === 'pending')
+            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+          if (pendingItems.length === 0) {
+            console.log('✅ Kuyrukta bekleyen ürün yok, otomatik işleme durduruluyor');
+            setIsAutoProcessing(false);
+            setCountdown(0);
+            return;
+          }
+
+          if (currentlyProcessing) {
+            console.log('⏳ Başka bir ürün işleniyor, bekleniyor...');
+            return;
+          }
+
+          const nextItem = pendingItems[0];
+          console.log(`🎯 Sıradaki ürün işleme alınıyor: ${nextItem.product_data?.title || nextItem.id}`);
+          
+          // Ürünü işleme al
+          await processQueueItem(nextItem.id);
+          
+          // İşlem bitince sayaç başlat (sadece daha fazla ürün varsa)
+          const remainingPendingItems = queueItems
+            .filter(item => item.status === 'pending' && item.id !== nextItem.id);
+          
+          if (remainingPendingItems.length > 0) {
+            console.log(`⏰ ${processingDelay} saniye bekleme başlatılıyor...`);
+            
+            let remainingTime = processingDelay;
+            setCountdown(remainingTime);
+            
+            const countdownInterval = setInterval(() => {
+              remainingTime--;
+              setCountdown(remainingTime);
+              
+              if (remainingTime <= 0) {
+                clearInterval(countdownInterval);
+                setCountdown(0);
+                console.log('✅ Bekleme süresi tamamlandı, sıradaki ürüne geçiliyor...');
+              }
+            }, 1000);
+          } else {
+            console.log('✅ Son ürün işlendi, otomatik işleme tamamlandı');
+            setIsAutoProcessing(false);
+          }
+
+        } catch (error) {
+          console.error('❌ Otomatik işleme hatası:', error);
+        }
+      };
+
+      // İlk işlemi hemen başlat
+      processNext();
+      
+      // Her 2 saniyede kontrol et (daha sık)
+      const interval = setInterval(processNext, 2000);
+      setQueueInterval(interval);
+
+    } else {
+      // Otomatik işleme durduruldu
+      console.log('⏹️ Otomatik işleme durduruldu');
+      if (queueInterval) {
+        clearInterval(queueInterval);
+        setQueueInterval(null);
+      }
+      setCountdown(0);
+    }
+
+    return () => {
+      if (queueInterval) {
+        clearInterval(queueInterval);
+      }
+    };
+  }, [isAutoProcessing, queueItems, currentlyProcessing, processingDelay, countdown]);
 
   // Click outside to close editing
   useEffect(() => {
@@ -196,6 +359,37 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-semibold">Ürünler</h2>
+          {/* Etsy Store Bilgileri */}
+          {storeInfo.isConnected ? (
+            <div className="mt-2 text-sm text-gray-600">
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <strong>{storeInfo.shopName}</strong> (ID: {storeInfo.shopId})
+                </span>
+                {storeInfo.apiLimit && (
+                  <span className="text-blue-600">
+                    📊 API Limit: {storeInfo.apiLimit.remaining || 'N/A'}/{storeInfo.apiLimit.daily_limit || 'N/A'}
+                  </span>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={disconnectEtsy}
+                  className="text-red-600 hover:bg-red-50"
+                >
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Bağlantıyı Kes
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 text-sm text-red-600">
+              <XCircle className="w-4 h-4 inline mr-1" />
+              Etsy hesabı bağlı değil
+            </div>
+          )}
+        </div>
           <p className="text-gray-800">Etsy&apos;e yüklenmiş veya taslak ürünleriniz</p>
         </div>
         <Button onClick={() => setIsProductFormOpen(true)}>
@@ -487,14 +681,47 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     try {
       setCurrentlyProcessing(itemId);
       
-      // Kuyruk öğesini işleme al
-      const response = await fetch('/api/etsy/listings/process', {
+      // Kuyruk öğesini al
+      const queueResponse = await fetch(`/api/queue?user_id=${userId}`);
+      if (!queueResponse.ok) {
+        throw new Error('Kuyruk verisi alınamadı');
+      }
+      
+      const queueData = await queueResponse.json();
+      const queueItem = queueData.items.find((item: any) => item.id === itemId);
+      
+      if (!queueItem) {
+        throw new Error('Kuyruk öğesi bulunamadı');
+      }
+
+      // Base64 resimlerini File objelerine dönüştür
+      const formData = new FormData();
+      formData.append('listingData', JSON.stringify(queueItem.product_data));
+
+      // Resimler
+      if (queueItem.product_data.images && queueItem.product_data.images.length > 0) {
+        queueItem.product_data.images.forEach((image: any, index: number) => {
+          if (image.data) {
+            const file = base64ToFile(image.data, image.name, image.type);
+            formData.append(`imageFile_${index}`, file);
+          }
+        });
+      }
+
+      // Video
+      if (queueItem.product_data.video && queueItem.product_data.video.data) {
+        const videoFile = base64ToFile(
+          queueItem.product_data.video.data,
+          queueItem.product_data.video.name,
+          queueItem.product_data.video.type
+        );
+        formData.append('videoFile', videoFile);
+      }
+
+      // Direkt Etsy API'sine gönder
+      const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          queueItemId: itemId,
-          isDraft: true // Otomatik olarak draft olarak gönder
-        })
+        body: formData
       });
 
       if (response.ok) {
@@ -514,9 +741,18 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
           )
         );
         
+        // Rate limit bilgisi varsa göster
+        let toastDescription = `Ürün Etsy'e draft olarak gönderildi (ID: ${result.listing_id})`;
+        if (result.rate_limit && result.rate_limit.daily_limit) {
+          const usedCalls = result.rate_limit.api_calls_used || 1;
+          const dailyLimit = result.rate_limit.daily_limit;
+          const remainingCalls = dailyLimit - usedCalls;
+          toastDescription += `\n📊 API Limit: ${remainingCalls.toLocaleString()}/${dailyLimit.toLocaleString()} kaldı`;
+        }
+        
         toast({
           title: "Başarılı",
-          description: `Ürün Etsy'e draft olarak gönderildi (ID: ${result.listing_id})`
+          description: toastDescription
         });
       } else {
         const error = await response.json();
@@ -821,6 +1057,14 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
               Kuyruğu Temizle
             </Button>
 
+            <Button
+              onClick={() => setIsProductFormOpen(true)}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Yeni Ürün Ekle
+            </Button>
+
             <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
@@ -861,11 +1105,57 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         </CardContent>
       </Card>
 
-      {/* Kuyruk Listesi */}
+      {/* Kuyruk Sekme Navigation */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="flex space-x-8">
+          <button
+            className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeQueueTab === 'live'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+            onClick={() => setActiveQueueTab('live')}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Canlı Kuyruk ({queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed').length})</span>
+          </button>
+          
+          {stats.completed > 0 && (
+            <button
+              className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeQueueTab === 'completed'
+                  ? 'border-green-500 text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+              onClick={() => setActiveQueueTab('completed')}
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Tamamlananlar ({stats.completed})</span>
+            </button>
+          )}
+
+          {stats.failed > 0 && (
+            <button
+              className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeQueueTab === 'failed'
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+              onClick={() => setActiveQueueTab('failed')}
+            >
+              <XCircle className="w-4 h-4" />
+              <span>Hatalılar ({stats.failed})</span>
+            </button>
+          )}
+        </nav>
+      </div>
+
+      {/* Canlı Kuyruk Listesi */}
+      {activeQueueTab === 'live' && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Canlı Kuyruk ({stats.total})</span>
+            <span>Canlı Kuyruk ({queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed').length})</span>
             <div className="flex items-center gap-2">
               {selectedItems.length > 0 && (
                 <span className="text-sm text-gray-600">
@@ -873,10 +1163,11 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                 </span>
               )}
               <Checkbox
-                checked={selectedItems.length === queueItems.length && queueItems.length > 0}
+                checked={selectedItems.length === queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed').length && queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed').length > 0}
                 onCheckedChange={(checked) => {
+                  const activeItems = queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed');
                   if (checked) {
-                    setSelectedItems(queueItems.map(item => item.id))
+                    setSelectedItems(activeItems.map(item => item.id))
                   } else {
                     setSelectedItems([])
                   }
@@ -889,13 +1180,16 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         <CardContent>
           {isLoadingQueue ? (
             <div className="text-center py-8">Kuyruk yükleniyor...</div>
-          ) : queueItems.length === 0 ? (
+          ) : queueItems.filter(item => item.status !== 'completed' && item.status !== 'failed').length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              Kuyrukta ürün bulunmuyor
+              Canlı kuyrukta ürün bulunmuyor
             </div>
           ) : (
             <div className="space-y-4">
-              {queueItems.map((item) => (
+              {queueItems
+                .filter(item => item.status !== 'completed' && item.status !== 'failed')
+                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                .map((item) => (
                 <div
                   key={item.id}
                   className={`border rounded-lg p-4 transition-all hover:shadow-md ${
@@ -1299,24 +1593,56 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                         </div>
 
                         <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                item.status === 'pending' ? 'secondary' :
-                                item.status === 'processing' ? 'default' :
-                                item.status === 'completed' ? 'default' : 'destructive'
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  item.status === 'pending' ? 'secondary' :
+                                  item.status === 'processing' ? 'default' :
+                                  item.status === 'completed' ? 'default' : 'destructive'
+                                }
+                                className={
+                                  item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  item.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                  item.status === 'completed' ? 'bg-green-100 text-green-800' : ''
+                                }
+                              >
+                                {item.status === 'pending' && 'Bekliyor'}
+                                {item.status === 'processing' && 'İşleniyor'}
+                                {item.status === 'completed' && 'Tamamlandı'}
+                                {item.status === 'failed' && 'Hatalı'}
+                              </Badge>
+                            </div>
+                            
+                            {/* Countdown for next item to be processed */}
+                            {(() => {
+                              const pendingItems = queueItems
+                                .filter(i => i.status === 'pending')
+                                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                              
+                              const isNextInQueue = pendingItems.length > 0 && pendingItems[0].id === item.id;
+                              const isSecondInQueue = pendingItems.length > 1 && pendingItems[1].id === item.id;
+                              
+                              if (isAutoProcessing && countdown > 0 && isSecondInQueue) {
+                                return (
+                                  <div className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                    <Timer className="w-3 h-3" />
+                                    {countdown}s sonra yüklenecek
+                                  </div>
+                                );
                               }
-                              className={
-                                item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                item.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                                item.status === 'completed' ? 'bg-green-100 text-green-800' : ''
+                              
+                              if (isAutoProcessing && isNextInQueue && !currentlyProcessing) {
+                                return (
+                                  <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                                    <Clock className="w-3 h-3" />
+                                    Sıradaki
+                                  </div>
+                                );
                               }
-                            >
-                              {item.status === 'pending' && 'Bekliyor'}
-                              {item.status === 'processing' && 'İşleniyor'}
-                              {item.status === 'completed' && 'Tamamlandı'}
-                              {item.status === 'failed' && 'Hatalı'}
-                            </Badge>
+                              
+                              return null;
+                            })()}
                           </div>
 
                           <div className="flex gap-1">
@@ -1358,9 +1684,260 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
           )}
         </CardContent>
       </Card>
+      )}
+
+      {/* Tamamlananlar Sekmesi */}
+      {activeQueueTab === 'completed' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                Tamamlananlar ({stats.completed})
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.completed === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <CheckCircle className="w-12 h-12 mx-auto mb-2 opacity-50 text-green-400" />
+                <p>Henüz tamamlanan ürün bulunmuyor</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {queueItems
+                  .filter(item => item.status === 'completed')
+                  .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                  .map((item) => (
+                <div
+                  key={item.id}
+                  className="border rounded-lg p-4 bg-green-50 border-green-200"
+                >
+                  <div className="flex items-start gap-4">
+                    <CheckCircle className="w-5 h-5 text-green-500 mt-1" />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="font-semibold text-lg mb-1 text-green-800">
+                            {item.product_data.title}
+                          </div>
+                          
+                          <div className="flex items-center gap-4 text-sm text-green-700 mb-2">
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">
+                                ${item.product_data.price?.toFixed(2) || '0.00'}
+                              </span>
+                            </div>
+                            <div>
+                              {getCategoryName(item.product_data.taxonomy_id)}
+                            </div>
+                            <div>
+                              {formatDate(item.created_at)}
+                            </div>
+                          </div>
+
+                          <div className="mb-2">
+                            <div className="flex items-center gap-1 text-sm text-green-600 mb-2">
+                              <Image className="w-4 h-4" />
+                              {item.product_data.images?.length || 0} resim
+                              {item.product_data.video && (
+                                <>
+                                  <Video className="w-4 h-4 ml-2" />
+                                  1 video
+                                </>
+                              )}
+                            </div>
+                            
+                            {/* Küçük thumbnail'ler */}
+                            <div className="flex gap-1">
+                              {item.product_data.images?.slice(0, 4).map((img: any, idx: number) => (
+                                <div 
+                                  key={idx} 
+                                  className="w-8 h-8 rounded border overflow-hidden bg-gray-100"
+                                >
+                                  {img.base64 && (
+                                    <img 
+                                      src={`data:${img.type};base64,${img.base64}`}
+                                      alt={`Resim ${idx + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                              {(item.product_data.images?.length || 0) > 4 && (
+                                <div className="w-8 h-8 rounded border bg-gray-100 flex items-center justify-center text-xs text-gray-500">
+                                  +{(item.product_data.images?.length || 0) - 4}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {item.product_data.tags?.slice(0, 6).map((tag: string, index: number) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                #{tag}
+                              </Badge>
+                            ))}
+                            {(item.product_data.tags?.length || 0) > 6 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{(item.product_data.tags?.length || 0) - 6} daha
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge className="bg-green-100 text-green-800 border-green-300">
+                            ✅ Tamamlandı
+                          </Badge>
+
+                          {item.etsy_listing_id && (
+                            <div className="text-xs text-green-600 font-medium">
+                              Etsy ID: {item.etsy_listing_id}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Hatalılar Sekmesi */}
+      {activeQueueTab === 'failed' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-red-500" />
+                Hatalılar ({stats.failed})
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {queueItems
+                .filter(item => item.status === 'failed')
+                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                .map((item) => (
+                <div
+                  key={item.id}
+                  className="border rounded-lg p-4 bg-red-50 border-red-200"
+                >
+                  <div className="flex items-start gap-4">
+                    <XCircle className="w-5 h-5 text-red-500 mt-1" />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="font-semibold text-lg mb-1 text-red-800">
+                            {item.product_data.title}
+                          </div>
+                          
+                          <div className="flex items-center gap-4 text-sm text-red-700 mb-2">
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">
+                                ${item.product_data.price?.toFixed(2) || '0.00'}
+                              </span>
+                            </div>
+                            <div>
+                              {getCategoryName(item.product_data.taxonomy_id)}
+                            </div>
+                            <div>
+                              {formatDate(item.created_at)}
+                            </div>
+                          </div>
+
+                          <div className="mb-2">
+                            <div className="flex items-center gap-1 text-sm text-red-600 mb-2">
+                              <Image className="w-4 h-4" />
+                              {item.product_data.images?.length || 0} resim
+                              {item.product_data.video && (
+                                <>
+                                  <Video className="w-4 h-4 ml-2" />
+                                  1 video
+                                </>
+                              )}
+                            </div>
+                            
+                            {/* Küçük thumbnail'ler */}
+                            <div className="flex gap-1">
+                              {item.product_data.images?.slice(0, 4).map((img: any, idx: number) => (
+                                <div 
+                                  key={idx} 
+                                  className="w-8 h-8 rounded border overflow-hidden bg-gray-100"
+                                >
+                                  {img.base64 && (
+                                    <img 
+                                      src={`data:${img.type};base64,${img.base64}`}
+                                      alt={`Resim ${idx + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                              {(item.product_data.images?.length || 0) > 4 && (
+                                <div className="w-8 h-8 rounded border bg-gray-100 flex items-center justify-center text-xs text-gray-500">
+                                  +{(item.product_data.images?.length || 0) - 4}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {item.product_data.tags?.slice(0, 6).map((tag: string, index: number) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                #{tag}
+                              </Badge>
+                            ))}
+                            {(item.product_data.tags?.length || 0) > 6 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{(item.product_data.tags?.length || 0) - 6} daha
+                              </Badge>
+                            )}
+                          </div>
+
+                          {item.error_message && (
+                            <div className="text-sm text-red-600 bg-red-100 p-3 rounded border border-red-200 space-y-2">
+                              <div className="font-medium">Hata Detayı:</div>
+                              <div>{item.error_message}</div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs border-red-300 text-red-700 hover:bg-red-100"
+                                onClick={() => retryQueueItem(item.id)}
+                                disabled={currentlyProcessing !== null}
+                              >
+                                <RotateCcw className="w-3 h-3 mr-1" />
+                                Tekrar Dene
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge className="bg-red-100 text-red-800 border-red-300">
+                            ❌ Hatalı
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
-  const renderAutoAdd = () => <div>Otomatik ekleme özelliği yakında...</div>;
+  const renderAutoAdd = () => <AutoProductPanel />;
 
   return (
     <DndProvider backend={HTML5Backend}>

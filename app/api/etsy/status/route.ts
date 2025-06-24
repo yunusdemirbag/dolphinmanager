@@ -66,6 +66,17 @@ export async function GET() {
                 const data = await response.json();
                 console.log('Etsy API bağlantısı başarılı:', data.shop_name);
                 
+                // Rate limit bilgilerini al
+                const rateLimitInfo = {
+                  daily_limit: response.headers.get('x-limit-per-day'),
+                  remaining: response.headers.get('x-ratelimit-remaining') || 
+                            response.headers.get('ratelimit-remaining') ||
+                            response.headers.get('x-rate-limit-remaining'),
+                  reset: response.headers.get('x-ratelimit-reset') || 
+                         response.headers.get('ratelimit-reset') ||
+                         response.headers.get('x-rate-limit-reset')
+                };
+                
                 // Başarılı bağlantı
                 return NextResponse.json({
                   isConnected: true,
@@ -75,7 +86,12 @@ export async function GET() {
                   },
                   shopId: data.shop_id.toString(),
                   shopName: data.shop_name,
-                  shopData: data
+                  shopData: data,
+                  apiLimit: {
+                    daily_limit: rateLimitInfo.daily_limit ? parseInt(rateLimitInfo.daily_limit) : null,
+                    remaining: rateLimitInfo.remaining ? parseInt(rateLimitInfo.remaining) : null,
+                    reset: rateLimitInfo.reset ? new Date(parseInt(rateLimitInfo.reset) * 1000).toISOString() : null
+                  }
                 });
               } catch (error: unknown) {
                 const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';

@@ -293,8 +293,26 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
   // Get current product files
   const getCurrentProductFiles = useCallback(() => {
     const startImageIndex = currentProductIndex * settings.imagesPerProduct;
-    const currentProductImages = settings.imageFiles.slice(startImageIndex, startImageIndex + settings.imagesPerProduct);
-    return [...currentProductImages, ...settings.resourceFiles];
+    const endImageIndex = startImageIndex + settings.imagesPerProduct;
+    const currentProductImages = settings.imageFiles.slice(startImageIndex, endImageIndex);
+    
+    // Her ürün için: İlk N resim + TÜM kaynak dosyaları (logo, watermark vs.)
+    // Bu şekilde her ürün kendi resimlerine + ortak kaynak dosyalarına sahip olur
+    const allFiles = [...currentProductImages, ...settings.resourceFiles];
+    
+    console.log(`🔍 DETAYLI DEBUG - Ürün ${currentProductIndex + 1}:`, {
+      currentProductIndex,
+      imagesPerProduct: settings.imagesPerProduct,
+      startImageIndex,
+      endImageIndex,
+      toplamResimSayısı: settings.imageFiles.length,
+      alınanResimSayısı: currentProductImages.length,
+      alınanResimAdları: currentProductImages.map(f => f.name),
+      kaynakDosyaları: settings.resourceFiles.map(f => f.name),
+      toplamDosyaSayısı: allFiles.length
+    });
+    
+    return allFiles;
   }, [currentProductIndex, settings.imageFiles, settings.resourceFiles, settings.imagesPerProduct]);
 
   // Generate product title from image name
@@ -352,7 +370,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
       // Wait 5 seconds before opening next form (as requested)
       console.log('⏰ Form kapandı, 5 saniye bekleniyor...');
       setTimeout(() => {
-        console.log('🔄 Sonraki ürün için form açılıyor...');
+        console.log(`🔄 Sonraki ürün için form açılıyor... ${currentProductIndex} → ${nextProductIndex}`);
         setCurrentProductIndex(nextProductIndex);
         setShowProductForm(true);
         
@@ -603,6 +621,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
 
       {/* Simple ProductFormModal - opens directly when processing starts */}
       <ProductFormModal
+        key={`product-${currentProductIndex}`} // Her ürün için yeni instance
         isOpen={showProductForm}
         onClose={handleFormClose}
         userId="auto-processing"

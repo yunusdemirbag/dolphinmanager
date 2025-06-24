@@ -1158,10 +1158,10 @@ export function ProductFormModal({
             }
           }
           
-          console.log('✅ Tüm resimler eklendi, 10 saniye geri sayım başlıyor...');
+          console.log('✅ Tüm resimler eklendi, 15 saniye geri sayım başlıyor...');
           
-          // 3. 10 saniye geri sayım başlat
-          setCountdown(10);
+          // 3. 15 saniye geri sayım başlat
+          setCountdown(15);
           
           const countdownInterval = setInterval(() => {
             setCountdown(prev => {

@@ -1034,6 +1034,13 @@ export function ProductFormModal({
       console.log('📝 Clean JSON string length:', jsonString.length);
       console.log('📝 Images count:', (imageDataArray || []).length);
       console.log('📝 Video URL:', videoUrl);
+      console.log('🎯 Varyasyon bilgileri:', {
+        has_variations: hasVariations,
+        total_variations: variations.length,
+        active_variations: variations.filter((v: any) => v.is_active).length,
+        quantity: quantity,
+        price: hasVariations ? 'Backend hesaplar' : price
+      });
       
       formData.append('listingData', jsonString);
 
@@ -1148,11 +1155,11 @@ export function ProductFormModal({
         // Formdan gelen dinamik değerler
         title,
         description,
-        price: 29.99, // TEST: Sabit price
+        price: hasVariations ? 0 : price, // Varyasyonlu ürünlerde backend hesaplar
         shipping_profile_id: Number(shippingProfileId),
         tags,
-        has_variations: false, // TEST: Variation'sız dene
-        variations: [], // Boş variation array
+        has_variations: hasVariations, // Dinamik varyasyon durumu
+        variations: hasVariations ? variations.filter((v: any) => v.is_active) : [], // Aktif varyasyonlar
         state: state, // Buton tarafından belirlenen durum (draft veya active)
         shop_section_id: Number(selectedShopSection) || undefined,
         
@@ -1163,7 +1170,7 @@ export function ProductFormModal({
         personalization_char_count_max: 256, // <-- Etsy için kritik alan
 
         // --- Etsy'nin İstediği Diğer Zorunlu Alanlar ---
-        quantity: 999,
+        quantity: quantity, // Dinamik quantity (default 4)
         taxonomy_id: taxonomyId,
         who_made: "i_did",
         when_made: "made_to_order",

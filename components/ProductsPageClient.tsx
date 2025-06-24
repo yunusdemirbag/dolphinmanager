@@ -717,14 +717,28 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         formData.append('videoFile', videoFile);
       }
 
+      console.log('📤 Etsy API\'sine gönderiliyor...', {
+        endpoint: '/api/etsy/listings/create',
+        hasImages: queueItem.product_data.images?.length || 0,
+        hasVideo: !!queueItem.product_data.video,
+        title: queueItem.product_data.title
+      });
+
       // Direkt Etsy API'sine gönder
       const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',
         body: formData
       });
 
+      console.log('📥 Etsy API yanıtı:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
       if (response.ok) {
         const result = await response.json();
+        console.log('✅ Başarılı yanıt:', result);
         
         // Local state'i güncelle
         setQueueItems(items => 
@@ -754,11 +768,32 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
           description: toastDescription
         });
       } else {
-        const error = await response.json();
-        throw new Error(error.message || 'Gönderim başarısız');
+        console.error('❌ HTTP Hatası:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ Hata detayı:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText || 'Gönderim başarısız' };
+        }
+        
+        throw new Error(errorData.message || errorData.error || 'Gönderim başarısız');
       }
     } catch (error) {
-      console.error('Kuyruk işleme hatası:', error);
+      console.error('🚨 DETAYLI KUYRUK İŞLEME HATASI:', {
+        error,
+        errorMessage: error instanceof Error ? error.message : 'Bilinmeyen hata',
+        errorStack: error instanceof Error ? error.stack : 'Stack yok',
+        itemId,
+        userId
+      });
+      
+      // Response hatası varsa detayını göster
+      if (error instanceof Error && error.message.includes('fetch')) {
+        console.error('🌐 FETCH HATASI - Network veya server sorunu olabilir');
+      }
       
       // Hatalı durumu işaretle
       setQueueItems(items => 
@@ -775,8 +810,8 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       
       toast({
         variant: "destructive",
-        title: "Hata",
-        description: error instanceof Error ? error.message : "Ürün gönderilemedi"
+        title: "Detaylı Hata",
+        description: `${error instanceof Error ? error.message : "Ürün gönderilemedi"} - Console'a bakın`
       });
     } finally {
       setCurrentlyProcessing(null);

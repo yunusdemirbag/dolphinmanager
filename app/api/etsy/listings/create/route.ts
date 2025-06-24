@@ -9,11 +9,20 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const listingDataString = formData.get('listingData') as string;
     
+    console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
+    
     if (!listingDataString) {
       return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
     }
     
-    const listingData = JSON.parse(listingDataString);
+    let listingData;
+    try {
+      listingData = JSON.parse(listingDataString);
+    } catch (parseError) {
+      console.error('❌ JSON parse hatası:', parseError);
+      console.error('❌ Problematik string:', listingDataString);
+      return NextResponse.json({ error: 'Invalid listing data format' }, { status: 400 });
+    }
     console.log('📋 Listing data alındı:', {
       title: listingData.title,
       state: listingData.state,
@@ -104,9 +113,13 @@ export async function POST(request: NextRequest) {
     }
     
     // Resimleri ekle
-    imageFiles.forEach((file, index) => {
-      etsyFormData.append(`image`, file);
-    });
+    if (imageFiles.length > 0) {
+      console.log('📷 Resimler ekleniyor, toplam:', imageFiles.length);
+      imageFiles.forEach((imageFile, index) => {
+        console.log(`📷 Resim ${index + 1}:`, imageFile.name, (imageFile.size / 1024 / 1024).toFixed(2), 'MB');
+        etsyFormData.append(`image`, imageFile);
+      });
+    }
     
     // Video ekle (eğer varsa)
     if (listingData.videoUrl) {
@@ -114,29 +127,49 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('📤 Etsy API\'sine gönderiliyor...');
+    console.log('⏰ Başlangıç zamanı:', new Date().toISOString());
     console.log('📋 Listing state:', listingData.state);
+    console.log('📋 Image count:', imageFiles.length);
+    console.log('📋 Video URL:', !!listingData.videoUrl);
+    console.log('📋 API URL:', etsyListingUrl);
+    console.log('📋 Form data keys:', Array.from(etsyFormData.keys()));
     
-    // Etsy API çağrısı
-    const etsyResponse = await fetch(etsyListingUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'x-api-key': api_key,
-      },
-      body: etsyFormData,
-    });
+    const startTime = Date.now();
     
-    const etsyResult = await etsyResponse.json();
-    console.log('📥 Etsy API yanıtı:', etsyResponse.status, etsyResponse.ok);
+    // Timeout controller ekle
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      console.error('⏰ Etsy API timeout - 30 seconds');
+    }, 60000); // 60 saniye timeout
     
-    if (!etsyResponse.ok) {
-      console.error('❌ Etsy API hatası:', etsyResult);
-      return NextResponse.json({
-        error: `Etsy API Error: ${etsyResult.error || 'Unknown error'}`,
-        details: etsyResult,
-        code: 'ETSY_API_ERROR'
-      }, { status: etsyResponse.status });
-    }
+    try {
+      // Etsy API çağrısı
+      const etsyResponse = await fetch(etsyListingUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${access_token}`,
+          'x-api-key': api_key,
+        },
+        body: etsyFormData,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log('📥 Etsy API yanıtı:', etsyResponse.status, etsyResponse.ok, `(${duration}s)`);
+    
+      const etsyResult = await etsyResponse.json();
+      console.log('📋 Response data keys:', Object.keys(etsyResult));
+      
+      if (!etsyResponse.ok) {
+        console.error('❌ Etsy API hatası:', etsyResult);
+        return NextResponse.json({
+          error: `Etsy API Error: ${etsyResult.error || 'Unknown error'}`,
+          details: etsyResult,
+          code: 'ETSY_API_ERROR'
+        }, { status: etsyResponse.status });
+      }
     
     console.log('✅ Etsy listing oluşturuldu:', etsyResult.listing_id);
     
@@ -157,6 +190,25 @@ export async function POST(request: NextRequest) {
       listing: etsyResult,
       message: `Listing ${listingData.state === 'draft' ? 'taslak olarak' : 'aktif olarak'} oluşturuldu!`
     });
+    
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error('⏰ Etsy API timeout');
+        return NextResponse.json({
+          error: 'Etsy API zaman aşımı - 30 saniye içinde yanıt alamadık',
+          code: 'TIMEOUT_ERROR',
+          success: false
+        }, { status: 408 });
+      }
+      
+      console.error('❌ Etsy API fetch hatası:', fetchError);
+      return NextResponse.json({
+        error: `Etsy API bağlantı hatası: ${fetchError.message}`,
+        code: 'CONNECTION_ERROR',
+        success: false
+      }, { status: 500 });
+    }
     
   } catch (error) {
     console.error('❌ Direkt Etsy listing hatası:', error);

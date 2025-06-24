@@ -1109,7 +1109,7 @@ export function ProductFormModal({
       
       const formData = new FormData();
 
-      const listingData = {
+      const listingData: any = {
         // Formdan gelen dinamik değerler
         title,
         description,
@@ -1138,34 +1138,26 @@ export function ProductFormModal({
         renewal_option: "automatic", // Her ürün otomatik yenileme ile oluşturulur
       };
       
-      // Görselleri base64'e çevir (Local DB için)
-      const imageDataArray: any[] = [];
+      // Base64'leri JSON'a ekleme - sadece file bilgilerini ekle
+      const imageInfoArray: any[] = [];
       for (let i = 0; i < (productImages || []).length; i++) {
         const image = productImages[i];
         if (image.file) {
-          // File'ı base64'e çevir
-          const base64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(image.file);
-          });
-          
-          imageDataArray.push({
-            base64: base64,
+          imageInfoArray.push({
             type: image.file.type,
             filename: image.file.name,
-            position: i
+            position: i,
+            size: image.file.size
           });
         }
       }
       
-      // Video'yu direkt File olarak gönder (base64'e çevirme)
-      let videoData: any = null;
+      // Video bilgilerini ekle (dosya olmadan)
+      let videoInfo: any = null;
       if (videoFile?.file) {
         console.log('🎥 Video hazırlanıyor:', videoFile.file.name, (videoFile.file.size / 1024 / 1024).toFixed(2), 'MB');
         
-        videoData = {
-          file: videoFile.file, // Direkt File objesi
+        videoInfo = {
           type: videoFile.file.type,
           filename: videoFile.file.name,
           size: videoFile.file.size
@@ -1174,11 +1166,24 @@ export function ProductFormModal({
         console.log('🎥 Video File objesi hazır');
       }
 
-      // Base64 verileri listingData'ya ekle
-      listingData.images = imageDataArray;
-      listingData.video = videoData;
+      // Sadece bilgileri listingData'ya ekle (base64 değil)
+      listingData.images = imageInfoArray;
+      listingData.video = videoInfo;
       
       formData.append('listingData', JSON.stringify(listingData));
+      
+      // Resim dosyalarını FormData'ya ekle
+      for (let i = 0; i < (productImages || []).length; i++) {
+        const image = productImages[i];
+        if (image.file) {
+          formData.append(`imageFile_${i}`, image.file);
+        }
+      }
+      
+      // Video dosyasını FormData'ya ekle
+      if (videoFile?.file) {
+        formData.append('videoFile', videoFile.file);
+      }
 
       const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',

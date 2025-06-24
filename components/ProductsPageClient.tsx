@@ -311,17 +311,10 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     // Add custom event listener
     window.addEventListener('queueUpdated', handleQueueUpdate);
     
-    // Fallback polling system - REDUCED FREQUENCY
-    const pollInterval = setInterval(() => {
-      if (activeTab === 'queue') {
-        console.log('🔄 Periodic kuyruk güncellemesi...');
-        fetchQueue();
-      }
-    }, 15000); // Her 15 saniyede poll (azaltıldı)
+    // OTOMATIK YENİLEME KALDIRILDI - Sadece manuel yenileme
     
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
-      clearInterval(pollInterval);
       console.log('🛑 Real-time listener sistemi temizlendi');
     };
   }, [activeTab]);
@@ -854,6 +847,28 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       // Product data'dan base64 image/video data'yı temizle
       const cleanProductData = { ...queueItem.product_data };
       
+      // 🔧 BAŞLIK 140 KARAKTER KONTROLÜ VE DÜZELTMESİ
+      if (cleanProductData.title && cleanProductData.title.length > 140) {
+        console.log(`⚠️ Başlık çok uzun (${cleanProductData.title.length} karakter), kısaltılıyor...`);
+        
+        // Son kelimeyi sil sil, 140 karakter altına düşene kadar
+        let shortTitle = cleanProductData.title;
+        while (shortTitle.length > 140) {
+          const words = shortTitle.trim().split(' ');
+          if (words.length > 1) {
+            words.pop(); // Son kelimeyi sil
+            shortTitle = words.join(' ');
+          } else {
+            // Tek kelime varsa, 140 karakterde kes
+            shortTitle = shortTitle.substring(0, 140).trim();
+            break;
+          }
+        }
+        
+        cleanProductData.title = shortTitle;
+        console.log(`✅ Başlık kısaltıldı: "${shortTitle}" (${shortTitle.length} karakter)`);
+      }
+      
       // Images ve video'yu product data'dan çıkar (FormData'ya ayrı ekleyeceğiz)
       if (cleanProductData.images) {
         delete cleanProductData.images;
@@ -1066,24 +1081,54 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         console.error('🌐 FETCH HATASI - Network veya server sorunu olabilir');
       }
       
-      // Hatalı durumu işaretle
-      setQueueItems(items => 
-        items.map(item => 
-          item.id === itemId 
-            ? {
-                ...item,
-                status: 'failed' as const,
-                error_message: error instanceof Error ? error.message : 'Bilinmeyen hata'
-              }
-            : item
-        )
-      );
+      // 🔄 RETRY LOGİĞİ - 2 deneme sonrası atla
+      const currentItem = queueItems.find(item => item.id === itemId);
+      const retryCount = (currentItem?.retry_count || 0) + 1;
       
-      toast({
-        variant: "destructive",
-        title: "Detaylı Hata",
-        description: `${error instanceof Error ? error.message : "Ürün gönderilemedi"} - Console'a bakın`
-      });
+      if (retryCount < 3) {
+        console.log(`🔄 Retry ${retryCount}/2 - Tekrar deneniyor:`, itemId);
+        
+        // Retry count'u artır ve tekrar pending yap
+        setQueueItems(items => 
+          items.map(item => 
+            item.id === itemId 
+              ? {
+                  ...item,
+                  status: 'pending' as const,
+                  retry_count: retryCount,
+                  error_message: error instanceof Error ? error.message : 'Bilinmeyen hata'
+                }
+              : item
+          )
+        );
+        
+        toast({
+          title: `Tekrar Deneme ${retryCount}/2`,
+          description: `Hata sonrası tekrar deneniyor: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
+        });
+      } else {
+        console.log(`❌ Max retry limit (2) reached, skipping item:`, itemId);
+        
+        // 2 deneme sonrası failed olarak işaretle ve atla
+        setQueueItems(items => 
+          items.map(item => 
+            item.id === itemId 
+              ? {
+                  ...item,
+                  status: 'failed' as const,
+                  retry_count: retryCount,
+                  error_message: `Max retry limit reached: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
+                }
+              : item
+          )
+        );
+        
+        toast({
+          variant: "destructive",
+          title: "Ürün Atlandı",
+          description: `2 deneme sonrası başarısız oldu ve atlandı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
+        });
+      }
     } finally {
       setCurrentlyProcessing(null);
     }

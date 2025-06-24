@@ -129,7 +129,29 @@ export async function GET(request: NextRequest) {
           
           // 🚀 UI'nin beklediği product_data nested yapısı  
           product_data: {
-            title: data.title || 'Unnamed Product',
+            title: (() => {
+              // 🔧 BAŞLIK 140 KARAKTER KONTROLÜ VE DÜZELTMESİ
+              let title = data.title || 'Unnamed Product';
+              if (title.length > 140) {
+                console.log(`⚠️ Queue'da uzun başlık bulundu (${title.length} karakter), kısaltılıyor...`);
+                
+                // Son kelimeyi sil sil, 140 karakter altına düşene kadar
+                while (title.length > 140) {
+                  const words = title.trim().split(' ');
+                  if (words.length > 1) {
+                    words.pop(); // Son kelimeyi sil
+                    title = words.join(' ');
+                  } else {
+                    // Tek kelime varsa, 140 karakterde kes
+                    title = title.substring(0, 140).trim();
+                    break;
+                  }
+                }
+                
+                console.log(`✅ Queue başlığı kısaltıldı: "${title}" (${title.length} karakter)`);
+              }
+              return title;
+            })(),
             price: data.price || 0,
             tags: data.tags || [],
             images: [], // Async image loading yapılacak aşağıda
@@ -168,57 +190,65 @@ export async function GET(request: NextRequest) {
           try {
             console.log(`🖼️ DEBUG - Item ${item.id}: imageCount=${item.imageCount}, current_images=${item.product_data.images.length}`);
             if (item.imageCount > 0 && item.product_data.images.length === 0) {
-              console.log(`🖼️ Loading thumbnail for ${item.id}...`);
-              // Sadece ilk resmi al
-              const firstImageRef = await adminDb.collection('queue_images')
+              console.log(`🖼️ Loading ALL images for ${item.id}...`);
+              // TÜM RESİMLERİ POSITION SIRASINA GÖRE YÜKLENCoded
+              const allImageRefs = await adminDb.collection('queue_images')
                 .where('queue_item_id', '==', item.id)
-                .limit(1)
                 .get();
               
-              console.log(`🖼️ Image query result for ${item.id}: ${firstImageRef.size} images found`);
+              console.log(`🖼️ Image query result for ${item.id}: ${allImageRefs.size} images found`);
               
-              if (!firstImageRef.empty) {
-                const firstImageDoc = firstImageRef.docs[0];
-                const imageData = firstImageDoc.data();
-                console.log(`🖼️ Found image doc for ${item.id}: chunks=${imageData.chunks_count}`);
+              if (!allImageRefs.empty) {
+                // RESİMLERİ POSITION SIRASINA GÖRE SIRALA
+                const sortedImageDocs = allImageRefs.docs
+                  .map(doc => ({ data: doc.data(), id: doc.id }))
+                  .sort((a, b) => (a.data.position || 0) - (b.data.position || 0));
                 
-                if (imageData.chunks_count > 0) {
-                  // INDEX-FREE BASE64 LOADING - Client-side sorting
-                  const allChunks = await adminDb.collection('queue_image_chunks')
-                    .where('image_id', '==', firstImageDoc.id)
-                    .get();
-                  
-                  if (!allChunks.empty) {
-                    console.log(`🖼️ Found ${allChunks.size} chunks for ${item.id}`);
+                console.log(`🖼️ Found ${sortedImageDocs.length} images for ${item.id}, positions:`, 
+                  sortedImageDocs.map(img => img.data.position));
+                
+                // TÜM RESİMLERİ PARALEL YÜKLE
+                const imageLoadPromises = sortedImageDocs.map(async (imageDoc) => {
+                  const imageData = imageDoc.data;
+                  if (imageData.chunks_count > 0) {
+                    // Chunk'ları yükle
+                    const allChunks = await adminDb.collection('queue_image_chunks')
+                      .where('image_id', '==', imageDoc.id)
+                      .get();
                     
-                    // Tüm chunk'ları sırala ve birleştir
-                    const sortedChunks = allChunks.docs
-                      .map(doc => ({ data: doc.data(), id: doc.id }))
-                      .sort((a, b) => a.data.chunk_index - b.data.chunk_index);
-                    
-                    console.log(`🖼️ Sorted chunks for ${item.id}:`, sortedChunks.map(c => c.data.chunk_index));
-                    
-                    const base64Parts: string[] = [];
-                    sortedChunks.forEach(chunk => {
-                      base64Parts.push(chunk.data.chunk_data);
-                    });
-                    const fullBase64 = base64Parts.join('');
-                    
-                    item.product_data.images = [{
-                      name: imageData.name,
-                      type: imageData.type,
-                      base64: fullBase64, // Tam base64 data
-                      data: fullBase64,   // processQueueItem için ek field
-                      isPartial: false
-                    }];
-                    
-                    console.log(`🖼️ Full thumbnail yüklendi: ${item.id} (${fullBase64.length} chars)`);
-                  } else {
-                    console.warn(`⚠️ No chunks found for image ${firstImageDoc.id}`);
+                    if (!allChunks.empty) {
+                      // Chunk'ları sırala ve birleştir
+                      const sortedChunks = allChunks.docs
+                        .map(doc => ({ data: doc.data(), id: doc.id }))
+                        .sort((a, b) => a.data.chunk_index - b.data.chunk_index);
+                      
+                      const base64Parts: string[] = [];
+                      sortedChunks.forEach(chunk => {
+                        base64Parts.push(chunk.data.chunk_data);
+                      });
+                      const fullBase64 = base64Parts.join('');
+                      
+                      return {
+                        name: imageData.name,
+                        type: imageData.type,
+                        base64: fullBase64,
+                        data: fullBase64,
+                        position: imageData.position || 0,
+                        isPartial: false
+                      };
+                    }
                   }
-                } else {
-                  console.warn(`⚠️ Image has 0 chunks: ${firstImageDoc.id}`);
-                }
+                  return null;
+                });
+                
+                const loadedImages = await Promise.all(imageLoadPromises);
+                const validImages = loadedImages.filter(img => img !== null);
+                
+                // POSITION SIRASINA GÖRE TEKRAR SIRALA (güvenlik için)
+                validImages.sort((a, b) => a.position - b.position);
+                
+                item.product_data.images = validImages;
+                console.log(`🖼️ ${validImages.length} images yüklendi for ${item.id} in correct order`);
               }
             }
           } catch (imageError) {

@@ -129,7 +129,7 @@ async function fetchAllEtsyListings(shopId: string, apiKey: string, initialAcces
                         if (imagesResponse.ok) {
                             const imagesData = await imagesResponse.json();
                             product.images = imagesData.results || [];
-                            console.log(`✅ Ürün ${product.listing_id} için ${product.images.length} resim alındı`);
+                            console.log(`✅ Ürün ${product.listing_id} için ${(product.images || []).length} resim alındı`);
                         } else {
                             console.error(`Ürün ${product.listing_id} için resim alınamadı: ${imagesResponse.status}`);
                         }
@@ -157,6 +157,100 @@ async function fetchAllEtsyListings(shopId: string, apiKey: string, initialAcces
 
     console.log(`✅ Toplam ${allProducts.length} Etsy ürünü başarıyla alındı`);
     return allProducts;
+}
+
+/**
+ * Fetch shipping profiles from Etsy API
+ */
+export async function fetchEtsyShippingProfiles(shopId: string, apiKey: string, accessToken: string): Promise<any[]> {
+    try {
+        console.log(`📦 Fetching shipping profiles for shop ${shopId}...`);
+        
+        const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}/shipping-profiles`, {
+            headers: {
+                'x-api-key': apiKey,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                console.log('Token expired, attempting to refresh...');
+                const newToken = await refreshEtsyToken(shopId);
+                if (newToken) {
+                    const retryResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}/shipping-profiles`, {
+                        headers: {
+                            'x-api-key': apiKey,
+                            'Authorization': `Bearer ${newToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (retryResponse.ok) {
+                        const data = await retryResponse.json();
+                        console.log(`✅ ${data.results?.length || 0} shipping profiles fetched successfully after token refresh`);
+                        return data.results || [];
+                    }
+                }
+            }
+            console.error(`Failed to fetch shipping profiles: ${response.status} ${response.statusText}`);
+            return [];
+        }
+
+        const data = await response.json();
+        console.log(`✅ ${data.results?.length || 0} shipping profiles fetched successfully`);
+        return data.results || [];
+    } catch (error) {
+        console.error('Error fetching shipping profiles:', error);
+        return [];
+    }
+}
+
+/**
+ * Fetch shop sections from Etsy API
+ */
+export async function fetchEtsyShopSections(shopId: string, apiKey: string, accessToken: string): Promise<any[]> {
+    try {
+        console.log(`📂 Fetching shop sections for shop ${shopId}...`);
+        
+        const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}/sections`, {
+            headers: {
+                'x-api-key': apiKey,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                console.log('Token expired, attempting to refresh...');
+                const newToken = await refreshEtsyToken(shopId);
+                if (newToken) {
+                    const retryResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${shopId}/sections`, {
+                        headers: {
+                            'x-api-key': apiKey,
+                            'Authorization': `Bearer ${newToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (retryResponse.ok) {
+                        const data = await retryResponse.json();
+                        console.log(`✅ ${data.results?.length || 0} shop sections fetched successfully after token refresh`);
+                        return data.results || [];
+                    }
+                }
+            }
+            console.error(`Failed to fetch shop sections: ${response.status} ${response.statusText}`);
+            return [];
+        }
+
+        const data = await response.json();
+        console.log(`✅ ${data.results?.length || 0} shop sections fetched successfully`);
+        return data.results || [];
+    } catch (error) {
+        console.error('Error fetching shop sections:', error);
+        return [];
+    }
 }
 
 export { fetchAllEtsyListings, refreshEtsyToken }; 

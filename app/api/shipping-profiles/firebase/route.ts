@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getShippingProfilesFromFirebase, syncShippingProfilesToFirebase } from '@/lib/firebase-sync';
+import { getShippingProfilesFromFirebaseAdmin, syncShippingProfilesToFirebaseAdmin, getConnectedStoreFromFirebaseAdmin } from '@/lib/firebase-sync';
+import { fetchEtsyShippingProfiles } from '@/lib/etsy-api';
+import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 
 export async function GET(request: Request) {
   try {
@@ -10,7 +12,37 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Shop ID is required' }, { status: 400 });
     }
 
-    const profiles = await getShippingProfilesFromFirebase(parseInt(shopId));
+    let profiles = await getShippingProfilesFromFirebaseAdmin(parseInt(shopId));
+    
+    // If no profiles found in Firebase, fetch from Etsy API and sync
+    if (profiles.length === 0) {
+      console.log(`No shipping profiles found in Firebase for shop ${shopId}, fetching from Etsy...`);
+      
+      // Get API credentials
+      initializeAdminApp();
+      if (!adminDb) {
+        return NextResponse.json({ error: 'Database not initialized' }, { status: 500 });
+      }
+      
+      const apiKeyDoc = await adminDb.collection('etsy_api_keys').doc(shopId).get();
+      if (!apiKeyDoc.exists) {
+        return NextResponse.json({ error: 'API keys not found for this shop' }, { status: 404 });
+      }
+      
+      const { api_key: apiKey, access_token: accessToken } = apiKeyDoc.data()!;
+      if (!apiKey || !accessToken) {
+        return NextResponse.json({ error: 'Incomplete API credentials' }, { status: 400 });
+      }
+      
+      // Fetch from Etsy API
+      const etsyProfiles = await fetchEtsyShippingProfiles(shopId, apiKey, accessToken);
+      
+      if (etsyProfiles.length > 0) {
+        // Sync to Firebase
+        await syncShippingProfilesToFirebaseAdmin(parseInt(shopId), etsyProfiles);
+        profiles = etsyProfiles;
+      }
+    }
     
     return NextResponse.json({ profiles });
   } catch (error) {
@@ -34,7 +66,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await syncShippingProfilesToFirebase(shop_id, profiles);
+    await syncShippingProfilesToFirebaseAdmin(shop_id, profiles);
 
     return NextResponse.json({ 
       message: 'Shipping profiles synced to Firebase successfully',

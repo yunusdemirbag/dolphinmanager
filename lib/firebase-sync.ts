@@ -354,7 +354,7 @@ export async function deleteProductDraftFromFirebase(draftId: string): Promise<v
 export async function syncProductsToFirebaseAdmin(userId: string, products: any[]): Promise<void> {
   initializeAdminApp();
   if (!adminDb) throw new Error('Firebase Admin not initialized');
-  if (!products || products.length === 0) return;
+  if (!products || !Array.isArray(products) || products.length === 0) return;
   
   console.log(`🔄 Veritabanına ${products.length} ürün yazılıyor (Kullanıcı: ${userId})...`);
 
@@ -376,6 +376,10 @@ export async function syncProductsToFirebaseAdmin(userId: string, products: any[
       // Bu nesneyi olduğu gibi alıp, sadece 'userId' ve 'synced_at' alanlarını ekliyoruz.
       const productDataToSave = {
         ...product,
+        // Ensure arrays are always arrays for safe .length access later
+        tags: Array.isArray(product.tags) ? product.tags : [],
+        images: Array.isArray(product.images) ? product.images : [],
+        variations: Array.isArray(product.variations) ? product.variations : [],
         userId: userId, // Ürünün kime ait olduğunu belirtmek için
         synced_at: new Date() // Senkronizasyon zamanı
       };
@@ -438,11 +442,16 @@ export async function getProductsFromFirebaseAdmin(
 
   const snapshot = await query.get();
 
-  const products = snapshot.docs.map(doc => {
+  const products = (snapshot.docs || []).map(doc => {
     const data = doc.data();
 
     const serializableData = {
       ...data,
+      // Ensure arrays are always arrays
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      images: Array.isArray(data.images) ? data.images : [],
+      variations: Array.isArray(data.variations) ? data.variations : [],
+      // Handle dates
       synced_at: data.synced_at?.toDate ? data.synced_at.toDate().toISOString() : null,
       created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : null,
       updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : null,
@@ -454,7 +463,7 @@ export async function getProductsFromFirebaseAdmin(
     };
   });
 
-  const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+  const lastDoc = (snapshot.docs && snapshot.docs.length > 0) ? snapshot.docs[snapshot.docs.length - 1] : null;
   const nextCursor = lastDoc ? lastDoc.data().listing_id : null;
 
   return { products, nextCursor };
@@ -501,5 +510,111 @@ export async function getConnectedStoreFromFirebaseAdmin(userId: string): Promis
   } catch (error) {
     console.error('Error fetching connected store from Firebase Admin:', error);
     return null;
+  }
+}
+
+/**
+ * Get shipping profiles from Firebase using Admin SDK
+ */
+export async function getShippingProfilesFromFirebaseAdmin(shopId: number): Promise<ShippingProfile[]> {
+  initializeAdminApp();
+  if (!adminDb) {
+    console.error("Firebase Admin DB not initialized");
+    return [];
+  }
+
+  try {
+    const profilesSnapshot = await adminDb
+      .collection(SHIPPING_PROFILES_COLLECTION)
+      .where('shop_id', '==', shopId)
+      .get();
+
+    return profilesSnapshot.docs.map(doc => doc.data() as ShippingProfile);
+  } catch (error) {
+    console.error('Error getting shipping profiles from Firebase Admin:', error);
+    return [];
+  }
+}
+
+/**
+ * Get shop sections from Firebase using Admin SDK
+ */
+export async function getShopSectionsFromFirebaseAdmin(shopId: number): Promise<ShopSection[]> {
+  initializeAdminApp();
+  if (!adminDb) {
+    console.error("Firebase Admin DB not initialized");
+    return [];
+  }
+
+  try {
+    const sectionsSnapshot = await adminDb
+      .collection(SHOP_SECTIONS_COLLECTION)
+      .where('shop_id', '==', shopId)
+      .get();
+
+    return sectionsSnapshot.docs.map(doc => doc.data() as ShopSection);
+  } catch (error) {
+    console.error('Error getting shop sections from Firebase Admin:', error);
+    return [];
+  }
+}
+
+/**
+ * Sync shipping profiles to Firebase using Admin SDK
+ */
+export async function syncShippingProfilesToFirebaseAdmin(shopId: number, profiles: ShippingProfile[]): Promise<void> {
+  initializeAdminApp();
+  if (!adminDb) {
+    console.error("Firebase Admin DB not initialized");
+    return;
+  }
+
+  try {
+    const batch = adminDb.batch();
+    
+    for (const profile of profiles) {
+      const profileRef = adminDb.collection(SHIPPING_PROFILES_COLLECTION).doc(`${shopId}_${profile.shipping_profile_id}`);
+      batch.set(profileRef, {
+        ...profile,
+        shop_id: shopId,
+        synced_at: new Date()
+      });
+    }
+    
+    await batch.commit();
+    console.log(`✅ Synced ${profiles.length} shipping profiles to Firebase for shop ${shopId}`);
+  } catch (error) {
+    console.error('Error syncing shipping profiles to Firebase Admin:', error);
+    throw error;
+  }
+}
+
+/**
+ * Sync shop sections to Firebase using Admin SDK
+ */
+export async function syncShopSectionsToFirebaseAdmin(shopId: number, sections: ShopSection[]): Promise<void> {
+  initializeAdminApp();
+  if (!adminDb) {
+    console.error("Firebase Admin DB not initialized");
+    return;
+  }
+
+  try {
+    const batch = adminDb.batch();
+    
+    for (const section of sections) {
+      const sectionRef = adminDb.collection(SHOP_SECTIONS_COLLECTION).doc(`${shopId}_${section.shop_section_id}`);
+      batch.set(sectionRef, {
+        ...section,
+        shop_id: shopId,
+        synced_at: new Date()
+      });
+    }
+    
+    await batch.commit();
+    console.log(`✅ Synced ${sections.length} shop sections to Firebase for shop ${shopId}`);
+  } catch (error) {
+    console.error('Error syncing shop sections to Firebase Admin:', error);
+    throw error;
   }
 }

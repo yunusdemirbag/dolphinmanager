@@ -42,7 +42,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     failed: 0
   });
   const [isLoadingQueue, setIsLoadingQueue] = useState(false);
-  const [products, setProducts] = useState<any[]>(initialProducts);
+  const [products, setProducts] = useState<any[]>(initialProducts || []);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [hasMoreProducts, setHasMoreProducts] = useState(!!initialNextCursor);
@@ -56,7 +56,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       const response = await fetch(`/api/products/paginate?user_id=${userId}&cursor=${nextCursor}`);
       if (response.ok) {
         const data = await response.json();
-        setProducts(prev => [...prev, ...data.products]);
+        setProducts(prev => [...prev, ...(data.products || [])]);
         setNextCursor(data.nextCursor);
         setHasMoreProducts(!!data.nextCursor);
       } else {
@@ -99,7 +99,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-semibold">Ürünler</h2>
-          <p className="text-gray-600">Etsy&apos;e yüklenmiş veya taslak ürünleriniz</p>
+          <p className="text-gray-800">Etsy&apos;e yüklenmiş veya taslak ürünleriniz</p>
         </div>
         <Button onClick={() => setIsProductFormOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
@@ -109,7 +109,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       
       {products.length === 0 ? (
         <Card className="p-4">
-          <div className="text-center text-gray-500">
+          <div className="text-center text-gray-700">
             <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p>Henüz ürün bulunamadı</p>
           </div>
@@ -139,7 +139,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                   </div>
                   <CardContent className="p-4">
                     <h3 className="font-medium truncate">{product.title}</h3>
-                    <div className="flex items-center justify-between text-sm text-gray-500 mt-2">
+                    <div className="flex items-center justify-between text-sm text-gray-700 mt-2">
                       <span>{product.quantity} Adet</span>
                       <span className="font-semibold">
                         {product.price && typeof product.price === 'number' 
@@ -184,7 +184,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                 className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
                     ? 'border-black text-black'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-700 hover:text-gray-700 hover:border-gray-300'
                 }`}
                 onClick={() => setActiveTab(tab.id)}
               >

@@ -53,7 +53,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-black">Ayarlar</h1>
-        <p className="text-gray-600">Sistem ayarlarınızı yapılandırın</p>
+        <p className="text-gray-800">Sistem ayarlarınızı yapılandırın</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -87,7 +87,7 @@ export default function SettingsPage() {
                 max="300"
                 className="w-32"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-700 mt-1">
                 5-300 saniye arası değer girebilirsiniz
               </p>
             </div>
@@ -139,7 +139,7 @@ export default function SettingsPage() {
                 Koyu Tema
               </Button>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-gray-700 mt-2">
               Şu anda sadece açık tema desteklenmektedir
             </p>
           </CardContent>
@@ -158,7 +158,7 @@ export default function SettingsPage() {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-semibold">AI Promptları</h2>
-              <p className="text-gray-600">OpenAI API çağrıları için kullanılan promptları özelleştirin</p>
+              <p className="text-gray-800">OpenAI API çağrıları için kullanılan promptları özelleştirin</p>
             </div>
             <Button onClick={handleResetAllPrompts} variant="outline" size="sm">
               <RotateCcw className="w-4 h-4 mr-2" />
@@ -201,7 +201,7 @@ export default function SettingsPage() {
                         rows={8}
                         className="font-mono text-sm"
                       />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-700 mt-1">
                         Değişkenler: ${`{title}`}, ${`{categoryNames}`} gibi değişkenler kullanabilirsiniz
                       </p>
                     </div>

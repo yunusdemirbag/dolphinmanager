@@ -10,19 +10,30 @@ import Link from 'next/link';
 // ASLA MOCK VERİ KULLANILMIYOR
 
 async function getInitialProducts(userId: string) {
-    initializeAdminApp();
-    if (!adminDb) {
-      console.error("Firebase Admin DB not initialized");
-      return { products: [], nextCursor: null };
-    }
-
     try {
+      initializeAdminApp();
+      if (!adminDb) {
+        console.error("Firebase Admin DB not initialized");
+        return { products: [], nextCursor: null };
+      }
+
       const productCount = await (await import('@/lib/firebase-sync')).countProductsInFirebaseAdmin(userId);
 
       if (productCount > 0) {
           console.log(`📦 Found ${productCount} products in Firebase for user ${userId}. Fetching from DB.`);
           const { getProductsFromFirebaseAdmin } = await import('@/lib/firebase-sync');
-          return getProductsFromFirebaseAdmin(userId, 12, null);
+          const result = await getProductsFromFirebaseAdmin(userId, 12, null);
+          
+          // Ensure the result always has safe array structures
+          return {
+            products: Array.isArray(result.products) ? result.products.map(product => ({
+              ...product,
+              tags: Array.isArray(product.tags) ? product.tags : [],
+              images: Array.isArray(product.images) ? product.images : [],
+              variations: Array.isArray(product.variations) ? product.variations : []
+            })) : [],
+            nextCursor: result.nextCursor || null
+          };
       }
 
       console.log(`📦 No products found in Firebase for user ${userId}. Fetching from Etsy API.`);
@@ -47,12 +58,20 @@ async function getInitialProducts(userId: string) {
         
         const { fetchAllEtsyListings } = await import('@/lib/etsy-api');
         const allEtsyProducts = await fetchAllEtsyListings(String(store.shop_id), apiKey, accessToken);
+        
+        // Ensure allEtsyProducts is always an array with safe structures
+        const products = Array.isArray(allEtsyProducts) ? allEtsyProducts.map(product => ({
+          ...product,
+          tags: Array.isArray(product.tags) ? product.tags : [],
+          images: Array.isArray(product.images) ? product.images : [],
+          variations: Array.isArray(product.variations) ? product.variations : []
+        })) : [];
 
-        if (allEtsyProducts.length > 0) {
-            console.log(`🔄 Syncing ${allEtsyProducts.length} products to Firebase for user ${userId}...`);
+        if (products.length > 0) {
+            console.log(`🔄 Syncing ${products.length} products to Firebase for user ${userId}...`);
             const { syncProductsToFirebaseAdmin } = await import('@/lib/firebase-sync');
             try {
-              await syncProductsToFirebaseAdmin(userId, allEtsyProducts);
+              await syncProductsToFirebaseAdmin(userId, products);
               console.log('✅ Sync complete.');
             } catch (error) {
               console.error('Error syncing products to Firebase:', error);
@@ -61,8 +80,8 @@ async function getInitialProducts(userId: string) {
         }
 
         const pageSize = 12;
-        const firstPageProducts = allEtsyProducts.slice(0, pageSize);
-        const nextCursor = allEtsyProducts.length > pageSize ? allEtsyProducts[pageSize - 1].listing_id : null;
+        const firstPageProducts = products.slice(0, pageSize);
+        const nextCursor = products.length > pageSize && products[pageSize - 1] ? products[pageSize - 1].listing_id : null;
         
         return { products: firstPageProducts, nextCursor };
       } catch (error) {
@@ -74,6 +93,9 @@ async function getInitialProducts(userId: string) {
       return { products: [], nextCursor: null };
     }
 }
+
+// Force dynamic rendering to avoid static generation errors
+export const dynamic = 'force-dynamic';
 
 // Server Component
 export default async function ProductsPage() {
@@ -87,7 +109,7 @@ export default async function ProductsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-black">Ürünler</h1>
-        <p className="text-gray-600">Ürünlerinizi yönetin ve Etsy&apos;e yükleyin</p>
+        <p className="text-gray-800">Ürünlerinizi yönetin ve Etsy&apos;e yükleyin</p>
       </div>
 
       {/* Store Connection Status */}

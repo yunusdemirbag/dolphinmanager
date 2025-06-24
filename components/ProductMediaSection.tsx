@@ -38,15 +38,15 @@ export function ProductMediaSection({
     const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
     const videoFiles = Array.from(files).filter(f => f.type.startsWith('video/'));
 
-    if (productImages.length + imageFiles.length > 10) {
+    if ((productImages || []).length + imageFiles.length > 10) {
       return toast({ variant: "destructive", description: "En fazla 10 resim yükleyebilirsiniz." });
     }
     
     const newImages: MediaFile[] = imageFiles.map(file => ({ file, preview: URL.createObjectURL(file) }));
-    setProductImages(prev => [...prev, ...newImages]);
+    setProductImages(prev => [...(prev || []), ...newImages]);
 
     // İlk resim yüklendiğinde otomatik içerik üretme
-    if (imageFiles.length > 0 && productImages.length === 0) {
+    if (imageFiles.length > 0 && (productImages || []).length === 0) {
       try {
         setIsProcessing(true);
         const firstImage = imageFiles[0];
@@ -106,7 +106,7 @@ export function ProductMediaSection({
       if (videoFile) URL.revokeObjectURL(videoFile.preview);
       setVideoFile({ file: videoFiles[0], preview: URL.createObjectURL(videoFiles[0]) });
     }
-  }, [productImages.length, setProductImages, videoFile, setVideoFile, toast, onImageUpload]);
+  }, [(productImages || []).length, setProductImages, videoFile, setVideoFile, toast, onImageUpload]);
 
   const handleRemoveImage = useCallback((index: number) => {
     setProductImages(prev => {
@@ -122,10 +122,10 @@ export function ProductMediaSection({
       <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} disabled={disabled || isProcessing} />
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Medya</h3>
-        <span className="text-sm text-gray-500">{productImages.length}/10 resim, {videoFile ? 1 : 0}/1 video</span>
+        <span className="text-sm text-gray-500">{(productImages || []).length}/10 resim, {videoFile ? 1 : 0}/1 video</span>
       </div>
       <div className="border-2 border-dashed rounded-lg p-6 text-center" onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }} onDragOver={(e) => e.preventDefault()} data-testid="media-upload-area">
-        {productImages.length === 0 && !videoFile ? (
+        {(productImages || []).length === 0 && !videoFile ? (
           <div className="flex flex-col items-center gap-2">
             {isProcessing ? (
               <>
@@ -155,7 +155,7 @@ export function ProductMediaSection({
                 </button>
               </div>
             ))}
-            {productImages.length < 10 && (
+            {(productImages || []).length < 10 && (
               <button 
                 type="button" 
                 onClick={() => fileInputRef.current?.click()} 

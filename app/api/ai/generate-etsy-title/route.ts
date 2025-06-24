@@ -7,7 +7,30 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { image, prompt } = await request.json();
+    // Check if request is FormData or JSON
+    const contentType = request.headers.get('content-type');
+    let image, prompt;
+    
+    if (contentType?.includes('multipart/form-data')) {
+      // Handle FormData
+      const formData = await request.formData();
+      const imageFile = formData.get('image') as File;
+      prompt = formData.get('prompt') as string;
+      
+      if (!imageFile) {
+        return NextResponse.json({ error: 'Image file is required' }, { status: 400 });
+      }
+      
+      // Convert image file to base64 data URL for OpenAI
+      const buffer = await imageFile.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      image = `data:${imageFile.type};base64,${base64}`;
+    } else {
+      // Handle JSON
+      const body = await request.json();
+      image = body.image;
+      prompt = body.prompt;
+    }
 
     if (!image) {
       return NextResponse.json({ error: 'Image is required' }, { status: 400 });

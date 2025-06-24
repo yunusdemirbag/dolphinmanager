@@ -35,6 +35,7 @@ import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
+import { PromptEditor } from './PromptEditor';
 import { createClientSupabase } from "@/lib/supabase";
 import { categoryPrompt, tagPrompt, titlePrompt, generateTitleWithFocus, selectCategory } from "@/lib/openai-yonetim";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
@@ -92,8 +93,6 @@ interface ProductFormModalProps {
   isOpen: boolean
   onClose: () => void
   product?: Product
-  shippingProfiles: ShippingProfile[]
-  loadingShippingProfiles: boolean
 }
 
 // Drag and drop için item tipleri
@@ -166,7 +165,7 @@ const DraggableImage = ({
           className="w-full h-full object-cover"
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400 text-xs">
+        <div className="w-full h-full flex items-center justify-center bg-gray-50 text-gray-700 text-xs">
           Görsel yüklenemedi
         </div>
       )}
@@ -222,8 +221,6 @@ export function ProductFormModal({
   isOpen,
   onClose,
   product,
-  shippingProfiles,
-  loadingShippingProfiles,
 }: ProductFormModalProps) {
   // All useState declarations at the top
   const { toast } = useToast()
@@ -251,6 +248,11 @@ export function ProductFormModal({
   const [variations, setVariations] = useState(product?.variations || predefinedVariations)
   const [shopSections, setShopSections] = useState<{ shop_section_id: number; title: string }[]>([]);
   const [selectedShopSection, setSelectedShopSection] = useState<string>('');
+  
+  // Shipping profiles and shop sections data fetching
+  const [shippingProfiles, setShippingProfiles] = useState<ShippingProfile[]>([]);
+  const [loadingShippingProfiles, setLoadingShippingProfiles] = useState(false);
+  const [loadingShopSections, setLoadingShopSections] = useState(false);
   
   // Ürün görselleri için state
   const [productImages, setProductImages] = useState<MediaFile[]>([])
@@ -312,11 +314,11 @@ export function ProductFormModal({
     let progress = 0;
     const totalFields = 8;
     
-    if (productImages.length > 0) progress += 1;
-    if (title.length > 10) progress += 1;
-    if (description.length > 50) progress += 1;
+    if ((productImages || []).length > 0) progress += 1;
+    if ((title || '').length > 10) progress += 1;
+    if ((description || '').length > 50) progress += 1;
     if (price > 0 || (hasVariations && variations.some(v => v.price > 0))) progress += 1;
-    if (tags.length > 3) progress += 1;
+    if ((tags || []).length > 3) progress += 1;
     if (shippingProfileId) progress += 1;
     if (selectedShopSection) progress += 1;
     if (hasVariations && variations.some(v => v.is_active)) progress += 1;
@@ -332,15 +334,15 @@ export function ProductFormModal({
   }, [productImages, title, description, price, tags, shippingProfileId, selectedShopSection, hasVariations, variations]);
 
   // Video reminder check
-  const shouldShowVideoReminder = productImages.length >= 3 && !videoFile;
+  const shouldShowVideoReminder = (productImages || []).length >= 3 && !videoFile;
 
   // Validation states
   const fieldValidation = {
-    media: productImages.length > 0 ? 'valid' : 'invalid',
-    title: title.length > 10 ? 'valid' : title.length > 0 ? 'warning' : 'invalid',
-    description: description.length > 50 ? 'valid' : description.length > 0 ? 'warning' : 'invalid',
+    media: (productImages || []).length > 0 ? 'valid' : 'invalid',
+    title: (title || '').length > 10 ? 'valid' : (title || '').length > 0 ? 'warning' : 'invalid',
+    description: (description || '').length > 50 ? 'valid' : (description || '').length > 0 ? 'warning' : 'invalid',
     price: (price > 0 || (hasVariations && variations.some(v => v.price > 0))) ? 'valid' : 'invalid',
-    tags: tags.length > 3 ? 'valid' : tags.length > 0 ? 'warning' : 'invalid'
+    tags: (tags || []).length > 3 ? 'valid' : (tags || []).length > 0 ? 'warning' : 'invalid'
   };
 
   // Basit toast alternatifi - güzel UI ile
@@ -396,11 +398,9 @@ export function ProductFormModal({
     if (isOpen) {
       async function loadShopSections() {
         try {
-          const response = await fetch('/api/etsy/shop-sections');
-          const data = await response.json();
-          if (response.ok && data.sections) {
-            setShopSections(data.sections);
-          }
+          // This is redundant since fetchStoreData already loads shop sections
+          // Just return early to avoid duplicate API calls
+          return;
         } catch (error) { 
           console.error("Dükkan bölümleri yüklenemedi:", error);
           toast({
@@ -431,12 +431,12 @@ export function ProductFormModal({
       setPersonalizationRequired(false);
       setPersonalizationInstructions(PERSONALIZATION_INSTRUCTIONS);
       setTaxonomyId(product?.taxonomy_id || WALL_DECOR_TAXONOMY_ID);
-      setHasVariations(product?.variations ? product.variations.length > 0 : true);
-      const initialVariations = product?.variations && product.variations.length > 0 
-        ? product.variations 
+      setHasVariations(product?.variations ? (product.variations || []).length > 0 : true);
+      const initialVariations = product?.variations && (product.variations || []).length > 0 
+        ? (product.variations || [])
         : predefinedVariations;
       setVariations(initialVariations);
-      if (product?.images?.length) {
+      if (product?.images && (product.images || []).length) {
         setProductImages(product.images.map(img => ({
           file: new File([], img.url || ''),
           preview: img.url || '',
@@ -455,10 +455,79 @@ export function ProductFormModal({
 
   // Kargo profili varsayılanı: Yeni ürün eklerken ilk profili otomatik seç
   useEffect(() => {
-    if (isOpen && !product && shippingProfiles.length > 0) {
+    if (isOpen && !product && (shippingProfiles || []).length > 0) {
       setShippingProfileId(shippingProfiles[0].shipping_profile_id.toString());
     }
   }, [isOpen, product, shippingProfiles]);
+
+  // Fetch shipping profiles and shop sections when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchStoreData = async () => {
+      try {
+        // Get user's connected store information
+        const userId = 'local-user-123'; // This should come from auth context
+        
+        // Fetch user's store info to get shop_id
+        const storeResponse = await fetch('/api/etsy/status');
+        if (!storeResponse.ok) {
+          console.error('Failed to fetch store info');
+          return;
+        }
+        
+        const storeData = await storeResponse.json();
+        console.log('Store data received:', storeData);
+        const shopId = storeData.store?.shop_id;
+        
+        if (!shopId) {
+          console.error('No shop ID found', { storeData, shopId });
+          return;
+        }
+        
+        console.log('Using shop ID:', shopId);
+
+        // Fetch shipping profiles
+        setLoadingShippingProfiles(true);
+        try {
+          const shippingResponse = await fetch(`/api/shipping-profiles/firebase?shop_id=${shopId}`);
+          if (shippingResponse.ok) {
+            const shippingData = await shippingResponse.json();
+            console.log('Shipping profiles received:', shippingData.profiles?.length || 0, 'profiles');
+            setShippingProfiles(shippingData.profiles || []);
+          } else {
+            console.error('Shipping profiles request failed:', shippingResponse.status);
+          }
+        } catch (error) {
+          console.error('Error fetching shipping profiles:', error);
+        } finally {
+          setLoadingShippingProfiles(false);
+        }
+
+        // Fetch shop sections
+        setLoadingShopSections(true);
+        try {
+          const sectionsResponse = await fetch(`/api/shop-sections/firebase?shop_id=${shopId}`);
+          if (sectionsResponse.ok) {
+            const sectionsData = await sectionsResponse.json();
+            console.log('Shop sections received:', sectionsData.sections?.length || 0, 'sections');
+            setShopSections(sectionsData.sections || []);
+          } else {
+            console.error('Shop sections request failed:', sectionsResponse.status);
+          }
+        } catch (error) {
+          console.error('Error fetching shop sections:', error);
+        } finally {
+          setLoadingShopSections(false);
+        }
+
+      } catch (error) {
+        console.error('Error fetching store data:', error);
+      }
+    };
+
+    fetchStoreData();
+  }, [isOpen]);
 
   // Başlık değişimini debounce ile geciktir
   const debouncedTitle = useDebounce(title, 1000); // 1 saniye debounce
@@ -469,8 +538,8 @@ export function ProductFormModal({
       title !== "" ||
       description !== "" ||
       price !== 0 ||
-      productImages.length > 0 ||
-      tags.length > 0
+      (productImages || []).length > 0 ||
+      (tags || []).length > 0
     );
   };
 
@@ -503,35 +572,35 @@ export function ProductFormModal({
     const files = e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
     const videoFiles = files.filter(f => f.type.startsWith('video/'));
-    if (productImages.length + imageFiles.length > 10) {
+    if ((productImages || []).length + (imageFiles || []).length > 10) {
       toast({ title: "Maksimum Resim Limiti", description: "En fazla 10 resim yükleyebilirsiniz.", variant: "destructive" });
     } else {
       const newImages = imageFiles.map(file => ({ file, preview: URL.createObjectURL(file), uploading: false }));
       setProductImages(prev => [...prev, ...newImages]);
     }
-    if (videoFiles.length > 0) {
+    if ((videoFiles || []).length > 0) {
       if (videoFile) URL.revokeObjectURL(videoFile.preview);
       setVideoFile({ file: videoFiles[0], preview: URL.createObjectURL(videoFiles[0]), uploading: false });
     }
-  }, [productImages.length, videoFile, toast]);
+  }, [(productImages || []).length, videoFile, toast]);
 
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     const files = Array.from(e.target.files);
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
     const videoFiles = files.filter(f => f.type.startsWith('video/'));
-    if (productImages.length + imageFiles.length > 10) {
+    if ((productImages || []).length + (imageFiles || []).length > 10) {
       toast({ title: "Maksimum Resim Limiti", description: "En fazla 10 resim yükleyebilirsiniz.", variant: "destructive" });
     } else {
       const newImages = imageFiles.map(file => ({ file, preview: URL.createObjectURL(file), uploading: false }));
       setProductImages(prev => [...prev, ...newImages]);
     }
-    if (videoFiles.length > 0) {
+    if ((videoFiles || []).length > 0) {
       if (videoFile) URL.revokeObjectURL(videoFile.preview);
       setVideoFile({ file: videoFiles[0], preview: URL.createObjectURL(videoFiles[0]), uploading: false });
     }
     e.target.value = '';
-  }, [productImages.length, videoFile, toast]);
+  }, [(productImages || []).length, videoFile, toast]);
 
   const handleRemoveImage = useCallback((index: number) => {
     setProductImages(prev => {
@@ -582,24 +651,52 @@ export function ProductFormModal({
 
   // Resim yüklendiğinde başlık üret
   useEffect(() => {
-    if (isOpen && productImages.length > 0 && !title && !autoTitleUsed && !userEditedTitle) {
+    if (isOpen && (productImages || []).length > 0 && !title && !autoTitleUsed && !userEditedTitle) {
+      console.log('🤖 Otomatik başlık üretimi başlatılıyor...', {
+        isOpen,
+        imageCount: (productImages || []).length,
+        title,
+        autoTitleUsed,
+        userEditedTitle
+      });
+      
       const generateTitle = async () => {
         setAutoTitleLoading(true);
         try {
           const formData = new FormData();
           formData.append("image", productImages[0].file);
-          formData.append("prompt", "Analyze this image and create a compelling Etsy product title that would attract customers. The title should be descriptive, include relevant keywords, and be optimized for Etsy search. Keep it under 140 characters and make it appealing to potential buyers.");
-          const res = await fetch("/api/ai/generate-etsy-title", {
+          formData.append("categories", JSON.stringify(shopSections));
+          formData.append("customPrompts", JSON.stringify({}));
+          
+          console.log('📤 Unified AI analizi için API çağrısı yapılıyor...');
+          const res = await fetch("/api/ai/analyze-and-generate", {
             method: "POST",
             body: formData,
           });
+          
           const data = await res.json();
+          console.log('📥 Unified AI yanıtı:', data);
+          
           if (data.title) {
             const generatedTitle = cleanTitle(data.title.trim());
+            console.log('✅ Başlık üretildi:', generatedTitle);
             setTitle(generatedTitle);
             setAutoTitleUsed(true);
+            
+            // Etiketleri de ayarla
+            if (data.tags && Array.isArray(data.tags)) {
+              setTags(data.tags.slice(0, 13));
+            }
+            
+            // Kategoriyi de ayarla
+            if (data.suggestedCategoryId) {
+              setSelectedShopSection(data.suggestedCategoryId.toString());
+            }
+          } else {
+            console.log('❌ API\'den başlık alınamadı');
           }
         } catch (e) {
+          console.error('❌ Başlık üretimi hatası:', e);
           toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
         } finally {
           setAutoTitleLoading(false);
@@ -616,73 +713,56 @@ export function ProductFormModal({
     console.log('Manuel kategori seçimi:', val);
   };
 
-  // Başlık değiştiğinde en uygun mağaza kategorisini OpenAI ile otomatik seç
+  // Category auto-selection is now handled by the unified AI API
+  // This useEffect is kept for fallback category selection if needed
   useEffect(() => {
-    // Sadece başlık varsa ve shop section'lar yüklenmişse ve otomatik seçim aktifse
-    if (!title || !shopSections.length || !shopSectionAutoSelected) return;
+    // Only run if we have title, shop sections, and auto-selection is active
+    // But unified AI already handles this, so we'll use simple keyword matching as fallback
+    if (!title || !(shopSections || []).length || !shopSectionAutoSelected) return;
     
-    // Debounce için 1 saniye bekle
-    const timer = setTimeout(async () => {
+    // Simple keyword-based category selection as fallback
+    const timer = setTimeout(() => {
       try {
-        console.log('Otomatik kategori seçimi başlatılıyor:', title);
-        const categoryNames = shopSections.map(s => s.title);
+        console.log('Fallback kategori seçimi başlatılıyor:', title);
         
-        // OpenAI API'ya kategori seçimi için istek
-        const response = await fetch('/api/ai/select-category', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            title, 
-            categoryNames 
-          })
-        });
+        const titleLower = title.toLowerCase();
+        let matchedSection = null;
         
-        if (response.ok) {
-          const aiCategory = (await response.text()).trim().toLowerCase();
-          console.log('AI kategori yanıtı:', aiCategory);
-          
-          // Tam eşleşme ara
-          let matchedSection = shopSections.find(
-            s => s.title.trim().toLowerCase() === aiCategory
-          );
-          
-          // Kısmi eşleşme ara (fallback)
-          if (!matchedSection) {
-            matchedSection = shopSections.find(s =>
-              s.title.toLowerCase().includes(aiCategory) ||
-              aiCategory.includes(s.title.toLowerCase())
+        // Try to find category based on common keywords in title
+        const keywordMapping = {
+          'abstract': ['abstract', 'geometric', 'modern'],
+          'animal': ['animal', 'pet', 'cat', 'dog', 'bird', 'wildlife'],
+          'botanical': ['flower', 'plant', 'leaf', 'tree', 'nature', 'botanical'],
+          'landscape': ['landscape', 'mountain', 'ocean', 'sunset', 'beach'],
+          'minimalist': ['minimalist', 'simple', 'clean', 'minimal']
+        };
+        
+        for (const [categoryType, keywords] of Object.entries(keywordMapping)) {
+          if (keywords.some(keyword => titleLower.includes(keyword))) {
+            matchedSection = shopSections.find(s => 
+              s.title.toLowerCase().includes(categoryType) ||
+              keywords.some(k => s.title.toLowerCase().includes(k))
             );
+            if (matchedSection) break;
           }
-          
-          // Varsayılan kategoriler için fallback
-          if (!matchedSection) {
-            const fallbackKeywords = ["modern", "abstract", "art", "animal"];
-            matchedSection = shopSections.find(s =>
-              fallbackKeywords.some(keyword =>
-                s.title.toLowerCase().includes(keyword)
-              )
-            );
-          }
-          
-          // Son çare: ilk kategoriyi seç
-          if (!matchedSection && shopSections.length > 0) {
-            matchedSection = shopSections[0];
-          }
-          
-          if (matchedSection) {
-            console.log('Kategori seçildi:', matchedSection.title);
-            setSelectedShopSection(matchedSection.shop_section_id.toString());
-          }
-        } else {
-          console.error('Kategori seçimi API hatası:', response.status);
+        }
+        
+        // Fallback to first section if no match
+        if (!matchedSection && shopSections.length > 0) {
+          matchedSection = shopSections[0];
+        }
+        
+        if (matchedSection && !selectedShopSection) {
+          console.log('Fallback kategori seçildi:', matchedSection.title);
+          setSelectedShopSection(matchedSection.shop_section_id.toString());
         }
       } catch (error) {
-        console.error('Kategori seçimi hatası:', error);
+        console.error('Fallback kategori seçimi hatası:', error);
       }
     }, 1000); // 1 saniye debounce
     
     return () => clearTimeout(timer);
-  }, [title, shopSections, shopSectionAutoSelected]); // Tüm dependency'leri ekle
+  }, [title, shopSections, shopSectionAutoSelected, selectedShopSection]); // Tüm dependency'leri ekle
 
   // Form açıldığında otomatik seçimi aktif et
   useEffect(() => {
@@ -698,10 +778,10 @@ export function ProductFormModal({
     console.log('📊 Form state:', {
       title,
       shippingProfileId,
-      productImagesLength: productImages.length,
+      productImagesLength: (productImages || []).length,
       price,
       hasVariations,
-      variations: variations.filter(v => v.is_active).length
+      variations: (variations || []).filter(v => v.is_active).length
     });
 
     // 1. Fiyat Validasyonu - DÜZELTILDI
@@ -718,8 +798,8 @@ export function ProductFormModal({
       isPriceValid, 
       price, 
       hasVariations,
-      activeVariations: variations.filter(v => v.is_active).length,
-      variations: variations.map(v => ({ size: v.size, price: Number(v.price), is_active: v.is_active }))
+      activeVariations: (variations || []).filter(v => v.is_active).length,
+      variations: (variations || []).map(v => ({ size: v.size, price: Number(v.price), is_active: v.is_active }))
     });
 
     if (!isPriceValid) {
@@ -741,12 +821,12 @@ export function ProductFormModal({
     console.log('✅ setSubmitting(true) çağrıldı');
     
     // 2. Diğer Validasyonlar
-    if (!title || !shippingProfileId || productImages.length === 0) {
+    if (!title || !shippingProfileId || (productImages || []).length === 0) {
       console.log('❌ Diğer validasyonlar başarısız');
       const missingItems = [];
       if (!title) missingItems.push("Başlık");
       if (!shippingProfileId) missingItems.push("Kargo Profili");  
-      if (productImages.length === 0) missingItems.push("En az bir Resim");
+      if ((productImages || []).length === 0) missingItems.push("En az bir Resim");
       
       toast({ 
         variant: "destructive", 
@@ -796,11 +876,14 @@ export function ProductFormModal({
         who_made: "i_did",
         when_made: "made_to_order",
         is_supply: false,
+        
+        // --- Renewal Options (Otomatik Yenileme) ---
+        renewal_option: "automatic", // Her ürün otomatik yenileme ile oluşturulur
       };
       
       // Görselleri base64'e çevir (Local DB için)
       const imageDataArray: any[] = [];
-      for (let i = 0; i < productImages.length; i++) {
+      for (let i = 0; i < (productImages || []).length; i++) {
         const image = productImages[i];
         if (image.file) {
           // File'ı base64'e çevir
@@ -874,7 +957,7 @@ export function ProductFormModal({
       console.log('🔍 listingData before stringify:', {
         keys: Object.keys(listingData),
         title: listingData.title,
-        imagesLength: imageDataArray.length,
+        imagesLength: (imageDataArray || []).length,
         videoUrl: videoUrl
       });
       
@@ -897,7 +980,7 @@ export function ProductFormModal({
       
       const jsonString = JSON.stringify(cleanListingData);
       console.log('📝 Clean JSON string length:', jsonString.length);
-      console.log('📝 Images count:', imageDataArray.length);
+      console.log('📝 Images count:', (imageDataArray || []).length);
       console.log('📝 Video URL:', videoUrl);
       
       formData.append('listingData', jsonString);
@@ -905,7 +988,7 @@ export function ProductFormModal({
       // KUYRUK API'sine gönder (Gemini önerisi: JSON + FormData hybrid)
       console.log('🌐 API çağrısı başlıyor: /api/etsy/listings/queue');
       console.log('📦 Gönderilecek veri:', {
-        images: imageDataArray.length,
+        images: (imageDataArray || []).length,
         videoUrl: videoUrl ? '✅ Supabase URL' : '❌ Yok',
         title: listingData.title,
         method: 'FormData + JSON hybrid'
@@ -990,7 +1073,7 @@ export function ProductFormModal({
     }
 
     // 2. Diğer Validasyonlar
-    if (!title || !shippingProfileId || productImages.length === 0) {
+    if (!title || !shippingProfileId || (productImages || []).length === 0) {
       toast({ variant: "destructive", description: "Başlık, Kargo Profili ve en az bir Resim zorunludur." });
       return;
     }
@@ -1018,7 +1101,7 @@ export function ProductFormModal({
         tags,
         has_variations: hasVariations,
         variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
-        state: state,
+        state: "draft", // Her ürün draft olarak oluşturulur
         shop_section_id: Number(selectedShopSection) || undefined,
         
         // --- Kişiselleştirme Ayarları (Sabit ve EKSİKSİZ) ---
@@ -1033,11 +1116,14 @@ export function ProductFormModal({
         who_made: "i_did",
         when_made: "made_to_order",
         is_supply: false,
+        
+        // --- Renewal Options (Otomatik Yenileme) ---
+        renewal_option: "automatic", // Her ürün otomatik yenileme ile oluşturulur
       };
       
       // Görselleri base64'e çevir (Local DB için)
       const imageDataArray: any[] = [];
-      for (let i = 0; i < productImages.length; i++) {
+      for (let i = 0; i < (productImages || []).length; i++) {
         const image = productImages[i];
         if (image.file) {
           // File'ı base64'e çevir
@@ -1195,19 +1281,19 @@ export function ProductFormModal({
 
       {/* Medya Dosyaları Başlığı ve Sayaçları */}
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-base font-medium text-gray-700">Medya Dosyaları</h3>
+        <h3 className="text-base font-medium text-gray-900">Medya Dosyaları</h3>
         <div className="flex items-center gap-3">
-          <div className="flex items-center text-xs text-gray-500">
-            <Image className="w-3.5 h-3.5 mr-1 text-gray-400" />
-            <span>{productImages.length}/10</span>
+          <div className="flex items-center text-xs text-gray-700">
+            <Image className="w-3.5 h-3.5 mr-1 text-gray-800" />
+            <span>{(productImages || []).length}/10</span>
           </div>
           {videoFile ? (
-            <div className="flex items-center text-xs text-gray-500">
-              <Video className="w-3.5 h-3.5 mr-1 text-gray-400" />
+            <div className="flex items-center text-xs text-gray-700">
+              <Video className="w-3.5 h-3.5 mr-1 text-gray-800" />
               <span>1/1</span>
             </div>
           ) : (
-            <div className="flex items-center text-xs text-gray-400">
+            <div className="flex items-center text-xs text-gray-800">
               <Video className="w-3.5 h-3.5 mr-1 opacity-50" />
               <span>0/1</span>
             </div>
@@ -1218,7 +1304,7 @@ export function ProductFormModal({
       {/* SÜRÜKLE-BIRAK ALANI */}
       <div
         className={`border rounded-lg transition-all ${
-          productImages.length === 0 && !videoFile 
+          (productImages || []).length === 0 && !videoFile 
             ? "border-dashed border-gray-300 bg-gray-50/50 hover:border-primary/40 hover:bg-gray-50" 
             : "border-gray-100 shadow-sm"
         }`}
@@ -1227,13 +1313,13 @@ export function ProductFormModal({
         onDragEnter={e => e.preventDefault()}
         onDragLeave={e => e.preventDefault()}
       >
-        {productImages.length === 0 && !videoFile ? (
+        {(productImages || []).length === 0 && !videoFile ? (
           <div className="text-center py-8 px-4">
             <div className="mx-auto w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-              <Upload className="w-5 h-5 text-gray-500" />
+              <Upload className="w-5 h-5 text-gray-700" />
             </div>
-            <p className="text-sm font-medium text-gray-700">Dosyaları buraya sürükleyin</p>
-            <p className="text-xs text-gray-500 mb-3">veya</p>
+            <p className="text-sm font-medium text-gray-900">Dosyaları buraya sürükleyin</p>
+            <p className="text-xs text-gray-700 mb-3">veya</p>
             <div className="flex gap-2 justify-center mb-4">
               <Button
                 type="button"
@@ -1300,7 +1386,7 @@ export function ProductFormModal({
                 )}
               </div>
             )}
-            {productImages.length < 10 && (
+            {(productImages || []).length < 10 && (
               <div className="flex flex-col gap-2">
                 <button
                   type="button"
@@ -1308,7 +1394,7 @@ export function ProductFormModal({
                   className="flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-lg p-3 h-full min-h-[100px] hover:bg-gray-50 hover:border-primary/40 transition-colors"
                 >
                   <Image className="w-5 h-5 text-gray-400 mb-1" />
-                  <span className="text-xs text-gray-500">Resim</span>
+                  <span className="text-xs text-gray-700">Resim</span>
                 </button>
                 {!videoFile && (
                   <button
@@ -1317,7 +1403,7 @@ export function ProductFormModal({
                     className="flex flex-col items-center justify-center border border-dashed border-gray-200 rounded-lg p-3 hover:bg-gray-50 hover:border-primary/40 transition-colors"
                   >
                     <Video className="w-5 h-5 text-gray-400 mb-1" />
-                    <span className="text-xs text-gray-500">Video</span>
+                    <span className="text-xs text-gray-700">Video</span>
                   </button>
                 )}
               </div>
@@ -1526,7 +1612,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
 
   // Başlığın yanındaki buton için ayrı bir fonksiyon
   const generateTitleOnly = async () => {
-    if (productImages.length === 0) {
+    if ((productImages || []).length === 0) {
       toast({
         variant: "destructive",
         title: "Eksik Bilgi",
@@ -1543,10 +1629,10 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       const file = productImages[0].file;
       const formData = new FormData();
       formData.append("image", file);
-      formData.append("prompt", "Analyze this image and create a compelling Etsy product title that would attract customers. The title should be descriptive, include relevant keywords, and be optimized for Etsy search. Keep it under 140 characters and make it appealing to potential buyers.");
-      formData.append("requestType", "title");
+      formData.append("categories", JSON.stringify(shopSections));
+      formData.append("customPrompts", JSON.stringify({}));
 
-      const response = await fetch("/api/ai/generate-etsy-title", {
+      const response = await fetch("/api/ai/analyze-and-generate", {
         method: "POST",
         body: formData,
       });
@@ -1556,6 +1642,16 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       if (data.title) {
         setTitle(cleanTitle(data.title.trim()));
         setAutoTitleUsed(true);
+        
+        // Etiketleri de ayarla
+        if (data.tags && Array.isArray(data.tags)) {
+          setTags(data.tags.slice(0, 13));
+        }
+        
+        // Kategoriyi de ayarla
+        if (data.suggestedCategoryId) {
+          setSelectedShopSection(data.suggestedCategoryId.toString());
+        }
       } else {
         throw new Error("Başlık üretilemedi");
       }
@@ -1568,7 +1664,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
 
   // Yeni focus başlık üretici fonksiyon
   const handleFocusTitle = async () => {
-    if (!titleInput.trim() || productImages.length === 0 || !productImages[0].file) {
+    if (!titleInput.trim() || (productImages || []).length === 0 || !(productImages || [])[0]?.file) {
       toast({
         variant: "destructive",
         title: "Eksik Bilgi", 
@@ -1586,11 +1682,30 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       const file = productImages[0].file;
       const formData = new FormData();
       formData.append("image", file);
-      formData.append("prompt", "Analyze this image and create a compelling Etsy product title that would attract customers. The title should be descriptive, include relevant keywords, and be optimized for Etsy search. Keep it under 140 characters and make it appealing to potential buyers.");
-      formData.append("focusKeyword", titleInput.trim());
-      formData.append("requestType", "focus");
+      formData.append("categories", JSON.stringify(shopSections));
+      
+      // Custom prompt for focus
+      const customPrompts = {
+        title: `TASK: Generate a single, SEO-optimized, high-conversion Etsy product title for a physical canvas wall art print based on this image.
 
-      const response = await fetch("/api/ai/generate-etsy-title", {
+FOCUS KEYWORD: "${titleInput.trim()}"
+
+REQUIREMENTS:
+- Maximum 140 characters
+- MUST include the focus keyword: "${titleInput.trim()}"
+- Include primary keyword: "canvas wall art" or "wall decor"
+- Include 2-3 relevant style descriptors (modern, minimalist, abstract, etc.)
+- Include room/space keywords (living room, bedroom, office, etc.)
+- Must be in English
+- Focus on physical canvas prints, not digital downloads
+
+OUTPUT FORMAT:
+Return only the title, no quotes, no explanations.`
+      };
+      
+      formData.append("customPrompts", JSON.stringify(customPrompts));
+
+      const response = await fetch("/api/ai/analyze-and-generate", {
         method: "POST",
         body: formData,
       });
@@ -1601,6 +1716,16 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
         setTitle(cleanTitle(data.title.trim()));
         setFocusStatus("Başarılı!");
         setAutoTitleUsed(true);
+        
+        // Etiketleri de ayarla
+        if (data.tags && Array.isArray(data.tags)) {
+          setTags(data.tags.slice(0, 13));
+        }
+        
+        // Kategoriyi de ayarla
+        if (data.suggestedCategoryId) {
+          setSelectedShopSection(data.suggestedCategoryId.toString());
+        }
       } else {
         throw new Error("Başlık üretilemedi");
       }
@@ -1675,7 +1800,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       if (submitting) return;
 
       // Basit validasyon kontrolü
-      if (!title || !shippingProfileId || productImages.length === 0) {
+      if (!title || !shippingProfileId || (productImages || []).length === 0) {
         toast({
           variant: "destructive",
           title: "⚠️ Eksik Bilgiler",
@@ -1693,7 +1818,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       handleSubmit("draft");
       setPressedKeys(new Set()); // Tuşları sıfırla
     }
-  }, [pressedKeys, isOpen, submitting, title, shippingProfileId, productImages.length]);
+  }, [pressedKeys, isOpen, submitting, title, shippingProfileId, (productImages || []).length]);
 
   return (
     <>
@@ -1725,7 +1850,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
               </div>
               <button
                 onClick={() => setToastMessages(prev => prev.filter(t => t.id !== toast.id))}
-                className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600"
+                className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-800"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1754,7 +1879,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
               <DialogTitle className="flex items-center justify-between">
                 <span>{product ? `Ürünü Düzenle: ${product.title}` : "Yeni Ürün Ekle"}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">İlerleme:</span>
+                  <span className="text-sm text-gray-700">İlerleme:</span>
                   <div className="w-32 bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-300"
@@ -1783,9 +1908,9 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                         {currentStep > step.id ? '✓' : step.icon}
                       </div>
                       <div className="mt-1 text-xs font-medium">{step.name}</div>
-                      <div className="text-xs text-gray-500 max-w-20 text-center">{step.description}</div>
+                      <div className="text-xs text-gray-700 max-w-20 text-center">{step.description}</div>
                     </div>
-                    {index < steps.length - 1 && (
+                    {index < (steps || []).length - 1 && (
                       <div className={`w-16 h-0.5 mx-2 transition-all ${
                         currentStep > step.id ? 'bg-blue-500' : 'bg-gray-300'
                       }`}></div>
@@ -1809,7 +1934,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                           🎬 Video Eklemeyi Unutmayın!
                         </h4>
                         <p className="text-sm text-blue-700 mb-3">
-                          {productImages.length} resminiz var ama video yok. Video eklemek ürününüzün satış şansını artırır!
+                          {(productImages || []).length} resminiz var ama video yok. Video eklemek ürününüzün satış şansını artırır!
                         </p>
                         <div className="flex gap-2">
                           <Button
@@ -1858,9 +1983,20 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                   <h3 className="text-lg font-medium">Temel Bilgiler</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="col-span-2">
-                      <Label htmlFor="title" className="block mb-1">
-                        Başlık <span className="text-red-500">*</span>
-                      </Label>
+                      <div className="flex items-center justify-between mb-1">
+                        <Label htmlFor="title" className="block">
+                          Başlık <span className="text-red-500">*</span>
+                        </Label>
+                        <PromptEditor 
+                          promptId="title-prompt" 
+                          onPromptUpdate={() => {
+                            // Re-generate title with new prompt if image exists
+                            if (productImages.length > 0 && !userEditedTitle) {
+                              generateTitleOnly();
+                            }
+                          }}
+                        />
+                      </div>
                       <div className="flex-1 flex gap-2 items-center">
                         <Input
                           id="title"
@@ -1871,8 +2007,8 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                           maxLength={160}
                         />
                         {/* Karakter sayacı */}
-                        <span className={`text-xs ${title.length > 140 ? 'text-red-500 font-medium' : 'text-gray-500'}`}>
-                          {title.length}/140 {title.length > 140 && `(+${title.length - 140})`}
+                        <span className={`text-xs ${(title || '').length > 140 ? 'text-red-500 font-medium' : 'text-gray-700'}`}>
+                          {(title || '').length}/140 {(title || '').length > 140 && `(+${(title || '').length - 140})`}
                         </span>
                         <Button
                           type="button"
@@ -1983,7 +2119,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                           >
                             {autoDescriptionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                           </Button>
-                          <span className="text-xs text-gray-500">Rastgele Açıklama İste</span>
+                          <span className="text-xs text-gray-700">Rastgele Açıklama İste</span>
                         </div>
                       </div>
                     </div>
@@ -2012,10 +2148,16 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                       <Select
                         value={selectedShopSection}
                         onValueChange={handleShopSectionChange}
-                        disabled={shopSections.length === 0}
+                        disabled={loadingShopSections || (shopSections || []).length === 0}
                       >
                         <SelectTrigger id="shopSection">
-                          <SelectValue placeholder="Bir kategori seçin..." />
+                          <SelectValue placeholder={
+                            loadingShopSections 
+                              ? "Kategoriler yükleniyor..." 
+                              : (shopSections || []).length === 0
+                              ? "Kategori bulunamadı"
+                              : "Bir kategori seçin..."
+                          } />
                         </SelectTrigger>
                         <SelectContent>
                           {shopSections.map(section => (
@@ -2039,9 +2181,20 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                   <h3 className="text-lg font-medium">Etiketler & Malzemeler</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <Label className="block mb-2">
-                        Etiketler <span className="text-gray-500 text-sm">(0-13)</span>
-                      </Label>
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="block">
+                          Etiketler <span className="text-gray-700 text-sm">(0-13)</span>
+                        </Label>
+                        <PromptEditor 
+                          promptId="tags-prompt"
+                          onPromptUpdate={() => {
+                            // Re-generate tags with new prompt if title exists
+                            if (title) {
+                              // Call tags generation function here if needed
+                            }
+                          }}
+                        />
+                      </div>
                       <div className="flex items-center gap-2">
                         <Input
                           value={newTag}
@@ -2085,7 +2238,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                         >
                           {autoTagsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TagIcon className="w-4 w-4" />}
                         </Button>
-                        <span className="text-xs text-gray-500 ml-1">Yeni Etiket İste</span>
+                        <span className="text-xs text-gray-700 ml-1">Yeni Etiket İste</span>
                       </div>
                       {autoTagsLoading && (
                         <div className="text-xs text-blue-500 mt-1">Başlığa göre etiketler üretiliyor...</div>
@@ -2096,8 +2249,8 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                       {tags.map((tag, index) => (
                         <Badge key={index} className="px-3 py-1 flex items-center gap-1">
                           <span>{tag}</span>
-                          <span className="ml-1 text-xs" style={{ color: tag.length > 20 ? '#dc2626' : '#6b7280' }}>
-                            ({tag.length})
+                          <span className="ml-1 text-xs" style={{ color: (tag || '').length > 20 ? '#dc2626' : '#6b7280' }}>
+                            ({(tag || '').length})
                           </span>
                           <X 
                             className="h-3 w-3 cursor-pointer ml-1" 
@@ -2106,8 +2259,8 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                         </Badge>
                       ))}
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {tags.length}/13 etiket eklendi
+                    <p className="text-sm text-gray-700 mt-1">
+                      {(tags || []).length}/13 etiket eklendi
                     </p>
                   </div>
                 </div>
@@ -2119,7 +2272,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                   <Label className="block mb-2">
                     Malzemeler
                   </Label>
-                  <div className="text-sm text-gray-600 bg-gray-100 p-2 rounded border border-gray-200">
+                  <div className="text-sm text-gray-800 bg-gray-100 p-2 rounded border border-gray-200">
                     <p>Bu ürün için kullanılan malzemeler:</p>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {DEFAULT_MATERIALS.map((material, i) => (
@@ -2144,13 +2297,13 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
                       <Select
                         value={shippingProfileId}
                         onValueChange={setShippingProfileId}
-                        disabled={loadingShippingProfiles || shippingProfiles.length === 0}
+                        disabled={loadingShippingProfiles || (shippingProfiles || []).length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder={
                             loadingShippingProfiles
                               ? "Kargo profilleri yükleniyor..."
-                              : shippingProfiles.length === 0
+                              : (shippingProfiles || []).length === 0
                               ? "Kargo profili bulunamadı"
                               : "Kargo profili seçin"
                           } />
@@ -2302,3 +2455,5 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     </>
   );
 }
+
+export default ProductFormModal;

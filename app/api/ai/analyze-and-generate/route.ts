@@ -1,0 +1,174 @@
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+import { getPromptById } from '@/lib/prompts';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    console.log('🚀 Unified AI analysis başlatılıyor...');
+    
+    // FormData'dan image ve diğer parametreleri al
+    const formData = await request.formData();
+    const imageFile = formData.get('image') as File;
+    const availableCategories = JSON.parse(formData.get('categories') as string || '[]');
+    const customPrompts = JSON.parse(formData.get('customPrompts') as string || '{}');
+    
+    if (!imageFile) {
+      return NextResponse.json({ error: 'Image file is required' }, { status: 400 });
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+    }
+
+    // Image'ı base64'e çevir
+    const buffer = await imageFile.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+    const imageDataUrl = `data:${imageFile.type};base64,${base64}`;
+
+    console.log('📸 Resim işlendi, AI analizi başlıyor...');
+
+    // Prompt'ları al (custom veya default)
+    const titlePromptConfig = getPromptById('title-prompt');
+    const titlePrompt = customPrompts.title || titlePromptConfig?.prompt || `
+TASK: Generate a single, SEO-optimized, high-conversion Etsy product title for a physical canvas wall art print based on this image.
+
+REQUIREMENTS:
+- Maximum 140 characters
+- Include primary keyword: "canvas wall art" or "wall decor"
+- Include 2-3 relevant style descriptors (modern, minimalist, abstract, etc.)
+- Include room/space keywords (living room, bedroom, office, etc.)
+- Must be in English
+- Focus on physical canvas prints, not digital downloads
+
+OUTPUT FORMAT:
+Return only the title, no quotes, no explanations.
+`;
+
+    // Unified prompt - tek çağrıda her şeyi al
+    const unifiedPrompt = `
+TASK: Analyze this image and generate complete Etsy listing data for a canvas wall art print.
+
+IMAGE ANALYSIS PROMPT:
+${titlePrompt}
+
+ADDITIONAL REQUIREMENTS:
+After generating the title, also provide:
+
+1. TAGS: Generate exactly 13 SEO-optimized Etsy tags based on the title
+   - Each tag maximum 20 characters
+   - Include: wall art, canvas print, style keywords, room keywords
+   - Format: comma-separated lowercase
+
+2. CATEGORY: Select the best category from these options:
+   ${availableCategories.map((cat: any) => `- ${cat.title}`).join('\n   ')}
+   
+3. ANALYSIS: Brief description of what you see in the image
+
+OUTPUT FORMAT (JSON):
+{
+  "title": "Your generated title here",
+  "tags": ["tag1", "tag2", "tag3", ...],
+  "suggestedCategory": "Category Name",
+  "imageAnalysis": "Brief description of the image",
+  "dominantColors": ["color1", "color2", "color3"],
+  "detectedStyle": ["style1", "style2"]
+}
+
+Return only valid JSON, no explanations.
+`;
+
+    // OpenAI'ye tek çağrı yap
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: unifiedPrompt
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: imageDataUrl,
+                detail: "low"
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const aiResult = response.choices[0]?.message?.content?.trim();
+    console.log('🤖 AI yanıtı alındı:', aiResult);
+
+    if (!aiResult) {
+      throw new Error('AI yanıt vermedi');
+    }
+
+    // JSON parse et
+    let parsedResult;
+    try {
+      parsedResult = JSON.parse(aiResult);
+    } catch (parseError) {
+      console.error('JSON parse hatası:', parseError);
+      // Fallback: Basit parsing
+      parsedResult = {
+        title: "Beautiful Canvas Wall Art Print - Modern Home Decor",
+        tags: ["wall art", "canvas print", "home decor", "modern art", "wall decoration", "living room", "bedroom art", "office decor", "abstract art", "contemporary", "minimalist", "housewarming", "gift idea"],
+        suggestedCategory: availableCategories[0]?.title || "Modern Art",
+        imageAnalysis: "Canvas wall art image",
+        dominantColors: ["blue", "white", "gray"],
+        detectedStyle: ["modern", "abstract"]
+      };
+    }
+
+    // Kategori ID'sini bul
+    const selectedCategory = availableCategories.find((cat: any) => 
+      cat.title.toLowerCase() === parsedResult.suggestedCategory?.toLowerCase()
+    );
+
+    const result = {
+      title: parsedResult.title || "Beautiful Canvas Wall Art Print - Modern Home Decor",
+      tags: Array.isArray(parsedResult.tags) ? parsedResult.tags.slice(0, 13) : [],
+      suggestedCategory: parsedResult.suggestedCategory || availableCategories[0]?.title,
+      suggestedCategoryId: selectedCategory?.shop_section_id || null,
+      imageAnalysis: parsedResult.imageAnalysis || "Canvas wall art image",
+      dominantColors: parsedResult.dominantColors || [],
+      detectedStyle: parsedResult.detectedStyle || [],
+      processingTime: Date.now(),
+      success: true
+    };
+
+    console.log('✅ Unified AI analizi tamamlandı:', {
+      title: result.title.substring(0, 50) + '...',
+      tagCount: result.tags.length,
+      category: result.suggestedCategory
+    });
+
+    return NextResponse.json(result);
+
+  } catch (error) {
+    console.error('❌ Unified AI analysis hatası:', error);
+    
+    // Fallback response
+    return NextResponse.json({
+      title: "Beautiful Canvas Wall Art Print - Modern Home Decor",
+      tags: ["wall art", "canvas print", "home decor", "modern art", "wall decoration", "living room", "bedroom art", "office decor", "abstract art", "contemporary", "minimalist", "housewarming", "gift idea"],
+      suggestedCategory: "Modern Art",
+      suggestedCategoryId: null,
+      imageAnalysis: "Unable to analyze image",
+      dominantColors: [],
+      detectedStyle: [],
+      error: error instanceof Error ? error.message : 'Analysis failed',
+      success: false
+    });
+  }
+}

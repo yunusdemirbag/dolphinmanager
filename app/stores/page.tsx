@@ -37,7 +37,7 @@ export default async function StoresPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-black">Mağazalar</h1>
-        <p className="text-gray-600">Bağlı Etsy mağazanızı yönetin</p>
+        <p className="text-gray-800">Bağlı Etsy mağazanızı yönetin</p>
       </div>
       <StoreClientPage store={augmentedStore} />
     </div>

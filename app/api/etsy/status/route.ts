@@ -56,6 +56,7 @@ export async function GET() {
                   console.error('Etsy API bağlantı hatası:', response.status);
                   return NextResponse.json({
                     isConnected: false,
+                    store: shopId ? { shop_id: parseInt(shopId), shop_name: shopName } : null,
                     shopId: shopId,
                     shopName: shopName,
                     error: `Etsy API hatası: ${response.status}`
@@ -68,6 +69,10 @@ export async function GET() {
                 // Başarılı bağlantı
                 return NextResponse.json({
                   isConnected: true,
+                  store: {
+                    shop_id: data.shop_id,
+                    shop_name: data.shop_name
+                  },
                   shopId: data.shop_id.toString(),
                   shopName: data.shop_name,
                   shopData: data
@@ -78,6 +83,7 @@ export async function GET() {
                 
                 return NextResponse.json({
                   isConnected: false,
+                  store: shopId ? { shop_id: parseInt(shopId), shop_name: shopName } : null,
                   shopId: shopId,
                   shopName: shopName,
                   error: `Etsy API bağlantı hatası: ${errorMessage}`
@@ -100,6 +106,7 @@ export async function GET() {
     // API bilgileri tam değilse, bağlantı yok demektir
     return NextResponse.json({
       isConnected: false,
+      store: null,
       shopId: null,
       shopName: null,
       error: 'Etsy bağlantısı bulunamadı'
@@ -111,6 +118,7 @@ export async function GET() {
     
     return NextResponse.json({
       isConnected: false,
+      store: null,
       shopId: null,
       shopName: null,
       error: `Bağlantı durumu kontrol edilemedi: ${errorMessage}`

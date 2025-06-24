@@ -69,6 +69,13 @@ export async function POST(request: Request) {
 
     const tokenData = await tokenResponse.json();
     console.log('✅ Yeni token alındı');
+    console.log('🔍 Etsy API token detayları:', {
+      expires_in: tokenData.expires_in,
+      expires_in_minutes: Math.round(tokenData.expires_in / 60),
+      expires_in_hours: Math.round(tokenData.expires_in / 3600),
+      calculated_expiry: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+      current_time: new Date().toISOString()
+    });
 
     // Yeni token'ları Firebase'e kaydet
     const updatedApiKeysData = {

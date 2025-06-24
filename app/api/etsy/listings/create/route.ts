@@ -27,7 +27,9 @@ export async function POST(request: NextRequest) {
       title: listingData.title,
       state: listingData.state,
       hasImages: !!(listingData.images),
-      hasVideo: !!(listingData.video || listingData.videoUrl)
+      hasVideo: !!(listingData.video || listingData.videoUrl),
+      has_variations: listingData.has_variations,
+      variation_count: listingData.variations?.length || 0
     });
     
     // Firebase Admin'i initialize et
@@ -36,19 +38,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not initialized' }, { status: 500 });
     }
     
-    // Kullanıcının Etsy credentials'ını al
+    // Kullanıcının Etsy credentials'ını al - Doğru koleksiyonları kullan
     const userId = 'local-user-123'; // Bu gerçek auth context'den gelecek
-    const userDoc = await adminDb.collection('etsy_users').doc(userId).get();
     
-    if (!userDoc.exists) {
+    // Aktif mağazayı bul
+    const storesSnapshot = await adminDb
+      .collection('etsy_stores')
+      .where('user_id', '==', userId)
+      .where('is_active', '==', true)
+      .get();
+    
+    if (storesSnapshot.empty) {
       return NextResponse.json({ 
         error: 'Etsy hesabınız bağlı değil', 
         code: 'NO_ETSY_TOKEN' 
       }, { status: 400 });
     }
     
-    const userData = userDoc.data()!;
-    const { shop_id, access_token, api_key } = userData;
+    const storeDoc = storesSnapshot.docs[0];
+    const storeData = storeDoc.data();
+    const shop_id = storeDoc.id; // Shop ID document ID olarak saklanıyor
+    
+    // API anahtarlarını al
+    const apiKeysDoc = await adminDb.collection('etsy_api_keys').doc(shop_id).get();
+    
+    if (!apiKeysDoc.exists) {
+      return NextResponse.json({ 
+        error: 'Etsy token bilgileri bulunamadı', 
+        code: 'NO_API_KEYS' 
+      }, { status: 400 });
+    }
+    
+    const apiKeysData = apiKeysDoc.data()!;
+    const { access_token, api_key } = apiKeysData;
     
     if (!access_token || !api_key) {
       return NextResponse.json({ 
@@ -57,7 +79,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    console.log('🔑 Etsy credentials alındı, shop_id:', shop_id);
+    console.log('🔑 Etsy credentials alındı, shop_id:', shop_id, 'shop_name:', storeData.shop_name);
     
     // Görselleri FormData'dan al
     const imageFiles: File[] = [];
@@ -80,17 +102,87 @@ export async function POST(request: NextRequest) {
     etsyFormData.append('quantity', listingData.quantity.toString());
     etsyFormData.append('title', listingData.title);
     etsyFormData.append('description', listingData.description);
-    etsyFormData.append('price', listingData.price.toString());
+    // Price kontrolü - Variation kullanıyorsak base price'ı en düşük variation'dan al
+    let finalPrice = 29.99; // Fallback price
+    
+    if (listingData.has_variations && listingData.variations?.length > 0) {
+      // Variation kullanıyorsa en düşük variation price'ını base price yap
+      const activePrices = listingData.variations
+        .filter((v: any) => v.is_active && v.price > 0)
+        .map((v: any) => v.price);
+      
+      if (activePrices.length > 0) {
+        finalPrice = Math.min(...activePrices);
+      }
+      console.log('📊 Variation price sistemi:', {
+        active_variations: activePrices.length,
+        min_price: finalPrice,
+        all_prices: activePrices
+      });
+    } else {
+      // Variation yoksa user input price'ını kullan
+      finalPrice = listingData.price && listingData.price > 0 ? listingData.price : 29.99;
+    }
+    
+    etsyFormData.append('price', finalPrice.toString());
     etsyFormData.append('who_made', listingData.who_made);
     etsyFormData.append('when_made', listingData.when_made);
     etsyFormData.append('taxonomy_id', listingData.taxonomy_id.toString());
     etsyFormData.append('shipping_profile_id', listingData.shipping_profile_id.toString());
-    etsyFormData.append('return_policy_id', listingData.return_policy_id?.toString() || '');
-    etsyFormData.append('materials', JSON.stringify(['Cotton Canvas', 'Wood Frame', 'Hanger']));
-    etsyFormData.append('shop_section_id', listingData.shop_section_id?.toString() || '');
+    // return_policy_id sadece varsa ekle (Etsy integer bekliyor)
+    if (listingData.return_policy_id && listingData.return_policy_id !== '') {
+      etsyFormData.append('return_policy_id', listingData.return_policy_id.toString());
+    }
+    // Etsy Materials Temizleme Fonksiyonu - BOŞLUK YOK!
+    function cleanEtsyMaterials(materials: string[]): string[] {
+      return materials
+        .filter(material => material && material.trim().length > 0)
+        .map(material => material
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '') // TÜM BOŞLUKLARI KALDIR
+          .replace(/[^a-z0-9]/g, '') // Sadece alfanumerik
+        )
+        .filter(material => material.length >= 2)
+        .slice(0, 13); // Etsy maksimum 13 material
+    }
+    
+    // TEST: Materials'ı tamamen kaldır
+    // etsyFormData.append('materials', JSON.stringify(['canvas'])); // Commented out
+    // shop_section_id sadece varsa ekle (Etsy integer bekliyor)
+    if (listingData.shop_section_id && listingData.shop_section_id !== '') {
+      etsyFormData.append('shop_section_id', listingData.shop_section_id.toString());
+    }
     etsyFormData.append('processing_min', '1');
     etsyFormData.append('processing_max', '3');
-    etsyFormData.append('tags', JSON.stringify(listingData.tags));
+    // Etsy Tags Temizleme Fonksiyonu - BOŞLUK YOK!
+    function cleanEtsyTags(tags: string[]): string[] {
+      return tags
+        .filter(tag => tag && tag.trim().length > 0)
+        .map(tag => tag
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '') // TÜM BOŞLUKLARI KALDIR
+          .replace(/[^a-z0-9]/g, '') // Sadece alfanumerik
+        )
+        .filter(tag => tag.length >= 2 && tag.length <= 20) // Etsy tag limiti
+        .slice(0, 13); // Maksimum 13 tag
+    }
+    
+    // TEST: Tag'ları tamamen kaldır
+    const cleanTags = []; // Boş array
+    // etsyFormData.append('tags', JSON.stringify(['art'])); // Commented out
+    
+    console.log('🧹 Temizlenmiş veriler:', {
+      original_price: listingData.price,
+      final_price: finalPrice,
+      original_tags_count: listingData.tags?.length,
+      clean_tags_count: cleanTags.length,
+      clean_tags: cleanTags,
+      clean_materials: [],
+      original_tags: listingData.tags,
+      test_mode: 'NO_TAGS_NO_MATERIALS'
+    });
     etsyFormData.append('is_personalizable', listingData.is_personalizable.toString());
     etsyFormData.append('personalization_is_required', listingData.personalization_is_required.toString());
     etsyFormData.append('personalization_char_count_max', listingData.personalization_char_count_max.toString());
@@ -98,7 +190,7 @@ export async function POST(request: NextRequest) {
     etsyFormData.append('is_supply', listingData.is_supply.toString());
     etsyFormData.append('is_customizable', 'true');
     etsyFormData.append('should_auto_renew', listingData.renewal_option === 'automatic' ? 'true' : 'false');
-    etsyFormData.append('state', listingData.state); // draft veya active
+    etsyFormData.append('state', 'draft'); // Her zaman draft olarak başla, sonra resim ekleyip activate ederiz
     
     // Varyasyonları ekle
     if (listingData.has_variations && listingData.variations?.length > 0) {
@@ -112,27 +204,30 @@ export async function POST(request: NextRequest) {
       etsyFormData.append('inventory', JSON.stringify(variations));
     }
     
-    // Resimleri ekle
-    if (imageFiles.length > 0) {
-      console.log('📷 Resimler ekleniyor, toplam:', imageFiles.length);
-      imageFiles.forEach((imageFile, index) => {
-        console.log(`📷 Resim ${index + 1}:`, imageFile.name, (imageFile.size / 1024 / 1024).toFixed(2), 'MB');
-        etsyFormData.append(`image`, imageFile);
-      });
-    }
+    // NOT: Resimler ayrı endpoint'e upload edilecek - burada eklenmez
     
     // Video ekle (eğer varsa)
     if (listingData.videoUrl) {
       etsyFormData.append('video_url', listingData.videoUrl);
     }
     
-    console.log('📤 Etsy API\'sine gönderiliyor...');
+    console.log('📤 ADIM 1: Draft listing oluşturuluyor...');
     console.log('⏰ Başlangıç zamanı:', new Date().toISOString());
-    console.log('📋 Listing state:', listingData.state);
-    console.log('📋 Image count:', imageFiles.length);
+    console.log('📋 Listing state:', 'draft'); // Her zaman draft olarak başla
+    console.log('📋 Sonra upload edilecek resim sayısı:', imageFiles.length);
     console.log('📋 Video URL:', !!listingData.videoUrl);
     console.log('📋 API URL:', etsyListingUrl);
     console.log('📋 Form data keys:', Array.from(etsyFormData.keys()));
+    
+    // Debug: Gönderilen tüm verileri log'la
+    console.log('🔍 Gönderilen veriler detayı:');
+    for (const [key, value] of etsyFormData.entries()) {
+      if (key === 'image') {
+        console.log(`  ${key}: [File: ${value.name}, ${(value.size / 1024).toFixed(1)}KB]`);
+      } else {
+        console.log(`  ${key}: ${typeof value === 'string' ? value.slice(0, 100) : value}`);
+      }
+    }
     
     const startTime = Date.now();
     
@@ -163,15 +258,102 @@ export async function POST(request: NextRequest) {
       console.log('📋 Response data keys:', Object.keys(etsyResult));
       
       if (!etsyResponse.ok) {
-        console.error('❌ Etsy API hatası:', etsyResult);
+        console.error('❌ Etsy API hatası:', {
+          status: etsyResponse.status,
+          statusText: etsyResponse.statusText,
+          response_body: etsyResult,
+          sent_data_keys: Array.from(etsyFormData.keys())
+        });
+        
+        // Detaylı hata mesajı
+        let errorMessage = 'Unknown error';
+        if (Array.isArray(etsyResult)) {
+          // Error array format (validation errors)
+          errorMessage = etsyResult.map(err => `${err.path}: ${err.message}`).join(', ');
+        } else if (etsyResult.error) {
+          errorMessage = etsyResult.error;
+        } else if (etsyResult.message) {
+          errorMessage = etsyResult.message;
+        }
+        
         return NextResponse.json({
-          error: `Etsy API Error: ${etsyResult.error || 'Unknown error'}`,
+          error: `Etsy API Error: ${errorMessage}`,
           details: etsyResult,
-          code: 'ETSY_API_ERROR'
+          code: 'ETSY_API_ERROR',
+          status: etsyResponse.status
         }, { status: etsyResponse.status });
       }
     
-    console.log('✅ Etsy listing oluşturuldu:', etsyResult.listing_id);
+    console.log('✅ ADIM 1 tamamlandı - Draft listing oluşturuldu:', etsyResult.listing_id);
+    console.log('📋 Etsy listing URL:', etsyResult.url);
+    
+    // ADIM 2: Resimleri upload et
+    let uploadedImageCount = 0;
+    if (imageFiles.length > 0) {
+      console.log(`📤 ADIM 2: ${imageFiles.length} resim upload ediliyor...`);
+      
+      for (let i = 0; i < imageFiles.length; i++) {
+        const imageFile = imageFiles[i];
+        console.log(`📷 Resim ${i + 1}/${imageFiles.length} upload ediliyor:`, imageFile.name, (imageFile.size / 1024 / 1024).toFixed(2), 'MB');
+        
+        try {
+          const imageFormData = new FormData();
+          imageFormData.append('image', imageFile);
+          
+          const imageUploadUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${etsyResult.listing_id}/images`;
+          
+          const imageResponse = await fetch(imageUploadUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${access_token}`,
+              'x-api-key': api_key,
+            },
+            body: imageFormData,
+          });
+          
+          if (imageResponse.ok) {
+            const imageResult = await imageResponse.json();
+            uploadedImageCount++;
+            console.log(`✅ Resim ${i + 1} başarıyla upload edildi:`, imageResult.listing_image_id);
+          } else {
+            const errorText = await imageResponse.text();
+            console.error(`❌ Resim ${i + 1} upload hatası:`, imageResponse.status, errorText);
+          }
+        } catch (imageError) {
+          console.error(`❌ Resim ${i + 1} upload exception:`, imageError);
+        }
+      }
+      
+      console.log(`📊 Resim upload özeti: ${uploadedImageCount}/${imageFiles.length} başarılı`);
+    }
+    
+    // ADIM 3: Eğer kullanıcı active olarak kaydetmek istiyorsa activate et
+    if (listingData.state === 'active' && uploadedImageCount > 0) {
+      console.log('📤 ADIM 3: Listing aktif hale getiriliyor...');
+      
+      try {
+        const activateFormData = new FormData();
+        activateFormData.append('state', 'active');
+        
+        const activateResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${etsyResult.listing_id}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'x-api-key': api_key,
+          },
+          body: activateFormData,
+        });
+        
+        if (activateResponse.ok) {
+          console.log('✅ Listing başarıyla aktif hale getirildi');
+        } else {
+          const errorText = await activateResponse.text();
+          console.error('❌ Listing aktifleştirme hatası:', activateResponse.status, errorText);
+        }
+      } catch (activateError) {
+        console.error('❌ Listing aktifleştirme exception:', activateError);
+      }
+    }
     
     // Firebase'e başarılı listing'i kaydet
     await adminDb.collection('etsy_listings').doc(etsyResult.listing_id.toString()).set({
@@ -188,7 +370,9 @@ export async function POST(request: NextRequest) {
       success: true,
       listing_id: etsyResult.listing_id,
       listing: etsyResult,
-      message: `Listing ${listingData.state === 'draft' ? 'taslak olarak' : 'aktif olarak'} oluşturuldu!`
+      uploaded_images: uploadedImageCount,
+      final_state: listingData.state === 'active' && uploadedImageCount > 0 ? 'active' : 'draft',
+      message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim yüklendi, durum: ${listingData.state === 'active' && uploadedImageCount > 0 ? 'aktif' : 'taslak'}`
     });
     
     } catch (fetchError) {

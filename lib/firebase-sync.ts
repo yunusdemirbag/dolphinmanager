@@ -498,11 +498,15 @@ export async function getConnectedStoreFromFirebaseAdmin(userId: string): Promis
     const storeDoc = querySnapshot.docs[0];
     const storeData = storeDoc.data() as EtsyStore;
     
+    // Firebase Timestamp'leri JavaScript Date'e çevir
     if (storeData.connected_at && typeof (storeData.connected_at as any).toDate === 'function') {
         storeData.connected_at = (storeData.connected_at as any).toDate();
     }
-     if (storeData.last_sync_at && typeof (storeData.last_sync_at as any).toDate === 'function') {
+    if (storeData.last_sync_at && typeof (storeData.last_sync_at as any).toDate === 'function') {
         storeData.last_sync_at = (storeData.last_sync_at as any).toDate();
+    }
+    if ((storeData as any).last_token_refresh && typeof ((storeData as any).last_token_refresh as any).toDate === 'function') {
+        (storeData as any).last_token_refresh = ((storeData as any).last_token_refresh as any).toDate();
     }
 
     return storeData;

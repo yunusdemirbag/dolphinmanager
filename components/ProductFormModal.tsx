@@ -1103,8 +1103,8 @@ export function ProductFormModal({
     try {
       // Başlangıç toast mesajı
       toast({ 
-        title: "🚀 Ürün yükleniyor...", 
-        description: "Lütfen bekleyin, ürün Etsy'e yükleniyor." 
+        title: "🚀 Etsy'e gönderiliyor...", 
+        description: `"${title}" taslak olarak yükleniyor... (Max 15 saniye)` 
       });
       
       const formData = new FormData();
@@ -1113,11 +1113,11 @@ export function ProductFormModal({
         // Formdan gelen dinamik değerler
         title,
         description,
-        price,
+        price: 29.99, // TEST: Sabit price
         shipping_profile_id: Number(shippingProfileId),
         tags,
-        has_variations: hasVariations,
-        variations: hasVariations ? variations.filter((v: any) => v.is_active) : [],
+        has_variations: false, // TEST: Variation'sız dene
+        variations: [], // Boş variation array
         state: state, // Buton tarafından belirlenen durum (draft veya active)
         shop_section_id: Number(selectedShopSection) || undefined,
         
@@ -1185,10 +1185,20 @@ export function ProductFormModal({
         formData.append('videoFile', videoFile.file);
       }
 
+      // Timeout controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        console.error('⏰ Request timeout - 15 seconds');
+      }, 15000); // 15 saniye timeout
+      
       const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       const result = await response.json();
       
@@ -1221,8 +1231,14 @@ export function ProductFormModal({
     } catch (error: any) {
       console.error('Ürün oluşturma hatası:', error);
       
-      // Etsy bağlantı hatası için özel mesaj
-      if (error.message && error.message.includes('Etsy')) {
+      // Timeout hatası kontrolü
+      if (error.name === 'AbortError') {
+        toast({ 
+          variant: "destructive", 
+          title: "⏰ Zaman Aşımı", 
+          description: "İşlem 15 saniyede tamamlanamadı. Lütfen tekrar deneyin."
+        });
+      } else if (error.message && error.message.includes('Etsy')) {
         toast({ 
           variant: "destructive", 
           title: "❌ Etsy Bağlantı Hatası", 
@@ -2433,6 +2449,33 @@ Return only the title, no quotes, no explanations.`
                     ) : (
                       "📋 Kuyrukta Gönder"
                     )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={async () => {
+                      // Debug test call
+                      const formData = new FormData();
+                      const testData = {
+                        title,
+                        description,
+                        price: 0,
+                        tags,
+                        has_variations: true,
+                        variations: variations.filter((v: any) => v.is_active),
+                        state: "draft"
+                      };
+                      formData.append('listingData', JSON.stringify(testData));
+                      
+                      const response = await fetch('/api/etsy/test-create', {
+                        method: 'POST',
+                        body: formData,
+                      });
+                      const result = await response.json();
+                      console.log('🧪 Test sonucu:', result);
+                      alert(JSON.stringify(result, null, 2));
+                    }}
+                  >
+                    🧪 Test
                   </Button>
                   <Button 
                     variant="secondary" 

@@ -1653,8 +1653,14 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
     }
   };
 
-  // Yeni focus başlık üretici fonksiyon
+  // Focus başlık üretici fonksiyon - geliştirildi
   const handleFocusTitle = async () => {
+    console.log('🎯 Focus başlık üretimi başlatılıyor...', {
+      titleInput: titleInput.trim(),
+      hasImage: (productImages || []).length > 0,
+      imageFile: !!(productImages || [])[0]?.file
+    });
+    
     if (!titleInput.trim() || (productImages || []).length === 0 || !(productImages || [])[0]?.file) {
       toast({
         variant: "destructive",
@@ -1696,28 +1702,48 @@ Return only the title, no quotes, no explanations.`
       
       formData.append("customPrompts", JSON.stringify(customPrompts));
 
+      console.log('📤 Focus için API çağrısı yapılıyor...');
       const response = await fetch("/api/ai/analyze-and-generate", {
         method: "POST",
         body: formData,
       });
 
+      console.log('📥 Focus API yanıtı alındı:', response.status, response.ok);
       const data = await response.json();
+      console.log('📋 Focus API data:', data);
+      
+      if (data.success === false || data.error) {
+        console.error('❌ Focus API Error:', data.error);
+        setFocusStatus("API Hatası!");
+        toast({ 
+          variant: "destructive", 
+          title: "Focus AI Hatası", 
+          description: data.error || "Focus başlık üretilemedi" 
+        });
+        return;
+      }
       
       if (data.title) {
-        setTitle(cleanTitle(data.title.trim()));
+        const generatedTitle = cleanTitle(data.title.trim());
+        console.log('✅ Focus başlık üretildi:', generatedTitle);
+        setTitle(generatedTitle);
         setFocusStatus("Başarılı!");
         setAutoTitleUsed(true);
         
         // Etiketleri de ayarla
         if (data.tags && Array.isArray(data.tags)) {
           setTags(data.tags.slice(0, 13));
+          console.log('✅ Focus etiketler güncellendi:', data.tags.length);
         }
         
         // Kategoriyi de ayarla
         if (data.suggestedCategoryId) {
           setSelectedShopSection(data.suggestedCategoryId.toString());
+          console.log('✅ Focus kategori güncellendi:', data.suggestedCategoryId);
         }
       } else {
+        console.log('❌ Focus API\'den başlık alınamadı');
+        setFocusStatus("Başlık bulunamadı!");
         throw new Error("Başlık üretilemedi");
       }
 
@@ -2227,7 +2253,7 @@ Return only the title, no quotes, no explanations.`
                               if (data.text) {
                                 // Parse comma-separated tags
                                 const tagsText = data.text.trim();
-                                const parsedTags = tagsText.split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag.length > 0);
+                                const parsedTags = tagsText.split(',').map((tag: string) => tag.trim().toLowerCase()).filter((tag: string) => tag.length > 0);
                                 setTags(parsedTags.slice(0, 13));
                               } else if (data.error) {
                                 toast({ variant: "destructive", title: data.error });

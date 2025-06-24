@@ -286,8 +286,17 @@ async function addInventoryWithVariations(accessToken: string, listingId: number
                 const price = existingVariation?.price || 0;
                 const isEnabled = existingVariation?.is_active || false;
                 
-                // Validate price (Etsy maximum)
-                const finalPrice = Math.min(price, 50000);
+                // Validate price - Etsy minimum 0.20 USD, maximum 50000 USD
+                // If price is 0 or negative, set minimum price but mark as disabled
+                let finalPrice = price;
+                let finalEnabled = isEnabled;
+                
+                if (price <= 0) {
+                    finalPrice = 0.2; // Set minimum Etsy price
+                    finalEnabled = false; // Mark as disabled
+                } else {
+                    finalPrice = Math.min(Math.max(price, 0.2), 50000);
+                }
                 
                 allVariations.push({
                     property_values: [
@@ -306,7 +315,7 @@ async function addInventoryWithVariations(accessToken: string, listingId: number
                         {
                             price: finalPrice,
                             quantity: 4,
-                            is_enabled: isEnabled
+                            is_enabled: finalEnabled
                         }
                     ]
                 });

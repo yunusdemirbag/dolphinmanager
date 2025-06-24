@@ -2547,33 +2547,6 @@ Return only the title, no quotes, no explanations.`
                     )}
                   </Button>
                   <Button 
-                    variant="outline" 
-                    onClick={async () => {
-                      // Debug test call
-                      const formData = new FormData();
-                      const testData = {
-                        title,
-                        description,
-                        price: 0,
-                        tags,
-                        has_variations: true,
-                        variations: variations.filter((v: any) => v.is_active),
-                        state: "draft"
-                      };
-                      formData.append('listingData', JSON.stringify(testData));
-                      
-                      const response = await fetch('/api/etsy/test-create', {
-                        method: 'POST',
-                        body: formData,
-                      });
-                      const result = await response.json();
-                      console.log('🧪 Test sonucu:', result);
-                      alert(JSON.stringify(result, null, 2));
-                    }}
-                  >
-                    🧪 Test
-                  </Button>
-                  <Button 
                     variant="secondary" 
                     onClick={() => handleSubmit("draft")} 
                     disabled={submitting}

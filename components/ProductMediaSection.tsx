@@ -45,58 +45,10 @@ export function ProductMediaSection({
     const newImages: MediaFile[] = imageFiles.map(file => ({ file, preview: URL.createObjectURL(file) }));
     setProductImages(prev => [...(prev || []), ...newImages]);
 
-    // İlk resim yüklendiğinde otomatik içerik üretme
-    if (imageFiles.length > 0 && (productImages || []).length === 0) {
-      try {
-        setIsProcessing(true);
-        const firstImage = imageFiles[0];
-        const reader = new FileReader();
-        
-        reader.onload = async (e) => {
-          if (!e.target?.result) {
-            setIsProcessing(false);
-            return;
-          }
-          
-          // Base64 formatına dönüştür
-          const base64String = e.target.result.toString().split(',')[1];
-          const imageType = firstImage.type.split('/')[1];
-          
-          try {
-            // Tüm içeriği tek seferde oluştur
-            const response = await fetch('/api/ai/generate-all', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                imageBase64: base64String,
-                imageType
-              })
-            });
-            
-            if (!response.ok) {
-              throw new Error("İçerik oluşturulamadı");
-            }
-            
-            if (onImageUpload) {
-              await onImageUpload(firstImage);
-            }
-          } catch (error) {
-            console.error("İçerik üretme hatası:", error);
-          } finally {
-            setIsProcessing(false);
-          }
-        };
-        
-        reader.onerror = () => {
-          console.error("Resim okunamadı");
-          setIsProcessing(false);
-        };
-        
-        reader.readAsDataURL(firstImage);
-      } catch (error) {
-        console.error("İçerik üretme hatası:", error);
-        setIsProcessing(false);
-      }
+    // İlk resim yüklendiğinde parent component'i bilgilendir
+    if (imageFiles.length > 0 && (productImages || []).length === 0 && onImageUpload) {
+      // Parent component'in AI analizini tetiklemek için sadece dosyayı ilet
+      onImageUpload(imageFiles[0]);
     }
 
     if (videoFiles.length > 0) {

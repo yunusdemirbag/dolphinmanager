@@ -756,16 +756,81 @@ export function ProductFormModal({
 
   // Tag ekleme
   const handleAddTag = () => {
-    if (newTag && !tags.includes(newTag)) {
-      setTags([...tags, newTag]);
-      setNewTag("");
+    if (!newTag.trim()) return;
+    
+    const trimmedTag = newTag.trim();
+    
+    // Karakter sınırı kontrolü
+    if (trimmedTag.length > 20) {
+      toast({ 
+        variant: "destructive", 
+        title: "Etiket Çok Uzun", 
+        description: "Etiket 20 karakterden uzun olamaz" 
+      });
+      return;
     }
+    
+    // Duplicate kontrolü
+    if (tags.includes(trimmedTag)) {
+      toast({ 
+        variant: "destructive", 
+        title: "Tekrar Eden Etiket", 
+        description: "Bu etiket zaten ekli" 
+      });
+      return;
+    }
+    
+    // Maksimum limit kontrolü
+    if (tags.length >= 13) {
+      toast({ 
+        variant: "destructive", 
+        title: "Etiket Limiti", 
+        description: "Maksimum 13 etiket ekleyebilirsiniz" 
+      });
+      return;
+    }
+    
+    setTags([...tags, trimmedTag]);
+    setNewTag("");
   }
 
   // Tag silme
   const handleRemoveTag = (tagToRemove: string) => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   }
+
+  // Uzun etiketleri otomatik temizle
+  const cleanupLongTags = useCallback(() => {
+    const longTags = tags.filter(tag => tag.length > 20);
+    if (longTags.length > 0) {
+      const validTags = tags.filter(tag => tag.length <= 20);
+      setTags(validTags);
+      
+      toast({ 
+        variant: "default", 
+        title: "Uzun Etiketler Temizlendi", 
+        description: `${longTags.length} adet 20+ karakterlik etiket otomatik olarak silindi: ${longTags.slice(0,3).join(', ')}${longTags.length > 3 ? '...' : ''}` 
+      });
+      
+      if (validTags.length < 13) {
+        const neededTags = 13 - validTags.length;
+        setTimeout(() => {
+          toast({ 
+            variant: "default", 
+            title: "Ek Etiket Gerekli", 
+            description: `${neededTags} adet daha etiket eklemek için "Yeni Etiket İste" butonuna tıklayın.` 
+          });
+        }, 2000); // 2 saniye gecikme ile göster
+      }
+    }
+  }, [tags, toast]);
+
+  // Component açıldığında uzun etiketleri kontrol et
+  useEffect(() => {
+    if (isOpen && tags.length > 0) {
+      cleanupLongTags();
+    }
+  }, [isOpen, cleanupLongTags]);
 
   // Duplicate resim kontrolü - çok güçlü
   const isDuplicateImage = useCallback((newFile: File, existingImages: MediaFile[]) => {
@@ -2852,7 +2917,30 @@ Return only the title, no quotes, no explanations.`
                                 // Parse comma-separated tags
                                 const tagsText = data.text.trim();
                                 const parsedTags = tagsText.split(',').map((tag: string) => tag.trim().toLowerCase()).filter((tag: string) => tag.length > 0);
-                                setTags(parsedTags.slice(0, 13));
+                                
+                                // Karakter sınırı kontrolü ve otomatik temizleme
+                                const validTags = parsedTags.filter(tag => tag.length <= 20);
+                                const invalidTags = parsedTags.filter(tag => tag.length > 20);
+                                
+                                if (invalidTags.length > 0) {
+                                  toast({ 
+                                    variant: "default", 
+                                    title: "Uzun Etiketler Temizlendi", 
+                                    description: `${invalidTags.length} adet 20+ karakterlik etiket otomatik olarak silindi: ${invalidTags.slice(0,3).join(', ')}${invalidTags.length > 3 ? '...' : ''}` 
+                                  });
+                                }
+                                
+                                setTags(validTags.slice(0, 13));
+                                
+                                // Eğer geçerli etiket sayısı 13'ten azsa, yeni etiket iste
+                                if (validTags.length < 13) {
+                                  const neededTags = 13 - validTags.length;
+                                  toast({ 
+                                    variant: "default", 
+                                    title: "Ek Etiket Gerekli", 
+                                    description: `${neededTags} adet daha etiket eklemek için tekrar "Yeni Etiket İste" butonuna tıklayın.` 
+                                  });
+                                }
                               } else if (data.error) {
                                 toast({ variant: "destructive", title: data.error });
                               }

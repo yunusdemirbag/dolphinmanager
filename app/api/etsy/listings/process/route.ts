@@ -3,11 +3,14 @@ import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
   try {
+    const startTime = Date.now();
     const { queueItemId, isDraft = true } = await request.json();
     
     if (!queueItemId) {
       return NextResponse.json({ error: 'Queue item ID is required' }, { status: 400 });
     }
+    
+    console.log('🚀 Kuyruk işleme başlatılıyor:', queueItemId);
 
     // Firebase bağlantısını başlat
     initializeAdminApp();
@@ -372,9 +375,29 @@ export async function POST(request: NextRequest) {
         updated_at: new Date()
       });
 
+      // Final logging
+      const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
+      const productTitle = queueData.title || 'Untitled Product';
+      
+      console.log('');
+      console.log('🎉 ======================= KUYRUK İŞLEME BAŞARILI =======================');
+      console.log('📦 Ürün Adı:', productTitle);
+      console.log('⏱️  Toplam İşleme Süresi:', `${totalDuration} saniye`);
+      console.log('🔗 Listing ID:', etsyResult.listing_id);
+      console.log('📊 Durum:', isDraft ? 'Taslak' : 'Aktif');
+      console.log('🔄 Kuyruk ID:', queueItemId);
+      if (etsyResult.rate_limit) {
+        console.log('⚡ Rate Limit Durumu:', `${etsyResult.rate_limit.remaining}/${etsyResult.rate_limit.limit} kalan`);
+        console.log('🕒 Rate Limit Reset:', etsyResult.rate_limit.reset ? new Date(etsyResult.rate_limit.reset).toLocaleString('tr-TR') : 'Bilinmiyor');
+      }
+      console.log('=======================================================================');
+      console.log('');
+
       return NextResponse.json({ 
         success: true,
         listing_id: etsyResult.listing_id,
+        total_duration: totalDuration,
+        rate_limit: etsyResult.rate_limit,
         message: `Product successfully sent to Etsy as ${isDraft ? 'draft' : 'active'}`
       });
 

@@ -33,6 +33,8 @@ export async function POST(request: NextRequest) {
 
     // Prompt'ları al (custom veya default)
     const titlePromptConfig = getPromptById('title-prompt');
+    const tagsPromptConfig = getPromptById('tags-prompt');
+    
     const titlePrompt = customPrompts.title || titlePromptConfig?.prompt || `
 TASK: Generate a single, SEO-optimized, high-conversion Etsy product title for a physical canvas wall art print based on this image.
 
@@ -48,25 +50,39 @@ OUTPUT FORMAT:
 Return only the title, no quotes, no explanations.
 `;
 
+    const tagsPrompt = customPrompts.tags || tagsPromptConfig?.prompt || `
+TASK: Generate a hyper-optimized list of 13 Etsy tags for a physical canvas wall art print, based on the provided product title.
+
+REQUIREMENTS:
+- Exactly 13 tags
+- Each tag maximum 20 characters
+- Focus on high-search volume keywords
+- Mix of broad and specific terms
+- Include style, room, and occasion keywords
+- All lowercase
+- No special characters or quotes
+- Separate with commas
+
+OUTPUT FORMAT:
+Return only the tags separated by commas, no explanations.
+`;
+
     // Unified prompt - tek çağrıda her şeyi al
     const unifiedPrompt = `
 TASK: Analyze this image and generate complete Etsy listing data for a canvas wall art print.
 
-IMAGE ANALYSIS PROMPT:
+TITLE GENERATION:
 ${titlePrompt}
 
-ADDITIONAL REQUIREMENTS:
-After generating the title, also provide:
+TAG GENERATION:
+${tagsPrompt}
 
-1. TAGS: Generate exactly 13 SEO-optimized Etsy tags based on the title
-   - Each tag maximum 20 characters
-   - Include: wall art, canvas print, style keywords, room keywords
-   - Format: comma-separated lowercase
+CATEGORY SELECTION:
+Select the best category from these options:
+${availableCategories.map((cat: any) => `- ${cat.title}`).join('\n')}
 
-2. CATEGORY: Select the best category from these options:
-   ${availableCategories.map((cat: any) => `- ${cat.title}`).join('\n   ')}
-   
-3. ANALYSIS: Brief description of what you see in the image
+ADDITIONAL ANALYSIS:
+Provide brief description of what you see in the image, dominant colors, and detected art style.
 
 OUTPUT FORMAT (JSON):
 {

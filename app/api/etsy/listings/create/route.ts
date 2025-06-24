@@ -350,7 +350,14 @@ export async function POST(request: NextRequest) {
       
       clearTimeout(timeoutId);
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      
+      // Rate limit bilgilerini al
+      const rateLimitRemaining = etsyResponse.headers.get('x-ratelimit-remaining');
+      const rateLimitLimit = etsyResponse.headers.get('x-ratelimit-limit');
+      const rateLimitReset = etsyResponse.headers.get('x-ratelimit-reset');
+      
       console.log('📥 Etsy API yanıtı:', etsyResponse.status, etsyResponse.ok, `(${duration}s)`);
+      console.log('⚡ Rate Limit:', `${rateLimitRemaining}/${rateLimitLimit} kalan`, rateLimitReset ? `Reset: ${new Date(parseInt(rateLimitReset) * 1000).toLocaleString('tr-TR')}` : '');
     
       const etsyResult = await etsyResponse.json();
       console.log('📋 Response data keys:', Object.keys(etsyResult));
@@ -531,14 +538,38 @@ export async function POST(request: NextRequest) {
       etsy_data: etsyResult
     });
     
+    // Final logging
+    const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
+    const productTitle = listingData.title || 'Untitled Product';
+    const finalState = listingData.state === 'active' && uploadedImageCount > 0 ? 'active' : 'draft';
+    
+    console.log('');
+    console.log('🎉 =========================== BAŞARILI ÜRÜN EKLEME ===========================');
+    console.log('📦 Ürün Adı:', productTitle);
+    console.log('⏱️  Toplam Yükleme Süresi:', `${totalDuration} saniye`);
+    console.log('📷 Yüklenen Resim:', `${uploadedImageCount}/${imageFiles.length}`);
+    console.log('🎬 Video:', videoUploaded ? 'Yüklendi' : 'Yok');
+    console.log('📊 Durum:', finalState === 'active' ? 'Aktif' : 'Taslak');
+    console.log('🔗 Listing ID:', etsyResult.listing_id);
+    console.log('⚡ Rate Limit Durumu:', `${rateLimitRemaining}/${rateLimitLimit} kalan`);
+    console.log('🕒 Rate Limit Reset:', rateLimitReset ? new Date(parseInt(rateLimitReset) * 1000).toLocaleString('tr-TR') : 'Bilinmiyor');
+    console.log('===============================================================================');
+    console.log('');
+    
     return NextResponse.json({
       success: true,
       listing_id: etsyResult.listing_id,
       listing: etsyResult,
       uploaded_images: uploadedImageCount,
       uploaded_video: videoUploaded,
-      final_state: listingData.state === 'active' && uploadedImageCount > 0 ? 'active' : 'draft',
-      message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim${videoUploaded ? ', 1 video' : ''} yüklendi, durum: ${listingData.state === 'active' && uploadedImageCount > 0 ? 'aktif' : 'taslak'}`
+      final_state: finalState,
+      total_duration: totalDuration,
+      rate_limit: {
+        remaining: rateLimitRemaining,
+        limit: rateLimitLimit,
+        reset: rateLimitReset ? new Date(parseInt(rateLimitReset) * 1000).toISOString() : null
+      },
+      message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim${videoUploaded ? ', 1 video' : ''} yüklendi, durum: ${finalState === 'active' ? 'aktif' : 'taslak'}`
     });
     
     } catch (fetchError) {

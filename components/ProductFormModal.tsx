@@ -38,6 +38,7 @@ import { ProductMediaSection } from './ProductMediaSection';
 import { PromptEditor } from './PromptEditor';
 import { createClientSupabase } from "@/lib/supabase";
 import { categoryPrompt, tagPrompt, titlePrompt, generateTitleWithFocus, selectCategory } from "@/lib/openai-yonetim";
+import { getPromptById } from "@/lib/prompts";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
@@ -677,6 +678,17 @@ export function ProductFormModal({
           const data = await res.json();
           console.log('📥 Unified AI yanıtı:', data);
           
+          if (data.success === false || data.error) {
+            console.error('❌ API Error:', data.error);
+            console.error('❌ Debug Info:', data.debugInfo);
+            toast({ 
+              variant: "destructive", 
+              title: "AI Analiz Hatası", 
+              description: data.error || "Başlık üretilemedi - API hatası" 
+            });
+            return;
+          }
+          
           if (data.title) {
             const generatedTitle = cleanTitle(data.title.trim());
             console.log('✅ Başlık üretildi:', generatedTitle);
@@ -694,6 +706,11 @@ export function ProductFormModal({
             }
           } else {
             console.log('❌ API\'den başlık alınamadı');
+            toast({ 
+              variant: "destructive", 
+              title: "Başlık Bulunamadı", 
+              description: "AI resmi analiz edemedi veya başlık üretemedi" 
+            });
           }
         } catch (e) {
           console.error('❌ Başlık üretimi hatası:', e);
@@ -1575,33 +1592,7 @@ ${descriptionParts.shippingDetails[randomIndex]}
 ${descriptionParts.deliveryInfo[randomIndex]}`;
   };
 
-  // Açıklama üretme fonksiyonunu güncelle
-  const generateDescriptionAndTags = async () => {
-    if (!title) return;
-    try {
-      setAutoDescriptionLoading(true);
-      setAutoTagsLoading(true);
-      
-      // Etiket üret
-      const tagPromptText = tagPrompt.prompt.replace("{{TITLE}}", title);
-      const tagRes = await fetch("/api/ai/generate-etsy-tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: tagPromptText, title, model: "gpt-3.5-turbo" }),
-      });
-      const tagData = await tagRes.json();
-      if (tagData.tags && Array.isArray(tagData.tags)) {
-        setTags(tagData.tags.slice(0, 13));
-      } else if (tagData.error) {
-        toast({ variant: "destructive", title: tagData.error });
-      }
-    } catch (e) {
-      toast({ variant: "destructive", title: "İçerik üretilemedi", description: "Başlığa göre içerik oluşturulamadı." });
-    } finally {
-      setAutoDescriptionLoading(false);
-      setAutoTagsLoading(false);
-    }
-  };
+  // This function is removed - unified AI API now handles everything in one call
 
   // Başlık değişikliğini kontrol eden fonksiyonu güncelle
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1747,11 +1738,10 @@ Return only the title, no quotes, no explanations.`
     setTitleInput("");
   }, [isOpen]);
 
-  // Başlık otomatik üretildiyse, başlık değiştiğinde açıklama ve etiket üretimini tetikle
+  // Başlık otomatik üretildiyse artık unified API kullandığımız için ayrı çağrı yapmıyoruz
   useEffect(() => {
     if (autoTitleUsed && title) {
-      generateDescriptionAndTags();
-      setAutoTitleUsed(false); // Sadece bir kez tetiklensin
+      setAutoTitleUsed(false); // Reset flag
     }
   }, [title, autoTitleUsed]);
 
@@ -2218,14 +2208,27 @@ Return only the title, no quotes, no explanations.`
                             if (!title) return;
                             try {
                               setAutoTagsLoading(true);
-                              const res = await fetch("/api/ai/generate-etsy-tags", {
+                              
+                              // Use the tags prompt from prompts.ts
+                              const tagsPromptConfig = getPromptById('tags-prompt');
+                              let prompt = tagsPromptConfig?.prompt || 'Generate 13 Etsy tags for this product title.';
+                              prompt = prompt.replace('${title}', title);
+                              
+                              const res = await fetch("/api/ai/generate-text", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ title }),
+                                body: JSON.stringify({ 
+                                  prompt: prompt,
+                                  maxTokens: 200 
+                                }),
                               });
                               const data = await res.json();
-                              if (data.tags && Array.isArray(data.tags)) {
-                                setTags(data.tags);
+                              
+                              if (data.text) {
+                                // Parse comma-separated tags
+                                const tagsText = data.text.trim();
+                                const parsedTags = tagsText.split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag.length > 0);
+                                setTags(parsedTags.slice(0, 13));
                               } else if (data.error) {
                                 toast({ variant: "destructive", title: data.error });
                               }

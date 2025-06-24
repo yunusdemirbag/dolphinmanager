@@ -82,6 +82,9 @@ Return only valid JSON, no explanations.
 `;
 
     // OpenAI'ye tek çağrı yap
+    console.log('🔑 OpenAI API Key exists:', !!process.env.OPENAI_API_KEY);
+    console.log('🔑 OpenAI API Key starts with:', process.env.OPENAI_API_KEY?.substring(0, 20) + '...');
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -105,6 +108,8 @@ Return only valid JSON, no explanations.
       max_tokens: 500,
       temperature: 0.7,
     });
+    
+    console.log('✅ OpenAI response received successfully');
 
     const aiResult = response.choices[0]?.message?.content?.trim();
     console.log('🤖 AI yanıtı alındı:', aiResult);
@@ -119,12 +124,16 @@ Return only valid JSON, no explanations.
       parsedResult = JSON.parse(aiResult);
     } catch (parseError) {
       console.error('JSON parse hatası:', parseError);
+      console.error('Raw AI result:', aiResult);
+      console.error('AI result type:', typeof aiResult);
+      console.error('AI result length:', aiResult?.length);
+      
       // Fallback: Basit parsing
       parsedResult = {
         title: "Beautiful Canvas Wall Art Print - Modern Home Decor",
         tags: ["wall art", "canvas print", "home decor", "modern art", "wall decoration", "living room", "bedroom art", "office decor", "abstract art", "contemporary", "minimalist", "housewarming", "gift idea"],
         suggestedCategory: availableCategories[0]?.title || "Modern Art",
-        imageAnalysis: "Canvas wall art image",
+        imageAnalysis: "Unable to analyze image",
         dominantColors: ["blue", "white", "gray"],
         detectedStyle: ["modern", "abstract"]
       };
@@ -157,18 +166,28 @@ Return only valid JSON, no explanations.
 
   } catch (error) {
     console.error('❌ Unified AI analysis hatası:', error);
+    console.error('❌ Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    });
     
-    // Fallback response
+    // Return error response instead of fallback
     return NextResponse.json({
-      title: "Beautiful Canvas Wall Art Print - Modern Home Decor",
-      tags: ["wall art", "canvas print", "home decor", "modern art", "wall decoration", "living room", "bedroom art", "office decor", "abstract art", "contemporary", "minimalist", "housewarming", "gift idea"],
-      suggestedCategory: "Modern Art",
+      title: null,
+      tags: [],
+      suggestedCategory: null,
       suggestedCategoryId: null,
-      imageAnalysis: "Unable to analyze image",
+      imageAnalysis: "Başlık üretilemedi - API hatası",
       dominantColors: [],
       detectedStyle: [],
-      error: error instanceof Error ? error.message : 'Analysis failed',
-      success: false
-    });
+      error: `API Error: ${error instanceof Error ? error.message : 'Analysis failed'}`,
+      success: false,
+      debugInfo: {
+        hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+        keyPrefix: process.env.OPENAI_API_KEY?.substring(0, 20) + '...',
+        timestamp: new Date().toISOString()
+      }
+    }, { status: 500 });
   }
 }

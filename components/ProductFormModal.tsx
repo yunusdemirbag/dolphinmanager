@@ -1878,6 +1878,12 @@ export function ProductFormModal({
 
       // Modal'ı kapat (sadece batch mode değilse veya tamamlandıysa)
       onClose();
+      
+      // Auto mode callback - otomatik işleme devam etmesi için
+      if (onSubmitSuccess) {
+        onSubmitSuccess();
+      }
+      
       router.refresh();
 
     } catch (error: any) {

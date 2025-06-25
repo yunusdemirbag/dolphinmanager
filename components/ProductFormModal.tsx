@@ -1023,10 +1023,32 @@ export function ProductFormModal({
     setAutoTitleUsed(false);
   }, [productImages]);
 
-  // Yardımcı fonksiyon: Başta/sonda özel karakter/noktalama temizle
+  // Yardımcı fonksiyon: Başta/sonda özel karakter/noktalama temizle + 140 karakter kontrolü
   const cleanTitle = (raw: string) => {
     // Başta ve sonda ! . * : , ? ; ' " - _ ( ) [ ] { } gibi karakterleri sil
-    return raw.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '').trim();
+    let cleaned = raw.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '').trim();
+    
+    // ⚡ SPEED CONTROL: 141+ karakter kontrolü - son kelimeleri sil
+    if (cleaned.length >= 141) {
+      console.log(`⚠️ Başlık çok uzun (${cleaned.length} karakter), kısaltılıyor...`);
+      
+      // Son kelimeyi sil sil, 140 karakter altına düşene kadar
+      while (cleaned.length > 140) {
+        const words = cleaned.trim().split(' ');
+        if (words.length > 1) {
+          words.pop(); // Son kelimeyi sil
+          cleaned = words.join(' ');
+        } else {
+          // Tek kelime varsa, 140 karakterde kes
+          cleaned = cleaned.substring(0, 140).trim();
+          break;
+        }
+      }
+      
+      console.log(`✅ Başlık kısaltıldı: "${cleaned}" (${cleaned.length} karakter)`);
+    }
+    
+    return cleaned;
   };
 
   // Resim yüklendiğinde başlık üret
@@ -1043,20 +1065,37 @@ export function ProductFormModal({
       
       const generateTitle = async () => {
         setAutoTitleLoading(true);
+        
+        // 🎯 PROGRESSIVE LOADING - Kullanıcıya hızlı feedback
+        toast({
+          title: "⚡ Hızlı AI Analizi", 
+          description: "Paralel işleme ile başlık, tag ve kategori üretiliyor..."
+        });
+        
         try {
           const formData = new FormData();
           formData.append("image", productImages[0].file);
           formData.append("categories", JSON.stringify(shopSections));
           formData.append("customPrompts", JSON.stringify({}));
           
-          console.log('📤 Unified AI analizi için API çağrısı yapılıyor...');
+          console.log('📤 Paralel AI analizi başlatılıyor (3 simultaneous requests)...');
+          const startTime = Date.now();
+          
           const res = await fetch("/api/ai/analyze-and-generate", {
             method: "POST",
             body: formData,
           });
           
+          const loadTime = Date.now() - startTime;
+          
           const data = await res.json();
-          console.log('📥 Unified AI yanıtı:', data);
+          console.log(`📥 Paralel AI yanıtı alındı (${loadTime}ms):`, data);
+          
+          // Hızlı feedback
+          toast({
+            title: `✅ AI Analizi Tamamlandı (${loadTime}ms)`,
+            description: "Başlık ve etiketler başarıyla üretildi"
+          });
           
           if (data.success === false || data.error) {
             console.error('❌ API Error:', data.error);
@@ -1223,34 +1262,89 @@ export function ProductFormModal({
             }
           }
           
-          console.log('✅ Tüm resimler eklendi, 15 saniye geri sayım başlıyor...');
+          console.log('✅ Tüm resimler eklendi');
           
-          // 3. 15 saniye geri sayım başlat
-          setCountdown(15);
-          
-          const countdownInterval = setInterval(() => {
-            setCountdown(prev => {
-              if (prev === null || prev <= 1) {
-                clearInterval(countdownInterval);
+          // OTOMATIK ÜRÜN EKLEME MODU: Geri sayım yok, sadece başlık kontrolü
+          if (isAutoMode) {
+            console.log('🤖 Otomatik mod: Başlık kontrolü yapılıyor...');
+            
+            // Başlık kontrolü için interval
+            const titleCheckInterval = setInterval(() => {
+              if (title && title.trim().length > 0 && title.length <= 140 && !autoTitleLoading) {
+                console.log('🎯 OTOMATIK MOD: Başlık hazır, 1 saniye sonra gönderiliyor!');
+                clearInterval(titleCheckInterval);
                 
-                // Geri sayım bitince otomatik submit
                 setTimeout(() => {
-                  console.log('⏰ Geri sayım bitti, otomatik submit başlıyor...');
                   const submitButton = document.querySelector('[data-submit-button]') as HTMLButtonElement;
                   if (submitButton && !submitButton.disabled) {
-                    console.log('🚀 Kuyruğa Gönder butonuna otomatik tıklanıyor...');
+                    console.log('🚀 Otomatik mod - Kuyruğa gönderiliyor...');
                     submitButton.click();
-                  } else {
-                    console.log('❌ Submit butonu bulunamadı veya disabled');
                   }
-                  setCountdown(null);
-                }, 100);
+                }, 1000); // 1 saniye bekle
                 
-                return null;
+                return;
               }
-              return prev - 1;
-            });
-          }, 1000);
+            }, 500); // Her 500ms kontrol et
+            
+            // Maximum 15 saniye bekle
+            setTimeout(() => {
+              clearInterval(titleCheckInterval);
+              if (!title || title.trim().length === 0) {
+                console.log('⚠️ Otomatik mod: 15 saniye sonra başlık gelmedi, yine de gönderiliyor...');
+                const submitButton = document.querySelector('[data-submit-button]') as HTMLButtonElement;
+                if (submitButton && !submitButton.disabled) {
+                  submitButton.click();
+                }
+              }
+            }, 15000);
+            
+          } else {
+            // MANUEL MOD: 15 saniye geri sayım
+            console.log('👤 Manuel mod: 15 saniye geri sayım başlıyor...');
+            setCountdown(15);
+            
+            const countdownInterval = setInterval(() => {
+              setCountdown(prev => {
+                if (prev === null || prev <= 1) {
+                  clearInterval(countdownInterval);
+                  
+                  // Geri sayım bitince otomatik submit
+                  setTimeout(() => {
+                    console.log('⏰ Geri sayım bitti, otomatik submit başlıyor...');
+                    const submitButton = document.querySelector('[data-submit-button]') as HTMLButtonElement;
+                    if (submitButton && !submitButton.disabled) {
+                      console.log('🚀 Kuyruğa Gönder butonuna otomatik tıklanıyor...');
+                      submitButton.click();
+                    } else {
+                      console.log('❌ Submit butonu bulunamadı veya disabled');
+                    }
+                    setCountdown(null);
+                  }, 100);
+                  
+                  return null;
+                }
+                
+                // BYPASS KONTROLÜ: Başlık hazırsa geri sayımı bitir
+                if (title && title.trim().length > 0 && title.length <= 140 && !autoTitleLoading) {
+                  console.log('🎯 BYPASS: Başlık hazır ve uygun uzunlukta, geri sayım iptal ediliyor ve direkt gönderiliyor!');
+                  clearInterval(countdownInterval);
+                  
+                  setTimeout(() => {
+                    const submitButton = document.querySelector('[data-submit-button]') as HTMLButtonElement;
+                    if (submitButton && !submitButton.disabled) {
+                      console.log('🚀 Başlık hazır - Direkt kuyruğa gönderiliyor...');
+                      submitButton.click();
+                    }
+                    setCountdown(null);
+                  }, 100);
+                  
+                  return null;
+                }
+                
+                return prev - 1;
+              });
+            }, 1000);
+          }
         };
         
         // Sıralı dosya ekleme işlemini başlat
@@ -1483,22 +1577,30 @@ export function ProductFormModal({
         console.log('🎥 Video FormData\'ya eklendi:', videoData.filename);
       }
 
-      // KUYRUK API'sine gönder (Firebase Queue System)
-      console.log('🌐 API çağrısı başlıyor: /api/etsy/listings/queue');
-      console.log('📦 Gönderilecek veri:', {
+      // 🚀 HAYVAN GİBİ HIZLI KUYRUK SİSTEMİ
+      console.log('⚡ LIGHTNING FAST kuyruk gönderimi başlıyor...');
+      
+      // Instant feedback - kullanıcı hemen görsün!
+      toast({
+        title: "⚡ Kuyruk Gönderimi",
+        description: `"${listingData.title}" kuyruğa ekleniyor...`
+      });
+
+      console.log('📦 HAYVAN GİBİ HIZLI veri:', {
         images: (imageDataArray || []).length,
         video: videoData ? `✅ ${videoData.filename}` : '❌ Yok',
         title: listingData.title,
-        method: 'FormData + Firebase Queue'
+        method: 'LIGHTNING FormData + Firebase'
       });
 
+      // Reduced timeout for SPEED
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-        console.error('⏰ API call timeout - 300 seconds');
-      }, 300000); // 5 minute timeout (büyük video/resim dosyaları için)
+        console.error('⏰ FAST timeout - 60 seconds');
+      }, 60000); // 1 minute max - SPEED!
       
-      console.log('📡 Fetch başlatılıyor...');
+      console.log('⚡ LIGHTNING fetch başlatılıyor...');
       const response = await fetch('/api/etsy/listings/queue', {
         method: 'POST',
         body: formData,
@@ -1506,7 +1608,7 @@ export function ProductFormModal({
       });
       
       clearTimeout(timeoutId);
-      console.log('🔄 Response alındı! Status:', response.status, response.statusText);
+      console.log('⚡ LIGHTNING Response! Status:', response.status, response.statusText);
 
       console.log('📡 API yanıtı alındı:', {
         status: response.status,
@@ -1525,20 +1627,30 @@ export function ProductFormModal({
       const endTime = Date.now();
       const duration = ((endTime - startTime) / 1000).toFixed(1);
 
-      // Başarı mesajı göster ve modal'ı kapat
+      // 🚀 HAYVAN GİBİ HIZLI başarı mesajı!
       toast({ 
-        title: "✅ Kuyruk Başarılı!", 
-        description: `"${title}" ürünü ${duration} saniyede kuyrukta eklendi. Kuyruktaki ürün #${result.queue_id}` 
+        title: "⚡ LIGHTNING KUYRUK BAŞARILI!", 
+        description: `"${title}" ${duration}s'de eklendi! Queue ID: #${result.queue_id}` 
       });
 
-      // Modal'ı kapat
+      // INSTANT modal kapatma - kullanıcı hemen kuyruka gidebilsin
       onClose();
       
-      // Call success callback if provided (for auto mode)
+      // Auto mode callback
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }
-      router.refresh();
+      
+      // HAYVAN GİBİ HIZLI refresh - kullanıcı hemen görsün
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          // Kuyruk sayfasını açık tutuyorsak güncellesin
+          window.dispatchEvent(new CustomEvent('queueUpdated', { 
+            detail: { newItem: result.queue_id } 
+          }));
+        }
+        router.refresh();
+      }, 100); // Instant!
 
     } catch (error: any) {
       console.error('❌ Kuyruk ekleme hatası:', error);

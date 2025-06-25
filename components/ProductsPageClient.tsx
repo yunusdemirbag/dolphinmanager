@@ -70,7 +70,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   // Queue management states
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
-  const [processingDelay, setProcessingDelay] = useState(15);
+  const [processingDelay, setProcessingDelay] = useState(3);
   const [currentlyProcessing, setCurrentlyProcessing] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -654,10 +654,9 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   };
 
   const addTag = () => {
-    const trimmedTag = newTagInput.trim();
+    const input = newTagInput.trim();
     
-    // Etiket validasyonları
-    if (!trimmedTag) {
+    if (!input) {
       toast({
         variant: "destructive",
         title: "Hata",
@@ -665,6 +664,39 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       });
       return;
     }
+    
+    // VİRGÜLLE AYRILMIŞ ETIKETLER - Toplu ekleme
+    if (input.includes(',')) {
+      const newTags = input
+        .split(',')
+        .map(tag => tag.trim().toLowerCase())
+        .filter(tag => tag.length > 0 && tag.length <= 20)
+        .filter(tag => !editingTags.includes(tag))
+        .slice(0, 13 - editingTags.length); // Sadece kalan slot kadar ekle
+      
+      if (newTags.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Geçerli yeni etiket bulunamadı (max 20 karakter, tekrar olmayan)"
+        });
+        return;
+      }
+      
+      const finalTags = [...editingTags, ...newTags].slice(0, 13); // Maximum 13 etiket
+      setEditingTags(finalTags);
+      setNewTagInput('');
+      
+      toast({
+        title: "Başarılı",
+        description: `${newTags.length} etiket eklendi (Toplam: ${finalTags.length}/13)`
+      });
+      
+      return;
+    }
+    
+    // TEK ETİKET EKLEME - Mevcut sistem
+    const trimmedTag = input.toLowerCase();
     
     if (trimmedTag.length > 20) {
       toast({
@@ -811,6 +843,52 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     setDraggedImageIndex(null);
   };
 
+  // Tüm tagleri temizleme fonksiyonu
+  const clearAllTags = async (itemId: string) => {
+    try {
+      const response = await fetch('/api/queue/update-item', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemId,
+          field: 'tags',
+          value: []
+        })
+      });
+
+      if (response.ok) {
+        // Local state güncelle
+        setQueueItems(items => 
+          items.map(item => 
+            item.id === itemId 
+              ? {
+                  ...item,
+                  product_data: {
+                    ...item.product_data,
+                    tags: []
+                  }
+                }
+              : item
+          )
+        );
+
+        toast({
+          title: "Başarılı",
+          description: "Tüm etiketler temizlendi"
+        });
+      } else {
+        throw new Error('Failed to clear tags');
+      }
+    } catch (error) {
+      console.error('Tag temizleme hatası:', error);
+      toast({
+        title: "Hata",
+        description: "Etiketler temizlenirken hata oluştu",
+        variant: "destructive"
+      });
+    }
+  };
+
   const processQueueItem = useCallback(async (itemId: string) => {
     console.log('🚀 processQueueItem başlatılıyor:', itemId);
     try {
@@ -818,28 +896,14 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       window.processingStartTime = performance.now();
       setCurrentlyProcessing(itemId);
       
-      // Kuyruk öğesini al
-      console.log('📡 API çağrısı yapılıyor:', `/api/queue?user_id=${userId}`);
-      const queueResponse = await fetch(`/api/queue?user_id=${userId}`);
-      console.log('📡 API yanıtı alındı:', queueResponse.status, queueResponse.statusText);
+      // ⚡ SPEED: Direkt individual item API'si kullan
+      const itemResponse = await fetch(`/api/queue/item/${itemId}`);
       
-      if (!queueResponse.ok) {
-        const errorText = await queueResponse.text();
-        console.error('❌ API yanıt hatası:', errorText);
-        throw new Error(`Kuyruk verisi alınamadı: ${queueResponse.status} - ${errorText}`);
+      if (!itemResponse.ok) {
+        throw new Error(`Queue item bulunamadı: ${itemResponse.status}`);
       }
       
-      const queueData = await queueResponse.json();
-      console.log('📋 Kuyruk verisi alındı:', queueData.items?.length, 'öğe');
-      
-      const queueItem = queueData.items.find((item: any) => item.id === itemId);
-      
-      if (!queueItem) {
-        console.error('❌ Öğe bulunamadı:', itemId, 'mevcut öğeler:', queueData.items.map((i: any) => i.id));
-        throw new Error(`Kuyruk öğesi bulunamadı: ${itemId}`);
-      }
-      
-      console.log('✅ Kuyruk öğesi bulundu:', queueItem.product_data?.title);
+      const queueItem = await itemResponse.json();
 
       // Base64 resimlerini File objelerine dönüştür
       const formData = new FormData();
@@ -1528,13 +1592,6 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
 
             <Button
               variant="outline"
-              disabled={stats.pending === 0}
-            >
-              Hemen İşle
-            </Button>
-
-            <Button
-              variant="outline"
               onClick={() => loadQueueItems()}
               disabled={isLoadingQueue}
             >
@@ -1960,7 +2017,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                                   return item.product_data.images?.slice(0, 4).map((img: any, idx: number) => (
                                     <div 
                                       key={idx} 
-                                      className="w-40 h-40 rounded border overflow-hidden bg-gray-100 cursor-pointer hover:shadow-md hover:border-blue-300 transition-all"
+                                      className={`${idx === 0 ? 'w-80 h-80' : 'w-40 h-40'} rounded border overflow-hidden bg-gray-100 cursor-pointer hover:shadow-md hover:border-blue-300 transition-all`}
                                       onClick={() => startMediaEdit(item.id)}
                                       title="Medyaları düzenlemek için tıklayın"
                                     >
@@ -2067,16 +2124,16 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                                           cancelEdit();
                                         }
                                       }}
-                                      placeholder="Yeni etiket ekle..."
-                                      className={`flex-1 h-8 text-xs ${newTagInput.length > 20 ? 'border-red-500' : ''}`}
+                                      placeholder="Etiket ekle veya virgülle ayırarak toplu ekle..."
+                                      className={`flex-1 h-8 text-xs ${newTagInput.length > 20 && !newTagInput.includes(',') ? 'border-red-500' : ''}`}
                                       autoFocus
-                                      maxLength={25}
+                                      maxLength={500}
                                       disabled={editingTags.length >= 13}
                                     />
                                     <Button
                                       size="sm"
                                       onClick={addTag}
-                                      disabled={!newTagInput.trim() || newTagInput.length > 20 || editingTags.length >= 13}
+                                      disabled={!newTagInput.trim() || (newTagInput.length > 20 && !newTagInput.includes(',')) || editingTags.length >= 13}
                                       className="h-8 px-2"
                                       variant="outline"
                                     >
@@ -2088,7 +2145,7 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                                   </div>
                                 </div>
                                 
-                                {/* Kaydet/İptal butonları */}
+                                {/* Kaydet/Temizle/İptal butonları */}
                                 <div className="flex gap-2">
                                   <Button
                                     size="sm"
@@ -2097,6 +2154,26 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                                   >
                                     ✓ Kaydet
                                   </Button>
+                                  
+                                  {/* Tümünü Temizle butonu - ortada */}
+                                  {editingTags.length > 0 && (
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => {
+                                        setEditingTags([]);
+                                        toast({
+                                          title: "Temizlendi",
+                                          description: "Tüm etiketler kaldırıldı (kaydetmeyi unutmayın)"
+                                        });
+                                      }}
+                                      className="h-8 px-3 text-xs"
+                                    >
+                                      <Trash2 className="w-3 h-3 mr-1" />
+                                      Tümünü Temizle
+                                    </Button>
+                                  )}
+                                  
                                   <Button
                                     size="sm"
                                     variant="outline"

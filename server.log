@@ -6621,3 +6621,151 @@ Expected ',', got '}'
   metadata: [Metadata]
 }
  GET /api/queue?user_id=local-user-123&limit=3 200 in 192ms
+🚀 Optimize Kuyruk Sistemi başlatıldı { userId: 'local-user-123', status: null, limit: 5 }
+📊 Firebase optimized query çalıştırılıyor...
+🔥 Firebase kuyruk hatası: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:56:40)
+  54 |       
+  55 |       console.log('📊 Firebase optimized query çalıştırılıyor...');
+> 56 |       const queueSnapshot = await query.get();
+     |                                        ^
+  57 |       
+  58 |       if (queueSnapshot.empty) {
+  59 |         console.log('📋 Kuyruk boş'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123&limit=5 200 in 396ms
+ ○ Compiling /products ...
+ ✓ Compiled /products in 5.9s
+🔍 local-user-123 kullanıcısı için mağaza bilgileri alınıyor...
+📦 Found 499 products in Firebase for user local-user-123. Fetching from DB.
+ GET /products 200 in 6970ms
+Firebase bağlantısı mevcut, kullanıcı local-user-123 için mağaza bilgileri alınıyor...
+Firebase'den mağaza bulundu: CyberDecorArt (ID: 56171647)
+Firebase'den API anahtarları başarıyla alındı
+🕒 Token expires at: 2025-06-24T22:27:38.676Z
+⏰ Time until expiry: 60 minutes
+🔄 Token expiring soon, proactively refreshing...
+♻️ Refreshing Etsy token for shop 56171647...
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 857ms
+🕒 New token expires at: 2025-06-24T22:28:03.310Z
+✅ Successfully refreshed and saved new token for shop 56171647.
+✅ Proactive token refresh successful
+Etsy API bağlantısı test ediliyor - Shop ID: 56171647
+ GET /favicon.ico?favicon.45db1c09.ico 200 in 1161ms
+Etsy API bağlantısı başarılı: CyberDecorArt
+ GET /api/etsy/status 200 in 1375ms
+🚀 Optimize Kuyruk Sistemi başlatıldı { userId: 'local-user-123', status: null, limit: 50 }
+📊 Firebase optimized query çalıştırılıyor...
+Firebase bağlantısı mevcut, kullanıcı local-user-123 için mağaza bilgileri alınıyor...
+🔥 Firebase kuyruk hatası: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:56:40)
+  54 |       
+  55 |       console.log('📊 Firebase optimized query çalıştırılıyor...');
+> 56 |       const queueSnapshot = await query.get();
+     |                                        ^
+  57 |       
+  58 |       if (queueSnapshot.empty) {
+  59 |         console.log('📋 Kuyruk boş'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123 200 in 175ms
+Firebase'den mağaza bulundu: CyberDecorArt (ID: 56171647)
+Firebase'den API anahtarları başarıyla alındı
+🕒 Token expires at: 2025-06-24T22:28:03.310Z
+⏰ Time until expiry: 60 minutes
+🔄 Token expiring soon, proactively refreshing...
+♻️ Refreshing Etsy token for shop 56171647...
+🕒 New token expires at: 2025-06-24T22:28:05.434Z
+✅ Successfully refreshed and saved new token for shop 56171647.
+✅ Proactive token refresh successful
+Etsy API bağlantısı test ediliyor - Shop ID: 56171647
+Etsy API bağlantısı başarılı: CyberDecorArt
+ GET /api/etsy/status 200 in 1003ms
+🚀 Optimize Kuyruk Sistemi başlatıldı { userId: 'local-user-123', status: null, limit: 50 }
+📊 Firebase optimized query çalıştırılıyor...
+🔥 Firebase kuyruk hatası: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:56:40)
+  54 |       
+  55 |       console.log('📊 Firebase optimized query çalıştırılıyor...');
+> 56 |       const queueSnapshot = await query.get();
+     |                                        ^
+  57 |       
+  58 |       if (queueSnapshot.empty) {
+  59 |         console.log('📋 Kuyruk boş'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123 200 in 161ms
+🚀 Optimize Kuyruk Sistemi başlatıldı { userId: 'local-user-123', status: null, limit: 50 }
+📊 Firebase optimized query çalıştırılıyor...
+🔥 Firebase kuyruk hatası: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:56:40)
+  54 |       
+  55 |       console.log('📊 Firebase optimized query çalıştırılıyor...');
+> 56 |       const queueSnapshot = await query.get();
+     |                                        ^
+  57 |       
+  58 |       if (queueSnapshot.empty) {
+  59 |         console.log('📋 Kuyruk boş'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123 200 in 285ms
+🚀 Optimize Kuyruk Sistemi başlatıldı { userId: 'local-user-123', status: null, limit: 50 }
+📊 Firebase optimized query çalıştırılıyor...
+🔥 Firebase kuyruk hatası: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:56:40)
+  54 |       
+  55 |       console.log('📊 Firebase optimized query çalıştırılıyor...');
+> 56 |       const queueSnapshot = await query.get();
+     |                                        ^
+  57 |       
+  58 |       if (queueSnapshot.empty) {
+  59 |         console.log('📋 Kuyruk boş'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123 200 in 209ms
+🚀 Optimize Kuyruk Sistemi başlatıldı { userId: 'local-user-123', status: null, limit: 50 }
+📊 Firebase optimized query çalıştırılıyor...
+🔥 Firebase kuyruk hatası: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:56:40)
+  54 |       
+  55 |       console.log('📊 Firebase optimized query çalıştırılıyor...');
+> 56 |       const queueSnapshot = await query.get();
+     |                                        ^
+  57 |       
+  58 |       if (queueSnapshot.empty) {
+  59 |         console.log('📋 Kuyruk boş'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123 200 in 172ms
+🚀 Optimize Kuyruk Sistemi başlatıldı { userId: 'local-user-123', status: null, limit: 50 }
+📊 Firebase optimized query çalıştırılıyor...
+🔥 Firebase kuyruk hatası: Error: 9 FAILED_PRECONDITION: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI
+    at GET (app/api/queue/route.ts:56:40)
+  54 |       
+  55 |       console.log('📊 Firebase optimized query çalıştırılıyor...');
+> 56 |       const queueSnapshot = await query.get();
+     |                                        ^
+  57 |       
+  58 |       if (queueSnapshot.empty) {
+  59 |         console.log('📋 Kuyruk boş'); {
+  code: 9,
+  details: 'The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/yunusfirebase-25/firestore/indexes?create_composite=Ck5wcm9qZWN0cy95dW51c2ZpcmViYXNlLTI1L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9xdWV1ZS9pbmRleGVzL18QARoLCgd1c2VyX2lkEAEaDgoKY3JlYXRlZF9hdBACGgwKCF9fbmFtZV9fEAI',
+  metadata: [Metadata]
+}
+ GET /api/queue?user_id=local-user-123 200 in 177ms
+ ✓ Compiled in 300ms
+[?25h

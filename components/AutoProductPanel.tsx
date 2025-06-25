@@ -399,7 +399,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
     
     if (newRemainingFiles >= settings.imagesPerProduct) {
       // Hala işlenecek dosya var - sonraki ürüne geç (ama index sıfırla)
-      console.log('⏰ Form kapandı, 5 saniye bekleniyor...');
+      console.log('⏰ Form kapandı, 1 saniye bekleniyor...');
       setTimeout(() => {
         console.log(`🔄 Sonraki ürün için form açılıyor... (index sıfırlanıyor: 0)`);
         setCurrentProductIndex(0); // Index'i sıfırla çünkü dosyalar silindi
@@ -409,7 +409,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
           title: "Sonraki Ürün",
           description: `Kalan ${newRemainingFiles} dosyadan sonraki 6'sı işleniyor...`
         });
-      }, 5000); // 5 saniye bekle
+      }, 1000); // 1 saniye bekle
     } else {
       // All products completed
       setProcessing(prev => ({

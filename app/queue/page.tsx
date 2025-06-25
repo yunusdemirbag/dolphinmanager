@@ -104,15 +104,49 @@ export default function QueuePage() {
     })()
   }
 
-  // Kuyruk verilerini yükle
+  // Kuyruk verilerini yükle - DEBUG MODE
   const loadQueueItems = async () => {
     try {
+      const startTime = Date.now();
+      
+      console.log('🔍 DEBUG: Kuyruk verileri yükleniyor...');
       const response = await fetch('/api/queue?user_id=local-user-123')
+      console.log('🔍 DEBUG: Response status:', response.status, response.statusText);
+      
       const data = await response.json()
+      console.log('🔍 DEBUG: Gelen veri:', data);
+      console.log('🔍 DEBUG: Items count:', data.items?.length || 0);
+      console.log('🔍 DEBUG: Items detay:', data.items);
+      
+      const loadTime = Date.now() - startTime;
+      
       // Tüm ürünleri al, filtreleme UI seviyesinde yapılacak
       setQueueItems(data.items || [])
+      console.log('🔍 DEBUG: State güncellendi, items count:', (data.items || []).length);
+      
+      // DEBUG: İstatistikleri logla
+      const newStats = {
+        pending: (data.items || []).filter((item: any) => item.status === 'pending').length,
+        processing: (data.items || []).filter((item: any) => item.status === 'processing').length,
+        completed: (data.items || []).filter((item: any) => item.status === 'completed').length,
+        failed: (data.items || []).filter((item: any) => item.status === 'failed').length,
+      };
+      console.log('🔍 DEBUG: Yeni istatistikler:', newStats);
+      
+      // Performance feedback göster
+      if (data.metadata?.optimized) {
+        console.log(`⚡ Optimize kuyruk yüklendi: ${data.metadata.totalItems} item, ${loadTime}ms`);
+        
+        // Çok yavaşsa toast göster
+        if (loadTime > 2000) {
+          toast({
+            title: "🐌 Yavaş Yükleme Tespit Edildi",
+            description: `Kuyruk ${loadTime}ms'de yüklendi. Firebase indekslerini kontrol et.`
+          });
+        }
+      }
     } catch (error) {
-      console.error('Kuyruk verileri yüklenemedi:', error)
+      console.error('🔍 DEBUG: Kuyruk yükleme hatası:', error)
       toast({
         variant: "destructive",
         title: "Hata",
@@ -321,18 +355,29 @@ export default function QueuePage() {
     await loadQueueItems()
   }
 
-  // Seçili ürünleri sil
+  // 🚀 BATCH DELETE - Optimized bulk operations
   const deleteSelectedItems = async () => {
     if (selectedItems.length === 0) return
     
+    const batchSize = Math.min(selectedItems.length, 10); // Max 10 at once
+    
     try {
+      console.log(`🗑️ BATCH DELETE: ${selectedItems.length} ürün siliniyor (batch size: ${batchSize})`);
+      
+      // Toast progress indicator
+      toast({
+        title: `🗑️ Toplu Silme Başlatıldı`,
+        description: `${selectedItems.length} ürün batch işlemle siliniyor...`
+      });
+      
       const response = await fetch('/api/queue', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           action: 'delete_selected',
           itemIds: selectedItems,
-          user_id: 'local-user-123'
+          user_id: 'local-user-123',
+          batchSize: batchSize
         })
       })
       
@@ -340,20 +385,20 @@ export default function QueuePage() {
       
       if (result.success) {
         toast({
-          title: "Ürünler Silindi",
+          title: "✅ Batch Delete Tamamlandı",
           description: `${selectedItems.length} ürün başarıyla silindi`
         })
         setSelectedItems([])
-        await loadQueueItems()
+        // Real-time listener zaten güncelleyecek, manuel yükleme gerekmiyor
       } else {
         throw new Error(result.error)
       }
     } catch (error) {
-      console.error('Silme hatası:', error)
+      console.error('Batch silme hatası:', error)
       toast({
         variant: "destructive",
-        title: "Hata",
-        description: "Seçili ürünler silinemedi"
+        title: "Batch Delete Hatası",
+        description: "Seçili ürünler batch işlemle silinemedi"
       })
     }
   }
@@ -416,8 +461,87 @@ export default function QueuePage() {
 
   useEffect(() => {
     loadQueueItems()
-    const interval = setInterval(loadQueueItems, 10000) // 10 saniyede bir güncelle
-    return () => clearInterval(interval)
+    
+    // 🔥 REAL-TIME LISTENERS - Firebase değişikliklerini anlık takip et
+    let unsubscribe: (() => void) | null = null;
+    
+    // Real-time listener kurma fonksiyonu
+    const setupRealTimeListener = async () => {
+      try {
+        const { onSnapshot, collection, query, where, orderBy } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        
+        const queueRef = collection(db, 'queue');
+        const queueQuery = query(
+          queueRef,
+          where('user_id', '==', 'local-user-123'),
+          orderBy('created_at', 'desc')
+        );
+        
+        console.log('🔥 Real-time Firebase listener kuruldu');
+        
+        unsubscribe = onSnapshot(queueQuery, (snapshot) => {
+          const realTimeItems = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            created_at: doc.data().created_at?.toDate()?.toISOString() || new Date().toISOString(),
+            updated_at: doc.data().updated_at?.toDate()?.toISOString() || new Date().toISOString(),
+          }));
+          
+          console.log(`⚡ LIGHTNING Real-time update: ${realTimeItems.length} items`);
+          setQueueItems(realTimeItems as QueueItem[]);
+          
+          // INSTANT feedback
+          if (realTimeItems.length > queueItems.length) {
+            const newItemsCount = realTimeItems.length - queueItems.length;
+            if (newItemsCount > 0) {
+              toast({
+                title: "⚡ LIGHTNING ADD!",
+                description: `${newItemsCount} yeni ürün kuyruğa eklendi!`
+              });
+            }
+          }
+        }, (error) => {
+          console.error('Firebase real-time listener hatası:', error);
+          // Hata durumunda polling'e geri dön
+          const fallbackInterval = setInterval(loadQueueItems, 5000); // Daha hızlı polling
+          return () => clearInterval(fallbackInterval);
+        });
+        
+      } catch (error) {
+        console.error('Real-time listener kurulamadı, HIZLI polling kullanılıyor:', error);
+        // Fallback: HAYVAN GİBİ HIZLI polling
+        const interval = setInterval(loadQueueItems, 3000); // 3 saniye!
+        return () => clearInterval(interval);
+      }
+    };
+    
+    // Real-time listener'ı başlat
+    setupRealTimeListener();
+    
+    // 🚀 CUSTOM EVENT LISTENER - Form modalden instant update
+    const handleCustomUpdate = (event: any) => {
+      console.log('⚡ Custom event - INSTANT queue reload!', event.detail);
+      loadQueueItems();
+      toast({
+        title: "⚡ INSTANT UPDATE!",
+        description: `Kuyruk güncellendi! Yeni item: #${event.detail?.newItem || 'Unknown'}`
+      });
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('queueUpdated', handleCustomUpdate);
+    }
+    
+    return () => {
+      if (unsubscribe) {
+        console.log('🔥 Firebase listener temizleniyor');
+        unsubscribe();
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('queueUpdated', handleCustomUpdate);
+      }
+    };
   }, [])
 
   const formatDate = (dateString: string) => {
@@ -450,6 +574,35 @@ export default function QueuePage() {
           >
             <RotateCcw className="w-4 h-4 mr-2" />
             Yenile
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={async () => {
+              console.log('🔍 MANUEL DEBUG: Firebase direkt kontrol...');
+              
+              try {
+                // Firebase'deki tüm queue itemları kontrol et
+                const response = await fetch('/api/queue?user_id=local-user-123&debug=true');
+                const data = await response.json();
+                
+                console.log('🔍 DEBUG: Response:', data);
+                
+                toast({
+                  title: "🔍 DEBUG Sonucu",
+                  description: `${data.items?.length || 0} item bulundu. Console'u kontrol et.`
+                });
+              } catch (error) {
+                console.error('🔍 DEBUG hatası:', error);
+                toast({
+                  variant: "destructive",
+                  title: "DEBUG Hatası",
+                  description: "Console'u kontrol et"
+                });
+              }
+            }}
+          >
+            🔍 DEBUG
           </Button>
         </div>
       </div>

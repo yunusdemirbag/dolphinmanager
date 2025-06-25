@@ -33,56 +33,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
     }
     
-    // DEBUG: Firebase'de toplam kaç ürün var?
-    try {
-      const allDocsSnapshot = await adminDb.collection('queue').get();
-      console.log('🔍 DEBUG: Firebase\'de toplam queue items:', allDocsSnapshot.size);
-      
-      if (allDocsSnapshot.size > 0) {
-        console.log('🔍 DEBUG: İlk 3 item:');
-        allDocsSnapshot.docs.slice(0, 3).forEach((doc, index) => {
-          const data = doc.data();
-          console.log(`🔍 DEBUG: Item ${index + 1}:`, {
-            id: doc.id,
-            user_id: data.user_id,
-            status: data.status,
-            title: data.title?.substring(0, 50) + '...'
-          });
-        });
-      }
-    } catch (debugError) {
-      console.error('🔍 DEBUG: Firebase debug query hatası:', debugError);
-    }
+    // ⚡ SPEED: Debug query kaldırıldı
     
     // OPTİMİZE EDİLMİŞ KUYRUK SİSTEMİ - FIREBASE QUERY İLE FİLTRELEME
     try {
-      // 🚀 INDEX HATASI ÇÖZÜMÜ - Basit query kullan
-      console.log('🔧 INDEX hatası için basit query kullanılıyor...');
-      
+      // ⚡ SPEED: Minimal query
       let query;
       if (status) {
-        // Status var ise sadece user_id + status (index gerektirmez)
         query = adminDb.collection('queue')
           .where('user_id', '==', userId)
           .where('status', '==', status)
           .limit(limit);
       } else {
-        // Status yok ise sadece user_id (index gerektirmez)
         query = adminDb.collection('queue')
           .where('user_id', '==', userId)
           .limit(limit);
       }
       
-      console.log('🔍 DEBUG: INDEX-FREE query çalıştırılıyor...', { userId, status, limit });
       const queueSnapshot = await query.get();
-      console.log('🔍 DEBUG: Query sonucu:', { 
-        isEmpty: queueSnapshot.empty, 
-        size: queueSnapshot.size,
-        docs: queueSnapshot.docs.length 
-      });
       
       if (queueSnapshot.empty) {
-        console.log('🔍 DEBUG: KUYRUK BOŞ - Hiç ürün yok!');
         return NextResponse.json({ 
           items: [], 
           metadata: {
@@ -95,22 +65,6 @@ export async function GET(request: NextRequest) {
           }
         });
       }
-      
-      console.log(`🔍 DEBUG: ${queueSnapshot.size} queue item bulundu!`);
-      
-      // DEBUG: Her doc'u detaylı logla
-      queueSnapshot.docs.forEach((doc, index) => {
-        const data = doc.data();
-        console.log(`🔍 DEBUG: Item ${index + 1}:`, {
-          id: doc.id,
-          user_id: data.user_id,
-          status: data.status,
-          title: data.title,
-          created_at: data.created_at,
-          has_images: !!data.image_refs,
-          image_count: data.image_refs?.length || 0
-        });
-      });
       
       // DÜZELTME: UI'nin beklediği nested product_data yapısını oluştur
       const items = queueSnapshot.docs.map(doc => {
@@ -182,12 +136,6 @@ export async function GET(request: NextRequest) {
           updated_timestamp: data.updated_at ? data.updated_at.toDate() : new Date()
         };
         
-        console.log(`🔍 DEBUG: UI uyumlu item:`, {
-          id: item.id,
-          title: item.product_data.title,
-          status: item.status,
-          images: item.imageCount
-        });
         return item;
       });
       
@@ -198,72 +146,50 @@ export async function GET(request: NextRequest) {
         return dateB - dateA; // En yeni önce
       });
       
-      // 🖼️ İLK RESİM LOADING - Sadece thumbnail için
-      console.log('🖼️ İlk resimler yükleniyor (thumbnail için)...');
+      // ⚡ SPEED: SADECE İLK RESİM THUMBNAIL
       const itemsWithFirstImage = await Promise.all(
         items.map(async (item) => {
           try {
-            console.log(`🖼️ DEBUG - Item ${item.id}: imageCount=${item.imageCount}, current_images=${item.product_data.images.length}`);
             if (item.imageCount > 0 && item.product_data.images.length === 0) {
-              console.log(`🖼️ Loading ALL images for ${item.id}...`);
-              // TÜM RESİMLERİ POSITION SIRASINA GÖRE YÜKLENCoded
-              const allImageRefs = await adminDb.collection('queue_images')
+              // SADECE İLK RESMİ AL - POSITION 0
+              const firstImageRef = await adminDb.collection('queue_images')
                 .where('queue_item_id', '==', item.id)
+                .where('position', '==', 0)
+                .limit(1)
                 .get();
               
-              console.log(`🖼️ Image query result for ${item.id}: ${allImageRefs.size} images found`);
-              
-              if (!allImageRefs.empty) {
-                // RESİMLERİ POSITION SIRASINA GÖRE SIRALA
-                const sortedImageDocs = allImageRefs.docs
-                  .map(doc => ({ data: doc.data(), id: doc.id }))
-                  .sort((a, b) => (a.data.position || 0) - (b.data.position || 0));
+              if (!firstImageRef.empty) {
+                const firstImageDoc = firstImageRef.docs[0];
+                const imageData = firstImageDoc.data();
                 
-                console.log(`🖼️ Found ${sortedImageDocs.length} images for ${item.id}, positions:`, 
-                  sortedImageDocs.map(img => img.data.position));
-                
-                // TÜM RESİMLERİ PARALEL YÜKLE
-                const imageLoadPromises = sortedImageDocs.map(async (imageDoc) => {
-                  const imageData = imageDoc.data;
-                  if (imageData.chunks_count > 0) {
-                    // Chunk'ları yükle
-                    const allChunks = await adminDb.collection('queue_image_chunks')
-                      .where('image_id', '==', imageDoc.id)
-                      .get();
+                if (imageData.chunks_count > 0) {
+                  // SADECE İLK RESMİN CHUNK'LARINI YÜKLECoded
+                  const allChunks = await adminDb.collection('queue_image_chunks')
+                    .where('image_id', '==', firstImageDoc.id)
+                    .get();
+                  
+                  if (!allChunks.empty) {
+                    const sortedChunks = allChunks.docs
+                      .map(doc => ({ data: doc.data(), id: doc.id }))
+                      .sort((a, b) => a.data.chunk_index - b.data.chunk_index);
                     
-                    if (!allChunks.empty) {
-                      // Chunk'ları sırala ve birleştir
-                      const sortedChunks = allChunks.docs
-                        .map(doc => ({ data: doc.data(), id: doc.id }))
-                        .sort((a, b) => a.data.chunk_index - b.data.chunk_index);
-                      
-                      const base64Parts: string[] = [];
-                      sortedChunks.forEach(chunk => {
-                        base64Parts.push(chunk.data.chunk_data);
-                      });
-                      const fullBase64 = base64Parts.join('');
-                      
-                      return {
-                        name: imageData.name,
-                        type: imageData.type,
-                        base64: fullBase64,
-                        data: fullBase64,
-                        position: imageData.position || 0,
-                        isPartial: false
-                      };
-                    }
+                    const base64Parts: string[] = [];
+                    sortedChunks.forEach(chunk => {
+                      base64Parts.push(chunk.data.chunk_data);
+                    });
+                    const fullBase64 = base64Parts.join('');
+                    
+                    // SADECE 1 RESİM ARRAY'İNE EKLECoded
+                    item.product_data.images = [{
+                      name: imageData.name,
+                      type: imageData.type,
+                      base64: fullBase64,
+                      data: fullBase64,
+                      position: 0,
+                      isPartial: false
+                    }];
                   }
-                  return null;
-                });
-                
-                const loadedImages = await Promise.all(imageLoadPromises);
-                const validImages = loadedImages.filter(img => img !== null);
-                
-                // POSITION SIRASINA GÖRE TEKRAR SIRALA (güvenlik için)
-                validImages.sort((a, b) => a.position - b.position);
-                
-                item.product_data.images = validImages;
-                console.log(`🖼️ ${validImages.length} images yüklendi for ${item.id} in correct order`);
+                }
               }
             }
           } catch (imageError) {
@@ -273,92 +199,22 @@ export async function GET(request: NextRequest) {
         })
       );
       
-      console.log('🔍 DEBUG: Final items with thumbnails:', itemsWithFirstImage.length);
-      
-      // 🎥 VIDEO LOADING - Sadece varsa
-      console.log('🎥 Video yükleniyor (varsa)...');
-      const itemsWithVideo = await Promise.all(
-        itemsWithFirstImage.map(async (item) => {
-          try {
-            console.log(`🎥 DEBUG - Item ${item.id}: hasVideo=${item.hasVideo}, current_video=${!!item.product_data.video}, has_video_data=${!!item.product_data.video?.data}`);
-            if (item.hasVideo && (!item.product_data.video || !item.product_data.video.data)) {
-              console.log(`🎥 Loading video for ${item.id}...`);
-              
-              // Video metadata'yı al
-              const videoRef = await adminDb.collection('queue_videos')
-                .where('queue_item_id', '==', item.id)
-                .limit(1)
-                .get();
-              
-              console.log(`🎥 Video query result for ${item.id}: ${videoRef.size} videos found`);
-              
-              if (!videoRef.empty) {
-                const videoDoc = videoRef.docs[0];
-                const videoData = videoDoc.data();
-                console.log(`🎥 Found video doc for ${item.id}: chunks=${videoData.chunks_count}`);
-                
-                if (videoData.chunks_count > 0) {
-                  // VIDEO CHUNKS LOADING - Client-side sorting
-                  const allVideoChunks = await adminDb.collection('queue_video_chunks')
-                    .where('video_id', '==', videoDoc.id)
-                    .get();
-                  
-                  if (!allVideoChunks.empty) {
-                    console.log(`🎥 Found ${allVideoChunks.size} video chunks for ${item.id}`);
-                    
-                    // Video chunk'ları sırala ve birleştir
-                    const sortedVideoChunks = allVideoChunks.docs
-                      .map(doc => ({ data: doc.data(), id: doc.id }))
-                      .sort((a, b) => a.data.chunk_index - b.data.chunk_index);
-                    
-                    console.log(`🎥 Sorted video chunks for ${item.id}:`, sortedVideoChunks.map(c => c.data.chunk_index));
-                    
-                    const videoBase64Parts: string[] = [];
-                    sortedVideoChunks.forEach(chunk => {
-                      videoBase64Parts.push(chunk.data.chunk_data);
-                    });
-                    const fullVideoBase64 = videoBase64Parts.join('');
-                    
-                    item.product_data.video = {
-                      name: videoData.filename,
-                      type: videoData.type,
-                      base64: fullVideoBase64,
-                      data: fullVideoBase64, // processQueueItem için ek field
-                      size: videoData.size
-                    };
-                    
-                    console.log(`🎥 Full video yüklendi: ${item.id} (${fullVideoBase64.length} chars)`);
-                  } else {
-                    console.warn(`⚠️ No video chunks found for video ${videoDoc.id}`);
-                  }
-                } else {
-                  console.warn(`⚠️ Video has 0 chunks: ${videoDoc.id}`);
-                }
-              }
-            }
-          } catch (videoError) {
-            console.error(`🎥 Video loading error for ${item.id}:`, videoError);
-          }
-          return item;
-        })
-      );
-      
-      console.log('🔍 DEBUG: Final items with videos:', itemsWithVideo.length);
+      // ⚡ SPEED: Video loading kaldırıldı - process sırasında yüklenecek
       
       const totalTime = Date.now() - startTime;
       
-      console.log(`✅ INDEX-FREE kuyruk + thumbnails + videos tamamlandı: ${itemsWithVideo.length} item, ${totalTime}ms`);
+      // ⚡ SPEED: Debug logları kaldırıldı
       
       // Status dağılımı
-      const statusCounts = itemsWithVideo.reduce((acc: any, item: any) => {
+      const statusCounts = itemsWithFirstImage.reduce((acc: any, item: any) => {
         acc[item.status] = (acc[item.status] || 0) + 1;
         return acc;
       }, {});
       
       return NextResponse.json({ 
-        items: itemsWithVideo,
+        items: itemsWithFirstImage,
         metadata: {
-          totalItems: itemsWithVideo.length,
+          totalItems: itemsWithFirstImage.length,
           loadTime: totalTime,
           optimized: true,
           statusDistribution: statusCounts,

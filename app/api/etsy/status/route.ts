@@ -168,15 +168,18 @@ export async function GET() {
                 const data = await response.json();
                 console.log('Etsy API bağlantısı başarılı:', data.shop_name);
                 
-                // Rate limit bilgilerini al
+                // Rate limit bilgilerini al ve logla
+                console.log('📊 Etsy API Headers:');
+                console.log('- x-ratelimit-remaining:', response.headers.get('x-ratelimit-remaining'));
+                console.log('- x-ratelimit-limit:', response.headers.get('x-ratelimit-limit'));
+                console.log('- x-ratelimit-reset:', response.headers.get('x-ratelimit-reset'));
+                console.log('- x-limit-per-day:', response.headers.get('x-limit-per-day'));
+                
                 const rateLimitInfo = {
+                  hourly_limit: response.headers.get('x-ratelimit-limit'),
+                  hourly_remaining: response.headers.get('x-ratelimit-remaining'),
                   daily_limit: response.headers.get('x-limit-per-day'),
-                  remaining: response.headers.get('x-ratelimit-remaining') || 
-                            response.headers.get('ratelimit-remaining') ||
-                            response.headers.get('x-rate-limit-remaining'),
-                  reset: response.headers.get('x-ratelimit-reset') || 
-                         response.headers.get('ratelimit-reset') ||
-                         response.headers.get('x-rate-limit-reset')
+                  reset: response.headers.get('x-ratelimit-reset')
                 };
                 
                 // Başarılı bağlantı
@@ -190,8 +193,9 @@ export async function GET() {
                   shopName: data.shop_name,
                   shopData: data,
                   apiLimit: {
+                    hourly_limit: rateLimitInfo.hourly_limit ? parseInt(rateLimitInfo.hourly_limit) : null,
+                    hourly_remaining: rateLimitInfo.hourly_remaining ? parseInt(rateLimitInfo.hourly_remaining) : null,
                     daily_limit: rateLimitInfo.daily_limit ? parseInt(rateLimitInfo.daily_limit) : null,
-                    remaining: rateLimitInfo.remaining ? parseInt(rateLimitInfo.remaining) : null,
                     reset: rateLimitInfo.reset ? new Date(parseInt(rateLimitInfo.reset) * 1000).toISOString() : null
                   }
                 });

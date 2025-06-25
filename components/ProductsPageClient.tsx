@@ -142,17 +142,24 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       const data = await response.json();
       
       if (data.isConnected && data.apiLimit) {
+        // Gerçek Etsy API header'larını kullan
+        const hourlyRemaining = data.apiLimit.hourly_remaining || 0;
+        const hourlyLimit = data.apiLimit.hourly_limit || 10000;
+        const dailyLimit = data.apiLimit.daily_limit || 10000;
+        const dailyUsed = dailyLimit - hourlyRemaining; // Tahmini günlük kullanım
+        
         setRateLimitInfo({
-          remaining: data.apiLimit.remaining || 0,
-          limit: 10000, // Etsy default hourly limit
+          remaining: hourlyRemaining,
+          limit: hourlyLimit,
           reset: data.apiLimit.reset || null,
-          dailyUsed: data.apiLimit.daily_limit ? (data.apiLimit.daily_limit - (data.apiLimit.remaining || 0)) : 0,
-          dailyLimit: data.apiLimit.daily_limit || 10000
+          dailyUsed: dailyUsed,
+          dailyLimit: dailyLimit
         });
         
         console.log('⚡ Rate limit bilgileri güncellendi:', {
-          remaining: data.apiLimit.remaining,
-          daily_limit: data.apiLimit.daily_limit,
+          hourly_remaining: hourlyRemaining,
+          hourly_limit: hourlyLimit,
+          daily_limit: dailyLimit,
           reset: data.apiLimit.reset
         });
       }

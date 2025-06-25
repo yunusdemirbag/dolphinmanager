@@ -2383,16 +2383,6 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                         </div>
                       </div>
                     </div>
-                    {data.etsy_listing_id && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => window.open(`https://www.etsy.com/listing/${data.etsy_listing_id}`, '_blank')}
-                        className="border-green-300 text-green-700 hover:bg-green-100"
-                      >
-                        Etsy'de Gör
-                      </Button>
-                    )}
                   </div>
                 ))}
               </div>

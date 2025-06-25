@@ -1030,6 +1030,22 @@ export function ProductFormModal({
     // Başta ve sonda ! . * : , ? ; ' " - _ ( ) [ ] { } gibi karakterleri sil
     let cleaned = raw.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '').trim();
     
+    // 🔧 ETSY FIX: "&" karakteri sadece 1 kez kullanılabilir
+    const ampersandCount = (cleaned.match(/&/g) || []).length;
+    if (ampersandCount > 1) {
+      console.log(`⚠️ Başlıkta ${ampersandCount} adet "&" bulundu, fazlalarını "and" ile değiştiriyorum...`);
+      // İlk "&" hariç diğerlerini "and" ile değiştir
+      let ampersandFound = false;
+      cleaned = cleaned.replace(/&/g, (match) => {
+        if (!ampersandFound) {
+          ampersandFound = true;
+          return match; // İlk "&" kalsın
+        }
+        return " and "; // Diğerleri "and" olsun
+      });
+      console.log(`✅ "&" karakterleri düzeltildi: "${cleaned}"`);
+    }
+    
     // ⚡ SPEED CONTROL: 141+ karakter kontrolü - son kelimeleri sil
     if (cleaned.length >= 141) {
       console.log(`⚠️ Başlık çok uzun (${cleaned.length} karakter), kısaltılıyor...`);

@@ -35,21 +35,13 @@ export async function GET(request: NextRequest) {
     
     // ⚡ SPEED: Debug query kaldırıldı
     
-    // OPTİMİZE EDİLMİŞ KUYRUK SİSTEMİ - FIREBASE QUERY İLE FİLTRELEME
+    // OPTİMİZE EDİLMİŞ KUYRUK SİSTEMİ - FIREBASE INDEX SORUNU GEÇİCİ ÇÖZÜMÜ
     try {
-      // ⚡ SPEED: Minimal query
-      let query;
-      if (status) {
-        query = adminDb.collection('queue')
-          .where('user_id', '==', userId)
-          .where('status', '==', status)
-          .limit(limit);
-      } else {
-        query = adminDb.collection('queue')
-          .where('user_id', '==', userId)
-          .limit(limit);
-      }
+      // ⚡ SPEED: Basit query (index problemi için)
+      let query = adminDb.collection('queue')
+        .where('user_id', '==', userId);
       
+      // Index eksikliği sebebiyle client-side filtering yapacağız
       const queueSnapshot = await query.get();
       
       if (queueSnapshot.empty) {
@@ -67,7 +59,7 @@ export async function GET(request: NextRequest) {
       }
       
       // DÜZELTME: UI'nin beklediği nested product_data yapısını oluştur
-      const items = queueSnapshot.docs.map(doc => {
+      let allItems = queueSnapshot.docs.map(doc => {
         const data = doc.data();
         
         // UI'nin beklediği nested yapı
@@ -139,12 +131,19 @@ export async function GET(request: NextRequest) {
         return item;
       });
       
-      // 🚀 CLIENT-SIDE SORTING - Firebase index olmadığı için
-      items.sort((a, b) => {
+      // 🚀 CLIENT-SIDE FILTERING VE SORTING - Firebase index olmadığı için
+      if (status) {
+        allItems = allItems.filter(item => item.status === status);
+      }
+      
+      allItems.sort((a, b) => {
         const dateA = new Date(a.created_at).getTime();
         const dateB = new Date(b.created_at).getTime();
         return dateB - dateA; // En yeni önce
       });
+      
+      // Limit uygula
+      const items = allItems.slice(0, limit);
       
       // ⚡ SPEED: SADECE İLK RESİM THUMBNAIL
       const itemsWithFirstImage = await Promise.all(
@@ -218,7 +217,7 @@ export async function GET(request: NextRequest) {
           loadTime: totalTime,
           optimized: true,
           statusDistribution: statusCounts,
-          hasMorePages: items.length === limit,
+          hasMorePages: allItems.length > limit,
           timestamp: new Date().toISOString()
         }
       });

@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
           error_message: data.error_message,
           etsy_listing_id: data.etsy_listing_id,
           
-          // 🚀 UI'nin beklediği product_data nested yapısı  
+          // 🚀 UI'nin beklediği product_data nested yapısı - TÜM ALANLAR İÇİNDE
           product_data: {
             title: (() => {
               // 🔧 BAŞLIK 140 KARAKTER KONTROLÜ VE DÜZELTMESİ
@@ -152,11 +152,26 @@ export async function GET(request: NextRequest) {
               }
               return title;
             })(),
+            description: data.description,
             price: data.price || 0,
+            quantity: data.quantity || 4,
             tags: data.tags || [],
             images: [], // Async image loading yapılacak aşağıda
             video: data.video_ref ? { exists: true } : undefined,
             taxonomy_id: data.taxonomy_id || 2078,
+            shop_section_id: data.shop_section_id,
+            has_variations: data.has_variations,
+            variations: data.variations_json ? JSON.parse(data.variations_json) : [],
+            renewal_option: data.renewal_option || 'automatic',
+            who_made: data.who_made || 'i_did',
+            when_made: data.when_made || 'made_to_order',
+            is_personalizable: data.is_personalizable,
+            personalization_is_required: data.personalization_is_required,
+            personalization_instructions: data.personalization_instructions,
+            personalization_char_count_max: data.personalization_char_count_max,
+            shipping_profile_id: data.shipping_profile_id,
+            materials: data.materials || ['Cotton Canvas', 'Wood Frame', 'Hanger'],
+            state: data.state || 'active',
             created_at: data.created_at ? data.created_at.toDate().toISOString() : new Date().toISOString()
           },
           

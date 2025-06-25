@@ -890,7 +890,35 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         has_video: !!queueItem.product_data.video
       });
       
-      formData.append('listingData', JSON.stringify(cleanProductData));
+      // 🔧 ARTIK TÜM VERİLER product_data İÇİNDE - SADECE BAŞLIK KONTROL EDİP DİREKT KULLAN
+      const completeProductData = {
+        ...cleanProductData
+        // Artık queue API'den tüm veriler product_data içinde geliyor
+      };
+      
+      console.log('🔧 Tamamlanmış ürün verisi:', {
+        title: completeProductData.title,
+        shop_section_id: completeProductData.shop_section_id,
+        description_length: completeProductData.description?.length,
+        description_preview: completeProductData.description?.substring(0, 50) + '...',
+        quantity: completeProductData.quantity,
+        price: completeProductData.price,
+        has_variations: completeProductData.has_variations,
+        variations_count: completeProductData.variations?.length,
+        renewal_option: completeProductData.renewal_option,
+        is_personalizable: completeProductData.is_personalizable
+      });
+      
+      console.log('🔍 Queue item product_data detayı:', {
+        product_data_shop_section_id: queueItem.product_data.shop_section_id,
+        product_data_description_length: queueItem.product_data.description?.length,
+        product_data_quantity: queueItem.product_data.quantity,
+        product_data_price: queueItem.product_data.price,
+        product_data_has_variations: queueItem.product_data.has_variations,
+        product_data_variations_length: queueItem.product_data.variations?.length
+      });
+      
+      formData.append('listingData', JSON.stringify(completeProductData));
 
       // Resimler - API'den gelen base64 formatını kontrol et
       if (queueItem.product_data.images && queueItem.product_data.images.length > 0) {

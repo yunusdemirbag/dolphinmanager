@@ -176,32 +176,36 @@ export async function POST(request: NextRequest) {
       json_length: variationsJson.length
     });
 
-    // Kuyruk öğesi oluştur - Base64 data olmadan
+    // Kuyruk öğesi oluştur - ESKİ ÇALIŞAN VERSİYONA UYGUN
     const queueItem = {
       user_id: userId,
       title: listingData.title,
       description: cleanDescription,
       price: listingData.price || 0,
+      quantity: listingData.quantity || 4, // ESKİ VERSİYONDA VARDI - DEFAULT 4
       tags: listingData.tags || [],
       taxonomy_id: listingData.taxonomy_id || 1027,
-      shop_section_id: listingData.shop_section_id,
+      shop_section_id: listingData.shop_section_id, // NULL olabilir, eski versiyonda böyleydi
       has_variations: listingData.has_variations || false,
       variations_count: cleanVariations.length,
       variations_json: variationsJson,
       images_count: imageRefs.length,
       image_refs: imageRefs, // Sadece ID referansları
       video_ref: videoRef, // Sadece ID referansı
-      // Personalization fields
+      // Personalization fields - ESKİ VERSİYONDA VARDI
       is_personalizable: listingData.is_personalizable || false,
       personalization_is_required: listingData.personalization_is_required || false,
       personalization_char_count_max: listingData.personalization_char_count_max || 0,
       personalization_instructions: listingData.personalization_instructions || '',
-      // Other Etsy fields
+      // Other Etsy fields - ESKİ VERSİYONDA VARDI
       who_made: listingData.who_made || 'i_did',
       when_made: listingData.when_made || 'made_to_order',
       shipping_profile_id: listingData.shipping_profile_id,
       is_supply: listingData.is_supply || false,
       renewal_option: listingData.renewal_option || 'automatic',
+      // ESKİ VERSİYONDA OLAN EK ALANLAR
+      materials: listingData.materials || ['Cotton Canvas', 'Wood Frame', 'Hanger'],
+      state: listingData.state || 'active',
       // product_data_json kaldırıldı - gereksiz ve büyük
       status: 'pending',
       created_at: new Date(),

@@ -151,8 +151,8 @@ export async function POST(request: NextRequest) {
     
     const etsyFormData = new FormData();
     
-    // Listing verisini ekle - eksik field'lar için default değerler
-    etsyFormData.append('quantity', (listingData.quantity || 1).toString());
+    // Listing verisini ekle - ESKİ ÇALIŞAN VERSİYONA UYGUN DEFAULT DEĞERLER
+    etsyFormData.append('quantity', (listingData.quantity || 4).toString()); // DEFAULT 4
     etsyFormData.append('title', listingData.title || 'Untitled Product');
     etsyFormData.append('description', listingData.description || 'No description provided');
     // Price kontrolü - Variation kullanıyorsak base price'ı en düşük variation'dan al

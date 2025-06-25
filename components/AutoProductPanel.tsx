@@ -48,6 +48,7 @@ interface Settings {
   imagesPerProduct: number;
   selectedImagesFolder: string;
   selectedResourcesFolder: string;
+  mode: 'queue' | 'direct-etsy'; // İki mod: Kuyruğa ekle veya direkt Etsy'ye
   imageFiles: File[];
   resourceFiles: File[];
   imagePreviewUrls: string[];
@@ -63,6 +64,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
     imagesPerProduct: 6,
     selectedImagesFolder: '',
     selectedResourcesFolder: '',
+    mode: 'queue', // Default: Kuyruğa ekle
     imageFiles: [],
     resourceFiles: [],
     imagePreviewUrls: [],
@@ -447,6 +449,45 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* MOD SEÇİCİSİ */}
+            <div className="border rounded-lg p-4 bg-blue-50">
+              <Label className="text-sm font-semibold text-blue-800 mb-3 block">
+                🚀 İşlem Modu Seçin
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant={settings.mode === 'queue' ? 'default' : 'outline'}
+                  onClick={() => setSettings(prev => ({ ...prev, mode: 'queue' }))}
+                  className="flex flex-col h-20 p-3"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="w-4 h-4" />
+                    <span className="font-semibold">Kuyruğa Ekle</span>
+                  </div>
+                  <span className="text-xs text-center">Önce kuyruğa ekle, sonra manuel kontrol et</span>
+                </Button>
+                
+                <Button
+                  variant={settings.mode === 'direct-etsy' ? 'default' : 'outline'}
+                  onClick={() => setSettings(prev => ({ ...prev, mode: 'direct-etsy' }))}
+                  className="flex flex-col h-20 p-3"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap className="w-4 h-4" />
+                    <span className="font-semibold">Direkt Etsy'ye</span>
+                  </div>
+                  <span className="text-xs text-center">Direkt Etsy taslak olarak gönder</span>
+                </Button>
+              </div>
+              
+              <div className="mt-3 text-xs text-blue-700 bg-blue-100 p-2 rounded">
+                {settings.mode === 'queue' 
+                  ? '📝 Ürünler önce kuyruğa eklenir, sonra manuel olarak kontrol edip Etsy\'ye gönderebilirsiniz.'
+                  : '⚡ Ürünler direkt olarak Etsy\'ye taslak (draft) olarak gönderilir. Manuel kontrol olmaz!'
+                }
+              </div>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Images Folder */}
               <div className="space-y-2">
@@ -657,6 +698,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
         onClose={handleFormClose}
         userId="auto-processing"
         isAutoMode={true}
+        autoMode={settings.mode} // Mod bilgisini geç
         autoFiles={memoizedProductFiles}
         autoTitle=""
         onSubmitSuccess={handleFormSubmitSuccess}

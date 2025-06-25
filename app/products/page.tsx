@@ -152,6 +152,7 @@ export default async function ProductsPage() {
       <ProductsPageClient 
         initialProducts={initialProductsData.products} 
         initialNextCursor={initialProductsData.nextCursor}
+        store={store}
         userId={userId}
       />
     </div>

@@ -46,9 +46,14 @@ interface ProductsPageClientProps {
     initialProducts: any[];
     initialNextCursor: string | null;
     userId: string;
+    store?: {
+      shop_id: string;
+      shop_name: string;
+      last_sync_at: string;
+    } | null;
 }
 
-export default function ProductsPageClient({ initialProducts, initialNextCursor, userId }: ProductsPageClientProps) {
+export default function ProductsPageClient({ initialProducts, initialNextCursor, userId, store }: ProductsPageClientProps) {
   const [activeTab, setActiveTab] = useState('products');
   const [activeQueueTab, setActiveQueueTab] = useState('live'); // 'live' veya 'completed'
   const [isQueueRunning, setIsQueueRunning] = useState(false);
@@ -83,6 +88,15 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const editingRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const { toast } = useToast();
+  
+  // Rate limit tracking
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    remaining: number;
+    limit: number;
+    reset: string | null;
+    dailyUsed: number;
+    dailyLimit: number;
+  } | null>(null);
   
   // Client-side mount kontrolü
   useEffect(() => {
@@ -1124,6 +1138,23 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
         setQueueItems(items => 
           items.filter(item => item.id !== itemId) // Silinen ürünü listeden çıkar
         );
+        
+        // Rate limit bilgilerini state'e kaydet
+        if (result.rate_limit) {
+          setRateLimitInfo({
+            remaining: result.rate_limit.remaining || 0,
+            limit: result.rate_limit.limit || 0,
+            reset: result.rate_limit.reset || null,
+            dailyUsed: result.rate_limit.api_calls_used || 1,
+            dailyLimit: result.rate_limit.daily_limit || 0
+          });
+          
+          // Console'da detaylı log
+          console.log('⚡ RATE LIMIT BİLGİLERİ GÜNCELLENDI:');
+          console.log(`   📊 Kalan API: ${result.rate_limit.remaining}/${result.rate_limit.limit}`);
+          console.log(`   📅 Günlük: ${result.rate_limit.api_calls_used}/${result.rate_limit.daily_limit} kullanıldı`);
+          console.log(`   🕒 Reset: ${result.rate_limit.reset ? new Date(result.rate_limit.reset).toLocaleString('tr-TR') : 'Bilinmiyor'}`);
+        }
         
         // Rate limit bilgisi varsa göster - SAFE
         let toastDescription = `Ürün Etsy'e gönderildi ve tamamlandı (${newCompletedCount || 0}) - ID: ${result.listing_id}`;
@@ -2502,9 +2533,65 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   
   const renderAutoAdd = () => <AutoProductPanel />;
 
+  // Rate Limit Widget Component
+  const RateLimitWidget = () => {
+    if (!rateLimitInfo || !store) return null;
+    
+    const remainingPercentage = rateLimitInfo.limit > 0 ? (rateLimitInfo.remaining / rateLimitInfo.limit) * 100 : 0;
+    const dailyRemainingPercentage = rateLimitInfo.dailyLimit > 0 ? ((rateLimitInfo.dailyLimit - rateLimitInfo.dailyUsed) / rateLimitInfo.dailyLimit) * 100 : 0;
+    
+    return (
+      <div className="fixed bottom-4 right-4 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs z-50 min-w-48">
+        <div className="font-semibold text-gray-700 mb-2 flex items-center gap-1">
+          ⚡ Etsy API Durumu
+        </div>
+        
+        <div className="space-y-2">
+          {/* Hourly Rate Limit */}
+          <div>
+            <div className="flex justify-between text-gray-600 mb-1">
+              <span>Saatlik:</span>
+              <span>{rateLimitInfo.remaining}/{rateLimitInfo.limit}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1">
+              <div 
+                className={`h-1 rounded-full transition-all ${remainingPercentage > 50 ? 'bg-green-500' : remainingPercentage > 20 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                style={{ width: `${remainingPercentage}%` }}
+              ></div>
+            </div>
+          </div>
+          
+          {/* Daily Rate Limit */}
+          <div>
+            <div className="flex justify-between text-gray-600 mb-1">
+              <span>Günlük:</span>
+              <span>{rateLimitInfo.dailyLimit - rateLimitInfo.dailyUsed}/{rateLimitInfo.dailyLimit}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1">
+              <div 
+                className={`h-1 rounded-full transition-all ${dailyRemainingPercentage > 50 ? 'bg-green-500' : dailyRemainingPercentage > 20 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                style={{ width: `${dailyRemainingPercentage}%` }}
+              ></div>
+            </div>
+          </div>
+          
+          {/* Reset Time */}
+          {rateLimitInfo.reset && (
+            <div className="text-gray-500 text-xs">
+              Reset: {new Date(rateLimitInfo.reset).toLocaleTimeString('tr-TR')}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <>
+        {/* Rate Limit Widget */}
+        <RateLimitWidget />
+        
         <div className="border-b border-gray-200">
         <nav className="flex space-x-8">
           {tabs.map((tab) => {

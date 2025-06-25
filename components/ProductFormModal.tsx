@@ -98,6 +98,7 @@ interface ProductFormModalProps {
   queueItemId?: string
   userId?: string
   isAutoMode?: boolean
+  autoMode?: 'queue' | 'direct-etsy'
   isEmbedded?: boolean
   autoFiles?: File[]
   autoTitle?: string
@@ -239,6 +240,7 @@ export function ProductFormModal({
   isEmbedded = false,
   autoFiles,
   autoTitle,
+  autoMode = 'queue',
   onSubmitSuccess,
 }: ProductFormModalProps) {
   // All useState declarations at the top
@@ -1275,23 +1277,27 @@ export function ProductFormModal({
                 clearInterval(titleCheckInterval);
                 
                 setTimeout(() => {
-                  const submitButton = document.querySelector('[data-submit-button]') as HTMLButtonElement;
+                  // Mod'a göre farklı buton seç
+                  const buttonSelector = autoMode === 'direct-etsy' ? '[data-direct-submit-button]' : '[data-submit-button]';
+                  const submitButton = document.querySelector(buttonSelector) as HTMLButtonElement;
                   if (submitButton && !submitButton.disabled) {
-                    console.log('🚀 Otomatik mod - Kuyruğa gönderiliyor...');
+                    const actionText = autoMode === 'direct-etsy' ? 'Direkt Etsy\'ye gönderiliyor' : 'Kuyruğa gönderiliyor';
+                    console.log(`🚀 Otomatik mod (${autoMode}) - ${actionText}...`);
                     submitButton.click();
                   }
                 }, 1000); // 1 saniye bekle
                 
                 return;
               }
-            }, 500); // Her 500ms kontrol et
+            }, 100); // Her 100ms kontrol et - 5x daha hızlı
             
             // Maximum 15 saniye bekle
             setTimeout(() => {
               clearInterval(titleCheckInterval);
               if (!title || title.trim().length === 0) {
                 console.log('⚠️ Otomatik mod: 15 saniye sonra başlık gelmedi, yine de gönderiliyor...');
-                const submitButton = document.querySelector('[data-submit-button]') as HTMLButtonElement;
+                const buttonSelector = autoMode === 'direct-etsy' ? '[data-direct-submit-button]' : '[data-submit-button]';
+                const submitButton = document.querySelector(buttonSelector) as HTMLButtonElement;
                 if (submitButton && !submitButton.disabled) {
                   submitButton.click();
                 }
@@ -1311,9 +1317,11 @@ export function ProductFormModal({
                   // Geri sayım bitince otomatik submit
                   setTimeout(() => {
                     console.log('⏰ Geri sayım bitti, otomatik submit başlıyor...');
-                    const submitButton = document.querySelector('[data-submit-button]') as HTMLButtonElement;
+                    const buttonSelector = autoMode === 'direct-etsy' ? '[data-direct-submit-button]' : '[data-submit-button]';
+                    const submitButton = document.querySelector(buttonSelector) as HTMLButtonElement;
                     if (submitButton && !submitButton.disabled) {
-                      console.log('🚀 Kuyruğa Gönder butonuna otomatik tıklanıyor...');
+                      const actionText = autoMode === 'direct-etsy' ? 'Direkt Etsy\'ye Gönder' : 'Kuyruğa Gönder';
+                      console.log(`🚀 ${actionText} butonuna otomatik tıklanıyor...`);
                       submitButton.click();
                     } else {
                       console.log('❌ Submit butonu bulunamadı veya disabled');
@@ -1330,9 +1338,11 @@ export function ProductFormModal({
                   clearInterval(countdownInterval);
                   
                   setTimeout(() => {
-                    const submitButton = document.querySelector('[data-submit-button]') as HTMLButtonElement;
+                    const buttonSelector = autoMode === 'direct-etsy' ? '[data-direct-submit-button]' : '[data-submit-button]';
+                    const submitButton = document.querySelector(buttonSelector) as HTMLButtonElement;
                     if (submitButton && !submitButton.disabled) {
-                      console.log('🚀 Başlık hazır - Direkt kuyruğa gönderiliyor...');
+                      const actionText = autoMode === 'direct-etsy' ? 'Direkt Etsy\'ye gönderiliyor' : 'Direkt kuyruğa gönderiliyor';
+                      console.log(`🚀 Başlık hazır - ${actionText}...`);
                       submitButton.click();
                     }
                     setCountdown(null);
@@ -3233,6 +3243,8 @@ Return only the title, no quotes, no explanations.`
                     variant="secondary" 
                     onClick={() => handleSubmit("draft")} 
                     disabled={submitting}
+                    className="bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
+                    data-direct-submit-button
                   >
                     {submitting ? (
                       <>
@@ -3240,7 +3252,7 @@ Return only the title, no quotes, no explanations.`
                         Taslak Kaydediliyor...
                       </>
                     ) : (
-                      "Taslak Olarak Kaydet"
+                      "🚀 Direkt Etsy'ye Gönder"
                     )}
                   </Button>
                   <Button 

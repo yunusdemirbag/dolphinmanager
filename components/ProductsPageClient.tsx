@@ -130,7 +130,36 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       console.log('🚀 Component mount - Queue tab aktif, kuyruk yükleniyor...');
       setTimeout(fetchQueue, 100); // Mikro delay ile
     }
+    
+    // Rate limit bilgilerini fetch et
+    fetchRateLimitInfo();
   }, []);
+  
+  // Rate limit bilgilerini fetch et
+  const fetchRateLimitInfo = async () => {
+    try {
+      const response = await fetch('/api/etsy/status');
+      const data = await response.json();
+      
+      if (data.isConnected && data.apiLimit) {
+        setRateLimitInfo({
+          remaining: data.apiLimit.remaining || 0,
+          limit: 10000, // Etsy default hourly limit
+          reset: data.apiLimit.reset || null,
+          dailyUsed: data.apiLimit.daily_limit ? (data.apiLimit.daily_limit - (data.apiLimit.remaining || 0)) : 0,
+          dailyLimit: data.apiLimit.daily_limit || 10000
+        });
+        
+        console.log('⚡ Rate limit bilgileri güncellendi:', {
+          remaining: data.apiLimit.remaining,
+          daily_limit: data.apiLimit.daily_limit,
+          reset: data.apiLimit.reset
+        });
+      }
+    } catch (error) {
+      console.error('Rate limit bilgileri alınamadı:', error);
+    }
+  };
   
   // Etsy store bilgileri
   const [storeInfo, setStoreInfo] = useState<{

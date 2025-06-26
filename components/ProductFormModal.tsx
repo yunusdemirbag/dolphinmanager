@@ -1126,6 +1126,9 @@ export function ProductFormModal({
         try {
           const formData = new FormData();
           formData.append("image", productImages[0].file);
+          
+          // Kategori verilerini doğru formatta gönder
+          console.log('🏪 AI\'ye gönderilen kategoriler:', shopSections);
           formData.append("categories", JSON.stringify(shopSections));
           formData.append("customPrompts", JSON.stringify({}));
           
@@ -1172,7 +1175,11 @@ export function ProductFormModal({
             
             // Kategoriyi de ayarla
             if (data.suggestedCategoryId) {
+              console.log('🏷️ API\'den gelen kategori ID:', data.suggestedCategoryId);
               setSelectedShopSection(data.suggestedCategoryId.toString());
+              console.log('✅ Kategori ayarlandı:', data.suggestedCategoryId.toString());
+            } else {
+              console.log('⚠️ API\'den kategori ID gelmedi');
             }
           } else {
             console.log('❌ API\'den başlık alınamadı');
@@ -1191,7 +1198,7 @@ export function ProductFormModal({
       };
       generateTitle();
     }
-  }, [productImages.length > 0 ? productImages[0] : null, isOpen, title, autoTitleUsed, userEditedTitle]);
+  }, [productImages.length > 0 ? productImages[0] : null, isOpen, title, autoTitleUsed, userEditedTitle, shopSections]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {

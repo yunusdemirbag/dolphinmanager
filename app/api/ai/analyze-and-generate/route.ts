@@ -56,6 +56,9 @@ export async function POST(request: NextRequest) {
     // Select category from available categories if provided
     let selectedCategory = null;
     if (availableCategories.length > 0) {
+      // Log kategori verilerinin yapısını görmek için
+      console.log('📋 Gelen kategoriler:', JSON.stringify(availableCategories.slice(0, 2)));
+      
       // Enhanced category matching based on title/category
       const titleLower = result.title.toLowerCase();
       
@@ -76,17 +79,26 @@ export async function POST(request: NextRequest) {
       for (const [categoryType, keywords] of Object.entries(keywordMapping)) {
         if (keywords.some(keyword => titleLower.includes(keyword))) {
           // Kategori adında veya anahtar kelimelerde eşleşme ara
-          const categoryMatch = availableCategories.find((cat: any) => 
-            cat && cat.title && (
-              cat.title.toLowerCase().includes(categoryType) ||
-              keywords.some(k => cat.title.toLowerCase().includes(k))
-            )
-          );
+          // Kategori yapısını doğru şekilde kontrol et
+          const categoryMatch = availableCategories.find((cat: any) => {
+            // Kategori yapısını kontrol et
+            if (!cat) return false;
+            
+            // Kategori adı title veya name alanında olabilir
+            const categoryTitle = cat.title || cat.name || '';
+            
+            if (!categoryTitle) return false;
+            
+            return (
+              categoryTitle.toLowerCase().includes(categoryType) ||
+              keywords.some(k => categoryTitle.toLowerCase().includes(k))
+            );
+          });
           
           if (categoryMatch) {
             selectedCategory = categoryMatch;
             matchFound = true;
-            console.log(`✅ Kategori eşleşmesi bulundu: "${categoryMatch.title}" (anahtar kelime: ${categoryType})`);
+            console.log(`✅ Kategori eşleşmesi bulundu: "${categoryMatch.title || categoryMatch.name}" (anahtar kelime: ${categoryType})`);
             break;
           }
         }
@@ -94,24 +106,31 @@ export async function POST(request: NextRequest) {
       
       // Eşleşme bulunamazsa, doğrudan başlık-kategori adı eşleştirmesi dene
       if (!matchFound) {
-        const directMatch = availableCategories.find((cat: any) => 
-          cat && cat.title && titleLower.includes(cat.title.toLowerCase())
-        );
+        const directMatch = availableCategories.find((cat: any) => {
+          if (!cat) return false;
+          const categoryTitle = cat.title || cat.name || '';
+          if (!categoryTitle) return false;
+          return titleLower.includes(categoryTitle.toLowerCase());
+        });
         
         if (directMatch) {
           selectedCategory = directMatch;
-          console.log(`✅ Doğrudan kategori eşleşmesi bulundu: "${directMatch.title}"`);
+          console.log(`✅ Doğrudan kategori eşleşmesi bulundu: "${directMatch.title || directMatch.name}"`);
         }
       }
       
       // Hala eşleşme yoksa ilk kategoriyi seç
       if (!selectedCategory && availableCategories.length > 0) {
         selectedCategory = availableCategories[0];
-        console.log(`⚠️ Kategori eşleşmesi bulunamadı, varsayılan kategori seçildi: "${availableCategories[0].title}"`);
+        console.log(`⚠️ Kategori eşleşmesi bulunamadı, varsayılan kategori seçildi: "${availableCategories[0].title || availableCategories[0].name}"`);
       }
     }
 
     const totalTime = Date.now() - startTime;
+
+    // Kategori ID'sini doğru şekilde belirle
+    const categoryId = selectedCategory?.shop_section_id || selectedCategory?.id || null;
+    console.log('🏷️ Seçilen kategori ID:', categoryId);
 
     return NextResponse.json({
       success: true,
@@ -119,7 +138,7 @@ export async function POST(request: NextRequest) {
       tags: result.tags,
       analysis,
       category: selectedCategory,
-      suggestedCategoryId: selectedCategory?.shop_section_id,
+      suggestedCategoryId: categoryId,
       processing_time: totalTime,
       ai_system: 'firebase_enhanced',
       results: {

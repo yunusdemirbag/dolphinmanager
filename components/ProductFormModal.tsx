@@ -760,10 +760,20 @@ export function ProductFormModal({
   const handleAddTag = () => {
     if (!newTag.trim()) return;
     
-    const trimmedTag = newTag.trim();
+    // Özel karakterleri temizle
+    const cleanTag = cleanTagText(newTag.trim());
+    
+    if (!cleanTag) {
+      toast({ 
+        variant: "destructive", 
+        title: "Geçersiz Etiket", 
+        description: "Etiket sadece harf, rakam ve boşluk içerebilir" 
+      });
+      return;
+    }
     
     // Karakter sınırı kontrolü
-    if (trimmedTag.length > 20) {
+    if (cleanTag.length > 20) {
       toast({ 
         variant: "destructive", 
         title: "Etiket Çok Uzun", 
@@ -773,7 +783,7 @@ export function ProductFormModal({
     }
     
     // Duplicate kontrolü
-    if (tags.includes(trimmedTag)) {
+    if (tags.includes(cleanTag)) {
       toast({ 
         variant: "destructive", 
         title: "Tekrar Eden Etiket", 
@@ -792,8 +802,31 @@ export function ProductFormModal({
       return;
     }
     
-    setTags([...tags, trimmedTag]);
+    setTags([...tags, cleanTag]);
     setNewTag("");
+  }
+
+  // Etiket metnini temizleme fonksiyonu
+  const cleanTagText = (tag: string): string => {
+    // Türkçe karakterleri İngilizce karakterlere dönüştür
+    let cleanTag = tag
+      .replace(/ğ/g, 'g')
+      .replace(/Ğ/g, 'G')
+      .replace(/ü/g, 'u')
+      .replace(/Ü/g, 'U')
+      .replace(/ş/g, 's')
+      .replace(/Ş/g, 'S')
+      .replace(/ı/g, 'i')
+      .replace(/İ/g, 'I')
+      .replace(/ö/g, 'o')
+      .replace(/Ö/g, 'O')
+      .replace(/ç/g, 'c')
+      .replace(/Ç/g, 'C');
+    
+    // Sadece alfanumerik karakterleri ve boşlukları koru
+    cleanTag = cleanTag.replace(/[^a-zA-Z0-9\s]/g, '');
+    
+    return cleanTag.toLowerCase(); // Tüm etiketleri küçük harfe dönüştür
   }
 
   // Tag silme
@@ -3099,14 +3132,18 @@ Return only the title, no quotes, no explanations.`
                                 const parsedTags = tagsText.split(',').map((tag: string) => tag.trim().toLowerCase()).filter((tag: string) => tag.length > 0);
                                 
                                 // Karakter sınırı kontrolü ve otomatik temizleme
-                                const validTags = parsedTags.filter(tag => tag.length <= 20);
-                                const invalidTags = parsedTags.filter(tag => tag.length > 20);
+                                // Özel karakterleri de temizle
+                                const validTags = parsedTags
+                                  .map(tag => cleanTagText(tag))
+                                  .filter(tag => tag && tag.length <= 20);
+                                
+                                const invalidTags = parsedTags.filter(tag => !cleanTagText(tag) || cleanTagText(tag).length > 20);
                                 
                                 if (invalidTags.length > 0) {
                                   toast({ 
                                     variant: "default", 
-                                    title: "Uzun Etiketler Temizlendi", 
-                                    description: `${invalidTags.length} adet 20+ karakterlik etiket otomatik olarak silindi: ${invalidTags.slice(0,3).join(', ')}${invalidTags.length > 3 ? '...' : ''}` 
+                                    title: "Geçersiz Etiketler Temizlendi", 
+                                    description: `${invalidTags.length} adet geçersiz etiket otomatik olarak silindi: ${invalidTags.slice(0,3).join(', ')}${invalidTags.length > 3 ? '...' : ''}` 
                                   });
                                 }
                                 

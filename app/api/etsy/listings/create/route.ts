@@ -238,7 +238,32 @@ export async function POST(request: NextRequest) {
     function cleanEtsyTags(tags: string[]): string[] {
       return tags
         .filter(tag => tag && tag.trim().length > 0)
-        .map(tag => tag.trim())
+        .map(tag => {
+          // Önce trim yaparak başındaki ve sonundaki boşlukları temizle
+          let cleanTag = tag.trim();
+          
+          // Türkçe karakterleri İngilizce karakterlere dönüştür
+          cleanTag = cleanTag
+            .replace(/ğ/g, 'g')
+            .replace(/Ğ/g, 'G')
+            .replace(/ü/g, 'u')
+            .replace(/Ü/g, 'U')
+            .replace(/ş/g, 's')
+            .replace(/Ş/g, 'S')
+            .replace(/ı/g, 'i')
+            .replace(/İ/g, 'I')
+            .replace(/ö/g, 'o')
+            .replace(/Ö/g, 'O')
+            .replace(/ç/g, 'c')
+            .replace(/Ç/g, 'C');
+          
+          // Sadece alfanumerik karakterleri ve boşlukları koru
+          // Tüm diğer özel karakterleri (*, -, ', !, vb.) kaldır
+          cleanTag = cleanTag.replace(/[^a-zA-Z0-9\s]/g, '');
+          
+          return cleanTag.toLowerCase(); // Tüm etiketleri küçük harfe dönüştür
+        })
+        .filter(tag => tag.length > 0) // Temizleme sonrası boş kalan etiketleri filtrele
         .slice(0, 13); // Maksimum 13 tag
     }
     

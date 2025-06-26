@@ -352,12 +352,13 @@ export async function POST(request: NextRequest) {
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       
       // Rate limit bilgilerini al
-      const rateLimitRemaining = etsyResponse.headers.get('x-ratelimit-remaining');
-      const rateLimitLimit = etsyResponse.headers.get('x-ratelimit-limit');
-      const rateLimitReset = etsyResponse.headers.get('x-ratelimit-reset');
+      const dailyRemaining = etsyResponse.headers.get('x-remaining-today');
+      const dailyLimit = etsyResponse.headers.get('x-limit-per-day');
+      const secondRemaining = etsyResponse.headers.get('x-remaining-this-second');
+      const secondLimit = etsyResponse.headers.get('x-limit-per-second');
       
       console.log('📥 Etsy API yanıtı:', etsyResponse.status, etsyResponse.ok, `(${duration}s)`);
-      console.log('⚡ Rate Limit:', `${rateLimitRemaining}/${rateLimitLimit} kalan`, rateLimitReset ? `Reset: ${new Date(parseInt(rateLimitReset) * 1000).toLocaleString('tr-TR')}` : '');
+      console.log('⚡ Rate Limit:', `${dailyRemaining}/${dailyLimit} günlük kalan | ${secondRemaining}/${secondLimit} saniyelik`);
     
       const etsyResult = await etsyResponse.json();
       console.log('📋 Response data keys:', Object.keys(etsyResult));
@@ -551,8 +552,7 @@ export async function POST(request: NextRequest) {
     console.log('🎬 Video:', videoUploaded ? 'Yüklendi' : 'Yok');
     console.log('📊 Durum:', finalState === 'active' ? 'Aktif' : 'Taslak');
     console.log('🔗 Listing ID:', etsyResult.listing_id);
-    console.log('⚡ Rate Limit Durumu:', `${rateLimitRemaining}/${rateLimitLimit} kalan`);
-    console.log('🕒 Rate Limit Reset:', rateLimitReset ? new Date(parseInt(rateLimitReset) * 1000).toLocaleString('tr-TR') : 'Bilinmiyor');
+    console.log('⚡ Rate Limit Durumu:', `${dailyRemaining}/${dailyLimit} günlük kalan | ${secondRemaining}/${secondLimit} saniyelik`);
     console.log('===============================================================================');
     console.log('');
     
@@ -565,9 +565,10 @@ export async function POST(request: NextRequest) {
       final_state: finalState,
       total_duration: totalDuration,
       rate_limit: {
-        remaining: rateLimitRemaining,
-        limit: rateLimitLimit,
-        reset: rateLimitReset ? new Date(parseInt(rateLimitReset) * 1000).toISOString() : null
+        daily_remaining: dailyRemaining,
+        daily_limit: dailyLimit,
+        second_remaining: secondRemaining,
+        second_limit: secondLimit
       },
       message: `Listing oluşturuldu! ${uploadedImageCount}/${imageFiles.length} resim${videoUploaded ? ', 1 video' : ''} yüklendi, durum: ${finalState === 'active' ? 'aktif' : 'taslak'}`
     });

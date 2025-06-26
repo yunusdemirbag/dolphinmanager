@@ -1289,20 +1289,56 @@ export function ProductFormModal({
             // Başlık kontrolü için interval
             const titleCheckInterval = setInterval(() => {
               if (title && title.trim().length > 0 && title.length <= 140 && !autoTitleLoading) {
-                console.log('🎯 OTOMATIK MOD: Başlık hazır, 1 saniye sonra gönderiliyor!');
+                console.log('🎯 OTOMATIK MOD: Başlık hazır, etiket kontrolü yapılıyor...');
                 clearInterval(titleCheckInterval);
                 
-                setTimeout(() => {
-                  // Mod'a göre farklı buton seç
-                  const buttonSelector = autoMode === 'direct-etsy' ? '[data-direct-submit-button]' : '[data-submit-button]';
-                  const submitButton = document.querySelector(buttonSelector) as HTMLButtonElement;
-                  if (submitButton && !submitButton.disabled) {
-                    const actionText = autoMode === 'direct-etsy' ? 'Direkt Etsy\'ye gönderiliyor' : 'Kuyruğa gönderiliyor';
-                    console.log(`🚀 Otomatik mod (${autoMode}) - ${actionText}...`);
-                    submitButton.click();
+                // Etiket kontrolü: 9+ etiket varsa direkt gönder, yoksa yeni etiket iste
+                const checkTagsAndSubmit = () => {
+                  const currentTagCount = tags.length;
+                  console.log(`🏷️ Mevcut etiket sayısı: ${currentTagCount}/13`);
+                  
+                  if (currentTagCount >= 9) {
+                    console.log('✅ Yeterli etiket var (9+), direkt gönderiliyor...');
+                    setTimeout(() => {
+                      const buttonSelector = autoMode === 'direct-etsy' ? '[data-direct-submit-button]' : '[data-submit-button]';
+                      const submitButton = document.querySelector(buttonSelector) as HTMLButtonElement;
+                      if (submitButton && !submitButton.disabled) {
+                        const actionText = autoMode === 'direct-etsy' ? 'Direkt Etsy\'ye gönderiliyor' : 'Kuyruğa gönderiliyor';
+                        console.log(`🚀 Otomatik mod (${autoMode}) - ${actionText}...`);
+                        submitButton.click();
+                      }
+                    }, 1000);
+                  } else {
+                    console.log(`⚠️ Etiket eksik (${currentTagCount}/9), "Yeni Etiket İste" butonuna tıklanıyor...`);
+                    
+                    // "Yeni Etiket İste" butonunu bul ve tıkla
+                    const newTagButton = document.querySelector('button[title="Yeni Etiket İste"]') as HTMLButtonElement;
+                    if (newTagButton) {
+                      console.log('🔄 Yeni etiket isteniyor...');
+                      newTagButton.click();
+                      
+                      // Yeni etiketlerin gelmesini bekle, sonra tekrar kontrol et
+                      setTimeout(() => {
+                        console.log('🔁 Etiket güncellendikten sonra tekrar kontrol ediliyor...');
+                        checkTagsAndSubmit(); // Recursive call
+                      }, 3000); // 3 saniye bekle
+                    } else {
+                      console.log('❌ "Yeni Etiket İste" butonu bulunamadı, mevcut etiketlerle devam ediliyor...');
+                      // Buton bulunamazsa mevcut etiketlerle devam et
+                      setTimeout(() => {
+                        const buttonSelector = autoMode === 'direct-etsy' ? '[data-direct-submit-button]' : '[data-submit-button]';
+                        const submitButton = document.querySelector(buttonSelector) as HTMLButtonElement;
+                        if (submitButton && !submitButton.disabled) {
+                          const actionText = autoMode === 'direct-etsy' ? 'Direkt Etsy\'ye gönderiliyor' : 'Kuyruğa gönderiliyor';
+                          console.log(`🚀 Otomatik mod (${autoMode}) - ${actionText}...`);
+                          submitButton.click();
+                        }
+                      }, 1000);
+                    }
                   }
-                }, 1000); // 1 saniye bekle
+                };
                 
+                checkTagsAndSubmit();
                 return;
               }
             }, 100); // Her 100ms kontrol et - 5x daha hızlı

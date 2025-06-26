@@ -143,24 +143,25 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
       
       if (data.isConnected && data.apiLimit) {
         // Gerçek Etsy API header'larını kullan
-        const hourlyRemaining = data.apiLimit.hourly_remaining || 0;
-        const hourlyLimit = data.apiLimit.hourly_limit || 10000;
+        const dailyRemaining = data.apiLimit.daily_remaining || 0;
         const dailyLimit = data.apiLimit.daily_limit || 10000;
-        const dailyUsed = dailyLimit - hourlyRemaining; // Tahmini günlük kullanım
+        const secondRemaining = data.apiLimit.second_remaining || 0;
+        const secondLimit = data.apiLimit.second_limit || 10;
+        const dailyUsed = dailyLimit - dailyRemaining;
         
         setRateLimitInfo({
-          remaining: hourlyRemaining,
-          limit: hourlyLimit,
-          reset: data.apiLimit.reset || null,
+          remaining: dailyRemaining,
+          limit: dailyLimit,
+          reset: null,
           dailyUsed: dailyUsed,
           dailyLimit: dailyLimit
         });
         
         console.log('⚡ Rate limit bilgileri güncellendi:', {
-          hourly_remaining: hourlyRemaining,
-          hourly_limit: hourlyLimit,
+          daily_remaining: dailyRemaining,
           daily_limit: dailyLimit,
-          reset: data.apiLimit.reset
+          second_remaining: secondRemaining,
+          second_limit: secondLimit
         });
       }
     } catch (error) {
@@ -547,11 +548,6 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                   <CheckCircle className="w-4 h-4 text-green-600" />
                   <strong>{storeInfo.shopName}</strong> (ID: {storeInfo.shopId})
                 </span>
-                {storeInfo.apiLimit && (
-                  <span className="text-blue-600">
-                    📊 API Limit: {storeInfo.apiLimit.remaining || 'N/A'}/{storeInfo.apiLimit.daily_limit || 'N/A'}
-                  </span>
-                )}
                 <Button
                   variant="outline"
                   size="sm"

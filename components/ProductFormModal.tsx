@@ -1198,7 +1198,8 @@ export function ProductFormModal({
       };
       generateTitle();
     }
-  }, [productImages.length > 0 ? productImages[0] : null, isOpen, title, autoTitleUsed, userEditedTitle, shopSections]);
+  // Kompleks nesneleri (arrays, objects) bağımlılık dizisinden çıkarıyoruz ve sadece primitive değerleri kullanıyoruz
+  }, [isOpen, title, autoTitleUsed, userEditedTitle]);
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -1256,7 +1257,8 @@ export function ProductFormModal({
     }, 1000); // 1 saniye debounce
     
     return () => clearTimeout(timer);
-  }, [title, shopSections, shopSectionAutoSelected, selectedShopSection]); // Tüm dependency'leri ekle
+  // Kompleks nesneleri (arrays, objects) bağımlılık dizisinden çıkarıyoruz ve sadece primitive değerleri kullanıyoruz
+  }, [title, shopSectionAutoSelected, selectedShopSection]); // shopSections çıkarıldı
 
   // Form açıldığında otomatik seçimi aktif et
   useEffect(() => {
@@ -1453,7 +1455,8 @@ export function ProductFormModal({
         addFilesSequentially();
       }
     }
-  }, [isAutoMode, isOpen, autoFiles, autoTitle, title, productImages.length, countdown]);
+  // Kompleks nesneleri (arrays, objects) bağımlılık dizisinden çıkarıyoruz ve sadece primitive değerleri kullanıyoruz
+  }, [isAutoMode, isOpen, countdown, title, autoTitleLoading]);
 
   // KUYRUK SİSTEMİ İÇİN YENİ FONKSİYON
   const handleSubmitToQueue = async () => {

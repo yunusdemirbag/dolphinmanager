@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
+import crypto from 'crypto';
+
+// PKCE için yardımcı fonksiyonlar
+function base64URLEncode(buffer: Buffer): string {
+  return buffer.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+function sha256(plain: string): Buffer {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return crypto.createHash('sha256').update(data).digest();
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,6 +107,68 @@ export async function POST(request: NextRequest) {
     console.error('Etsy API key bağlantı hatası:', error);
     return NextResponse.json(
       { error: 'Bağlantı hatası oluştu' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    // Firebase Admin'i başlat
+    initializeAdminApp();
+    
+    if (!adminDb) {
+      throw new Error('Firebase Admin başlatılamadı');
+    }
+
+    // Kullanıcı kimliği
+    const userId = process.env.MOCK_USER_ID || 'local-user-123';
+
+    // State ve PKCE için code verifier oluştur
+    const state = crypto.randomBytes(16).toString('hex');
+    const codeVerifier = base64URLEncode(crypto.randomBytes(32));
+    const codeChallenge = base64URLEncode(sha256(codeVerifier));
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    const stateWithSession = `${state}:${sessionId}`;
+
+    // Session bilgilerini Firebase'e kaydet
+    const sessionRef = adminDb.collection('etsy_auth_sessions').doc(sessionId);
+    await sessionRef.set({
+      state,
+      codeVerifier,
+      userId,
+      created_at: new Date()
+    });
+
+    // OAuth URL'sini oluştur
+    const scope = 'email_r shops_r shops_w listings_r listings_w listings_d transactions_r transactions_w profile_r address_r address_w billing_r cart_r cart_w';
+    const redirectUri = process.env.ETSY_REDIRECT_URI;
+    const clientId = process.env.ETSY_CLIENT_ID;
+
+    if (!clientId || !redirectUri) {
+      throw new Error('ETSY_CLIENT_ID veya ETSY_REDIRECT_URI çevre değişkenleri tanımlanmamış');
+    }
+
+    const url = new URL('https://www.etsy.com/oauth/connect');
+    url.searchParams.append('response_type', 'code');
+    url.searchParams.append('client_id', clientId);
+    url.searchParams.append('redirect_uri', redirectUri);
+    url.searchParams.append('scope', scope);
+    url.searchParams.append('state', stateWithSession);
+    url.searchParams.append('code_challenge', codeChallenge);
+    url.searchParams.append('code_challenge_method', 'S256');
+
+    // URL'yi döndür
+    return NextResponse.json({
+      url: url.toString()
+    });
+  } catch (error: any) {
+    console.error('OAuth URL oluşturma hatası:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: error.message || 'OAuth URL oluşturulamadı' 
+      },
       { status: 500 }
     );
   }

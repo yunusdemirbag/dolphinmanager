@@ -60,6 +60,67 @@ interface QueueStats {
   total: number;
 }
 
+// Client-side localStorage yardımcı fonksiyonları
+const getCompletedCount = () => {
+  if (typeof window === 'undefined') return 0;
+  
+  try {
+    const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
+    const validCompleted = completedKeys.filter(key => {
+      try {
+        const data = JSON.parse(localStorage.getItem(key) || '{}');
+        return data.title && data.completed_at && !isNaN(new Date(data.completed_at).getTime());
+      } catch {
+        localStorage.removeItem(key); // Bozuk veriyi temizle
+        return false;
+      }
+    });
+    localStorage.setItem('completed_count', validCompleted.length.toString());
+    return validCompleted.length;
+  } catch (e) {
+    return 0;
+  }
+};
+
+const saveCompletedItem = (item: QueueItem) => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const completedCount = parseInt(localStorage.getItem('completed_count') || '0') + 1;
+    localStorage.setItem('completed_count', completedCount.toString());
+    localStorage.setItem(`completed_${item.id}`, JSON.stringify({
+      id: item.id,
+      title: item.product_data.title,
+      etsy_listing_id: item.etsy_listing_id,
+      completed_at: new Date().toISOString()
+    }));
+  } catch (e) {
+    console.error('localStorage kayıt hatası:', e);
+  }
+};
+
+const clearCompletedItems = () => {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
+    completedKeys.forEach(key => localStorage.removeItem(key));
+    localStorage.removeItem('completed_count');
+  } catch (e) {
+    console.error('localStorage temizleme hatası:', e);
+  }
+};
+
+const getCompletedItemData = (completedId: string) => {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    return JSON.parse(localStorage.getItem(completedId) || '{}');
+  } catch (e) {
+    return null;
+  }
+};
+
 export default function QueuePage() {
   const [queueItems, setQueueItems] = useState<QueueItem[]>([])
   const [selectedItems, setSelectedItems] = useState<string[]>([])
@@ -69,39 +130,21 @@ export default function QueuePage() {
   const [countdown, setCountdown] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [completedCount, setCompletedCount] = useState(0)
   const { toast } = useToast()
+
+  // Client-side localStorage işlemleri için effect
+  useEffect(() => {
+    setCompletedCount(getCompletedCount());
+  }, []);
 
   // Kuyruk istatistikleri
   const stats: QueueStats = {
     pending: queueItems.filter(item => item.status === 'pending').length,
     processing: queueItems.filter(item => item.status === 'processing').length,
-    completed: (() => {
-      const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
-      const validCompleted = completedKeys.filter(key => {
-        try {
-          const data = JSON.parse(localStorage.getItem(key) || '{}');
-          return data.title && data.completed_at && !isNaN(new Date(data.completed_at).getTime());
-        } catch {
-          localStorage.removeItem(key); // Bozuk veriyi temizle
-          return false;
-        }
-      });
-      localStorage.setItem('completed_count', validCompleted.length.toString());
-      return validCompleted.length;
-    })(),
+    completed: completedCount,
     failed: queueItems.filter(item => item.status === 'failed').length,
-    total: queueItems.length + (() => {
-      const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'));
-      const validCompleted = completedKeys.filter(key => {
-        try {
-          const data = JSON.parse(localStorage.getItem(key) || '{}');
-          return data.title && data.completed_at && !isNaN(new Date(data.completed_at).getTime());
-        } catch {
-          return false;
-        }
-      });
-      return validCompleted.length;
-    })()
+    total: queueItems.length + completedCount
   }
 
   // Kuyruk verilerini yükle - DEBUG MODE
@@ -248,31 +291,17 @@ export default function QueuePage() {
           })
         })
 
-        const deleteResult = await deleteResponse.json()
-        
-        if (deleteResult.success) {
-          // Tamamlananlar sayacını localStorage'da tut
-          const completedCount = parseInt(localStorage.getItem('completed_count') || '0') + 1
-          localStorage.setItem('completed_count', completedCount.toString())
-          localStorage.setItem(`completed_${nextItem.id}`, JSON.stringify({
-            title: nextItem.product_data.title,
-            completed_at: new Date().toISOString(),
-            etsy_listing_id: etsyResult.listing_id,
-            processing_time: Math.round(processingDelay) // İşlem süresi saniye olarak
-          }))
+        // Tamamlananlar sayacını localStorage'da tut
+        saveCompletedItem({
+          ...nextItem,
+          etsy_listing_id: etsyResult.listing_id
+        });
+        setCompletedCount(prev => prev + 1);
 
-          toast({
-            title: "Ürün Gönderildi",
-            description: `"${nextItem.product_data.title}" Etsy'ye gönderildi ve tamamlandı (${completedCount})`
-          })
-        } else {
-          console.error('DELETE işlemi başarısız:', deleteResult.error)
-          toast({
-            variant: "destructive", 
-            title: "Uyarı",
-            description: `Ürün Etsy'ye gönderildi ama kuyruktan silinemedi: ${deleteResult.error}`
-          })
-        }
+        toast({
+          title: "Ürün Gönderildi",
+          description: `"${nextItem.product_data.title}" Etsy'ye gönderildi ve tamamlandı (${completedCount})`
+        })
       } else {
         console.log('❌ Etsy başarısız, hata:', etsyResult.error)
         // Hatalı - Ürünü direkt sil (hatalıları da kuyruktaki karmaşayı önlemek için)
@@ -405,47 +434,43 @@ export default function QueuePage() {
 
   // Kuyruğu temizle
   const clearQueue = async () => {
-    const totalItems = queueItems.length + stats.completed
-    
-    if (totalItems === 0) return
-    
-    if (!confirm(`Tüm kuyruk temizlenecek (${queueItems.length} aktif + ${stats.completed} tamamlanan = ${totalItems} toplam). Bu işlem geri alınamaz. Emin misiniz?`)) return
+    if (!confirm('Tüm kuyruk öğelerini silmek istediğinizden emin misiniz?')) return
     
     try {
-      // Database'deki tüm ürünleri sil
-      const response = await fetch('/api/queue', {
+      setIsLoading(true)
+      const response = await fetch('/api/queue/clear', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'clear_all',
-          user_id: 'local-user-123'
-        })
+        body: JSON.stringify({ user_id: 'local-user-123' })
       })
-      
-      const result = await response.json()
-      
-      if (result.success) {
+
+      if (response.ok) {
         // localStorage'daki tamamlanan ürünleri de temizle
-        const completedKeys = Object.keys(localStorage).filter(key => key.startsWith('completed_'))
-        completedKeys.forEach(key => localStorage.removeItem(key))
-        localStorage.removeItem('completed_count')
+        clearCompletedItems();
+        setCompletedCount(0);
         
         toast({
-          title: "Kuyruk Tamamen Temizlendi",
-          description: `${totalItems} ürün (aktif + tamamlanan) başarıyla silindi`
+          title: "Kuyruk Temizlendi",
+          description: "Tüm kuyruk öğeleri başarıyla silindi"
         })
-        setSelectedItems([])
+        
         await loadQueueItems()
       } else {
-        throw new Error(result.error)
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Kuyruk temizlenirken bir sorun oluştu"
+        })
       }
     } catch (error) {
-      console.error('Temizleme hatası:', error)
+      console.error('Kuyruk temizleme hatası:', error)
       toast({
         variant: "destructive",
         title: "Hata",
         description: "Kuyruk temizlenemedi"
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 

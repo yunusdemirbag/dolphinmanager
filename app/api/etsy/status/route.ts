@@ -132,17 +132,18 @@ export async function GET() {
     const storeSnap = await adminDb
       .collection('etsy_stores')
       .where('user_id', '==', userId)
-      .where('is_active', '==', true)
-      .limit(1)
       .get();
 
-    if (storeSnap.empty)
+    // İndeks oluşturulana kadar JavaScript tarafında filtreleme yap
+    const activeStores = storeSnap.docs.filter(doc => doc.data().is_active);
+
+    if (activeStores.length === 0)
       return NextResponse.json({
         isConnected: false,
         error: 'Aktif mağaza bulunamadı',
       });
 
-    const store = storeSnap.docs[0].data();
+    const store = activeStores[0].data();
     const shopId = String(store.shop_id);
     const shopName = store.shop_name as string;
 
@@ -240,9 +241,15 @@ export async function GET() {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Unhandled error while checking Etsy connection:', msg);
 
+    // İndeks hatası için özel mesaj
+    const isIndexError = msg.includes('FAILED_PRECONDITION') && msg.includes('requires an index');
+    
     return NextResponse.json({
       isConnected: false,
-      error: msg,
-    });
+      error: isIndexError 
+        ? 'Firebase indeksi oluşturulma sürecinde. Lütfen birkaç dakika bekleyin ve tekrar deneyin.'
+        : 'Etsy bağlantısı kontrol edilirken bir hata oluştu.',
+      details: msg
+    }, { status: 500 });
   }
 }

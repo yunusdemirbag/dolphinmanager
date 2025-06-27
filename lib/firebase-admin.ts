@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getFirestore, Firestore, Timestamp } from 'firebase-admin/firestore';
+import { Store } from '@/types/store';
 
 let adminDb: Firestore | null = null;
 
@@ -20,7 +21,6 @@ export function initializeAdminApp() {
       return;
     }
 
-    // Private key'in doğru formatta olduğundan emin ol
     const formattedPrivateKey = privateKey.includes('\\n') 
       ? privateKey.replace(/\\n/g, '\n') 
       : privateKey;
@@ -31,7 +31,6 @@ export function initializeAdminApp() {
       privateKey: formattedPrivateKey,
     };
 
-    // Config kontrolü
     console.log('Firebase Admin Config kontrol ediliyor:');
     console.log('- Project ID:', firebaseAdminConfig.projectId ? '✅ Mevcut' : '❌ Eksik');
     console.log('- Client Email:', firebaseAdminConfig.clientEmail ? '✅ Mevcut' : '❌ Eksik');
@@ -59,14 +58,77 @@ export function initializeAdminApp() {
   }
 }
 
-// Initialize on first load in a server environment.
 if (typeof window === 'undefined') {
   initializeAdminApp();
 }
 
 export { adminDb };
 
-// Bağlı Etsy mağaza bilgisini getir (tek mağaza)
+// Kullanıcının tüm mağazalarını getir
+export async function getAllUserStores(userId: string) {
+  try {
+    initializeAdminApp();
+    
+    if (!adminDb) {
+      throw new Error('Firebase Admin başlatılamadı');
+    }
+
+    const storesSnapshot = await adminDb
+      .collection('etsy_stores')
+      .where('user_id', '==', userId)
+      .get();
+
+    const stores = await Promise.all(storesSnapshot.docs.map(async (doc) => {
+      const storeData = doc.data();
+      
+      // API anahtarlarını kontrol et
+      const apiKeysDoc = await adminDb!
+        .collection('etsy_api_keys')
+        .doc(doc.id)
+        .get();
+
+      // Timestamp'leri Date objesine çevir
+      const connected_at = storeData.connected_at instanceof Timestamp 
+        ? storeData.connected_at.toDate() 
+        : new Date(storeData.connected_at);
+
+      const last_sync_at = storeData.last_sync_at instanceof Timestamp 
+        ? storeData.last_sync_at.toDate() 
+        : new Date(storeData.last_sync_at);
+
+      const last_token_refresh = storeData.last_token_refresh instanceof Timestamp 
+        ? storeData.last_token_refresh.toDate() 
+        : storeData.last_token_refresh 
+          ? new Date(storeData.last_token_refresh) 
+          : null;
+
+      // Mağaza ikonunu ekleyin
+      const shop_icon_url = storeData.shop_icon_url || null;
+
+      return {
+        id: doc.id,
+        ...storeData,
+        connected_at,
+        last_sync_at,
+        last_token_refresh,
+        shop_icon_url,
+        hasValidToken: apiKeysDoc.exists
+      } as Store;
+    }));
+
+    // JavaScript tarafında sırala
+    return stores.sort((a, b) => {
+      const dateA = new Date(a.connected_at);
+      const dateB = new Date(b.connected_at);
+      return dateB.getTime() - dateA.getTime();
+    });
+  } catch (error) {
+    console.error('Mağaza listesi alınırken hata:', error);
+    return [];
+  }
+}
+
+// Bağlı Etsy mağaza bilgisini getir (tek mağaza - eski sistem için)
 export async function getConnectedStoreFromFirebaseAdmin(userId?: string) {
   try {
     initializeAdminApp();
@@ -77,7 +139,6 @@ export async function getConnectedStoreFromFirebaseAdmin(userId?: string) {
 
     const targetUserId = userId || 'local-user-123';
     
-    // Aktif mağazayı bul
     const storesSnapshot = await adminDb
       .collection('etsy_stores')
       .where('user_id', '==', targetUserId)
@@ -89,17 +150,38 @@ export async function getConnectedStoreFromFirebaseAdmin(userId?: string) {
     }
 
     const storeDoc = storesSnapshot.docs[0];
+    const storeData = storeDoc.data();
+
+    // Timestamp'leri Date objesine çevir
+    const connected_at = storeData.connected_at instanceof Timestamp 
+      ? storeData.connected_at.toDate() 
+      : new Date(storeData.connected_at);
+
+    const last_sync_at = storeData.last_sync_at instanceof Timestamp 
+      ? storeData.last_sync_at.toDate() 
+      : new Date(storeData.last_sync_at);
+
+    const last_token_refresh = storeData.last_token_refresh instanceof Timestamp 
+      ? storeData.last_token_refresh.toDate() 
+      : storeData.last_token_refresh 
+        ? new Date(storeData.last_token_refresh) 
+        : null;
+
     return {
       id: storeDoc.id,
-      ...storeDoc.data()
-    };
+      ...storeData,
+      connected_at,
+      last_sync_at,
+      last_token_refresh,
+      hasValidToken: true // Aktif mağaza olduğu için token geçerli kabul edilir
+    } as Store;
   } catch (error) {
     console.error('Store bilgisi alınırken hata:', error);
     return null;
   }
 }
 
-// Kullanıcının tüm bağlı mağazalarını getir
+// Çoklu mağaza API için - yeni sistem
 export async function getConnectedStoresFromFirebaseAdmin(userId?: string) {
   try {
     initializeAdminApp();
@@ -110,12 +192,11 @@ export async function getConnectedStoresFromFirebaseAdmin(userId?: string) {
 
     const targetUserId = userId || 'local-user-123';
     
-    // Kullanıcının tüm aktif mağazalarını bul
+    // Kullanıcının tüm aktif mağazalarını bul (orderBy kaldırıldı)
     const storesSnapshot = await adminDb
       .collection('etsy_stores')
       .where('user_id', '==', targetUserId)
       .where('is_active', '==', true)
-      .orderBy('connected_at', 'desc')
       .get();
 
     if (storesSnapshot.empty) {
@@ -129,5 +210,104 @@ export async function getConnectedStoresFromFirebaseAdmin(userId?: string) {
   } catch (error) {
     console.error('Mağaza listesi alınırken hata:', error);
     return [];
+  }
+}
+
+// Aktif mağazayı değiştir
+export async function switchActiveStore(userId: string, newActiveShopId: string) {
+  try {
+    initializeAdminApp();
+    
+    if (!adminDb) {
+      throw new Error('Firebase Admin başlatılamadı');
+    }
+
+    // Mağazanın kullanıcıya ait olduğunu kontrol et
+    const storeDoc = await adminDb
+      .collection('etsy_stores')
+      .doc(newActiveShopId)
+      .get();
+
+    if (!storeDoc.exists) {
+      throw new Error('Mağaza bulunamadı');
+    }
+
+    const storeData = storeDoc.data();
+    if (storeData?.user_id !== userId) {
+      throw new Error('Bu mağaza üzerinde yetkiniz yok');
+    }
+
+    const batch = adminDb.batch();
+
+    // Önce tüm mağazaları pasif yap
+    const storesSnapshot = await adminDb
+      .collection('etsy_stores')
+      .where('user_id', '==', userId)
+      .get();
+
+    storesSnapshot.docs.forEach(doc => {
+      batch.update(doc.ref, { is_active: false });
+    });
+
+    // Seçilen mağazayı aktif yap
+    batch.update(storeDoc.ref, { 
+      is_active: true,
+      last_activated_at: new Date()
+    });
+
+    await batch.commit();
+    return {
+      success: true,
+      store: {
+        id: storeDoc.id,
+        ...storeData
+      }
+    };
+  } catch (error: any) {
+    console.error('Mağaza geçişi sırasında hata:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// Mağaza bağlantısını kontrol et
+export async function checkStoreConnection(shopId: string) {
+  try {
+    initializeAdminApp();
+    
+    if (!adminDb) {
+      throw new Error('Firebase Admin başlatılamadı');
+    }
+
+    const [storeDoc, apiKeysDoc] = await Promise.all([
+      adminDb.collection('etsy_stores').doc(shopId).get(),
+      adminDb.collection('etsy_api_keys').doc(shopId).get()
+    ]);
+
+    if (!storeDoc.exists || !apiKeysDoc.exists) {
+      return {
+        exists: false,
+        isValid: false
+      };
+    }
+
+    const apiKeys = apiKeysDoc.data();
+    const expiresAt = apiKeys?.expires_at?.toDate();
+    const isValid = expiresAt ? expiresAt > new Date() : false;
+
+    return {
+      exists: true,
+      isValid,
+      expiresAt
+    };
+  } catch (error) {
+    console.error('Mağaza bağlantısı kontrol edilirken hata:', error);
+    return {
+      exists: false,
+      isValid: false,
+      error: 'Bağlantı kontrolü başarısız'
+    };
   }
 }

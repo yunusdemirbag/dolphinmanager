@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         
         // Daha kapsamlı kategori eşleştirme anahtar kelimeleri
         const keywordMapping = {
-          'abstract': ['abstract', 'geometric', 'modern', 'contemporary', 'minimal', 'rothko', 'color field', 'expressionism', 'non-representational'],
+          'abstract': ['abstract', 'geometric', 'modern', 'contemporary', 'minimal', 'color field', 'expressionism', 'non-representational'],
           'animal': ['animal', 'pet', 'cat', 'dog', 'bird', 'wildlife', 'fauna'],
           'botanical': ['flower', 'plant', 'leaf', 'tree', 'nature', 'botanical', 'floral', 'garden'],
           'landscape': ['landscape', 'mountain', 'ocean', 'sunset', 'beach', 'sea', 'sky', 'forest'],
@@ -119,58 +119,77 @@ export async function POST(request: NextRequest) {
           'religious': ['jesus', 'christ', 'religious', 'spiritual', 'sacred', 'divine', 'biblical', 'cross', 'angel', 'faith', 'prayer'],
           'minimalist': ['minimalist', 'simple', 'clean', 'minimal', 'line art'],
           'typography': ['text', 'quote', 'word', 'typography', 'lettering', 'saying'],
-          'geometric': ['geometric', 'shape', 'pattern', 'circle', 'square', 'triangle']
+          'geometric': ['geometric', 'shape', 'pattern', 'circle', 'square', 'triangle'],
+          'mark rothko art print': ['rothko', 'mark rothko']
         };
         
-        // Önce başlıktaki anahtar kelimelere göre kategori bul
+        // Öncelikli eşleştirme için özel durumlar
         let matchFound = false;
-        for (const [categoryType, keywords] of Object.entries(keywordMapping)) {
-          if (keywords.some(keyword => titleLower.includes(keyword))) {
-            // Kategori adında veya anahtar kelimelerde eşleşme ara
-            // Kategori yapısını doğru şekilde kontrol et
-            const categoryMatch = availableCategories.find((cat: any) => {
-              // Kategori yapısını kontrol et
-              if (!cat) return false;
+        
+        // Rothko için özel kontrol - Eğer başlıkta "rothko" geçiyorsa direkt Mark Rothko kategorisini seç
+        if (titleLower.includes('rothko')) {
+          const rothkoCategory = availableCategories.find((cat: any) => 
+            (cat.title || cat.name || '').toLowerCase().includes('rothko')
+          );
+          
+          if (rothkoCategory) {
+            selectedCategory = rothkoCategory;
+            console.log(`✅ Özel eşleştirme: Rothko başlığı için "${rothkoCategory.title || rothkoCategory.name}" kategorisi seçildi`);
+            matchFound = true;
+          }
+        }
+        
+        // Eğer özel eşleştirme yapılmadıysa normal anahtar kelime eşleştirmesine devam et
+        if (!matchFound) {
+          // Önce başlıktaki anahtar kelimelere göre kategori bul
+          for (const [categoryType, keywords] of Object.entries(keywordMapping)) {
+            if (keywords.some(keyword => titleLower.includes(keyword))) {
+              // Kategori adında veya anahtar kelimelerde eşleşme ara
+              // Kategori yapısını doğru şekilde kontrol et
+              const categoryMatch = availableCategories.find((cat: any) => {
+                // Kategori yapısını kontrol et
+                if (!cat) return false;
+                
+                // Kategori adı title veya name alanında olabilir
+                const categoryTitle = cat.title || cat.name || '';
+                
+                if (!categoryTitle) return false;
+                
+                return (
+                  categoryTitle.toLowerCase().includes(categoryType) ||
+                  keywords.some(k => categoryTitle.toLowerCase().includes(k))
+                );
+              });
               
-              // Kategori adı title veya name alanında olabilir
-              const categoryTitle = cat.title || cat.name || '';
-              
-              if (!categoryTitle) return false;
-              
-              return (
-                categoryTitle.toLowerCase().includes(categoryType) ||
-                keywords.some(k => categoryTitle.toLowerCase().includes(k))
-              );
-            });
-            
-            if (categoryMatch) {
-              selectedCategory = categoryMatch;
-              matchFound = true;
-              console.log(`✅ Anahtar kelime kategori eşleşmesi bulundu: "${categoryMatch.title || categoryMatch.name}" (anahtar kelime: ${categoryType})`);
-              break;
+              if (categoryMatch) {
+                selectedCategory = categoryMatch;
+                matchFound = true;
+                console.log(`✅ Anahtar kelime kategori eşleşmesi bulundu: "${categoryMatch.title || categoryMatch.name}" (anahtar kelime: ${categoryType})`);
+                break;
+              }
             }
           }
-        }
-        
-        // Eşleşme bulunamazsa, doğrudan başlık-kategori adı eşleştirmesi dene
-        if (!matchFound) {
-          const directMatch = availableCategories.find((cat: any) => {
-            if (!cat) return false;
-            const categoryTitle = cat.title || cat.name || '';
-            if (!categoryTitle) return false;
-            return titleLower.includes(categoryTitle.toLowerCase());
-          });
           
-          if (directMatch) {
-            selectedCategory = directMatch;
-            console.log(`✅ Doğrudan kategori eşleşmesi bulundu: "${directMatch.title || directMatch.name}"`);
+          // Eşleşme bulunamazsa, doğrudan başlık-kategori adı eşleştirmesi dene
+          if (!matchFound) {
+            const directMatch = availableCategories.find((cat: any) => {
+              if (!cat) return false;
+              const categoryTitle = cat.title || cat.name || '';
+              if (!categoryTitle) return false;
+              return titleLower.includes(categoryTitle.toLowerCase());
+            });
+            
+            if (directMatch) {
+              selectedCategory = directMatch;
+              console.log(`✅ Doğrudan kategori eşleşmesi bulundu: "${directMatch.title || directMatch.name}"`);
+            }
           }
-        }
-        
-        // Hala eşleşme yoksa ilk kategoriyi seç
-        if (!selectedCategory && availableCategories.length > 0) {
-          selectedCategory = availableCategories[0];
-          console.log(`⚠️ Kategori eşleşmesi bulunamadı, varsayılan kategori seçildi: "${availableCategories[0].title || availableCategories[0].name}"`);
+          
+          // Hala eşleşme yoksa ilk kategoriyi seç
+          if (!selectedCategory && availableCategories.length > 0) {
+            selectedCategory = availableCategories[0];
+            console.log(`⚠️ Kategori eşleşmesi bulunamadı, varsayılan kategori seçildi: "${availableCategories[0].title || availableCategories[0].name}"`);
+          }
         }
       }
     }

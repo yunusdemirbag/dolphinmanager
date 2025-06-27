@@ -63,8 +63,12 @@ export function StoreProvider({ children }: StoreProviderProps) {
       if (data.success) {
         // Sadece bağlı mağazaları al
         const connectedStores = data.stores.filter((s: Store) => s.is_connected !== false);
+        console.log(`🏪 Context'te mağaza durumu:`, {
+          toplam: data.stores.length,
+          bağlı: connectedStores.length,
+          mağazalar: connectedStores.map(s => `${s.shop_name} (${s.is_connected ? 'bağlı' : 'kesildi'})`)
+        });
         setAllStores(connectedStores);
-        console.log(`📋 ${connectedStores.length} bağlı mağaza yüklendi`);
         
         // Aktif mağazayı bul
         const activeStoreFromApi = connectedStores.find((s: Store) => s.is_active);

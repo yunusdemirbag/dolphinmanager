@@ -79,6 +79,16 @@ export async function getAllUserStores(userId: string, includeDisconnected: bool
 
     const storesSnapshot = await query.get();
 
+    console.log(`🔍 Firebase'den toplam ${storesSnapshot.docs.length} mağaza bulundu`);
+    storesSnapshot.docs.forEach((doc, index) => {
+      const data = doc.data();
+      console.log(`${index + 1}. ${data.shop_name} (ID: ${data.shop_id})`, {
+        is_connected: data.is_connected,
+        is_active: data.is_active,
+        disconnected_at: data.disconnected_at ? 'VAR' : 'YOK'
+      });
+    });
+    
     const allStores = await Promise.all(storesSnapshot.docs.map(async (doc) => {
       const storeData = doc.data();
       

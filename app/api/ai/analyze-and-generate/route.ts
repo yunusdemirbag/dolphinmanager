@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         
         // Daha kapsamlı kategori eşleştirme anahtar kelimeleri
         const keywordMapping = {
-          'abstract': ['abstract', 'geometric', 'modern', 'contemporary', 'minimal'],
+          'abstract': ['abstract', 'geometric', 'modern', 'contemporary', 'minimal', 'rothko', 'color field', 'expressionism', 'non-representational'],
           'animal': ['animal', 'pet', 'cat', 'dog', 'bird', 'wildlife', 'fauna'],
           'botanical': ['flower', 'plant', 'leaf', 'tree', 'nature', 'botanical', 'floral', 'garden'],
           'landscape': ['landscape', 'mountain', 'ocean', 'sunset', 'beach', 'sea', 'sky', 'forest'],

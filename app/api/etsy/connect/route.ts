@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
 import crypto from 'crypto';
 
+// PKCE için yardımcı fonksiyonlar
+function base64URLEncode(buffer: Buffer): string {
+  return buffer.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+function sha256(plain: string): Buffer {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return crypto.createHash('sha256').update(data).digest();
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { apiKey } = await request.json();
@@ -112,11 +126,13 @@ export async function GET(request: NextRequest) {
 
     // State ve PKCE için code verifier oluştur
     const state = crypto.randomBytes(16).toString('hex');
-    const codeVerifier = crypto.randomBytes(32).toString('hex');
-    const stateWithSession = `${state}:${crypto.randomBytes(16).toString('hex')}`;
+    const codeVerifier = base64URLEncode(crypto.randomBytes(32));
+    const codeChallenge = base64URLEncode(sha256(codeVerifier));
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    const stateWithSession = `${state}:${sessionId}`;
 
     // Session bilgilerini Firebase'e kaydet
-    const sessionRef = adminDb.collection('etsy_auth_sessions').doc(stateWithSession.split(':')[1]);
+    const sessionRef = adminDb.collection('etsy_auth_sessions').doc(sessionId);
     await sessionRef.set({
       state,
       codeVerifier,
@@ -139,6 +155,8 @@ export async function GET(request: NextRequest) {
     url.searchParams.append('redirect_uri', redirectUri);
     url.searchParams.append('scope', scope);
     url.searchParams.append('state', stateWithSession);
+    url.searchParams.append('code_challenge', codeChallenge);
+    url.searchParams.append('code_challenge_method', 'S256');
 
     // URL'yi döndür
     return NextResponse.json({

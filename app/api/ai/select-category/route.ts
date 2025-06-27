@@ -6,7 +6,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
     const { title, categoryNames } = await request.json();
 
@@ -14,11 +17,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Title and categoryNames array are required' }, { status: 400 });
     }
 
+    console.log(`🎯 TEMİZ OpenAI kategori seçimi: "${title}"`);
+    console.log(`📋 Mevcut kategoriler: ${categoryNames.join(', ')}`);
+
+    // OpenAI API key kontrol
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+      const modernCategory = categoryNames.find(cat => 
+        cat.toLowerCase().includes('modern') || 
+        cat.toLowerCase().includes('fashion') ||
+        cat.toLowerCase().includes('contemporary')
+      );
+      
+      const noKeyFallback = modernCategory || categoryNames[0] || 'Abstract Art';
+      console.log(`⚠️ OpenAI API key yok, Modern fallback: "${noKeyFallback}"`);
+      return new Response(noKeyFallback, {
+        headers: { 'Content-Type': 'text/plain' }
+      });
     }
 
-    // Get category prompt
+    // Basit ve temiz prompt
     const categoryPromptConfig = getPromptById('category-prompt');
     let prompt = categoryPromptConfig?.prompt || 'Select the best category for this product title.';
     
@@ -26,6 +43,7 @@ export async function POST(request: NextRequest) {
     prompt = prompt.replace('${title}', title);
     prompt = prompt.replace('${categoryNames}', categoryNames.join('\n'));
 
+    // Hızlı OpenAI çağrısı
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
@@ -35,28 +53,56 @@ export async function POST(request: NextRequest) {
         }
       ],
       max_tokens: 50,
-      temperature: 0.3,
+      temperature: 0.1,
     });
 
     const selectedCategory = response.choices[0]?.message?.content?.trim();
+    const duration = Date.now() - startTime;
     
-    // Check if selected category is in the list
+    console.log(`🤖 OpenAI seçimi (${duration}ms): "${selectedCategory}"`);
+    
+    // Eşleşme kontrolü
     if (selectedCategory && categoryNames.includes(selectedCategory)) {
       return new Response(selectedCategory, {
         headers: { 'Content-Type': 'text/plain' }
       });
     }
     
-    // Fallback: return first category
-    return new Response(categoryNames[0] || 'Home', {
+    // Fallback: Modern kategorisi ara, yoksa Modern'e yakın kategoriye at
+    const modernCategory = categoryNames.find(cat => 
+      cat.toLowerCase().includes('modern') || 
+      cat.toLowerCase().includes('fashion') ||
+      cat.toLowerCase().includes('contemporary')
+    );
+    
+    const fallbackCategory = modernCategory || categoryNames[0] || 'Abstract Art';
+    console.log(`⚠️ Eşleşme yok, Modern fallback: "${fallbackCategory}"`);
+    return new Response(fallbackCategory, {
       headers: { 'Content-Type': 'text/plain' }
     });
 
   } catch (error) {
-    console.error('Category selection error:', error);
-    return NextResponse.json(
-      { error: 'Failed to select category' },
-      { status: 500 }
-    );
+    const duration = Date.now() - startTime;
+    console.error(`❌ Kategori seçimi hatası (${duration}ms):`, error);
+    
+    // Hata durumunda Modern kategori ara
+    try {
+      const { categoryNames } = await request.json();
+      const modernCategory = categoryNames?.find(cat => 
+        cat.toLowerCase().includes('modern') || 
+        cat.toLowerCase().includes('fashion') ||
+        cat.toLowerCase().includes('contemporary')
+      );
+      
+      const errorFallback = modernCategory || categoryNames?.[0] || 'Abstract Art';
+      console.log(`💥 Hata fallback - Modern kategori: "${errorFallback}"`);
+      return new Response(errorFallback, {
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    } catch {
+      return new Response('Abstract Art', {
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
   }
 }

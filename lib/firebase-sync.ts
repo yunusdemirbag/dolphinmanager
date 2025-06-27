@@ -425,28 +425,38 @@ export async function getProductsFromFirebaseAdmin(
   startAfterListingId: number | null = null,
   shopId?: string | null
 ) {
-  initializeAdminApp();
-  if (!adminDb) {
-    console.error("Firebase Admin DB not initialized");
-    return { products: [], nextCursor: null };
-  }
+  try {
+    initializeAdminApp();
+    if (!adminDb) {
+      console.error("Firebase Admin DB not initialized");
+      return { products: [], nextCursor: null };
+    }
 
-  // Ana 'products' koleksiyonunu kullanıyoruz ve 'userId' ile filtreliyoruz
-  let query = adminDb.collection('products')
-    .where('userId', '==', userId);
-  
-  // ShopId varsa o mağazanın ürünlerini getir
-  if (shopId) {
-    query = query.where('shop_id', '==', parseInt(shopId));
-  }
-  
-  query = query.orderBy('listing_id', 'desc').limit(pageSize);
+    console.log(`🔍 Ürünler getiriliyor - userId: ${userId}, shopId: ${shopId}, pageSize: ${pageSize}`);
 
-  if (startAfterListingId) {
-    query = query.startAfter(startAfterListingId);
-  }
+    // Ana 'products' koleksiyonunu kullanıyoruz ve 'userId' ile filtreliyoruz
+    let query = adminDb.collection('products')
+      .where('userId', '==', userId);
+    
+    // ShopId varsa o mağazanın ürünlerini getir
+    if (shopId) {
+      const shopIdNumber = parseInt(shopId);
+      console.log(`🏪 ShopId filtresi ekleniyor: ${shopId} -> ${shopIdNumber}`);
+      if (isNaN(shopIdNumber)) {
+        throw new Error(`Geçersiz shopId formatı: ${shopId}`);
+      }
+      query = query.where('shop_id', '==', shopIdNumber);
+    }
+    
+    query = query.orderBy('listing_id', 'desc').limit(pageSize);
 
-  const snapshot = await query.get();
+    if (startAfterListingId) {
+      console.log(`📄 Cursor ile başlangıç: ${startAfterListingId}`);
+      query = query.startAfter(startAfterListingId);
+    }
+
+    const snapshot = await query.get();
+    console.log(`📦 ${snapshot.docs.length} ürün bulundu`);
 
   const products = (snapshot.docs || []).map(doc => {
     const data = doc.data();
@@ -469,10 +479,22 @@ export async function getProductsFromFirebaseAdmin(
     };
   });
 
-  const lastDoc = (snapshot.docs && snapshot.docs.length > 0) ? snapshot.docs[snapshot.docs.length - 1] : null;
-  const nextCursor = lastDoc ? lastDoc.data().listing_id : null;
+    const lastDoc = (snapshot.docs && snapshot.docs.length > 0) ? snapshot.docs[snapshot.docs.length - 1] : null;
+    const nextCursor = lastDoc ? lastDoc.data().listing_id : null;
 
-  return { products, nextCursor };
+    console.log(`✅ Ürünler hazırlandı - nextCursor: ${nextCursor}`);
+    return { products, nextCursor };
+  } catch (error) {
+    console.error('❌ getProductsFromFirebaseAdmin hatası:', error);
+    console.error('❌ Hata detayları:', {
+      userId,
+      shopId,
+      pageSize,
+      startAfterListingId,
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
+    throw error; // Re-throw error so API endpoint can handle it
+  }
 }
 
 export async function getConnectedStoreFromFirebaseAdmin(userId: string): Promise<EtsyStore | null> {

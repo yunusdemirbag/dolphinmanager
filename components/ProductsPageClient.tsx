@@ -74,6 +74,8 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [hasMoreProducts, setHasMoreProducts] = useState(!!initialNextCursor);
+  const [currentShopId, setCurrentShopId] = useState<string | null>(null);
+  const [isQuickSyncing, setIsQuickSyncing] = useState(false);
   
   // Queue management states
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -110,31 +112,70 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   
   // Aktif mağaza değiştiğinde ürünleri yenile
   useEffect(() => {
-    if (activeStore && activeStore.shop_id !== store?.shop_id) {
+    if (activeStore?.shop_id && activeStore.shop_id.toString() !== currentShopId) {
       console.log('🔄 Aktif mağaza değişti, ürünler yeniden yükleniyor...');
+      console.log(`📍 Önceki: ${currentShopId} → Yeni: ${activeStore.shop_id}`);
       
       // Ürünleri sıfırla ve yeniden yükle
       setProducts([]);
       setNextCursor(null);
-      setHasMoreProducts(false);
+      setHasMoreProducts(true);
       setIsLoadingProducts(true);
       
+      // Mevcut shop ID'yi güncelle
+      setCurrentShopId(activeStore.shop_id.toString());
+      
       // Yeni mağazanın ürünlerini yükle
-      fetchProductsForStore(activeStore.shop_id);
+      fetchProductsForStore(activeStore.shop_id.toString());
     }
-  }, [activeStore?.shop_id]);
+  }, [activeStore?.shop_id, currentShopId]);
 
-  // Mağaza ürünlerini yükle
+  // Mağaza ürünlerini yükle (geçici çözüm: client-side filtreleme)
   const fetchProductsForStore = async (shopId: string) => {
     try {
-      const response = await fetch(`/api/products/paginate?userId=${userId}&shopId=${shopId}&limit=12`);
+      console.log(`🔄 ${shopId} mağazasının ürünleri yükleniyor...`);
+      
+      // Daha fazla ürün çek ki tüm shop'ların ürünleri gelsin
+      const timestamp = Date.now();
+      const response = await fetch(`/api/products/paginate?userId=${userId}&limit=200&t=${timestamp}`);
       const data = await response.json();
       
+      console.log('🔍 API Response Debug:', {
+        success: data.success,
+        productCount: data.products?.length,
+        error: data.error
+      });
+      
       if (data.success) {
-        setProducts(data.products || []);
-        setNextCursor(data.nextCursor);
-        setHasMoreProducts(!!data.nextCursor);
-        console.log(`✅ ${data.products?.length || 0} ürün yüklendi`);
+        // ShopId'ye göre filtrele
+        const shopIdNumber = parseInt(shopId);
+        console.log(`🔍 Filtreleme başlıyor: aranan shopId=${shopIdNumber}, toplam ürün=${data.products?.length || 0}`);
+        
+        if (data.products && data.products.length > 0) {
+          const first3 = data.products.slice(0, 3);
+          first3.forEach((product: any, index: number) => {
+            console.log(`🔍 Ürün ${index + 1}:`, {
+              listing_id: product.listing_id,
+              shop_id: product.shop_id,
+              shop_id_type: typeof product.shop_id,
+              title: product.title?.substring(0, 30)
+            });
+          });
+        }
+        
+        const filteredProducts = (data.products || []).filter((product: any) => 
+          product.shop_id === shopIdNumber
+        );
+        
+        console.log(`✅ ${filteredProducts.length} ürün filtrelendi (${shopId} mağazası, toplam: ${data.products?.length || 0})`);
+        
+        // Tüm unique shop_id'leri göster
+        const allShopIds = [...new Set(data.products.map((p: any) => p.shop_id))];
+        console.log(`🏪 Tüm shop_id'ler:`, allShopIds);
+        
+        setProducts(filteredProducts);
+        setNextCursor(null);
+        setHasMoreProducts(false);
       } else {
         console.error('❌ Ürün yükleme hatası:', data.error);
         toast({
@@ -155,9 +196,70 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     }
   };
 
+  // Quick Sync - Cache'li sistem: İlk tıklamada Firebase'e kaydet, sonrakılerde cache'den göster
+  const quickSyncProducts = async (shopId: string) => {
+    if (isQuickSyncing) {
+      console.log('⚠️ Quick sync zaten çalışıyor, atlanıyor...');
+      return;
+    }
+    
+    try {
+      setIsQuickSyncing(true);
+      console.log(`🚀 Quick sync başlıyor - Fresh data çekiliyor, ShopId: ${shopId}`);
+      
+      // Direkt Etsy API'den fresh data çek (cache kontrolü yok)
+      const response = await fetch('/api/store/live-products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shopId })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log(`✅ Fresh data çekildi: ${data.products.length} ürün gösteriliyor`);
+        
+        // Direkt live products'ı göster
+        setProducts(data.products || []);
+        setNextCursor(null);
+        setHasMoreProducts(false);
+        
+        toast({
+          title: 'Güncel Ürünler Yüklendi!',
+          description: `${data.products.length} ürün Etsy'den çekildi.`,
+          variant: 'default',
+        });
+        
+      } else {
+        console.error('❌ Quick sync hatası:', data.error);
+        
+        toast({
+          title: 'Sync Hatası',
+          description: 'Ürünler yüklenirken hata oluştu.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('❌ Quick sync fetch hatası:', error);
+      
+      toast({
+        title: 'Bağlantı Hatası',
+        description: 'Sunucuya bağlanırken hata oluştu.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsQuickSyncing(false);
+    }
+  };
+
   // Client-side mount kontrolü
   useEffect(() => {
     setMounted(true);
+    
+    // İlk yüklemede currentShopId'yi set et
+    if (activeStore?.shop_id) {
+      setCurrentShopId(activeStore.shop_id.toString());
+    }
     
     // localStorage'dan completed verileri yükle
     if (typeof window !== 'undefined') {
@@ -729,10 +831,42 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
           )}
           <p className="text-gray-800">Etsy&apos;e yüklenmiş veya taslak ürünleriniz</p>
         </div>
-        <Button onClick={() => setIsProductFormOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Yeni Ürün Ekle
-        </Button>
+        <div className="flex gap-2">
+          {activeStore && (
+            <>
+              <Button 
+                onClick={() => quickSyncProducts(activeStore.shop_id.toString())}
+                disabled={isQuickSyncing}
+                variant="outline"
+                className="bg-blue-50 hover:bg-blue-100 border-blue-200"
+              >
+                {isQuickSyncing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Quick Sync (12)
+              </Button>
+              <Button 
+                onClick={() => {/* Full sync fonksiyonu */}}
+                disabled={isSyncing}
+                variant="outline"
+                className="bg-green-50 hover:bg-green-100 border-green-200"
+              >
+                {isSyncing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Full Sync
+              </Button>
+            </>
+          )}
+          <Button onClick={() => setIsProductFormOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Yeni Ürün Ekle
+          </Button>
+        </div>
       </div>
       
       {products.length === 0 ? (

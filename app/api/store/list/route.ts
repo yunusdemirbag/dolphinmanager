@@ -15,17 +15,39 @@ export async function GET(request: NextRequest) {
     
     console.log('🔍 Kullanıcının tüm mağazaları getiriliyor:', userId);
     
-    // Kullanıcının tüm aktif mağazalarını bul (orderBy çıkarıldı - index gereksinimi için)
+    // Kullanıcının tüm bağlı mağazalarını bul (is_active filtresi kaldırıldı)
     const storesSnapshot = await adminDb
       .collection('etsy_stores')
       .where('user_id', '==', userId)
-      .where('is_active', '==', true)
       .get();
 
-    let stores = storesSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
+    let stores = await Promise.all(storesSnapshot.docs.map(async (doc) => {
+      const storeData = doc.data();
+      
+      // API anahtarlarını kontrol et
+      const apiKeysDoc = await adminDb!
+        .collection('etsy_api_keys')
+        .doc(doc.id)
+        .get();
+        
+      return {
+        id: doc.id,
+        ...storeData,
+        hasValidToken: apiKeysDoc.exists
+      };
     }));
+    
+    // Bağlantısı kesilmiş mağazaları filtrele (includeDisconnected parametresi kontrol et)
+    const { searchParams } = new URL(request.url);
+    const includeDisconnected = searchParams.get('includeDisconnected') === 'true';
+    
+    if (!includeDisconnected) {
+      stores = stores.filter((store: any) => {
+        // Sadece açıkça false olan veya disconnected_at tarihi olan mağazaları filtrele
+        const isConnected = store.is_connected !== false && !store.disconnected_at;
+        return isConnected;
+      });
+    }
     
     // Client-side sorting by connected_at (desc)
     stores = stores.sort((a: any, b: any) => {
@@ -36,10 +58,13 @@ export async function GET(request: NextRequest) {
     
     console.log('📋 Bulunan mağaza sayısı:', stores.length);
     
+    // Aktif mağazayı bul
+    const activeStore = stores.find((store: any) => store.is_active === true);
+    
     return NextResponse.json({
       success: true,
       stores: stores,
-      activeStoreId: stores.length > 0 ? stores[0].shop_id : null
+      activeStoreId: activeStore ? activeStore.shop_id : (stores.length > 0 ? stores[0].shop_id : null)
     });
     
   } catch (error) {

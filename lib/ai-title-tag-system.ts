@@ -415,8 +415,8 @@ class AITitleTagSystem {
       {
         id: 'animal_tags',
         category: 'animal',
-        tags: ['animal art', 'wildlife decor', 'safari art', 'lion wall art', 'elephant print', 'wolf canvas', 'bird art', 'nature animal', 'wild life', 'zoo art', 'pet portrait', 'forest animal', 'jungle art'],
-        title_patterns: ['animal', 'wildlife', 'lion', 'elephant', 'wolf', 'bird', 'safari'],
+        tags: ['animal art', 'wildlife decor', 'safari art', 'lion wall art', 'elephant print', 'wolf canvas', 'bird art', 'nature animal', 'wild life', 'zoo art', 'pet portrait', 'forest animal', 'jungle art', 'cat art', 'dog art', 'tiger print', 'horse art', 'deer art', 'bear art', 'eagle art', 'owl art', 'fish art', 'butterfly art', 'fox art', 'giraffe art', 'zebra art', 'panda art', 'monkey art', 'rabbit art', 'shark art', 'whale art', 'farm animal', 'domestic pet', 'marine life'],
+        title_patterns: ['animal', 'wildlife', 'lion', 'elephant', 'wolf', 'bird', 'safari', 'cat', 'dog', 'tiger', 'horse', 'deer', 'bear', 'eagle', 'owl', 'fish', 'butterfly', 'fox', 'giraffe', 'zebra', 'panda', 'monkey', 'rabbit', 'shark', 'whale', 'pet', 'creature', 'wild', 'mammal', 'reptile', 'marine'],
         created_at: new Date(),
         success_count: 0
       },
@@ -670,12 +670,12 @@ class AITitleTagSystem {
           
         } else if (category === 'woman') {
           // Woman Art specific variables
-          const adjectives = ['Elegant', 'Powerful', 'Graceful', 'Strong', 'Confident', 'Bold', 'Beautiful', 'Empowering', 'Modern'];
-          const styles = ['Modern Woman', 'African Woman', 'Business Woman', 'Portrait', 'Fashion', 'Professional', 'Contemporary'];
-          const details = ['Portrait', 'with Natural Hair', 'in Flowing Dress', 'in Professional Attire', 'with Confident Pose', 'in Elegant Style', 'with Powerful Stance'];
-          const themes = ['Bold Female Art', 'Empowering Female Art', 'Feminine Portrait', 'Professional Female Art', 'Contemporary Woman Art', 'Strong Woman Art'];
-          const purposes = ['for Living Room or Bedroom Decor', 'for Office or Home', 'for Bedroom or Bathroom Decor', 'for Office or Study Room', 'for Empowerment Space'];
-          const values = ['Statement Piece', 'Gallery Quality', 'Art Lovers', 'Inspirational Decor', 'Empowering Gift', 'Female Power'];
+          const adjectives = ['Elegant', 'Powerful', 'Graceful', 'Strong', 'Confident', 'Bold', 'Beautiful', 'Empowering', 'Modern', 'Sexy', 'Stunning', 'Gorgeous', 'Fierce', 'Divine', 'Alluring', 'Captivating'];
+          const styles = ['Modern Woman', 'African Woman', 'Business Woman', 'Portrait', 'Fashion', 'Professional', 'Contemporary', 'Pin-up Girl', 'Goddess', 'Nude Art', 'Female Figure', 'Lady Portrait', 'Girl Art', 'Beauty Art'];
+          const details = ['Portrait', 'with Natural Hair', 'in Flowing Dress', 'in Professional Attire', 'with Confident Pose', 'in Elegant Style', 'with Powerful Stance', 'in Artistic Pose', 'with Flowing Hair', 'in Natural Beauty', 'with Graceful Pose', 'in Feminine Style'];
+          const themes = ['Bold Female Art', 'Empowering Female Art', 'Feminine Portrait', 'Professional Female Art', 'Contemporary Woman Art', 'Strong Woman Art', 'Beauty Art', 'Pin-up Art', 'Goddess Art', 'Female Power Art', 'Nude Figure Art', 'Sensual Art'];
+          const purposes = ['for Living Room or Bedroom Decor', 'for Office or Home', 'for Bedroom or Bathroom Decor', 'for Office or Study Room', 'for Empowerment Space', 'for Beauty Salon', 'for Feminine Space', 'for Boudoir Decor'];
+          const values = ['Statement Piece', 'Gallery Quality', 'Art Lovers', 'Inspirational Decor', 'Empowering Gift', 'Female Power', 'Beauty Gift', 'Feminine Art', 'Goddess Art'];
           
           const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
           const randomStyle = styles[Math.floor(Math.random() * styles.length)];
@@ -688,12 +688,12 @@ class AITitleTagSystem {
           
         } else if (category === 'animal') {
           // Animal Art specific variables
-          const adjectives = ['Majestic', 'Graceful', 'Powerful', 'Colorful', 'Wild', 'Noble', 'Fierce', 'Beautiful', 'Strong'];
-          const animals = ['Lion', 'Elephant', 'Wolf', 'Tiger', 'Eagle', 'Deer', 'Horse', 'Bear', 'Owl', 'Hummingbird'];
-          const poses = ['Portrait', 'in Nature', 'Pack', 'in Flight', 'Family', 'in Action', 'at Rest', 'Hunting', 'Running'];
-          const styles = ['Bold Wildlife Art', 'Safari Animal Art', 'Nature Bird Art', 'Wild Animal Art', 'Forest Animal Art', 'Jungle Wildlife Art'];
-          const purposes = ['for Living Room or Office Decor', 'for Bedroom or Study Room', 'for Man Cave or Living Room', 'for Kitchen or Bathroom', 'for Nature Lover', 'for Wildlife Enthusiast'];
-          const values = ['Statement Piece', 'Gallery Quality', 'Collector Item', 'Art Lovers', 'Nature Gift', 'Wildlife Decor'];
+          const adjectives = ['Majestic', 'Graceful', 'Powerful', 'Colorful', 'Wild', 'Noble', 'Fierce', 'Beautiful', 'Strong', 'Elegant', 'Bold', 'Vibrant', 'Stunning', 'Dynamic'];
+          const animals = ['Lion', 'Elephant', 'Wolf', 'Tiger', 'Eagle', 'Deer', 'Horse', 'Bear', 'Owl', 'Hummingbird', 'Cat', 'Dog', 'Bird', 'Fox', 'Giraffe', 'Zebra', 'Panda', 'Monkey', 'Rabbit', 'Butterfly', 'Shark', 'Whale', 'Fish'];
+          const poses = ['Portrait', 'in Nature', 'Pack', 'in Flight', 'Family', 'in Action', 'at Rest', 'Hunting', 'Running', 'Sitting', 'Looking', 'Standing', 'Playing', 'Swimming'];
+          const styles = ['Bold Wildlife Art', 'Safari Animal Art', 'Nature Bird Art', 'Wild Animal Art', 'Forest Animal Art', 'Jungle Wildlife Art', 'Pet Portrait Art', 'Marine Animal Art', 'Domestic Animal Art', 'Farm Animal Art'];
+          const purposes = ['for Living Room or Office Decor', 'for Bedroom or Study Room', 'for Man Cave or Living Room', 'for Kitchen or Bathroom', 'for Nature Lover', 'for Wildlife Enthusiast', 'for Pet Lover', 'for Animal Lover', 'for Safari Theme'];
+          const values = ['Statement Piece', 'Gallery Quality', 'Collector Item', 'Art Lovers', 'Nature Gift', 'Wildlife Decor', 'Animal Art', 'Pet Gift'];
           
           const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
           const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
@@ -833,7 +833,7 @@ class AITitleTagSystem {
             content: [
               {
                 type: "text",
-                text: "Analyze this image and determine the art category. Categories: rothko, klimt, frida, religious, african, jazz, asian, woman, animal, modern, zen, nature, abstract, vintage, portrait, general. Return only the category name. Use 'klimt' for golden tears, art nouveau, or Klimt-style portraits with gold elements. Use 'asian' for Japanese, Chinese, samurai, geisha, oriental art, dragon motifs, or Asian cultural themes. Use 'jazz' for musicians, musical instruments, jazz performers, trumpet, saxophone, piano players, or music-themed art. Use 'woman' for female portraits, empowering women, business women, or female-focused art. Use 'animal' for wildlife, safari animals, pets, lions, elephants, birds, or any animal subjects. Use 'modern' for contemporary, geometric, minimalist, or sleek modern designs. Use 'zen' for Buddha, meditation, lotus flowers, bamboo, zen stones, or spiritual/peaceful themes. Use 'nature' for landscapes, flowers, botanical art, forests, mountains, or natural scenery."
+                text: "Analyze this image and determine the art category. Categories: rothko, klimt, frida, religious, african, jazz, asian, woman, animal, modern, zen, nature, abstract, vintage, portrait, general. Return only the category name. PRIORITY DETECTION RULES: 1. 'woman' - ANY female figure, woman, girl, lady, female portrait, female body, female silhouette, sexy woman, nude woman, pin-up, goddess, female face, women art MUST be detected as 'woman'. 2. 'animal' - ANY animal (cat, dog, bird, lion, elephant, tiger, horse, deer, wolf, bear, wildlife, pets, safari animals, sea creatures, insects, farm animals) MUST be detected as 'animal'. 3. 'klimt' for golden tears, art nouveau, or Klimt-style portraits with gold elements. 4. 'asian' for Japanese, Chinese, samurai, geisha, oriental art, dragon motifs, or Asian cultural themes. 5. 'jazz' for musicians, musical instruments, jazz performers, trumpet, saxophone, piano players, or music-themed art. 6. 'modern' for contemporary, geometric, minimalist, or sleek modern designs. 7. 'zen' for Buddha, meditation, lotus flowers, bamboo, zen stones, or spiritual/peaceful themes. 8. 'nature' for landscapes, flowers, botanical art, forests, mountains, or natural scenery. If you see ANY female figure or woman (including sexy, nude, pin-up, goddess), ALWAYS return 'woman'."
               },
               {
                 type: "image_url",

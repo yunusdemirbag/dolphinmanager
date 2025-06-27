@@ -303,70 +303,79 @@ export const categoryPrompt: PromptConfig = {
   id: "category-prompt",
   name: "Kategori Seçme Promptu",
   description: "Ürün başlığına göre mağaza kategorisi seçmek için kullanılan prompt (${title} ve ${categoryNames} değişkenleri eklenir)",
-  prompt: `# CANVAS CATEGORY SELECTION EXPERT
+  prompt: `# KANVAS KATEGORİ SEÇİMİ - BAŞLIK ANALİZİ
 
-## TASK
-Select the MOST APPROPRIATE shop category for the canvas wall art based on the product title.
+## GÖREV
+Ürün başlığını analiz ederek mevcut kategorilerden EN UYGUN olanını seç.
 
-## INPUT
-- TITLE: \${title}
-- AVAILABLE CATEGORIES: \${categoryNames}
+## GİRİŞ
+BAŞLIK: \${title}
+MEVCUt KATEGORİLER: \${categoryNames}
 
-## CATEGORY SELECTION RULES
+## ÖNCELIK SIRASINA GÖRE SEÇİM KURALLARI:
 
-### RELIGIOUS & SPIRITUAL ART
-- If the title contains words like "Jesus", "Christ", "Madonna", "Holy", "Sacred", "Divine", "Biblical", "Cross", "Angel", "Faith", "Prayer", "Religious", "Spiritual" → Select categories like "Religious", "Spiritual", "Sacred Art"
+### 1. ROTHKO/MARK ROTHKO SANATI (EN YÜKSEK ÖNCELİK)
+Başlıkta şu kelimeler varsa → "Mark Rothko Art Print" / "Rothko" kategori seç:
+- Rothko, Mark Rothko, Rothko Style
+- Color Field, Color Block, Color Field Art
+- Abstract Expressionism (sadece renk bloklarıysa)
 
-### PORTRAIT & FIGURE ART
-- If the title mentions people, faces, figures, portraits, women, men, children → Select categories like "Portrait", "Figure", "People", "Face Art"
-- If it's a silhouette or minimalist human form → Select "Portrait" or "Minimalist"
+### 2. ANIMAL/HAYVAN SANATI (YÜKSEk ÖNCELİK)
+Başlıkta şu kelimeler varsa → "Animal" / "Animal Art" / benzeri kategori seç:
+- Lion, Lioness, Tiger, Leopard, Cheetah, Panther
+- Elephant, Rhino, Giraffe, Zebra, Hippo
+- Wolf, Fox, Bear, Deer, Moose
+- Eagle, Hawk, Owl, Bird, Parrot
+- Horse, Bull, Cow, Sheep
+- Cat, Dog, Pet
+- Wildlife, Safari, Zoo, Jungle
+- Sea animals: Whale, Dolphin, Shark, Fish
 
-### LANDSCAPE & NATURE
-- For landscapes, seascapes, mountains, beaches, forests, nature scenes → Select "Landscape", "Nature", "Scenic"
-- For sunset/sunrise scenes → Select "Landscape" or "Sunset"
-- For cityscapes or urban scenes → Select "Cityscape" or "Urban"
+### 3. WOMAN/KADIN SANATI
+Başlıkta şu kelimeler varsa → "Woman Art" / "Woman" kategori seç:
+- Woman, Girl, Lady, Female, Goddess, Queen
+- Beauty, Elegant Woman, Fashion Woman
+- Feminine, Empowerment, Strong Woman
 
-### BOTANICAL & FLORAL
-- For flowers, plants, trees, leaves, botanical illustrations → Select "Botanical", "Floral", "Plant Art"
+### 4. RELIGIOUS/DİNİ SANAT
+Başlıkta şu kelimeler varsa → "Religious Art" / "Religious" kategori seç:
+- Jesus, Christ, God, Sacred, Holy, Divine
+- Religious, Christian, Spiritual, Faith
+- Cross, Angel, Prayer, Church
 
-### ANIMAL ART
-- For any animals, wildlife, pets, birds, insects → Select "Animal", "Wildlife", "Pet Portrait"
+### 5. PORTRAIT/PORTRe SANAT
+Başlıkta şu kelimeler varsa → "Portrait" / "Portrait Art" kategori seç:
+- Portrait, Face, Person, Man
+- Human Figure, People
 
-### ABSTRACT ART
-- For non-representational art, geometric patterns, color fields → Select "Abstract", "Modern", "Contemporary"
-- For minimalist designs with simple shapes/lines → Select "Minimalist" or "Abstract"
+### 6. LANDSCAPE/DOĞA SANATI
+Başlıkta şu kelimeler varsa → "Landscape" / "Landscape Art" kategori seç:
+- Landscape, Mountain, Forest, Tree, River, Lake
+- Nature, Sunset, Sunrise, Beach, Ocean
+- Botanical, Flower, Plant (sadece doğa temalıysa)
 
-### COLOR-BASED SELECTION
-- Blue/teal dominant abstract art → Often "Abstract" or "Modern"
-- Earth tones landscapes → "Landscape" or "Nature"
-- Vibrant colorful abstracts → "Abstract" or "Modern"
+### 7. ABSTRACT/SOYUT SANAT (VARSAYILAN)
+Başka kategori uygun değilse → "Abstract Art" / "Abstract" / "Modern" seç:
+- Abstract, Modern, Geometric, Minimalist
+- Contemporary, Artistic, Creative
+- Color, Shape, Pattern
 
-### STYLE-BASED SELECTION
-- Modern, contemporary styles → "Modern", "Contemporary"
-- Vintage, retro styles → "Vintage", "Retro"
-- Minimalist styles → "Minimalist"
+## ÖNEMLİ NOTLAR
+- Başlıkta birden fazla kategori uyuyorsa, ÖNCELIK SIRASINA göre seç
+- Örnek: "Lion Woman Warrior" → ANIMAL kategorisi seç (daha yüksek öncelik)
+- Kanvas/Canvas kelimesi kategori seçimini etkilemez, sadece sanat içeriğine odaklan
+- Emin değilsen Abstract Art seç
 
-## OUTPUT INSTRUCTIONS
-- Return ONLY the exact name of ONE category from the provided list
-- Do not add any explanations or additional text
-- Ensure the category name matches EXACTLY one of the provided options
-- If multiple categories could apply, select the MOST specific and relevant one
+## ÇIKTI FORMATI
+Sadece kategori adını döndür. Açıklama, virgül, nokta kullanma.
 
-## EXAMPLES
-Title: "Serene Mountain Lake Landscape Canvas Wall Art Print | Nature Scene Home Decor"
-Category: Landscape
-
-Title: "Abstract Blue Geometric Shapes Canvas Print | Modern Living Room Wall Art"
-Category: Abstract
-
-Title: "Radiant Jesus with Open Arms Canvas Wall Art Print | Spiritual Living Room Decor"
-Category: Religious
-
-Title: "Elegant African Woman Portrait Canvas Print | Black Art Home Decor"
-Category: Portrait
-
-Title: "Minimalist Line Art Face Canvas Print | Modern Bedroom Wall Decor"
-Category: Portrait`,
+## ÖRNEKLER
+"Bold Ochre Rothko Style Color Field Canvas" → Mark Rothko Art Print
+"Majestic Lioness in Floral Canvas Wall Art Print" → Animal Art
+"Elegant Woman Portrait Canvas" → Woman Art
+"Abstract Blue Geometric Shapes" → Abstract Art
+"Jesus Sacred Heart Religious" → Religious Art
+"Mountain Sunset Landscape" → Landscape Art`,
   defaultPrompt: `Aşağıdaki ürün başlığına en uygun mağaza kategorisini sadece aşağıdaki seçeneklerden birini seçerek döndür. Sadece kategori adını döndür.
 
 BAŞLIK: \${title}

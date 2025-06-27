@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { aiTitleTagSystem } from '@/lib/ai-title-tag-system';
 import { initializeAdminApp } from '@/lib/firebase-admin';
+import OpenAI from 'openai';
+import { getPromptById } from '@/lib/prompts';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -56,140 +58,160 @@ export async function POST(request: NextRequest) {
     // Select category from available categories if provided
     let selectedCategory = null;
     if (availableCategories.length > 0) {
-      // Log kategori verilerinin yapısını görmek için
-      console.log('📋 Gelen kategoriler:', JSON.stringify(availableCategories.slice(0, 2)));
+      console.log('📋 Kanvas kategorileri:', availableCategories.map((cat: any) => cat.title || cat.name).join(', '));
       
-      try {
-        // OpenAI API ile kategori seçimi yap
-        console.log('🧠 OpenAI API ile kategori seçimi yapılıyor...');
+      // İLK ÖNCE AI ANALİZİNDEN GELEN KATEGORİ BİLGİSİNİ KULLAN
+      console.log(`🎨 İlk analiz kategorisi: "${result.category}" - Hızlı eşleştirme yapılıyor...`);
+      
+      const detectedCategoryLower = result.category.toLowerCase();
+      
+      // Kategori eşleştirme haritası
+      const categoryMapping = {
+        'rothko': ['mark rothko', 'rothko'],
+        'animal': ['animal'],
+        'religious': ['religious'],
+        'woman': ['woman'],
+        'abstract': ['abstract'],
+        'flowers': ['flower'],
+        'landscape': ['landscape'],
+        'modern': ['modern', 'fashion'],
+        'zen': ['buddha', 'zen'],
+        'african': ['ethnic'],
+        'jazz': ['music', 'dance'],
+        'asian': ['ethnic'],
+        'frida': ['ethnic'],
+        'klimt': ['woman', 'abstract'],
+        'nature': ['landscape', 'flower']
+      };
+      
+      // İlk analiz kategorisine göre eşleştir
+      const mappedKeywords = categoryMapping[detectedCategoryLower as keyof typeof categoryMapping] || [detectedCategoryLower];
+      
+      for (const keyword of mappedKeywords) {
+        const matchedCategory = availableCategories.find((cat: any) => {
+          const categoryTitle = (cat.title || cat.name || '').toLowerCase();
+          return categoryTitle.includes(keyword);
+        });
+        
+        if (matchedCategory) {
+          selectedCategory = matchedCategory;
+          console.log(`✅ Hızlı kategori eşleştirmesi: "${result.category}" → "${matchedCategory.title || matchedCategory.name}"`);
+          break;
+        }
+      }
+      
+      // Eğer hızlı eşleştirme başarısızsa, başlık bazlı OpenAI seçimi yap
+      if (!selectedCategory) {
+        console.log('⚠️ Hızlı eşleştirme başarısız, OpenAI başlık analizi yapılıyor...');
         
         // Kategori isimlerini al
         const categoryNames = availableCategories.map((cat: any) => cat.title || cat.name || '').filter(Boolean);
         
-        if (categoryNames.length > 0) {
-          // OpenAI API'ye istek gönder
-          const response = await fetch('/api/ai/select-category', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              title: result.title,
-              categoryNames
-            }),
-          });
-          
-          if (response.ok) {
-            const selectedCategoryName = await response.text();
-            console.log(`🎯 OpenAI kategori seçimi: "${selectedCategoryName}"`);
+        try {
+          if (categoryNames.length > 0 && process.env.OPENAI_API_KEY) {
+            // OpenAI instance oluştur
+            const openai = new OpenAI({
+              apiKey: process.env.OPENAI_API_KEY,
+            });
+
+            // Basit ve temiz prompt
+            const categoryPromptConfig = getPromptById('category-prompt');
+            let prompt = categoryPromptConfig?.prompt || 'Select the best category for this product title.';
             
-            // Seçilen kategori adına göre kategori nesnesini bul
-            const matchedCategory = availableCategories.find((cat: any) => 
-              (cat.title || cat.name || '').toLowerCase() === selectedCategoryName.toLowerCase()
-            );
+            // Replace variables
+            prompt = prompt.replace('${title}', result.title);
+            prompt = prompt.replace('${categoryNames}', categoryNames.join('\n'));
+
+            // Hızlı OpenAI çağrısı
+            const openaiResponse = await openai.chat.completions.create({
+              model: "gpt-3.5-turbo",
+              messages: [
+                {
+                  role: "user",
+                  content: prompt
+                }
+              ],
+              max_tokens: 50,
+              temperature: 0.1,
+            });
+
+            const selectedCategoryName = openaiResponse.choices[0]?.message?.content?.trim();
+            console.log(`🎯 OpenAI başlık bazlı kategori seçimi: "${selectedCategoryName}"`);
             
-            if (matchedCategory) {
-              selectedCategory = matchedCategory;
-              console.log(`✅ Kategori eşleşmesi bulundu: "${matchedCategory.title || matchedCategory.name}"`);
-            } else {
-              console.log(`⚠️ OpenAI'nin seçtiği kategori bulunamadı: "${selectedCategoryName}"`);
-            }
-          } else {
-            console.error('❌ OpenAI kategori seçimi hatası:', await response.text());
-          }
-        }
-      } catch (error) {
-        console.error('❌ OpenAI kategori seçimi hatası:', error);
-      }
-      
-      // OpenAI ile seçim başarısız olduysa fallback olarak anahtar kelime eşleştirmesi kullan
-      if (!selectedCategory) {
-        console.log('⚠️ OpenAI kategori seçimi başarısız, anahtar kelime eşleştirmesine geçiliyor...');
-        
-        // Enhanced category matching based on title/category
-        const titleLower = result.title.toLowerCase();
-        
-        // Daha kapsamlı kategori eşleştirme anahtar kelimeleri
-        const keywordMapping = {
-          'abstract': ['abstract', 'geometric', 'modern', 'contemporary', 'minimal', 'color field', 'expressionism', 'non-representational'],
-          'animal': ['animal', 'pet', 'cat', 'dog', 'bird', 'wildlife', 'fauna'],
-          'botanical': ['flower', 'plant', 'leaf', 'tree', 'nature', 'botanical', 'floral', 'garden'],
-          'landscape': ['landscape', 'mountain', 'ocean', 'sunset', 'beach', 'sea', 'sky', 'forest'],
-          'portrait': ['portrait', 'face', 'woman', 'man', 'people', 'person', 'figure'],
-          'religious': ['jesus', 'christ', 'religious', 'spiritual', 'sacred', 'divine', 'biblical', 'cross', 'angel', 'faith', 'prayer'],
-          'minimalist': ['minimalist', 'simple', 'clean', 'minimal', 'line art'],
-          'typography': ['text', 'quote', 'word', 'typography', 'lettering', 'saying'],
-          'geometric': ['geometric', 'shape', 'pattern', 'circle', 'square', 'triangle'],
-          'mark rothko art print': ['rothko', 'mark rothko']
-        };
-        
-        // Öncelikli eşleştirme için özel durumlar
-        let matchFound = false;
-        
-        // Rothko için özel kontrol - Eğer başlıkta "rothko" geçiyorsa direkt Mark Rothko kategorisini seç
-        if (titleLower.includes('rothko')) {
-          const rothkoCategory = availableCategories.find((cat: any) => 
-            (cat.title || cat.name || '').toLowerCase().includes('rothko')
-          );
-          
-          if (rothkoCategory) {
-            selectedCategory = rothkoCategory;
-            console.log(`✅ Özel eşleştirme: Rothko başlığı için "${rothkoCategory.title || rothkoCategory.name}" kategorisi seçildi`);
-            matchFound = true;
-          }
-        }
-        
-        // Eğer özel eşleştirme yapılmadıysa normal anahtar kelime eşleştirmesine devam et
-        if (!matchFound) {
-          // Önce başlıktaki anahtar kelimelere göre kategori bul
-          for (const [categoryType, keywords] of Object.entries(keywordMapping)) {
-            if (keywords.some(keyword => titleLower.includes(keyword))) {
-              // Kategori adında veya anahtar kelimelerde eşleşme ara
-              // Kategori yapısını doğru şekilde kontrol et
-              const categoryMatch = availableCategories.find((cat: any) => {
-                // Kategori yapısını kontrol et
-                if (!cat) return false;
-                
-                // Kategori adı title veya name alanında olabilir
-                const categoryTitle = cat.title || cat.name || '';
-                
-                if (!categoryTitle) return false;
-                
-                return (
-                  categoryTitle.toLowerCase().includes(categoryType) ||
-                  keywords.some(k => categoryTitle.toLowerCase().includes(k))
-                );
-              });
+            // Eşleşme kontrolü
+            if (selectedCategoryName && categoryNames.includes(selectedCategoryName)) {
+              // Seçilen kategori adına göre kategori nesnesini bul
+              const matchedCategory = availableCategories.find((cat: any) => 
+                (cat.title || cat.name || '').toLowerCase() === selectedCategoryName.toLowerCase()
+              );
               
-              if (categoryMatch) {
-                selectedCategory = categoryMatch;
-                matchFound = true;
-                console.log(`✅ Anahtar kelime kategori eşleşmesi bulundu: "${categoryMatch.title || categoryMatch.name}" (anahtar kelime: ${categoryType})`);
-                break;
+              if (matchedCategory) {
+                selectedCategory = matchedCategory;
+                console.log(`✅ OpenAI kategorisi bulundu: "${matchedCategory.title || matchedCategory.name}"`);
               }
             }
           }
-          
-          // Eşleşme bulunamazsa, doğrudan başlık-kategori adı eşleştirmesi dene
-          if (!matchFound) {
-            const directMatch = availableCategories.find((cat: any) => {
+        } catch (error) {
+          console.error('❌ OpenAI kategori seçimi hatası:', error);
+        }
+      }
+      
+      // GÜÇLÜ FALLBACK SİSTEMİ - Referans dosyadan alındı
+      if (!selectedCategory) {
+        console.log('⚠️ OpenAI kategori seçimi başarısız, güçlü keyword matching başlatılıyor...');
+        
+        const titleLower = result.title.toLowerCase();
+        
+        // Kapsamlı kategori eşleştirme anahtar kelimeleri
+        const keywordMapping = {
+          'animal': ['animal', 'lion', 'lioness', 'tiger', 'elephant', 'cat', 'dog', 'bird', 'wildlife', 'pet', 'fauna', 'wolf', 'bear', 'deer'],
+          'religious': ['jesus', 'christ', 'religious', 'spiritual', 'sacred', 'divine', 'biblical', 'cross', 'angel', 'faith', 'prayer', 'holy'],
+          'abstract': ['abstract', 'geometric', 'modern', 'contemporary', 'minimal', 'color field', 'expressionism'],
+          'flower': ['flower', 'plant', 'leaf', 'tree', 'nature', 'botanical', 'floral', 'garden', 'rose'],
+          'landscape': ['landscape', 'mountain', 'ocean', 'sunset', 'beach', 'sea', 'sky', 'forest'],
+          'rothko': ['rothko', 'mark rothko', 'color field'],
+          'love': ['love', 'heart', 'romance', 'couple'],
+          'woman': ['woman', 'girl', 'lady', 'female', 'goddess', 'beauty'],
+          'portrait': ['portrait', 'face', 'man', 'people', 'person', 'figure'],
+          'modern': ['modern', 'fashion', 'contemporary', 'stylish'],
+          'kitchen': ['kitchen', 'food', 'cooking', 'chef'],
+          'surreal': ['surreal', 'dream', 'fantasy', 'psychedelic'],
+          'erotic': ['erotic', 'nude', 'sensual', 'intimate']
+        };
+        
+        // Başlıktaki anahtar kelimelere göre kategori bul
+        for (const [categoryType, keywords] of Object.entries(keywordMapping)) {
+          if (keywords.some(keyword => titleLower.includes(keyword))) {
+            // Kategori adında veya anahtar kelimelerde eşleşme ara
+            const categoryMatch = availableCategories.find((cat: any) => {
               if (!cat) return false;
-              const categoryTitle = cat.title || cat.name || '';
+              const categoryTitle = (cat.title || cat.name || '').toLowerCase();
               if (!categoryTitle) return false;
-              return titleLower.includes(categoryTitle.toLowerCase());
+              
+              // Kategori tipine göre eşleştir
+              return categoryTitle.includes(categoryType) || 
+                     keywords.some(k => categoryTitle.includes(k));
             });
             
-            if (directMatch) {
-              selectedCategory = directMatch;
-              console.log(`✅ Doğrudan kategori eşleşmesi bulundu: "${directMatch.title || directMatch.name}"`);
+            if (categoryMatch) {
+              selectedCategory = categoryMatch;
+              console.log(`✅ Keyword eşleşmesi: "${categoryType}" → "${categoryMatch.title || categoryMatch.name}"`);
+              break;
             }
           }
+        }
+        
+        // Hala eşleşme yoksa Modern kategori ara (fallback)
+        if (!selectedCategory) {
+          const modernCategory = availableCategories.find((cat: any) => {
+            const catTitle = (cat.title || cat.name || '').toLowerCase();
+            return catTitle.includes('modern') || 
+                   catTitle.includes('fashion') || 
+                   catTitle.includes('contemporary');
+          });
           
-          // Hala eşleşme yoksa ilk kategoriyi seç
-          if (!selectedCategory && availableCategories.length > 0) {
-            selectedCategory = availableCategories[0];
-            console.log(`⚠️ Kategori eşleşmesi bulunamadı, varsayılan kategori seçildi: "${availableCategories[0].title || availableCategories[0].name}"`);
-          }
+          selectedCategory = modernCategory || availableCategories[0];
+          console.log(`⚠️ Modern fallback kategori: "${selectedCategory?.title || selectedCategory?.name}"`);
         }
       }
     }

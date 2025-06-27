@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { useDrag, useDrop } from "react-dnd"
 import {
@@ -752,7 +752,21 @@ export function ProductFormModal({
     if (hasUnsavedChanges()) {
       setShowUnsavedChangesDialog(true);
     } else {
-      onClose();
+      // Tüm form state'lerini temizle
+      setTitle("");
+      setAutoTitleUsed(false);
+      setUserEditedTitle(false);
+      setProductImages([]);
+      setDescription("");
+      setPrice("");
+      setQuantity(1);
+      setTags([]);
+      setSelectedCategory(null);
+      setSelectedShopSection("");
+      // Force modal close
+      setTimeout(() => {
+        onClose();
+      }, 0);
     }
   };
 
@@ -1102,17 +1116,23 @@ export function ProductFormModal({
     return cleaned;
   };
 
+  // Image count'u optimize et - sadece length değiştiğinde yeniden hesapla
+  const imageCount = useMemo(() => (productImages || []).length, [productImages]);
+
   // Resim yüklendiğinde başlık üret
   useEffect(() => {
-    // Sadece ilk resim eklendiğinde AI analizi yap
-    if (isOpen && (productImages || []).length === 1 && !title && !autoTitleUsed && !userEditedTitle) {
-      console.log('🤖 Otomatik başlık üretimi başlatılıyor...', {
-        isOpen,
-        imageCount: (productImages || []).length,
-        title,
-        autoTitleUsed,
-        userEditedTitle
-      });
+    console.log('🔍 Auto title check:', {
+      isOpen,
+      imageCount,
+      title: title ? `"${title.substring(0, 30)}..."` : 'empty',
+      autoTitleUsed,
+      userEditedTitle,
+      shouldGenerate: isOpen && imageCount >= 1 && (!title || title.trim() === '') && !autoTitleUsed && !userEditedTitle && !autoTitleLoading
+    });
+    
+    // İlk resim eklendiğinde SADECE 1 KEZ AI analizi yap - loading durumunu da kontrol et
+    if (isOpen && imageCount >= 1 && (!title || title.trim() === '') && !autoTitleUsed && !userEditedTitle && !autoTitleLoading) {
+      console.log('🤖 Otomatik başlık üretimi başlatılıyor...');
       
       const generateTitle = async () => {
         setAutoTitleLoading(true);
@@ -1173,13 +1193,26 @@ export function ProductFormModal({
               setTags(data.tags.slice(0, 13));
             }
             
-            // Kategoriyi de ayarla
-            if (data.suggestedCategoryId) {
-              console.log('🏷️ API\'den gelen kategori ID:', data.suggestedCategoryId);
-              setSelectedShopSection(data.suggestedCategoryId.toString());
-              console.log('✅ Kategori ayarlandı:', data.suggestedCategoryId.toString());
-            } else {
-              console.log('⚠️ API\'den kategori ID gelmedi');
+            // analyze-and-generate API'den gelen kategori seçimini kullan
+            if (data.suggestedCategoryId && shopSections.length > 0) {
+              const suggestedSection = shopSections.find(s => 
+                s.shop_section_id.toString() === data.suggestedCategoryId.toString()
+              );
+              
+              if (suggestedSection) {
+                setSelectedShopSection(suggestedSection.shop_section_id.toString());
+                console.log('✅ AI kategori seçimi kullanıldı:', suggestedSection.title);
+              } else {
+                // Fallback: Modern kategorisi ara
+                const modernSection = shopSections.find(s => 
+                  s.title.toLowerCase().includes('modern') || 
+                  s.title.toLowerCase().includes('fashion') ||
+                  s.title.toLowerCase().includes('contemporary')
+                );
+                const fallbackSection = modernSection || shopSections[0];
+                setSelectedShopSection(fallbackSection.shop_section_id.toString());
+                console.log('⚠️ AI kategori bulunamadı, fallback:', fallbackSection.title);
+              }
             }
           } else {
             console.log('❌ API\'den başlık alınamadı');
@@ -1198,8 +1231,9 @@ export function ProductFormModal({
       };
       generateTitle();
     }
-  // Kompleks nesneleri (arrays, objects) bağımlılık dizisinden çıkarıyoruz ve sadece primitive değerleri kullanıyoruz
-  }, [isOpen, title, autoTitleUsed, userEditedTitle]);
+  // imageCount optimize edildi, sadece gerçekten değiştiğinde tetiklenecek
+  }, [isOpen, title, autoTitleUsed, userEditedTitle, imageCount, autoTitleLoading]);
+
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
   const handleShopSectionChange = (val: string) => {
@@ -2761,19 +2795,25 @@ Return only the title, no quotes, no explanations.`
 
       <Dialog
         open={isOpen && !isEmbedded}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
+        onOpenChange={(open) => {
+          console.log('🔍 Dialog onOpenChange:', open);
+          if (!open) {
+            // Force close all modal states
+            document.body.style.pointerEvents = 'auto';
+            document.body.style.overflow = 'auto';
             handleCloseModal();
           } else {
             setTitle("");
             setAutoTitleUsed(false);
+            setUserEditedTitle(false);
           }
         }}
+        modal={true}
       >
         <DialogTrigger asChild>
           {/* DialogTrigger content */}
         </DialogTrigger>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-white">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle className="flex items-center justify-between">
                 <span>
@@ -3379,8 +3419,16 @@ Return only the title, no quotes, no explanations.`
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showUnsavedChangesDialog} onOpenChange={setShowUnsavedChangesDialog}>
-        <AlertDialogContent>
+      <AlertDialog open={showUnsavedChangesDialog} onOpenChange={(open) => {
+        console.log('🔍 AlertDialog onOpenChange:', open);
+        if (!open) {
+          // Force close all modal states
+          document.body.style.pointerEvents = 'auto';
+          document.body.style.overflow = 'auto';
+        }
+        setShowUnsavedChangesDialog(open);
+      }}>
+        <AlertDialogContent className="bg-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Kaydedilmemiş değişiklikler</AlertDialogTitle>
             <AlertDialogDescription>
@@ -3388,10 +3436,20 @@ Return only the title, no quotes, no explanations.`
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => {
+              console.log('🔍 AlertDialog Cancel clicked');
+              document.body.style.pointerEvents = 'auto';
+              document.body.style.overflow = 'auto';
+              setShowUnsavedChangesDialog(false);
+            }}>İptal</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
-              setShowUnsavedChangesDialog(false)
-              onClose()
+              console.log('🔍 AlertDialog Action clicked');
+              document.body.style.pointerEvents = 'auto';
+              document.body.style.overflow = 'auto';
+              setShowUnsavedChangesDialog(false);
+              setTimeout(() => {
+                onClose();
+              }, 0);
             }}>
               Değişiklikleri Sil
             </AlertDialogAction>

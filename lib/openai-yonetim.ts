@@ -202,16 +202,75 @@ Clean gently with a dry cloth. Avoid direct sunlight for optimal color preservat
 Order now and transform your walls with this beautiful piece of art!`;
 }
 
-// Kategori seçimi için uygunluk fonksiyonu
+// Keyword-based kategori seçimi (daha güvenilir)
+function selectCategoryByKeywords(title: string, categories: Array<{title: string, shop_section_id: number}>): number | null {
+  const titleLower = title.toLowerCase();
+  
+  // Kesin anahtar kelimeler ile kategori eşleştirme
+  const keywordMap = [
+    // Religious - sadece kesin religious kelimeler
+    { keywords: ['jesus', 'christ', 'madonna', 'holy', 'sacred', 'divine', 'biblical', 'cross', 'angel', 'prayer', 'christian', 'god'], categories: ['religious art', 'religious', 'sacred art'] },
+    
+    // Portrait - insan figürleri
+    { keywords: ['portrait', 'face', 'woman', 'man', 'person', 'people', 'figure'], categories: ['portrait', 'figure', 'people'] },
+    
+    // Landscape - doğa manzaraları
+    { keywords: ['landscape', 'mountain', 'beach', 'forest', 'nature', 'sunset', 'sunrise', 'lake', 'river', 'ocean'], categories: ['landscape', 'nature', 'scenic'] },
+    
+    // Botanical - bitki sanatı
+    { keywords: ['flower', 'plant', 'tree', 'leaf', 'botanical', 'floral'], categories: ['botanical', 'floral', 'plant art'] },
+    
+    // Animal - hayvan sanatı
+    { keywords: ['animal', 'wildlife', 'bird', 'cat', 'dog', 'lion', 'elephant'], categories: ['animal', 'wildlife', 'pet portrait'] },
+    
+    // Abstract - soyut sanat (default fallback)
+    { keywords: ['abstract', 'geometric', 'modern', 'contemporary', 'minimalist', 'color field', 'pattern'], categories: ['abstract', 'modern art', 'contemporary', 'wall art'] }
+  ];
+  
+  // Anahtar kelimelere göre kategori bul
+  for (const mapping of keywordMap) {
+    if (mapping.keywords.some(keyword => titleLower.includes(keyword))) {
+      // Bu anahtar kelimeye uygun kategorilerden birini bul
+      for (const categoryName of mapping.categories) {
+        const matchedCategory = categories.find(cat => cat.title.toLowerCase() === categoryName);
+        if (matchedCategory) {
+          return matchedCategory.shop_section_id;
+        }
+      }
+    }
+  }
+  
+  // Fallback: Abstract veya ilk kategori
+  const abstractCategory = categories.find(cat => 
+    cat.title.toLowerCase().includes('abstract') || 
+    cat.title.toLowerCase().includes('wall art') ||
+    cat.title.toLowerCase().includes('modern')
+  );
+  
+  return abstractCategory?.shop_section_id || categories[0]?.shop_section_id || null;
+}
+
+// Kategori seçimi için uygunluk fonksiyonu - hibrit yaklaşım
 export async function selectCategory(title: string, categories: Array<{title: string, shop_section_id: number}>): Promise<number | null> {
   try {
+    // Önce keyword-based seçim dene (daha güvenilir)
+    const keywordBasedResult = selectCategoryByKeywords(title, categories);
+    if (keywordBasedResult) {
+      console.log('🎯 Keyword-based kategori seçimi:', keywordBasedResult);
+      return keywordBasedResult;
+    }
+    
+    // Keyword bulamazsa AI'ya sor
     const categoryNames = categories.map(cat => cat.title);
     const selectedCategoryName = await categoryPrompt(title, categoryNames);
     
     const selectedCategory = categories.find(cat => cat.title === selectedCategoryName);
+    console.log('🤖 AI-based kategori seçimi:', selectedCategory?.shop_section_id);
     return selectedCategory?.shop_section_id || null;
   } catch (error) {
     console.error('Category selection error:', error);
-    return null;
+    
+    // Hata durumunda keyword-based fallback
+    return selectCategoryByKeywords(title, categories);
   }
 }

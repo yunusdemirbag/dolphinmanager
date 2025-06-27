@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Store } from '@/types/store';
 import { ShopAnalytics } from '@/types/analytics';
 import { useStoreAnalytics } from '@/hooks/useStoreAnalytics';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CompactMetrics } from '@/components/MetricsGrid';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Store as StoreIcon, Trash2, RefreshCw, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Store as StoreIcon, Trash2, RefreshCw, CheckCircle, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 
 interface StoreCardProps {
@@ -20,11 +21,24 @@ interface StoreCardProps {
 export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }: StoreCardProps) {
   const { analytics, isLoading: analyticsLoading, refreshAnalytics } = useStoreAnalytics(store.id);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  
+  const [isSwitching, setIsSwitching] = useState(false);
+  const router = useRouter();
 
   const handleStoreSwitch = async () => {
-    if (store.is_active || isLoading) return;
-    await onStoreSwitch(store);
+    if (store.is_active || isLoading || isSwitching) return;
+    
+    setIsSwitching(true);
+    try {
+      await onStoreSwitch(store);
+      // Başarılı geçiş sonrası ürünler sayfasına yönlendir
+      setTimeout(() => {
+        router.push('/products');
+      }, 1000);
+    } catch (error) {
+      console.error('Mağaza geçiş hatası:', error);
+    } finally {
+      setIsSwitching(false);
+    }
   };
 
   const handleDisconnect = async () => {
@@ -37,25 +51,27 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
   };
 
   const getStatusBadge = () => {
-    // Eğer analytics varsa ve API anahtarı geçerliyse, mağaza bağlıdır
-    const isReallyConnected = store.hasValidToken && !store.disconnected_at;
+    // Mağaza bağlantısı kontrolü
+    const isDisconnected = store.is_connected === false || store.disconnected_at;
+    const hasNoToken = store.hasValidToken === false;
     
-    if (!isReallyConnected || store.is_connected === false) {
+    if (isDisconnected) {
       return <Badge variant="secondary">Bağlantı Kesildi</Badge>;
+    }
+    if (hasNoToken) {
+      return <Badge variant="destructive">Token Hatası</Badge>;
     }
     if (store.is_active) {
       return <Badge variant="default" className="bg-green-500">Aktif</Badge>;
-    }
-    if (!store.hasValidToken) {
-      return <Badge variant="destructive">Token Hatası</Badge>;
     }
     return <Badge variant="outline">Bağlı</Badge>;
   };
 
   const getActionButtons = () => {
-    const isReallyConnected = store.hasValidToken && !store.disconnected_at;
+    const isDisconnected = store.is_connected === false || store.disconnected_at;
+    const hasNoToken = store.hasValidToken === false;
     
-    if (!isReallyConnected || store.is_connected === false) {
+    if (isDisconnected || hasNoToken) {
       return (
         <div className="flex gap-2">
           <Button
@@ -162,17 +178,20 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
       <div className="flex gap-2">
         <Button
           onClick={handleStoreSwitch}
-          disabled={isLoading === store.id || !store.hasValidToken}
-          className="flex-1"
+          disabled={isSwitching || isLoading === store.id || hasNoToken}
+          className="flex-1 group transition-all duration-300 hover:scale-105 bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-xl"
           size="sm"
         >
-          {isLoading === store.id ? (
+          {isSwitching || isLoading === store.id ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Geçiş Yapılıyor...
+              {isSwitching ? 'Ürünler Yükleniyor...' : 'Geçiş Yapılıyor...'}
             </>
           ) : (
-            'Bu Mağazaya Geç'
+            <>
+              Bu Mağazaya Geç
+              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+            </>
           )}
         </Button>
         

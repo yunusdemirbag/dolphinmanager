@@ -5,7 +5,8 @@ import { getProductsFromFirebaseAdmin } from '@/lib/firebase-sync';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const userId = searchParams.get('user_id');
+  const userId = searchParams.get('userId') || searchParams.get('user_id');
+  const shopId = searchParams.get('shopId');
   const cursorParam = searchParams.get('cursor');
 
   if (!userId) {
@@ -19,10 +20,20 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { products, nextCursor } = await getProductsFromFirebaseAdmin(userId, 12, cursor);
-    return NextResponse.json({ products, nextCursor });
+    // ShopId varsa mağaza-spesifik ürünleri getir
+    const { products, nextCursor } = await getProductsFromFirebaseAdmin(userId, 12, cursor, shopId);
+    
+    return NextResponse.json({ 
+      success: true,
+      products, 
+      nextCursor,
+      shopId: shopId || 'all'
+    });
   } catch (error) {
     console.error('Error fetching paginated products:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false,
+      error: 'Internal Server Error' 
+    }, { status: 500 });
   }
 } 

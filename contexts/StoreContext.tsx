@@ -128,9 +128,6 @@ export function StoreProvider({ children }: StoreProviderProps) {
         
         // Tüm sayfalardaki veriyi yenile
         await refreshAllData();
-        
-        // Sayfayı yenile (temiz geçiş için)
-        window.location.reload();
       } else {
         throw new Error(result.error || 'Mağaza geçişi başarısız');
       }

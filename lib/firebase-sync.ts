@@ -422,7 +422,8 @@ export async function countProductsInFirebaseAdmin(userId: string): Promise<numb
 export async function getProductsFromFirebaseAdmin(
   userId: string,
   pageSize: number = 12,
-  startAfterListingId: number | null = null
+  startAfterListingId: number | null = null,
+  shopId?: string | null
 ) {
   initializeAdminApp();
   if (!adminDb) {
@@ -432,9 +433,14 @@ export async function getProductsFromFirebaseAdmin(
 
   // Ana 'products' koleksiyonunu kullanıyoruz ve 'userId' ile filtreliyoruz
   let query = adminDb.collection('products')
-    .where('userId', '==', userId)
-    .orderBy('listing_id', 'desc')
-    .limit(pageSize);
+    .where('userId', '==', userId);
+  
+  // ShopId varsa o mağazanın ürünlerini getir
+  if (shopId) {
+    query = query.where('shop_id', '==', parseInt(shopId));
+  }
+  
+  query = query.orderBy('listing_id', 'desc').limit(pageSize);
 
   if (startAfterListingId) {
     query = query.startAfter(startAfterListingId);

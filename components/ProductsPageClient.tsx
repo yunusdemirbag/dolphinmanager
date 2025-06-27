@@ -4,6 +4,7 @@
 import dynamic from 'next/dynamic';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useStore } from '@/contexts/StoreContext';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Package, Clock, Play, Pause, Settings as SettingsIcon, Image, Loader2, RotateCcw, Timer, CheckCircle, XCircle, Upload, Trash2, Edit3, Video, Trash, RefreshCw } from "lucide-react";
@@ -54,6 +55,8 @@ interface ProductsPageClientProps {
 }
 
 export default function ProductsPageClient({ initialProducts, initialNextCursor, userId, store }: ProductsPageClientProps) {
+  const { activeStore } = useStore();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('products');
   const [activeQueueTab, setActiveQueueTab] = useState('live'); // 'live' veya 'completed'
   const [isQueueRunning, setIsQueueRunning] = useState(false);
@@ -87,7 +90,6 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   const [editingMediaItemId, setEditingMediaItemId] = useState<string | null>(null);
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const editingRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  const { toast } = useToast();
   
   // Rate limit tracking
   const [rateLimitInfo, setRateLimitInfo] = useState<{
@@ -106,6 +108,53 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     status: string;
   } | null>(null);
   
+  // Aktif mağaza değiştiğinde ürünleri yenile
+  useEffect(() => {
+    if (activeStore && activeStore.shop_id !== store?.shop_id) {
+      console.log('🔄 Aktif mağaza değişti, ürünler yeniden yükleniyor...');
+      
+      // Ürünleri sıfırla ve yeniden yükle
+      setProducts([]);
+      setNextCursor(null);
+      setHasMoreProducts(false);
+      setIsLoadingProducts(true);
+      
+      // Yeni mağazanın ürünlerini yükle
+      fetchProductsForStore(activeStore.shop_id);
+    }
+  }, [activeStore?.shop_id]);
+
+  // Mağaza ürünlerini yükle
+  const fetchProductsForStore = async (shopId: string) => {
+    try {
+      const response = await fetch(`/api/products/paginate?userId=${userId}&shopId=${shopId}&limit=12`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setProducts(data.products || []);
+        setNextCursor(data.nextCursor);
+        setHasMoreProducts(!!data.nextCursor);
+        console.log(`✅ ${data.products?.length || 0} ürün yüklendi`);
+      } else {
+        console.error('❌ Ürün yükleme hatası:', data.error);
+        toast({
+          title: 'Hata',
+          description: 'Ürünler yüklenirken hata oluştu',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('❌ Ürün fetch hatası:', error);
+      toast({
+        title: 'Hata',
+        description: 'Ürünler yüklenirken hata oluştu',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
   // Client-side mount kontrolü
   useEffect(() => {
     setMounted(true);

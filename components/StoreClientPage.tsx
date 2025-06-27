@@ -1,52 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useStore } from '@/contexts/StoreContext';
+import { StoreCard } from '@/components/StoreCard';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Store } from '@/types/store';
-import Image from 'next/image';
+import { Plus, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 
 interface StoreClientPageProps {
   initialStores: Store[];
 }
 
 export function StoreClientPage({ initialStores }: StoreClientPageProps) {
-  const [stores, setStores] = useState<Store[]>(initialStores);
-  const [isLoading, setIsLoading] = useState<string | null>(null);
-  const [isUpdatingIcons, setIsUpdatingIcons] = useState(false);
+  const { 
+    allStores, 
+    switchingStoreId, 
+    switchStore,
+    isLoading, 
+    refreshStores, 
+    disconnectStore,
+    refreshAllAnalytics,
+    error 
+  } = useStore();
   const { toast } = useToast();
 
-  const handleStoreSwitch = async (shopId: string) => {
+  // Mağaza geçişi
+  const handleStoreSwitch = async (store: Store) => {
     try {
-      setIsLoading(shopId);
-
-      const response = await fetch('/api/etsy/stores/switch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ shopId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Mağaza geçişi başarısız');
-      }
-
-      // Mağaza listesini güncelle
-      setStores(prevStores =>
-        prevStores.map(store => ({
-          ...store,
-          is_active: store.id === shopId
-        }))
-      );
-
+      await switchStore(store);
       toast({
         title: 'Başarılı',
-        description: 'Mağaza geçişi tamamlandı',
+        description: `${store.shop_name} mağazasına geçildi`,
       });
     } catch (error: any) {
       toast({
@@ -54,14 +38,29 @@ export function StoreClientPage({ initialStores }: StoreClientPageProps) {
         description: error.message || 'Mağaza geçişi sırasında bir hata oluştu',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(null);
     }
   };
 
+  // Mağaza kaldırma
+  const handleStoreDisconnect = async (store: Store) => {
+    try {
+      await disconnectStore(store);
+      toast({
+        title: 'Başarılı',
+        description: `${store.shop_name} mağazası kaldırıldı`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Hata',
+        description: error.message || 'Mağaza kaldırma sırasında bir hata oluştu',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Yeni mağaza bağlama
   const handleConnect = async () => {
     try {
-      // API endpoint'inden OAuth URL'sini al
       const response = await fetch('/api/etsy/connect');
       const data = await response.json();
       
@@ -69,7 +68,6 @@ export function StoreClientPage({ initialStores }: StoreClientPageProps) {
         throw new Error(data.error || 'OAuth URL oluşturulamadı');
       }
       
-      // Alınan URL'ye yönlendir
       window.location.href = data.url;
     } catch (error: any) {
       toast({
@@ -80,145 +78,137 @@ export function StoreClientPage({ initialStores }: StoreClientPageProps) {
     }
   };
 
-  const updateStoreIcons = async () => {
+  // Analytics yenileme
+  const handleRefreshAnalytics = async () => {
     try {
-      setIsUpdatingIcons(true);
-      
-      const response = await fetch('/api/etsy/stores/update-icons', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Mağaza ikonları güncellenemedi');
-      }
-
-      // Başarılı ikon güncellemeleri için mağaza listesini güncelle
-      if (data.updatedStores && data.updatedStores.length > 0) {
-        setStores(prevStores => 
-          prevStores.map(store => {
-            const updated = data.updatedStores.find((u: any) => u.id === store.id);
-            if (updated) {
-              return {
-                ...store,
-                shop_icon_url: updated.shop_icon_url
-              };
-            }
-            return store;
-          })
-        );
-      }
-
+      await refreshAllAnalytics();
       toast({
         title: 'Başarılı',
-        description: data.message || 'Mağaza ikonları güncellendi',
+        description: 'Tüm mağaza analytics\'leri güncellendi',
       });
     } catch (error: any) {
       toast({
-        title: 'Hata',
-        description: error.message || 'Mağaza ikonları güncellenirken bir hata oluştu',
+        title: 'Uyarı',
+        description: 'Analytics güncellenirken bazı hatalar oluştu',
         variant: 'destructive',
       });
-    } finally {
-      setIsUpdatingIcons(false);
     }
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-black">Mağazalar</h1>
+            <p className="text-gray-600">Etsy mağazalarınızı yönetin</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-96 bg-gray-200 rounded-lg animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-black">Mağazalar</h1>
-          <p className="text-gray-600">Etsy mağazalarınızı yönetin</p>
+          <p className="text-gray-600">
+            {allStores.length > 0 
+              ? `${allStores.length} mağaza bağlı - Performans metriklerini görüntüleyin`
+              : 'Etsy mağazalarınızı bağlayın ve yönetin'
+            }
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={updateStoreIcons} 
-            disabled={isUpdatingIcons || stores.length === 0}
-          >
-            {isUpdatingIcons ? 'Güncelleniyor...' : 'İkonları Güncelle'}
-          </Button>
-          <Button onClick={handleConnect}>
+        
+        <div className="flex gap-3">
+          {allStores.length > 0 && (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={handleRefreshAnalytics}
+                disabled={isLoading}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Analytics Yenile
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={refreshStores}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Mağazaları Yenile
+              </Button>
+            </>
+          )}
+          
+          <Button onClick={handleConnect} disabled={isLoading}>
+            <Plus className="w-4 h-4 mr-2" />
             Yeni Mağaza Bağla
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {stores.map((store) => (
-          <Card key={store.id} className="p-6 space-y-4">
-            <div className="flex justify-between items-start">
-              <div className="flex items-center gap-3">
-                {store.shop_icon_url ? (
-                  <div className="relative w-12 h-12 rounded-full overflow-hidden">
-                    <Image 
-                      src={store.shop_icon_url} 
-                      alt={store.shop_name}
-                      width={48}
-                      height={48}
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                    <span className="text-xl font-bold text-gray-500">
-                      {store.shop_name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                <div>
-                  <h3 className="text-lg font-semibold">{store.shop_name}</h3>
-                  <div className="space-x-2 mt-2">
-                    {store.is_active && (
-                      <Badge variant="default">Aktif</Badge>
-                    )}
-                    {!store.hasValidToken && (
-                      <Badge variant="destructive">Token Hatası</Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-500" />
+          <div>
+            <p className="text-red-800 font-medium">Hata oluştu</p>
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={refreshStores}
+            className="ml-auto"
+          >
+            Tekrar Dene
+          </Button>
+        </div>
+      )}
 
-            <div className="space-y-2 text-sm text-gray-600">
-              {store.total_products !== undefined && (
-                <p>Toplam Ürün: {store.total_products}</p>
-              )}
-              <p>Son Senkronizasyon: {new Date(store.last_sync_at).toLocaleString('tr-TR')}</p>
-            </div>
-
-            <div className="pt-4">
-              {!store.is_active ? (
-                <Button
-                  onClick={() => handleStoreSwitch(store.id)}
-                  disabled={isLoading === store.id || !store.hasValidToken}
-                  className="w-full"
-                >
-                  {isLoading === store.id ? 'Geçiş Yapılıyor...' : 'Bu Mağazaya Geç'}
-                </Button>
-              ) : (
-                <Button variant="outline" className="w-full" disabled>
-                  Aktif Mağaza
-                </Button>
-              )}
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {stores.length === 0 && (
+      {/* Store Cards Grid */}
+      {allStores.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {allStores.map((store) => (
+            <StoreCard
+              key={store.id}
+              store={store}
+              onStoreSwitch={handleStoreSwitch}
+              onStoreDisconnect={handleStoreDisconnect}
+              isLoading={switchingStoreId}
+            />
+          ))}
+        </div>
+      ) : (
+        // Empty State
         <div className="text-center py-12">
-          <h3 className="text-lg font-medium text-gray-900">Henüz bağlı mağaza yok</h3>
-          <p className="mt-2 text-sm text-gray-600">
-            Etsy mağazanızı bağlamak için yukarıdaki butonu kullanın
+          <div className="w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Plus className="w-12 h-12 text-orange-500" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Henüz bağlı mağaza yok
+          </h3>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            Etsy mağazanızı bağlayarak ürünlerinizi yönetmeye, analytics verilerini görüntülemeye ve daha fazlasını yapmaya başlayın.
           </p>
+          <Button onClick={handleConnect} size="lg">
+            <Plus className="w-5 h-5 mr-2" />
+            İlk Mağazanızı Bağlayın
+          </Button>
         </div>
       )}
     </div>
   );
-} 
+}

@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '@/contexts/StoreContext';
 import { Button } from '@/components/ui/button';
-import { Store, ChevronDown, Check, Loader2 } from 'lucide-react';
+import { Store, ChevronDown, Check, Loader2, AlertCircle } from 'lucide-react';
 
 export function StoreSelector() {
-  const { activeStore, allStores, switchStore, isLoading, hasMultipleStores } = useStore();
-  const [isSwitching, setIsSwitching] = useState(false);
+  const { activeStore, allStores, switchStore, isLoading, hasMultipleStores, switchingStoreId } = useStore();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -61,14 +60,13 @@ export function StoreSelector() {
 
   // Çoklu mağaza - Custom dropdown
   const handleStoreSwitch = async (store: any) => {
-    if (store.shop_id === activeStore.shop_id) return;
+    if (store.id === activeStore?.id) return;
     
-    setIsSwitching(true);
     setIsOpen(false);
     try {
       await switchStore(store);
-    } finally {
-      setIsSwitching(false);
+    } catch (error) {
+      console.error('Store switch error:', error);
     }
   };
 
@@ -76,10 +74,10 @@ export function StoreSelector() {
     <div className="relative" ref={dropdownRef}>
       <Button 
         variant="outline" 
-        disabled={isSwitching}
+        disabled={!!switchingStoreId}
         onClick={() => setIsOpen(!isOpen)}
       >
-        {isSwitching ? (
+        {switchingStoreId ? (
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
         ) : (
           <Store className="w-4 h-4 mr-2" />

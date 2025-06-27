@@ -65,7 +65,7 @@ if (typeof window === 'undefined') {
 export { adminDb };
 
 // Kullanıcının tüm mağazalarını getir
-export async function getAllUserStores(userId: string) {
+export async function getAllUserStores(userId: string, includeDisconnected: boolean = false) {
   try {
     initializeAdminApp();
     
@@ -73,10 +73,16 @@ export async function getAllUserStores(userId: string) {
       throw new Error('Firebase Admin başlatılamadı');
     }
 
-    const storesSnapshot = await adminDb
+    let query = adminDb
       .collection('etsy_stores')
-      .where('user_id', '==', userId)
-      .get();
+      .where('user_id', '==', userId);
+
+    // Sadece bağlı mağazaları getir (default)
+    if (!includeDisconnected) {
+      query = query.where('is_connected', '!=', false);
+    }
+
+    const storesSnapshot = await query.get();
 
     const stores = await Promise.all(storesSnapshot.docs.map(async (doc) => {
       const storeData = doc.data();
@@ -123,9 +129,15 @@ export async function getAllUserStores(userId: string) {
         last_token_refresh,
         last_activated_at,
         is_active: storeData.is_active,
+        is_connected: storeData.is_connected !== false, // Default true for backward compatibility
         shop_icon_url,
         hasValidToken: apiKeysDoc.exists,
-        total_products: storeData.total_products || 0
+        total_products: storeData.total_products || 0,
+        disconnected_at: storeData.disconnected_at ? 
+          (storeData.disconnected_at instanceof Timestamp ? 
+            storeData.disconnected_at.toDate() : 
+            new Date(storeData.disconnected_at)) : null,
+        disconnect_reason: storeData.disconnect_reason || null
       } as Store;
     }));
 

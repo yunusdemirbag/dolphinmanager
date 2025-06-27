@@ -1,26 +1,39 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { EtsyStore } from '@/lib/firebase-sync';
+import { Store } from '@/types/store';
 
 interface StoreContextType {
   // Aktif mağaza
-  activeStore: EtsyStore | null;
+  activeStore: Store | null;
   
   // Tüm mağazalar
-  allStores: EtsyStore[];
+  allStores: Store[];
   
   // Mağaza değiştirme (tek tuşla!)
-  switchStore: (store: EtsyStore) => Promise<void>;
+  switchStore: (store: Store) => Promise<void>;
+  
+  // Mağaza kaldırma
+  disconnectStore: (store: Store) => Promise<void>;
+  
+  // Mağaza yeniden bağlama
+  reconnectStore: (store: Store) => Promise<void>;
   
   // Yükleme durumu
   isLoading: boolean;
+  switchingStoreId: string | null;
   
   // Mağaza yenileme
   refreshStores: () => Promise<void>;
   
+  // Analytics refresh
+  refreshAllAnalytics: () => Promise<void>;
+  
   // Hızlı erişim
   hasMultipleStores: boolean;
+  
+  // Error handling
+  error: string | null;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -30,14 +43,17 @@ interface StoreProviderProps {
 }
 
 export function StoreProvider({ children }: StoreProviderProps) {
-  const [activeStore, setActiveStore] = useState<EtsyStore | null>(null);
-  const [allStores, setAllStores] = useState<EtsyStore[]>([]);
+  const [activeStore, setActiveStore] = useState<Store | null>(null);
+  const [allStores, setAllStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [switchingStoreId, setSwitchingStoreId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Mağazaları yükle
   const loadStores = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       
       console.log('🔄 Mağazalar yükleniyor...');
       
@@ -45,54 +61,54 @@ export function StoreProvider({ children }: StoreProviderProps) {
       const data = await response.json();
       
       if (data.success) {
-        setAllStores(data.stores);
-        console.log(`📋 ${data.stores.length} mağaza yüklendi`);
+        // Sadece bağlı mağazaları al
+        const connectedStores = data.stores.filter((s: Store) => s.is_connected !== false);
+        setAllStores(connectedStores);
+        console.log(`📋 ${connectedStores.length} bağlı mağaza yüklendi`);
         
-        // LocalStorage'dan aktif mağaza ID'sini al
-        const savedActiveStoreId = localStorage.getItem('activeStoreId');
-        
-        if (savedActiveStoreId) {
-          const savedStore = data.stores.find((s: EtsyStore) => s.shop_id.toString() === savedActiveStoreId);
-          if (savedStore) {
-            setActiveStore(savedStore);
-            console.log('✅ Kayıtlı aktif mağaza:', savedStore.shop_name);
-          } else if (data.stores.length > 0) {
-            // Kayıtlı mağaza bulunamadıysa ilkini seç
-            setActiveStore(data.stores[0]);
-            localStorage.setItem('activeStoreId', data.stores[0].shop_id.toString());
-            console.log('🔄 İlk mağaza aktif yapıldı:', data.stores[0].shop_name);
-          }
-        } else if (data.stores.length > 0) {
-          // Hiç kayıt yoksa ilkini seç
-          setActiveStore(data.stores[0]);
-          localStorage.setItem('activeStoreId', data.stores[0].shop_id.toString());
-          console.log('🎯 İlk kez mağaza seçildi:', data.stores[0].shop_name);
+        // Aktif mağazayı bul
+        const activeStoreFromApi = connectedStores.find((s: Store) => s.is_active);
+        if (activeStoreFromApi) {
+          setActiveStore(activeStoreFromApi);
+          localStorage.setItem('activeStoreId', activeStoreFromApi.id);
+          console.log('✅ Aktif mağaza:', activeStoreFromApi.shop_name);
+        } else if (connectedStores.length > 0) {
+          // Aktif mağaza yoksa ilkini aktif yap
+          const firstStore = connectedStores[0];
+          setActiveStore(firstStore);
+          localStorage.setItem('activeStoreId', firstStore.id);
+          console.log('🔄 İlk mağaza aktif yapıldı:', firstStore.shop_name);
+        } else {
+          setActiveStore(null);
+          localStorage.removeItem('activeStoreId');
         }
       } else {
+        setError(data.error || 'Mağaza listesi alınamadı');
         console.error('❌ Mağaza listesi alınamadı:', data.error);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
+      setError(errorMessage);
       console.error('❌ Mağaza yükleme hatası:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Mağaza değiştir (TEK TUŞLA!)
-  const switchStore = async (store: EtsyStore) => {
+  // Mağaza değiştir (GERÇEK GEÇİŞ!)
+  const switchStore = async (store: Store) => {
     try {
+      setSwitchingStoreId(store.id);
+      setError(null);
+      
       console.log(`🔄 Mağaza değiştiriliyor: ${store.shop_name}`);
       
-      // Önce UI'ı güncelle (hızlı görünüm için)
-      setActiveStore(store);
-      localStorage.setItem('activeStoreId', store.shop_id.toString());
-      
-      // API'ye bildir
-      const response = await fetch('/api/store/switch', {
+      // Backend'e mağaza geçişi bildir
+      const response = await fetch('/api/etsy/stores/switch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          shopId: store.shop_id.toString(),
+          shopId: store.id,
           userId: 'local-user-123'
         }),
       });
@@ -100,15 +116,152 @@ export function StoreProvider({ children }: StoreProviderProps) {
       const result = await response.json();
       
       if (result.success) {
+        // Local state güncelle
+        setActiveStore(store);
+        setAllStores(prev => prev.map(s => ({
+          ...s,
+          is_active: s.id === store.id
+        })));
+        localStorage.setItem('activeStoreId', store.id);
+        
         console.log(`✅ ${store.shop_name} mağazasına geçildi`);
         
-        // Sayfayı yenile (temiz başlangıç için)
+        // Tüm sayfalardaki veriyi yenile
+        await refreshAllData();
+        
+        // Sayfayı yenile (temiz geçiş için)
         window.location.reload();
       } else {
-        console.error('❌ Mağaza geçiş hatası:', result.error);
+        throw new Error(result.error || 'Mağaza geçişi başarısız');
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Mağaza geçişi hatası';
+      setError(errorMessage);
       console.error('❌ Mağaza geçiş hatası:', error);
+    } finally {
+      setSwitchingStoreId(null);
+    }
+  };
+
+  // Mağaza kaldır (Soft Delete)
+  const disconnectStore = async (store: Store) => {
+    try {
+      setError(null);
+      
+      console.log(`🔌 Mağaza kaldırılıyor: ${store.shop_name}`);
+      
+      const response = await fetch('/api/store/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          shopId: store.id,
+          userId: store.user_id,
+          reason: 'user_request'
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ ${store.shop_name} mağazası kaldırıldı`);
+        
+        // Mağaza listesini güncelle
+        await loadStores();
+        
+        // Eğer yeni aktif mağaza varsa ona geç
+        if (result.newActiveStore) {
+          setActiveStore(result.newActiveStore);
+          localStorage.setItem('activeStoreId', result.newActiveStore.id);
+        }
+      } else {
+        throw new Error(result.error || 'Mağaza kaldırılamadı');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Mağaza kaldırma hatası';
+      setError(errorMessage);
+      console.error('❌ Mağaza kaldırma hatası:', error);
+      throw error;
+    }
+  };
+
+  // Mağaza yeniden bağla
+  const reconnectStore = async (store: Store) => {
+    try {
+      setError(null);
+      
+      console.log(`🔌 Mağaza yeniden bağlanıyor: ${store.shop_name}`);
+      
+      const response = await fetch('/api/store/reconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          shopId: store.id,
+          userId: store.user_id,
+          makeActive: true
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ ${store.shop_name} mağazası yeniden bağlandı`);
+        
+        // Mağaza listesini güncelle
+        await loadStores();
+      } else {
+        if (result.requiresOAuth) {
+          // OAuth gerekiyorsa kullanıcıyı yönlendir
+          window.location.href = '/api/etsy/auth';
+          return;
+        }
+        throw new Error(result.error || 'Mağaza yeniden bağlanamadı');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Mağaza yeniden bağlama hatası';
+      setError(errorMessage);
+      console.error('❌ Mağaza yeniden bağlama hatası:', error);
+      throw error;
+    }
+  };
+
+  // Tüm veriyi yenile (mağaza geçişinde)
+  const refreshAllData = async () => {
+    try {
+      console.log('🔄 Tüm veriler yenileniyor...');
+      
+      // Analytics'leri yenile
+      if (activeStore) {
+        await fetch('/api/store/analytics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shopId: activeStore.id })
+        });
+      }
+      
+      console.log('✅ Veriler yenilendi');
+    } catch (error) {
+      console.warn('⚠️ Veri yenileme hatası:', error);
+    }
+  };
+
+  // Tüm analytics yenile
+  const refreshAllAnalytics = async () => {
+    try {
+      console.log('📊 Tüm analytics yenileniyor...');
+      
+      await Promise.all(
+        allStores.map(store => 
+          fetch('/api/store/analytics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shopId: store.id })
+          })
+        )
+      );
+      
+      console.log('✅ Analytics yenilendi');
+    } catch (error) {
+      console.warn('⚠️ Analytics yenileme hatası:', error);
     }
   };
 
@@ -126,9 +279,14 @@ export function StoreProvider({ children }: StoreProviderProps) {
     activeStore,
     allStores,
     switchStore,
+    disconnectStore,
+    reconnectStore,
     isLoading,
+    switchingStoreId,
     refreshStores,
+    refreshAllAnalytics,
     hasMultipleStores: allStores.length > 1,
+    error,
   };
 
   return (

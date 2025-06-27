@@ -140,7 +140,11 @@ export async function getAllUserStores(userId: string, includeDisconnected: bool
     // Bağlantısı kesilen mağazaları filtrele
     const stores = includeDisconnected 
       ? allStores 
-      : allStores.filter(store => store.is_connected !== false);
+      : allStores.filter(store => {
+          // Sadece açıkça false olan veya disconnected_at tarihi olan mağazaları filtrele
+          const isConnected = store.is_connected !== false && !store.disconnected_at;
+          return isConnected;
+        });
 
     // JavaScript tarafında sırala
     return stores.sort((a, b) => {

@@ -59,70 +59,119 @@ export async function POST(request: NextRequest) {
       // Log kategori verilerinin yapısını görmek için
       console.log('📋 Gelen kategoriler:', JSON.stringify(availableCategories.slice(0, 2)));
       
-      // Enhanced category matching based on title/category
-      const titleLower = result.title.toLowerCase();
-      
-      // Daha kapsamlı kategori eşleştirme anahtar kelimeleri
-      const keywordMapping = {
-        'abstract': ['abstract', 'geometric', 'modern', 'contemporary', 'minimal'],
-        'animal': ['animal', 'pet', 'cat', 'dog', 'bird', 'wildlife', 'fauna'],
-        'botanical': ['flower', 'plant', 'leaf', 'tree', 'nature', 'botanical', 'floral', 'garden'],
-        'landscape': ['landscape', 'mountain', 'ocean', 'sunset', 'beach', 'sea', 'sky', 'forest'],
-        'portrait': ['portrait', 'face', 'woman', 'man', 'people', 'person', 'figure'],
-        'minimalist': ['minimalist', 'simple', 'clean', 'minimal', 'line art'],
-        'typography': ['text', 'quote', 'word', 'typography', 'lettering', 'saying'],
-        'geometric': ['geometric', 'shape', 'pattern', 'circle', 'square', 'triangle']
-      };
-      
-      // Önce başlıktaki anahtar kelimelere göre kategori bul
-      let matchFound = false;
-      for (const [categoryType, keywords] of Object.entries(keywordMapping)) {
-        if (keywords.some(keyword => titleLower.includes(keyword))) {
-          // Kategori adında veya anahtar kelimelerde eşleşme ara
-          // Kategori yapısını doğru şekilde kontrol et
-          const categoryMatch = availableCategories.find((cat: any) => {
-            // Kategori yapısını kontrol et
-            if (!cat) return false;
-            
-            // Kategori adı title veya name alanında olabilir
-            const categoryTitle = cat.title || cat.name || '';
-            
-            if (!categoryTitle) return false;
-            
-            return (
-              categoryTitle.toLowerCase().includes(categoryType) ||
-              keywords.some(k => categoryTitle.toLowerCase().includes(k))
-            );
+      try {
+        // OpenAI API ile kategori seçimi yap
+        console.log('🧠 OpenAI API ile kategori seçimi yapılıyor...');
+        
+        // Kategori isimlerini al
+        const categoryNames = availableCategories.map((cat: any) => cat.title || cat.name || '').filter(Boolean);
+        
+        if (categoryNames.length > 0) {
+          // OpenAI API'ye istek gönder
+          const response = await fetch('/api/ai/select-category', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              title: result.title,
+              categoryNames
+            }),
           });
           
-          if (categoryMatch) {
-            selectedCategory = categoryMatch;
-            matchFound = true;
-            console.log(`✅ Kategori eşleşmesi bulundu: "${categoryMatch.title || categoryMatch.name}" (anahtar kelime: ${categoryType})`);
-            break;
+          if (response.ok) {
+            const selectedCategoryName = await response.text();
+            console.log(`🎯 OpenAI kategori seçimi: "${selectedCategoryName}"`);
+            
+            // Seçilen kategori adına göre kategori nesnesini bul
+            const matchedCategory = availableCategories.find((cat: any) => 
+              (cat.title || cat.name || '').toLowerCase() === selectedCategoryName.toLowerCase()
+            );
+            
+            if (matchedCategory) {
+              selectedCategory = matchedCategory;
+              console.log(`✅ Kategori eşleşmesi bulundu: "${matchedCategory.title || matchedCategory.name}"`);
+            } else {
+              console.log(`⚠️ OpenAI'nin seçtiği kategori bulunamadı: "${selectedCategoryName}"`);
+            }
+          } else {
+            console.error('❌ OpenAI kategori seçimi hatası:', await response.text());
           }
         }
+      } catch (error) {
+        console.error('❌ OpenAI kategori seçimi hatası:', error);
       }
       
-      // Eşleşme bulunamazsa, doğrudan başlık-kategori adı eşleştirmesi dene
-      if (!matchFound) {
-        const directMatch = availableCategories.find((cat: any) => {
-          if (!cat) return false;
-          const categoryTitle = cat.title || cat.name || '';
-          if (!categoryTitle) return false;
-          return titleLower.includes(categoryTitle.toLowerCase());
-        });
+      // OpenAI ile seçim başarısız olduysa fallback olarak anahtar kelime eşleştirmesi kullan
+      if (!selectedCategory) {
+        console.log('⚠️ OpenAI kategori seçimi başarısız, anahtar kelime eşleştirmesine geçiliyor...');
         
-        if (directMatch) {
-          selectedCategory = directMatch;
-          console.log(`✅ Doğrudan kategori eşleşmesi bulundu: "${directMatch.title || directMatch.name}"`);
+        // Enhanced category matching based on title/category
+        const titleLower = result.title.toLowerCase();
+        
+        // Daha kapsamlı kategori eşleştirme anahtar kelimeleri
+        const keywordMapping = {
+          'abstract': ['abstract', 'geometric', 'modern', 'contemporary', 'minimal'],
+          'animal': ['animal', 'pet', 'cat', 'dog', 'bird', 'wildlife', 'fauna'],
+          'botanical': ['flower', 'plant', 'leaf', 'tree', 'nature', 'botanical', 'floral', 'garden'],
+          'landscape': ['landscape', 'mountain', 'ocean', 'sunset', 'beach', 'sea', 'sky', 'forest'],
+          'portrait': ['portrait', 'face', 'woman', 'man', 'people', 'person', 'figure'],
+          'religious': ['jesus', 'christ', 'religious', 'spiritual', 'sacred', 'divine', 'biblical', 'cross', 'angel', 'faith', 'prayer'],
+          'minimalist': ['minimalist', 'simple', 'clean', 'minimal', 'line art'],
+          'typography': ['text', 'quote', 'word', 'typography', 'lettering', 'saying'],
+          'geometric': ['geometric', 'shape', 'pattern', 'circle', 'square', 'triangle']
+        };
+        
+        // Önce başlıktaki anahtar kelimelere göre kategori bul
+        let matchFound = false;
+        for (const [categoryType, keywords] of Object.entries(keywordMapping)) {
+          if (keywords.some(keyword => titleLower.includes(keyword))) {
+            // Kategori adında veya anahtar kelimelerde eşleşme ara
+            // Kategori yapısını doğru şekilde kontrol et
+            const categoryMatch = availableCategories.find((cat: any) => {
+              // Kategori yapısını kontrol et
+              if (!cat) return false;
+              
+              // Kategori adı title veya name alanında olabilir
+              const categoryTitle = cat.title || cat.name || '';
+              
+              if (!categoryTitle) return false;
+              
+              return (
+                categoryTitle.toLowerCase().includes(categoryType) ||
+                keywords.some(k => categoryTitle.toLowerCase().includes(k))
+              );
+            });
+            
+            if (categoryMatch) {
+              selectedCategory = categoryMatch;
+              matchFound = true;
+              console.log(`✅ Anahtar kelime kategori eşleşmesi bulundu: "${categoryMatch.title || categoryMatch.name}" (anahtar kelime: ${categoryType})`);
+              break;
+            }
+          }
         }
-      }
-      
-      // Hala eşleşme yoksa ilk kategoriyi seç
-      if (!selectedCategory && availableCategories.length > 0) {
-        selectedCategory = availableCategories[0];
-        console.log(`⚠️ Kategori eşleşmesi bulunamadı, varsayılan kategori seçildi: "${availableCategories[0].title || availableCategories[0].name}"`);
+        
+        // Eşleşme bulunamazsa, doğrudan başlık-kategori adı eşleştirmesi dene
+        if (!matchFound) {
+          const directMatch = availableCategories.find((cat: any) => {
+            if (!cat) return false;
+            const categoryTitle = cat.title || cat.name || '';
+            if (!categoryTitle) return false;
+            return titleLower.includes(categoryTitle.toLowerCase());
+          });
+          
+          if (directMatch) {
+            selectedCategory = directMatch;
+            console.log(`✅ Doğrudan kategori eşleşmesi bulundu: "${directMatch.title || directMatch.name}"`);
+          }
+        }
+        
+        // Hala eşleşme yoksa ilk kategoriyi seç
+        if (!selectedCategory && availableCategories.length > 0) {
+          selectedCategory = availableCategories[0];
+          console.log(`⚠️ Kategori eşleşmesi bulunamadı, varsayılan kategori seçildi: "${availableCategories[0].title || availableCategories[0].name}"`);
+        }
       }
     }
 

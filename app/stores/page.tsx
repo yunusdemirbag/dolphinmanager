@@ -1,45 +1,21 @@
-import { getConnectedStoreFromFirebaseAdmin, countProductsInFirebaseAdmin, EtsyStore } from '@/lib/firebase-sync';
+import { Metadata } from 'next';
 import { StoreClientPage } from '@/components/StoreClientPage';
-import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
+import { getAllUserStores } from '@/lib/firebase-admin';
 
-// Server Component
+export const metadata: Metadata = {
+  title: 'Mağaza Yönetimi',
+  description: 'Etsy mağazalarınızı yönetin',
+};
+
+export const dynamic = 'force-dynamic';
+
 export default async function StoresPage() {
-  // Fetch data on the server
-  // In a real app, this would come from the user's session
   const userId = process.env.MOCK_USER_ID || 'local-user-123';
-  console.log("--- Mağazalar Sayfası ---");
-  console.log("KULLANILAN KULLANICI ID:", userId);
-
-  const store = await getConnectedStoreFromFirebaseAdmin(userId);
-  
-  console.log("BULUNAN MAĞAZA BİLGİSİ:", store);
-
-  if (!store) {
-    console.error("HATA: Bu kullanıcı ID'si için Firebase'de bağlı bir mağaza bulunamadı. Lütfen .env.local dosyasındaki MOCK_USER_ID'yi kontrol edin.");
-  }
-
-  let augmentedStore = null;
-  if (store) {
-    const productCountUserId = store.user_id || userId;
-    console.log(`Ürün sayısı için kullanılacak ID: ${productCountUserId}`);
-    const totalProducts = await countProductsInFirebaseAdmin(productCountUserId);
-    console.log(`Bulunan ürün sayısı: ${totalProducts}`);
-
-    augmentedStore = {
-      ...store,
-      total_products: totalProducts,
-      active_listings: 0, // Placeholder
-      monthly_sales: '0.00', // Placeholder
-    };
-  }
+  const stores = await getAllUserStores(userId);
   
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-black">Mağazalar</h1>
-        <p className="text-gray-800">Bağlı Etsy mağazanızı yönetin</p>
-      </div>
-      <StoreClientPage store={augmentedStore} />
+    <div className="container mx-auto px-4 py-8">
+      <StoreClientPage initialStores={stores} />
     </div>
   );
 }

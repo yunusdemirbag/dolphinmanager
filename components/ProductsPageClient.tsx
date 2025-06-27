@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, Clock, Play, Pause, Settings as SettingsIcon, Image, Loader2, RotateCcw, Timer, CheckCircle, XCircle, Upload, Trash2, Edit3, Video, Trash } from "lucide-react";
+import { Plus, Package, Clock, Play, Pause, Settings as SettingsIcon, Image, Loader2, RotateCcw, Timer, CheckCircle, XCircle, Upload, Trash2, Edit3, Video, Trash, RefreshCw } from "lucide-react";
 import ProductFormModal from "@/components/ProductFormModal";
 import AutoProductPanel from "@/components/AutoProductPanel";
 import { DndProvider } from "react-dnd";
@@ -96,6 +96,14 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
     reset: string | null;
     dailyUsed: number;
     dailyLimit: number;
+  } | null>(null);
+
+  // Store sync states
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{
+    current: number;
+    total: number;
+    status: string;
   } | null>(null);
   
   // Client-side mount kontrolü
@@ -234,6 +242,67 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
   };
 
   // Etsy bağlantısını kes
+  // Store data sync function
+  const syncStoreData = async () => {
+    if (isSyncing) return;
+    
+    setIsSyncing(true);
+    setSyncProgress({ current: 0, total: 0, status: 'Başlatılıyor...' });
+    
+    try {
+      console.log('🔄 Starting store data sync...');
+      
+      const response = await fetch('/api/store/sync-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Sync failed');
+      }
+      
+      const data = await response.json();
+      
+      console.log('✅ Store sync completed:', data);
+      
+      setSyncProgress({
+        current: data.syncResult.synced_listings,
+        total: data.syncResult.total_listings,
+        status: 'Tamamlandı'
+      });
+      
+      toast({
+        title: "Başarılı",
+        description: `${data.syncResult.synced_listings} ürün verisi çekildi ve kaydedildi`
+      });
+      
+      // Clear progress after 3 seconds
+      setTimeout(() => {
+        setSyncProgress(null);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('❌ Store sync error:', error);
+      
+      setSyncProgress({ current: 0, total: 0, status: 'Hata!' });
+      
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: error instanceof Error ? error.message : "Mağaza verileri çekilemedi"
+      });
+      
+      // Clear progress after 3 seconds
+      setTimeout(() => {
+        setSyncProgress(null);
+      }, 3000);
+      
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const disconnectEtsy = async () => {
     try {
       const response = await fetch('/api/etsy/disconnect', {
@@ -551,6 +620,25 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={syncStoreData}
+                  className="text-blue-600 hover:bg-blue-50"
+                  disabled={isSyncing}
+                >
+                  {isSyncing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      Veri Çekiliyor...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-1" />
+                      Mağaza Verilerini Çek
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={disconnectEtsy}
                   className="text-red-600 hover:bg-red-50"
                 >
@@ -558,6 +646,31 @@ export default function ProductsPageClient({ initialProducts, initialNextCursor,
                   Bağlantıyı Kes
                 </Button>
               </div>
+              {/* Sync Progress */}
+              {syncProgress && (
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-800">
+                      {syncProgress.status}
+                    </span>
+                    {syncProgress.total > 0 && (
+                      <span className="text-sm text-blue-600">
+                        {syncProgress.current}/{syncProgress.total}
+                      </span>
+                    )}
+                  </div>
+                  {syncProgress.total > 0 && (
+                    <div className="w-full bg-blue-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${(syncProgress.current / syncProgress.total) * 100}%` 
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="mt-2 text-sm text-red-600">

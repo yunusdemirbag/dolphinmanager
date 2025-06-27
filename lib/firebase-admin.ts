@@ -73,18 +73,13 @@ export async function getAllUserStores(userId: string, includeDisconnected: bool
       throw new Error('Firebase Admin başlatılamadı');
     }
 
-    let query = adminDb
+    const query = adminDb
       .collection('etsy_stores')
       .where('user_id', '==', userId);
 
-    // Sadece bağlı mağazaları getir (default)
-    if (!includeDisconnected) {
-      query = query.where('is_connected', '!=', false);
-    }
-
     const storesSnapshot = await query.get();
 
-    const stores = await Promise.all(storesSnapshot.docs.map(async (doc) => {
+    const allStores = await Promise.all(storesSnapshot.docs.map(async (doc) => {
       const storeData = doc.data();
       
       // API anahtarlarını kontrol et
@@ -140,6 +135,11 @@ export async function getAllUserStores(userId: string, includeDisconnected: bool
         disconnect_reason: storeData.disconnect_reason || null
       } as Store;
     }));
+
+    // Bağlantısı kesilen mağazaları filtrele
+    const stores = includeDisconnected 
+      ? allStores 
+      : allStores.filter(store => store.is_connected !== false);
 
     // JavaScript tarafında sırala
     return stores.sort((a, b) => {

@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
     });
 
     // OAuth URL'sini oluştur
-    const scope = 'listings_r listings_w';
+    const scope = 'email_r shops_r shops_w listings_r listings_w listings_d transactions_r transactions_w profile_r address_r address_w billing_r cart_r cart_w';
     const redirectUri = process.env.ETSY_REDIRECT_URI;
     const clientId = process.env.ETSY_CLIENT_ID;
 

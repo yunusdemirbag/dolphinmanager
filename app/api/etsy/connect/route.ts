@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
+import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,6 +93,64 @@ export async function POST(request: NextRequest) {
     console.error('Etsy API key bağlantı hatası:', error);
     return NextResponse.json(
       { error: 'Bağlantı hatası oluştu' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    // Firebase Admin'i başlat
+    initializeAdminApp();
+    
+    if (!adminDb) {
+      throw new Error('Firebase Admin başlatılamadı');
+    }
+
+    // Kullanıcı kimliği
+    const userId = process.env.MOCK_USER_ID || 'local-user-123';
+
+    // State ve PKCE için code verifier oluştur
+    const state = crypto.randomBytes(16).toString('hex');
+    const codeVerifier = crypto.randomBytes(32).toString('hex');
+    const stateWithSession = `${state}:${crypto.randomBytes(16).toString('hex')}`;
+
+    // Session bilgilerini Firebase'e kaydet
+    const sessionRef = adminDb.collection('etsy_auth_sessions').doc(stateWithSession.split(':')[1]);
+    await sessionRef.set({
+      state,
+      codeVerifier,
+      userId,
+      created_at: new Date()
+    });
+
+    // OAuth URL'sini oluştur
+    const scope = 'listings_r listings_w';
+    const redirectUri = process.env.ETSY_REDIRECT_URI;
+    const clientId = process.env.ETSY_CLIENT_ID;
+
+    if (!clientId || !redirectUri) {
+      throw new Error('ETSY_CLIENT_ID veya ETSY_REDIRECT_URI çevre değişkenleri tanımlanmamış');
+    }
+
+    const url = new URL('https://www.etsy.com/oauth/connect');
+    url.searchParams.append('response_type', 'code');
+    url.searchParams.append('client_id', clientId);
+    url.searchParams.append('redirect_uri', redirectUri);
+    url.searchParams.append('scope', scope);
+    url.searchParams.append('state', stateWithSession);
+
+    // URL'yi döndür
+    return NextResponse.json({
+      url: url.toString()
+    });
+  } catch (error: any) {
+    console.error('OAuth URL oluşturma hatası:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: error.message || 'OAuth URL oluşturulamadı' 
+      },
       { status: 500 }
     );
   }

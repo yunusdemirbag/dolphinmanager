@@ -59,22 +59,25 @@ export function StoreClientPage({ initialStores }: StoreClientPageProps) {
     }
   };
 
-  const handleConnect = () => {
-    // Etsy OAuth başlatma URL'sini oluştur
-    const state = Math.random().toString(36).substring(7);
-    const scope = 'listings_r listings_w';
-    const redirectUri = process.env.NEXT_PUBLIC_ETSY_REDIRECT_URI;
-    const clientId = process.env.NEXT_PUBLIC_ETSY_CLIENT_ID;
-
-    const url = new URL('https://www.etsy.com/oauth/connect');
-    url.searchParams.append('response_type', 'code');
-    url.searchParams.append('client_id', clientId!);
-    url.searchParams.append('redirect_uri', redirectUri!);
-    url.searchParams.append('scope', scope);
-    url.searchParams.append('state', state);
-
-    // Yeni pencerede aç
-    window.location.href = url.toString();
+  const handleConnect = async () => {
+    try {
+      // API endpoint'inden OAuth URL'sini al
+      const response = await fetch('/api/etsy/connect');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'OAuth URL oluşturulamadı');
+      }
+      
+      // Alınan URL'ye yönlendir
+      window.location.href = data.url;
+    } catch (error: any) {
+      toast({
+        title: 'Hata',
+        description: error.message || 'Etsy bağlantısı başlatılamadı',
+        variant: 'destructive',
+      });
+    }
   };
 
   const updateStoreIcons = async () => {

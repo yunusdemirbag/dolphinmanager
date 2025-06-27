@@ -61,6 +61,44 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
             <RefreshCw className="w-4 h-4 mr-1" />
             Yeniden Bağla
           </Button>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-red-600 hover:bg-red-50"
+                disabled={isDisconnecting}
+              >
+                {isDisconnecting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Mağazayı Tamamen Kaldır</AlertDialogTitle>
+                <AlertDialogDescription>
+                  <strong>{store.shop_name}</strong> mağazasını tamamen kaldırmak istediğinizden emin misiniz?
+                  <br /><br />
+                  Bu işlem mağazayı sistemden tamamen kaldıracak ve Firebase'deki tüm veriler silinecek.
+                  <br />
+                  <strong>Bu işlem geri alınamaz!</strong>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>İptal</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleDisconnect}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Tamamen Kaldır
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       );
     }

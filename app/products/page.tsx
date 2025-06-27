@@ -1,6 +1,6 @@
 // Import server-side functions and types
 import { getConnectedStoreFromFirebaseAdmin, EtsyStore } from '@/lib/firebase-sync';
-import { adminDb, initializeAdminApp } from '@/lib/firebase-admin';
+import { adminDb, initializeAdminApp, getAllUserStores } from '@/lib/firebase-admin';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, AlertCircle, Store } from 'lucide-react';
@@ -37,7 +37,8 @@ async function getInitialProducts(userId: string) {
       }
 
       console.log(`📦 No products found in Firebase for user ${userId}. Fetching from Etsy API.`);
-      const store = await getConnectedStoreFromFirebaseAdmin(userId);
+      const stores = await getAllUserStores(userId);
+      const store = stores.find(s => s.is_active && s.is_connected);
       if (!store) {
           console.error('No active Etsy store connected for this user.');
           return { products: [], nextCursor: null };
@@ -101,8 +102,9 @@ export const dynamic = 'force-dynamic';
 export default async function ProductsPage() {
   const userId = process.env.MOCK_USER_ID || 'local-user-123'; // Gerçek kullanıcı ID'si .env.local dosyasından alınıyor
   
-  // Fetch initial data on the server
-  const store = await getConnectedStoreFromFirebaseAdmin(userId);
+  // Fetch initial data on the server - YENİ MULTİ-STORE SİSTEMİ
+  const allStores = await getAllUserStores(userId);
+  const activeStore = allStores.find(s => s.is_active && s.is_connected);
   const initialProductsData = await getInitialProducts(userId);
 
   return (
@@ -112,24 +114,29 @@ export default async function ProductsPage() {
         <p className="text-gray-800">Ürünlerinizi yönetin ve Etsy&apos;e yükleyin</p>
       </div>
 
-      {/* Store Connection Status */}
-      <Card className={`${store ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
+      {/* Store Connection Status - YENİ MULTİ-STORE SİSTEMİ */}
+      <Card className={`${activeStore ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
         <CardContent className="p-4">
-          {store ? (
+          {activeStore ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <CheckCircle className="w-5 h-5 text-green-600" />
                 <div>
                   <span className="font-medium text-green-800">
-                    Etsy mağazası bağlı: {store.shop_name}
+                    Aktif mağaza: {activeStore.shop_name}
                   </span>
                   <p className="text-sm text-green-600">
-                    Son senkronizasyon: {store.last_sync_at ? new Date(store.last_sync_at).toLocaleString('tr-TR') : 'Henüz yok'}
+                    Son senkronizasyon: {activeStore.last_sync_at ? new Date(activeStore.last_sync_at).toLocaleString('tr-TR') : 'Henüz yok'}
                   </p>
+                  {allStores.length > 1 && (
+                    <p className="text-xs text-green-600">
+                      Toplam {allStores.length} mağaza bağlı
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="text-xs text-green-600">ID: {store.shop_id}</span>
+                <span className="text-xs text-green-600">ID: {activeStore.shop_id}</span>
               </div>
             </div>
           ) : (
@@ -148,16 +155,16 @@ export default async function ProductsPage() {
         </CardContent>
       </Card>
 
-      {/* Pass initial data to the client component */}
+      {/* Pass initial data to the client component - YENİ MULTİ-STORE SİSTEMİ */}
       <ProductsPageClient 
         initialProducts={initialProductsData.products} 
         initialNextCursor={initialProductsData.nextCursor}
-        store={store ? {
-          ...store,
-          connected_at: store.connected_at ? (typeof store.connected_at === 'string' ? store.connected_at : store.connected_at.toISOString?.() || store.connected_at.toString()) : null,
-          last_sync_at: store.last_sync_at ? (typeof store.last_sync_at === 'string' ? store.last_sync_at : store.last_sync_at.toISOString?.() || store.last_sync_at.toString()) : null,
-          last_activated_at: store.last_activated_at ? (typeof store.last_activated_at === 'string' ? store.last_activated_at : store.last_activated_at.toISOString?.() || store.last_activated_at.toString()) : null,
-          last_token_refresh: store.last_token_refresh ? (typeof store.last_token_refresh === 'string' ? store.last_token_refresh : store.last_token_refresh.toISOString?.() || store.last_token_refresh.toString()) : null,
+        store={activeStore ? {
+          ...activeStore,
+          connected_at: activeStore.connected_at ? (typeof activeStore.connected_at === 'string' ? activeStore.connected_at : activeStore.connected_at.toISOString?.() || activeStore.connected_at.toString()) : null,
+          last_sync_at: activeStore.last_sync_at ? (typeof activeStore.last_sync_at === 'string' ? activeStore.last_sync_at : activeStore.last_sync_at.toISOString?.() || activeStore.last_sync_at.toString()) : null,
+          last_activated_at: activeStore.last_activated_at ? (typeof activeStore.last_activated_at === 'string' ? activeStore.last_activated_at : activeStore.last_activated_at.toISOString?.() || activeStore.last_activated_at.toString()) : null,
+          last_token_refresh: activeStore.last_token_refresh ? (typeof activeStore.last_token_refresh === 'string' ? activeStore.last_token_refresh : activeStore.last_token_refresh.toISOString?.() || activeStore.last_token_refresh.toString()) : null,
         } : null}
         userId={userId}
       />

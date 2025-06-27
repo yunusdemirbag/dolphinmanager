@@ -59,7 +59,10 @@ export default async function Home() {
                     <p className="text-sm text-gray-600">Son Senkronizasyon</p>
                     <p className="font-semibold text-gray-900">
                       {storeInfo.updated_at ? 
-                        new Date(storeInfo.updated_at.seconds * 1000).toLocaleString('tr-TR') : 
+                        (storeInfo.updated_at.seconds ? 
+                          new Date(storeInfo.updated_at.seconds * 1000).toLocaleString('tr-TR') :
+                          new Date(storeInfo.updated_at).toLocaleString('tr-TR')
+                        ) : 
                         new Date().toLocaleString('tr-TR')
                       }
                     </p>

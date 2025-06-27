@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Store, Package, Settings } from 'lucide-react';
+import { StoreSelector } from '@/components/StoreSelector';
 
 const Navigation = () => {
   const pathname = usePathname();
@@ -58,6 +59,11 @@ const Navigation = () => {
                 );
               })}
             </div>
+          </div>
+          
+          {/* Mağaza Seçici - Sağ tarafta */}
+          <div className="flex items-center">
+            <StoreSelector />
           </div>
         </div>
       </div>

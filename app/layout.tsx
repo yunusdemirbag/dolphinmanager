@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navigation from "@/components/Navigation";
 import { Toaster } from "@/components/ui/toaster";
+import { StoreProvider } from "@/contexts/StoreContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,13 +23,15 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body className={`${inter.className} antialiased`} style={{backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))' }} suppressHydrationWarning={true}>
-        <div className="min-h-screen bg-gray-50">
-          <Navigation />
-          <main className="container mx-auto py-8 px-4">
-            {children}
-          </main>
-          <Toaster />
-        </div>
+        <StoreProvider>
+          <div className="min-h-screen bg-gray-50">
+            <Navigation />
+            <main className="container mx-auto py-8 px-4">
+              {children}
+            </main>
+            <Toaster />
+          </div>
+        </StoreProvider>
       </body>
     </html>
   );

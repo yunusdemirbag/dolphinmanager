@@ -66,8 +66,8 @@ if (typeof window === 'undefined') {
 
 export { adminDb };
 
-// Bağlı Etsy mağaza bilgisini getir
-export async function getConnectedStoreFromFirebaseAdmin() {
+// Bağlı Etsy mağaza bilgisini getir (tek mağaza)
+export async function getConnectedStoreFromFirebaseAdmin(userId?: string) {
   try {
     initializeAdminApp();
     
@@ -75,12 +75,12 @@ export async function getConnectedStoreFromFirebaseAdmin() {
       throw new Error('Firebase Admin not initialized');
     }
 
-    const userId = 'local-user-123'; // Bu gerçek auth context'den gelecek
+    const targetUserId = userId || 'local-user-123';
     
     // Aktif mağazayı bul
     const storesSnapshot = await adminDb
       .collection('etsy_stores')
-      .where('user_id', '==', userId)
+      .where('user_id', '==', targetUserId)
       .where('is_active', '==', true)
       .get();
 
@@ -96,5 +96,38 @@ export async function getConnectedStoreFromFirebaseAdmin() {
   } catch (error) {
     console.error('Store bilgisi alınırken hata:', error);
     return null;
+  }
+}
+
+// Kullanıcının tüm bağlı mağazalarını getir
+export async function getConnectedStoresFromFirebaseAdmin(userId?: string) {
+  try {
+    initializeAdminApp();
+    
+    if (!adminDb) {
+      throw new Error('Firebase Admin not initialized');
+    }
+
+    const targetUserId = userId || 'local-user-123';
+    
+    // Kullanıcının tüm aktif mağazalarını bul
+    const storesSnapshot = await adminDb
+      .collection('etsy_stores')
+      .where('user_id', '==', targetUserId)
+      .where('is_active', '==', true)
+      .orderBy('connected_at', 'desc')
+      .get();
+
+    if (storesSnapshot.empty) {
+      return [];
+    }
+
+    return storesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Mağaza listesi alınırken hata:', error);
+    return [];
   }
 }

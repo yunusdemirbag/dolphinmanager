@@ -30,6 +30,10 @@ export default async function StoresPage() {
       total_products: totalProducts,
       active_listings: 0, // Placeholder
       monthly_sales: '0.00', // Placeholder
+      connected_at: store.connected_at ? (typeof store.connected_at === 'string' ? store.connected_at : store.connected_at.toISOString?.() || store.connected_at.toString()) : null,
+      last_sync_at: store.last_sync_at ? (typeof store.last_sync_at === 'string' ? store.last_sync_at : store.last_sync_at.toISOString?.() || store.last_sync_at.toString()) : null,
+      last_activated_at: store.last_activated_at ? (typeof store.last_activated_at === 'string' ? store.last_activated_at : store.last_activated_at.toISOString?.() || store.last_activated_at.toString()) : null,
+      last_token_refresh: store.last_token_refresh ? (typeof store.last_token_refresh === 'string' ? store.last_token_refresh : store.last_token_refresh.toISOString?.() || store.last_token_refresh.toString()) : null,
     };
   }
   

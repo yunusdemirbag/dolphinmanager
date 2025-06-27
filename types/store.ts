@@ -3,6 +3,7 @@ export interface Store {
   user_id: string;
   shop_id: number;
   shop_name: string;
+  etsy_user_id?: number;
   connected_at: Date;
   last_sync_at: Date;
   last_token_refresh?: Date | null;

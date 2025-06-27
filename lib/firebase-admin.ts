@@ -102,17 +102,30 @@ export async function getAllUserStores(userId: string) {
           ? new Date(storeData.last_token_refresh) 
           : null;
 
+      const last_activated_at = storeData.last_activated_at instanceof Timestamp 
+        ? storeData.last_activated_at.toDate() 
+        : storeData.last_activated_at 
+          ? new Date(storeData.last_activated_at) 
+          : null;
+
       // Mağaza ikonunu ekleyin
       const shop_icon_url = storeData.shop_icon_url || null;
 
+      // Serialize edilebilir obje oluştur
       return {
         id: doc.id,
-        ...storeData,
+        user_id: storeData.user_id,
+        shop_id: storeData.shop_id,
+        shop_name: storeData.shop_name,
+        etsy_user_id: storeData.etsy_user_id,
         connected_at,
         last_sync_at,
         last_token_refresh,
+        last_activated_at,
+        is_active: storeData.is_active,
         shop_icon_url,
-        hasValidToken: apiKeysDoc.exists
+        hasValidToken: apiKeysDoc.exists,
+        total_products: storeData.total_products || 0
       } as Store;
     }));
 
@@ -167,13 +180,27 @@ export async function getConnectedStoreFromFirebaseAdmin(userId?: string) {
         ? new Date(storeData.last_token_refresh) 
         : null;
 
+    const last_activated_at = storeData.last_activated_at instanceof Timestamp 
+      ? storeData.last_activated_at.toDate() 
+      : storeData.last_activated_at 
+        ? new Date(storeData.last_activated_at) 
+        : null;
+
+    // Serialize edilebilir obje oluştur
     return {
       id: storeDoc.id,
-      ...storeData,
+      user_id: storeData.user_id,
+      shop_id: storeData.shop_id,
+      shop_name: storeData.shop_name,
+      etsy_user_id: storeData.etsy_user_id,
       connected_at,
       last_sync_at,
       last_token_refresh,
-      hasValidToken: true // Aktif mağaza olduğu için token geçerli kabul edilir
+      last_activated_at,
+      is_active: storeData.is_active,
+      shop_icon_url: storeData.shop_icon_url || null,
+      hasValidToken: true, // Aktif mağaza olduğu için token geçerli kabul edilir
+      total_products: storeData.total_products || 0
     } as Store;
   } catch (error) {
     console.error('Store bilgisi alınırken hata:', error);

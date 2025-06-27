@@ -103,8 +103,11 @@ export default async function ProductsPage() {
   const userId = process.env.MOCK_USER_ID || 'local-user-123'; // Gerçek kullanıcı ID'si .env.local dosyasından alınıyor
   
   // Fetch initial data on the server - YENİ MULTİ-STORE SİSTEMİ
-  const allStores = await getAllUserStores(userId);
-  const activeStore = allStores.find(s => s.is_active && s.is_connected);
+  const allUserStores = await getAllUserStores(userId);
+  
+  // Sadece bağlı mağazaları al (mağazalar sayfası ile tutarlı)
+  const connectedStores = allUserStores.filter(s => s.is_connected !== false && !s.disconnected_at);
+  const activeStore = connectedStores.find(s => s.is_active);
   const initialProductsData = await getInitialProducts(userId);
 
   return (
@@ -128,9 +131,9 @@ export default async function ProductsPage() {
                   <p className="text-sm text-green-600">
                     Son senkronizasyon: {activeStore.last_sync_at ? new Date(activeStore.last_sync_at).toLocaleString('tr-TR') : 'Henüz yok'}
                   </p>
-                  {allStores.length > 1 && (
+                  {connectedStores.length > 1 && (
                     <p className="text-xs text-green-600">
-                      Toplam {allStores.length} mağaza bağlı
+                      Toplam {connectedStores.length} mağaza bağlı
                     </p>
                   )}
                 </div>

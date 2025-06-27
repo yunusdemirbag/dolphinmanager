@@ -82,6 +82,7 @@ export async function getAllUserStores(userId: string, includeDisconnected: bool
     const allStores = await Promise.all(storesSnapshot.docs.map(async (doc) => {
       const storeData = doc.data();
       
+      
       // API anahtarlarını kontrol et
       const apiKeysDoc = await adminDb!
         .collection('etsy_api_keys')
@@ -124,7 +125,7 @@ export async function getAllUserStores(userId: string, includeDisconnected: bool
         last_token_refresh,
         last_activated_at,
         is_active: storeData.is_active,
-        is_connected: storeData.is_connected !== false, // Default true for backward compatibility
+        is_connected: storeData.is_connected !== false && !storeData.disconnected_at, // Default true for backward compatibility
         shop_icon_url,
         hasValidToken: apiKeysDoc.exists,
         total_products: storeData.total_products || 0,

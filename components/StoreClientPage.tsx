@@ -4,8 +4,9 @@ import { useStore } from '@/contexts/StoreContext';
 import { StoreCard } from '@/components/StoreCard';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Store } from '@/types/store';
-import { Plus, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, RefreshCw, AlertCircle, Loader2, Trash2 } from 'lucide-react';
 
 interface StoreClientPageProps {
   initialStores: Store[];
@@ -95,6 +96,25 @@ export function StoreClientPage({ initialStores }: StoreClientPageProps) {
     }
   };
 
+  // Tüm mağazaları kaldırma
+  const handleDisconnectAllStores = async () => {
+    try {
+      const promises = allStores.map(store => disconnectStore(store));
+      await Promise.all(promises);
+      
+      toast({
+        title: 'Başarılı',
+        description: `${allStores.length} mağazanın bağlantısı kesildi. Token'lar silindi, veriler korundu.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Hata',
+        description: error.message || 'Mağaza kaldırma sırasında hata oluştu',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -149,6 +169,44 @@ export function StoreClientPage({ initialStores }: StoreClientPageProps) {
                 <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                 Mağazaları Yenile
               </Button>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="text-red-600 hover:bg-red-50 border-red-200"
+                    disabled={isLoading}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Tümünü Kaldır
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Tüm Mağaza Bağlantılarını Kes</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      <strong>{allStores.length} mağazanın</strong> tüm bağlantılarını kesmek istediğinizden emin misiniz?
+                      <br /><br />
+                      Bu işlem:
+                      <br />
+                      • Tüm API token'larını silecek
+                      <br />
+                      • Ürünler ve analytics verileriniz Firebase'de korunacak
+                      <br />
+                      • Tekrar bağlandığınızda verilerinizden devam edebilirsiniz
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>İptal</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleDisconnectAllStores}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Tüm Bağlantıları Kes
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           )}
           

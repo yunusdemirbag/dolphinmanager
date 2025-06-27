@@ -42,7 +42,18 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
-    // Soft delete - Mağazayı disconnected olarak işaretle
+    // API token'larını sil (güvenlik için)
+    try {
+      await adminDb
+        .collection('etsy_api_keys')
+        .doc(shopId)
+        .delete();
+      console.log('🔑 API token\'ları silindi');
+    } catch (error) {
+      console.warn('⚠️ Token silme hatası:', error);
+    }
+
+    // Soft delete - Mağazayı disconnected olarak işaretle (Firebase verileri korunur)
     await adminDb
       .collection('etsy_stores')
       .doc(shopId)

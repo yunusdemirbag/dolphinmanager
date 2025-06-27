@@ -20,6 +20,7 @@ interface StoreCardProps {
 export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }: StoreCardProps) {
   const { analytics, isLoading: analyticsLoading, refreshAnalytics } = useStoreAnalytics(store.id);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  
 
   const handleStoreSwitch = async () => {
     if (store.is_active || isLoading) return;
@@ -36,7 +37,10 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
   };
 
   const getStatusBadge = () => {
-    if (!store.is_connected) {
+    // Eğer analytics varsa ve API anahtarı geçerliyse, mağaza bağlıdır
+    const isReallyConnected = store.hasValidToken && !store.disconnected_at;
+    
+    if (!isReallyConnected || store.is_connected === false) {
       return <Badge variant="secondary">Bağlantı Kesildi</Badge>;
     }
     if (store.is_active) {
@@ -45,11 +49,13 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
     if (!store.hasValidToken) {
       return <Badge variant="destructive">Token Hatası</Badge>;
     }
-    return null;
+    return <Badge variant="outline">Bağlı</Badge>;
   };
 
   const getActionButtons = () => {
-    if (!store.is_connected) {
+    const isReallyConnected = store.hasValidToken && !store.disconnected_at;
+    
+    if (!isReallyConnected || store.is_connected === false) {
       return (
         <div className="flex gap-2">
           <Button
@@ -79,13 +85,13 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Mağazayı Tamamen Kaldır</AlertDialogTitle>
+                <AlertDialogTitle>Mağaza Bağlantısını Kes</AlertDialogTitle>
                 <AlertDialogDescription>
-                  <strong>{store.shop_name}</strong> mağazasını tamamen kaldırmak istediğinizden emin misiniz?
+                  <strong>{store.shop_name}</strong> mağazasının bağlantısını kaldırmak istediğinizden emin misiniz?
                   <br /><br />
-                  Bu işlem mağazayı sistemden tamamen kaldıracak ve Firebase'deki tüm veriler silinecek.
+                  Bu işlem sadece API token'larını silecek. Ürünler ve analytics verileriniz Firebase'de korunacak.
                   <br />
-                  <strong>Bu işlem geri alınamaz!</strong>
+                  Tekrar bağlandığınızda verilerinizden devam edebilirsiniz.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -94,7 +100,7 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
                   onClick={handleDisconnect}
                   className="bg-red-600 hover:bg-red-700"
                 >
-                  Tamamen Kaldır
+                  Bağlantıyı Kes
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -128,12 +134,12 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Mağazayı Kaldır</AlertDialogTitle>
+                <AlertDialogTitle>Aktif Mağaza Bağlantısını Kes</AlertDialogTitle>
                 <AlertDialogDescription>
-                  <strong>{store.shop_name}</strong> mağazasını kaldırmak istediğinizden emin misiniz? 
+                  <strong>{store.shop_name}</strong> aktif mağazanızın bağlantısını kesmek istediğinizden emin misiniz? 
                   <br /><br />
-                  Bu işlem mağaza bağlantısını kesecek ancak verileriniz Firebase'de korunacak. 
-                  Daha sonra tekrar bağlayabilirsiniz.
+                  Bu işlem sadece API token'larını silecek. Ürünler ve analytics verileriniz Firebase'de korunacak. 
+                  Tekrar bağlandığınızda verilerinizden devam edebilirsiniz.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -142,7 +148,7 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
                   onClick={handleDisconnect}
                   className="bg-red-600 hover:bg-red-700"
                 >
-                  Mağazayı Kaldır
+                  Bağlantıyı Kes
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -187,12 +193,12 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Mağazayı Kaldır</AlertDialogTitle>
+              <AlertDialogTitle>Mağaza Bağlantısını Kes</AlertDialogTitle>
               <AlertDialogDescription>
-                <strong>{store.shop_name}</strong> mağazasını kaldırmak istediğinizden emin misiniz?
+                <strong>{store.shop_name}</strong> mağazasının bağlantısını kesmek istediğinizden emin misiniz?
                 <br /><br />
-                Bu işlem mağaza bağlantısını kesecek ancak verileriniz Firebase'de korunacak. 
-                Daha sonra tekrar bağlayabilirsiniz.
+                Bu işlem sadece API token'larını silecek. Ürünler ve analytics verileriniz Firebase'de korunacak. 
+                Tekrar bağlandığınızda verilerinizden devam edebilirsiniz.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -201,7 +207,7 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
                 onClick={handleDisconnect}
                 className="bg-red-600 hover:bg-red-700"
               >
-                Mağazayı Kaldır
+                Bağlantıyı Kes
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

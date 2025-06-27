@@ -156,6 +156,17 @@ export async function POST(request: NextRequest) {
         last_analytics_update: new Date()
       });
 
+    // Analytics başarıyla alındığında mağaza durumunu da güncelle
+    await adminDb
+      .collection('etsy_stores')
+      .doc(shopId)
+      .update({
+        is_connected: true,
+        disconnected_at: null,
+        disconnect_reason: null,
+        last_sync_at: new Date()
+      });
+
     console.log('✅ Analytics başarıyla güncellendi');
 
     return NextResponse.json({

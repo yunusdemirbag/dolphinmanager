@@ -95,7 +95,7 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>İptal</AlertDialogCancel>
+                <AlertDialogCancel className="bg-gray-100 hover:bg-gray-200 text-gray-800">İptal</AlertDialogCancel>
                 <AlertDialogAction 
                   onClick={handleDisconnect}
                   className="bg-red-600 hover:bg-red-700"
@@ -143,7 +143,7 @@ export function StoreCard({ store, onStoreSwitch, onStoreDisconnect, isLoading }
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>İptal</AlertDialogCancel>
+                <AlertDialogCancel className="bg-gray-100 hover:bg-gray-200 text-gray-800">İptal</AlertDialogCancel>
                 <AlertDialogAction 
                   onClick={handleDisconnect}
                   className="bg-red-600 hover:bg-red-700"

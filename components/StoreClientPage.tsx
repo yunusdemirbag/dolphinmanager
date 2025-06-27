@@ -149,36 +149,29 @@ export function StoreClientPage({ initialStores }: StoreClientPageProps) {
           </p>
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {allStores.length > 0 && (
             <>
               <Button 
-                variant="outline" 
-                onClick={handleRefreshAnalytics}
-                disabled={isLoading}
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Analytics Yenile
-              </Button>
-              
-              <Button 
-                variant="outline" 
+                variant="ghost" 
+                size="sm"
                 onClick={refreshStores}
                 disabled={isLoading}
+                title="Mağazaları yenile"
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Mağazaları Yenile
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
-                    variant="outline" 
-                    className="text-red-600 hover:bg-red-50 border-red-200"
+                    variant="ghost" 
+                    size="sm"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
                     disabled={isLoading}
+                    title="Tüm mağaza bağlantılarını kes"
                   >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Tümünü Kaldır
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -197,7 +190,7 @@ export function StoreClientPage({ initialStores }: StoreClientPageProps) {
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>İptal</AlertDialogCancel>
+                    <AlertDialogCancel className="bg-gray-100 hover:bg-gray-200 text-gray-800">İptal</AlertDialogCancel>
                     <AlertDialogAction 
                       onClick={handleDisconnectAllStores}
                       className="bg-red-600 hover:bg-red-700"

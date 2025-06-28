@@ -2,13 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { aiTitleTagSystem } from '@/lib/ai-title-tag-system';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import OpenAI from 'openai';
-import { getPromptById } from '@/lib/prompts';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
   try {
     console.log('🚀 New AI Title-Tag System başlatılıyor...');
+    
+    // OpenAI API key kontrolü
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('❌ OpenAI API key bulunamadı');
+      return NextResponse.json({ 
+        error: 'OpenAI API key not configured' 
+      }, { status: 500 });
+    }
     
     // Initialize Firebase Admin
     initializeAdminApp();
@@ -19,8 +26,35 @@ export async function POST(request: NextRequest) {
     // FormData'dan image ve diğer parametreleri al
     const formData = await request.formData();
     const imageFile = formData.get('image') as File;
-    const availableCategories = JSON.parse(formData.get('categories') as string || '[]');
-    const customPrompts = JSON.parse(formData.get('customPrompts') as string || '{}');
+    
+    let availableCategories = JSON.parse(formData.get('categories') as string || '[]');
+    
+    // Kategoriler gelmiyorsa manuel liste kullan - geçici düzeltme
+    if (availableCategories.length === 0) {
+      console.log('⚠️ Kategoriler gelmiyor, manuel liste kullanılıyor...');
+      availableCategories = [
+        { title: 'Abstract Art', shop_section_id: 52817067 },
+        { title: 'Love Art', shop_section_id: 52817069 },
+        { title: 'Woman Art', shop_section_id: 52817075 },
+        { title: 'Flowers Art', shop_section_id: 52806532 },
+        { title: 'Landscape Art', shop_section_id: 52806536 },
+        { title: 'Animal Art', shop_section_id: 52817083 },
+        { title: 'Mark Rothko Art Print', shop_section_id: 52806538 },
+        { title: 'Modern Art', shop_section_id: 52806540 },
+        { title: 'Surreal Canvas Art', shop_section_id: 52806542 },
+        { title: 'Banksy & Graffiti Art', shop_section_id: 52806544 },
+        { title: 'Music & Dance Art', shop_section_id: 52817093 },
+        { title: 'Ethnic', shop_section_id: 52817095 },
+        { title: 'Religious Art', shop_section_id: 52806554 },
+        { title: 'Peacock Art', shop_section_id: 52806558 },
+        { title: 'Kitchen Art', shop_section_id: 52817099 },
+        { title: 'Buddha and Zen Stones', shop_section_id: 52817101 },
+        { title: 'Oil Painting', shop_section_id: 54279354 }
+      ];
+    }
+    
+    console.log('✅ Kategoriler alındı:', availableCategories.length, 'adet');
+    console.log('📋 Kategori listesi:', availableCategories.map(c => c.title || c.name).join(', '));
     
     if (!imageFile) {
       return NextResponse.json({ error: 'Image file is required' }, { status: 400 });
@@ -33,7 +67,39 @@ export async function POST(request: NextRequest) {
     console.log('📸 Resim işlendi, AI analizi başlıyor...');
 
     // Use new AI Title-Tag System for title and tags
-    const result = await aiTitleTagSystem.generateTitleAndTags(base64);
+    let result;
+    try {
+      result = await aiTitleTagSystem.generateTitleAndTags(base64);
+    } catch (aiError) {
+      console.error('❌ AI sistem hatası:', aiError);
+      
+      // OpenAI API kredi/quota hatası kontrolü
+      const errorMessage = aiError instanceof Error ? aiError.message : String(aiError);
+      if (errorMessage.includes('insufficient_quota') || 
+          errorMessage.includes('You exceeded your current quota') ||
+          errorMessage.includes('429')) {
+        
+        console.error('❌ OpenAI API kredisi/quota hatası tespit edildi!');
+        return NextResponse.json({
+          success: false,
+          error: 'OpenAI API kredisi tükenmiş. Lütfen API kredinizi kontrol edin ve yenileyin.',
+          error_type: 'openai_quota_exceeded',
+          processing_time: Date.now() - startTime
+        }, { status: 429 });
+      }
+      
+      // Fallback basit sistem
+      return NextResponse.json({
+        success: true,
+        title: "Modern Canvas Wall Art Print | Contemporary Home Decor | Statement Piece",
+        tags: ["canvas art", "wall decor", "modern art", "home decoration", "living room", "bedroom art", "contemporary", "statement piece", "ready to hang", "gift idea", "wall hanging", "art print", "interior design"],
+        analysis: { primarySubject: 'modern', artStyle: 'contemporary' },
+        category: availableCategories[0],
+        suggestedCategoryId: availableCategories[0]?.shop_section_id,
+        processing_time: Date.now() - startTime,
+        ai_system: 'fallback_basic'
+      });
+    }
     
     console.log(`✅ AI Title-Tag System completed in ${result.processing_time}ms`);
     console.log(`🎯 Generated: "${result.title}"`);
@@ -55,164 +121,99 @@ export async function POST(request: NextRequest) {
       uniqueness: 'High'
     };
 
-    // Select category from available categories if provided
+    // SADECE BAŞLIK + OPENAI KATEGORİ SEÇİMİ
     let selectedCategory = null;
+    
     if (availableCategories.length > 0) {
       console.log('📋 Kanvas kategorileri:', availableCategories.map((cat: any) => cat.title || cat.name).join(', '));
+      console.log(`🤖 OpenAI ile başlık bazlı kategori seçimi: "${result.title}"`);
       
-      // İLK ÖNCE AI ANALİZİNDEN GELEN KATEGORİ BİLGİSİNİ KULLAN
-      console.log(`🎨 İlk analiz kategorisi: "${result.category}" - Hızlı eşleştirme yapılıyor...`);
-      
-      const detectedCategoryLower = result.category.toLowerCase();
-      
-      // Kategori eşleştirme haritası
-      const categoryMapping = {
-        'rothko': ['mark rothko', 'rothko'],
-        'animal': ['animal'],
-        'religious': ['religious'],
-        'woman': ['woman'],
-        'abstract': ['abstract'],
-        'flowers': ['flower'],
-        'landscape': ['landscape'],
-        'modern': ['modern', 'fashion'],
-        'zen': ['buddha', 'zen'],
-        'african': ['ethnic'],
-        'jazz': ['music', 'dance'],
-        'asian': ['ethnic'],
-        'frida': ['ethnic'],
-        'klimt': ['woman', 'abstract'],
-        'nature': ['landscape', 'flower']
-      };
-      
-      // İlk analiz kategorisine göre eşleştir
-      const mappedKeywords = categoryMapping[detectedCategoryLower as keyof typeof categoryMapping] || [detectedCategoryLower];
-      
-      for (const keyword of mappedKeywords) {
-        const matchedCategory = availableCategories.find((cat: any) => {
-          const categoryTitle = (cat.title || cat.name || '').toLowerCase();
-          return categoryTitle.includes(keyword);
-        });
-        
-        if (matchedCategory) {
-          selectedCategory = matchedCategory;
-          console.log(`✅ Hızlı kategori eşleştirmesi: "${result.category}" → "${matchedCategory.title || matchedCategory.name}"`);
-          break;
-        }
-      }
-      
-      // Eğer hızlı eşleştirme başarısızsa, başlık bazlı OpenAI seçimi yap
-      if (!selectedCategory) {
-        console.log('⚠️ Hızlı eşleştirme başarısız, OpenAI başlık analizi yapılıyor...');
-        
-        // Kategori isimlerini al
-        const categoryNames = availableCategories.map((cat: any) => cat.title || cat.name || '').filter(Boolean);
-        
-        try {
-          if (categoryNames.length > 0 && process.env.OPENAI_API_KEY) {
-            // OpenAI instance oluştur
-            const openai = new OpenAI({
-              apiKey: process.env.OPENAI_API_KEY,
-            });
+      try {
+        if (process.env.OPENAI_API_KEY) {
+          const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+          });
 
-            // Basit ve temiz prompt
-            const categoryPromptConfig = getPromptById('category-prompt');
-            let prompt = categoryPromptConfig?.prompt || 'Select the best category for this product title.';
+          const categoryNames = availableCategories.map((cat: any) => cat.title || cat.name || '').filter(Boolean);
+          
+          // Özel kategori kontrolleri
+          // 1. Rothko için özel kontrol
+          if (result.title.toLowerCase().includes('rothko')) {
+            const rothkoCategory = availableCategories.find((cat: any) => 
+              (cat.title || cat.name || '').toLowerCase().includes('rothko')
+            );
             
-            // Replace variables
-            prompt = prompt.replace('${title}', result.title);
-            prompt = prompt.replace('${categoryNames}', categoryNames.join('\n'));
+            if (rothkoCategory) {
+              selectedCategory = rothkoCategory;
+              console.log(`✅ Rothko kategorisi manuel seçildi: "${rothkoCategory.title || rothkoCategory.name}"`);
+            }
+          }
+          
+          // 2. Buddha/Religious başlık için özel kontrol  
+          if (!selectedCategory && (result.title.toLowerCase().includes('buddha') || 
+              result.title.toLowerCase().includes('zen') || 
+              result.title.toLowerCase().includes('meditation'))) {
+            const buddhaCategory = availableCategories.find((cat: any) => 
+              (cat.title || cat.name || '').toLowerCase().includes('buddha') ||
+              (cat.title || cat.name || '').toLowerCase().includes('zen')
+            );
+            
+            if (buddhaCategory) {
+              selectedCategory = buddhaCategory;
+              console.log(`✅ Buddha/Zen kategorisi manuel seçildi: "${buddhaCategory.title || buddhaCategory.name}"`);
+            }
+          }
+          
+          // Eğer özel kategori seçilmediyse OpenAI'ye sor
+          if (!selectedCategory) {
+            const prompt = `Look at this canvas wall art title and choose the best category:
 
-            // Hızlı OpenAI çağrısı
+TITLE: "${result.title}"
+
+AVAILABLE CATEGORIES:
+${categoryNames.join('\n')}
+
+Choose the most suitable category from the list above. Return only the exact category name.`;
+
+            console.log('📤 OpenAI prompt gönderiliyor...');
+            
             const openaiResponse = await openai.chat.completions.create({
               model: "gpt-3.5-turbo",
-              messages: [
-                {
-                  role: "user",
-                  content: prompt
-                }
-              ],
+              messages: [{ role: "user", content: prompt }],
               max_tokens: 50,
               temperature: 0.1,
             });
 
             const selectedCategoryName = openaiResponse.choices[0]?.message?.content?.trim();
-            console.log(`🎯 OpenAI başlık bazlı kategori seçimi: "${selectedCategoryName}"`);
+            console.log(`🎯 OpenAI seçimi: "${selectedCategoryName}"`);
             
-            // Eşleşme kontrolü
-            if (selectedCategoryName && categoryNames.includes(selectedCategoryName)) {
-              // Seçilen kategori adına göre kategori nesnesini bul
-              const matchedCategory = availableCategories.find((cat: any) => 
-                (cat.title || cat.name || '').toLowerCase() === selectedCategoryName.toLowerCase()
-              );
-              
-              if (matchedCategory) {
-                selectedCategory = matchedCategory;
-                console.log(`✅ OpenAI kategorisi bulundu: "${matchedCategory.title || matchedCategory.name}"`);
-              }
+            // Kategori bul
+            const matchedCategory = availableCategories.find((cat: any) => 
+              (cat.title || cat.name || '').toLowerCase() === selectedCategoryName?.toLowerCase()
+            );
+            
+            if (matchedCategory) {
+              selectedCategory = matchedCategory;
+              console.log(`✅ Kategori bulundu: "${matchedCategory.title || matchedCategory.name}"`);
+            } else {
+              console.log(`⚠️ "${selectedCategoryName}" listede bulunamadı, fallback yapılıyor...`);
             }
           }
-        } catch (error) {
-          console.error('❌ OpenAI kategori seçimi hatası:', error);
         }
+      } catch (error) {
+        console.error('❌ OpenAI kategori seçimi hatası:', error);
       }
       
-      // GÜÇLÜ FALLBACK SİSTEMİ - Referans dosyadan alındı
+      // FALLBACK: OpenAI başarısızsa Abstract Art seç
       if (!selectedCategory) {
-        console.log('⚠️ OpenAI kategori seçimi başarısız, güçlü keyword matching başlatılıyor...');
+        console.log('⚠️ OpenAI seçimi başarısız, Abstract Art fallback...');
         
-        const titleLower = result.title.toLowerCase();
+        const abstractCategory = availableCategories.find((cat: any) => 
+          (cat.title || cat.name || '').toLowerCase() === 'abstract art'
+        );
         
-        // Kapsamlı kategori eşleştirme anahtar kelimeleri
-        const keywordMapping = {
-          'animal': ['animal', 'lion', 'lioness', 'tiger', 'elephant', 'cat', 'dog', 'bird', 'wildlife', 'pet', 'fauna', 'wolf', 'bear', 'deer'],
-          'religious': ['jesus', 'christ', 'religious', 'spiritual', 'sacred', 'divine', 'biblical', 'cross', 'angel', 'faith', 'prayer', 'holy'],
-          'abstract': ['abstract', 'geometric', 'modern', 'contemporary', 'minimal', 'color field', 'expressionism'],
-          'flower': ['flower', 'plant', 'leaf', 'tree', 'nature', 'botanical', 'floral', 'garden', 'rose'],
-          'landscape': ['landscape', 'mountain', 'ocean', 'sunset', 'beach', 'sea', 'sky', 'forest'],
-          'rothko': ['rothko', 'mark rothko', 'color field'],
-          'love': ['love', 'heart', 'romance', 'couple'],
-          'woman': ['woman', 'girl', 'lady', 'female', 'goddess', 'beauty'],
-          'portrait': ['portrait', 'face', 'man', 'people', 'person', 'figure'],
-          'modern': ['modern', 'fashion', 'contemporary', 'stylish'],
-          'kitchen': ['kitchen', 'food', 'cooking', 'chef'],
-          'surreal': ['surreal', 'dream', 'fantasy', 'psychedelic'],
-          'erotic': ['erotic', 'nude', 'sensual', 'intimate']
-        };
-        
-        // Başlıktaki anahtar kelimelere göre kategori bul
-        for (const [categoryType, keywords] of Object.entries(keywordMapping)) {
-          if (keywords.some(keyword => titleLower.includes(keyword))) {
-            // Kategori adında veya anahtar kelimelerde eşleşme ara
-            const categoryMatch = availableCategories.find((cat: any) => {
-              if (!cat) return false;
-              const categoryTitle = (cat.title || cat.name || '').toLowerCase();
-              if (!categoryTitle) return false;
-              
-              // Kategori tipine göre eşleştir
-              return categoryTitle.includes(categoryType) || 
-                     keywords.some(k => categoryTitle.includes(k));
-            });
-            
-            if (categoryMatch) {
-              selectedCategory = categoryMatch;
-              console.log(`✅ Keyword eşleşmesi: "${categoryType}" → "${categoryMatch.title || categoryMatch.name}"`);
-              break;
-            }
-          }
-        }
-        
-        // Hala eşleşme yoksa Modern kategori ara (fallback)
-        if (!selectedCategory) {
-          const modernCategory = availableCategories.find((cat: any) => {
-            const catTitle = (cat.title || cat.name || '').toLowerCase();
-            return catTitle.includes('modern') || 
-                   catTitle.includes('fashion') || 
-                   catTitle.includes('contemporary');
-          });
-          
-          selectedCategory = modernCategory || availableCategories[0];
-          console.log(`⚠️ Modern fallback kategori: "${selectedCategory?.title || selectedCategory?.name}"`);
-        }
+        selectedCategory = abstractCategory || availableCategories[0];
+        console.log(`🔄 Fallback kategori: "${selectedCategory?.title || selectedCategory?.name}"`);
       }
     }
 

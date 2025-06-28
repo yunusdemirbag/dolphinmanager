@@ -269,6 +269,8 @@ export function ProductFormModal({
   const [variations, setVariations] = useState(initialData?.variations || product?.variations || predefinedVariations.map(v => ({ ...v, is_active: true })))
   const [shopSections, setShopSections] = useState<{ shop_section_id: number; title: string }[]>([]);
   const [selectedShopSection, setSelectedShopSection] = useState<string>('');
+  const [aiCategorySelected, setAiCategorySelected] = useState(false); // AI kategori seçimi bayrağı
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null); // AI'den gelen kategori ID'si
   
   // Shipping profiles and shop sections data fetching
   const [shippingProfiles, setShippingProfiles] = useState<ShippingProfile[]>([]);
@@ -561,17 +563,65 @@ export function ProductFormModal({
 
   // Shop sections yüklendikten sonra default seçim yap
   useEffect(() => {
+    console.log('🔄 useEffect OTOMATIK SEÇİM çalıştı:', {
+      isOpen,
+      shopSectionsLength: shopSections.length,
+      selectedShopSection,
+      product: !!product,
+      aiCategorySelected
+    });
+    
     // Yeni ürün oluşturuluyorsa ve shop sections yüklendiyse, ilkini seç
-    if (isOpen && shopSections.length > 0 && !selectedShopSection && !product) {
+    // ANCAK AI kategorisi seçilmediyse
+    if (isOpen && shopSections.length > 0 && !selectedShopSection && !product && !aiCategorySelected) {
       const firstSectionId = shopSections[0].shop_section_id.toString();
+      console.log('🚨🚨🚨 OTOMATIK SEÇİM YAPILIYOR - OVERRIDE RISKI!', firstSectionId, shopSections[0].title);
       setSelectedShopSection(firstSectionId);
       console.log('🏪 Otomatik shop section seçildi:', {
         id: firstSectionId,
         title: shopSections[0].title,
         total_sections: shopSections.length
       });
+    } else {
+      console.log('❌ Otomatik seçim yapılmadı çünkü:', {
+        aiCategorySelected,
+        selectedShopSection,
+        kondülyonlar: `isOpen:${isOpen}, shopSections:${shopSections.length}, selectedShopSection:${!selectedShopSection}, product:${!product}, aiCategorySelected:${!aiCategorySelected}`
+      });
     }
-  }, [isOpen, shopSections, selectedShopSection, product]);
+  }, [isOpen, shopSections, selectedShopSection, product, aiCategorySelected]);
+
+  // Pending category bilgisini shop sections yüklendiğinde uygula
+  useEffect(() => {
+    if (pendingCategoryId && shopSections.length > 0 && !aiCategorySelected) {
+      console.log('🔄 Pending category uygulanıyor:', pendingCategoryId);
+      
+      try {
+        const categoryInfo = JSON.parse(pendingCategoryId);
+        const categoryName = categoryInfo.title || categoryInfo.name;
+        
+        if (categoryName) {
+          const matchedSection = shopSections.find(s => 
+            s.title.toLowerCase() === categoryName.toLowerCase()
+          );
+          
+          if (matchedSection) {
+            setSelectedShopSection(matchedSection.shop_section_id.toString());
+            setAiCategorySelected(true);
+            setPendingCategoryId(null);
+            console.log('✅ Pending kategori uygulandı:', matchedSection.title);
+          } else {
+            console.log('⚠️ Pending kategori bulunamadı:', categoryName);
+            console.log('📋 Mevcut kategoriler:', shopSections.map(s => s.title));
+            setPendingCategoryId(null);
+          }
+        }
+      } catch (error) {
+        console.log('❌ Pending category parse hatası:', error);
+        setPendingCategoryId(null);
+      }
+    }
+  }, [shopSections, pendingCategoryId, aiCategorySelected]);
 
   // Dükkan bölümlerini API'den çekmek için useEffect - eski çalışan versiyona uygun
   useEffect(() => {
@@ -763,6 +813,8 @@ export function ProductFormModal({
       setTags([]);
       setSelectedCategory(null);
       setSelectedShopSection("");
+      setAiCategorySelected(false); // AI seçim flag'ini sıfırla
+      setPendingCategoryId(null); // Pending kategori ID'yi sıfırla
       // Force modal close
       setTimeout(() => {
         onClose();
@@ -1073,47 +1125,19 @@ export function ProductFormModal({
   }, [productImages]);
 
   // Yardımcı fonksiyon: Başta/sonda özel karakter/noktalama temizle + 140 karakter kontrolü
-  const cleanTitle = (raw: string) => {
-    // Başta ve sonda ! . * : , ? ; ' " - _ ( ) [ ] { } gibi karakterleri sil
-    let cleaned = raw.replace(/^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+|[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/g, '').trim();
-    
-    // 🔧 ETSY FIX: "&" karakteri sadece 1 kez kullanılabilir
-    const ampersandCount = (cleaned.match(/&/g) || []).length;
-    if (ampersandCount > 1) {
-      console.log(`⚠️ Başlıkta ${ampersandCount} adet "&" bulundu, fazlalarını "and" ile değiştiriyorum...`);
-      // İlk "&" hariç diğerlerini "and" ile değiştir
-      let ampersandFound = false;
-      cleaned = cleaned.replace(/&/g, (match) => {
-        if (!ampersandFound) {
-          ampersandFound = true;
-          return match; // İlk "&" kalsın
-        }
-        return " and "; // Diğerleri "and" olsun
-      });
-      console.log(`✅ "&" karakterleri düzeltildi: "${cleaned}"`);
-    }
-    
-    // ⚡ SPEED CONTROL: 141+ karakter kontrolü - son kelimeleri sil
-    if (cleaned.length >= 141) {
-      console.log(`⚠️ Başlık çok uzun (${cleaned.length} karakter), kısaltılıyor...`);
+  const cleanTitle = (raw: string) =>
+    raw
+      .trim()
+      .replace(/^[!.:,*]+|[!.:,*]+$/g, '')
+      .substring(0, 140);
       
-      // Son kelimeyi sil sil, 140 karakter altına düşene kadar
-      while (cleaned.length > 140) {
-        const words = cleaned.trim().split(' ');
-        if (words.length > 1) {
-          words.pop(); // Son kelimeyi sil
-          cleaned = words.join(' ');
-        } else {
-          // Tek kelime varsa, 140 karakterde kes
-          cleaned = cleaned.substring(0, 140).trim();
-          break;
-        }
-      }
-      
-      console.log(`✅ Başlık kısaltıldı: "${cleaned}" (${cleaned.length} karakter)`);
-    }
-    
-    return cleaned;
+  // Etsy'nin kabul ettiği karakterlere göre başlık temizleme fonksiyonu
+  const cleanEtsyTitle = (title: string) => {
+    // Etsy'nin kabul etmediği karakterleri temizle
+    return title
+      .replace(/[^\w\s\-,.&'"\(\)\/\\]/g, '') // Sadece izin verilen karakterleri tut
+      .trim()
+      .substring(0, 140); // 140 karakter sınırı
   };
 
   // Image count'u optimize et - sadece length değiştiğinde yeniden hesapla
@@ -1135,96 +1159,71 @@ export function ProductFormModal({
       console.log('🤖 Otomatik başlık üretimi başlatılıyor...');
       
       const generateTitle = async () => {
+        if (!productImages || productImages.length === 0) {
+          toast({
+            variant: "destructive",
+            title: "Resim Yok",
+            description: "Başlık oluşturmak için en az bir resim ekleyin."
+          });
+          return;
+        }
+
         setAutoTitleLoading(true);
-        
-        // 🎯 PROGRESSIVE LOADING - Kullanıcıya hızlı feedback
-        toast({
-          title: "⚡ Hızlı AI Analizi", 
-          description: "Paralel işleme ile başlık, tag ve kategori üretiliyor..."
-        });
-        
+        setAutoTitleUsed(true);
+
         try {
           const formData = new FormData();
-          formData.append("image", productImages[0].file);
+          formData.append('image', productImages[0].file);
           
-          // Kategori verilerini doğru formatta gönder
-          console.log('🏪 AI\'ye gönderilen kategoriler:', shopSections);
-          formData.append("categories", JSON.stringify(shopSections));
-          formData.append("customPrompts", JSON.stringify({}));
-          
-          console.log('📤 Paralel AI analizi başlatılıyor (3 simultaneous requests)...');
-          const startTime = Date.now();
-          
-          const res = await fetch("/api/ai/analyze-and-generate", {
-            method: "POST",
+          // Kategorileri ekle
+          if (shopSections && shopSections.length > 0) {
+            formData.append('categories', JSON.stringify(shopSections));
+          }
+
+          const response = await fetch('/api/ai/analyze-and-generate', {
+            method: 'POST',
             body: formData,
           });
+
+          const data = await response.json();
           
-          const loadTime = Date.now() - startTime;
-          
-          const data = await res.json();
-          console.log(`📥 Paralel AI yanıtı alındı (${loadTime}ms):`, data);
-          
-          // Hızlı feedback
-          toast({
-            title: `✅ AI Analizi Tamamlandı (${loadTime}ms)`,
-            description: "Başlık ve etiketler başarıyla üretildi"
-          });
-          
-          if (data.success === false || data.error) {
-            console.error('❌ API Error:', data.error);
-            console.error('❌ Debug Info:', data.debugInfo);
-            toast({ 
-              variant: "destructive", 
-              title: "AI Analiz Hatası", 
-              description: data.error || "Başlık üretilemedi - API hatası" 
+          // OpenAI API kredi/quota hatası kontrolü
+          if (!data.success && data.error_type === 'openai_quota_exceeded') {
+            console.error('❌ OpenAI API kredisi/quota hatası tespit edildi!');
+            toast({
+              variant: "destructive",
+              title: "OpenAI API Kredisi Tükendi",
+              description: "OpenAI API krediniz tükenmiş. Lütfen API kredinizi kontrol edin ve yenileyin.",
             });
+            setAutoTitleLoading(false);
             return;
           }
-          
+
           if (data.title) {
-            const generatedTitle = cleanTitle(data.title.trim());
-            console.log('✅ Başlık üretildi:', generatedTitle);
-            setTitle(generatedTitle);
-            setAutoTitleUsed(true);
+            const cleanedTitle = cleanTitle(data.title);
+            setTitle(cleanedTitle);
             
-            // Etiketleri de ayarla
+            // Etiketleri ekle
             if (data.tags && Array.isArray(data.tags)) {
-              setTags(data.tags.slice(0, 13));
+              const cleanTags = data.tags.map(tag => cleanTagText(tag)).filter(Boolean);
+              setTags(cleanTags);
             }
             
-            // analyze-and-generate API'den gelen kategori seçimini kullan
+            // Shop section seçimi
             if (data.suggestedCategoryId && shopSections.length > 0) {
-              const suggestedSection = shopSections.find(s => 
-                s.shop_section_id.toString() === data.suggestedCategoryId.toString()
-              );
-              
-              if (suggestedSection) {
-                setSelectedShopSection(suggestedSection.shop_section_id.toString());
-                console.log('✅ AI kategori seçimi kullanıldı:', suggestedSection.title);
-              } else {
-                // Fallback: Modern kategorisi ara
-                const modernSection = shopSections.find(s => 
-                  s.title.toLowerCase().includes('modern') || 
-                  s.title.toLowerCase().includes('fashion') ||
-                  s.title.toLowerCase().includes('contemporary')
-                );
-                const fallbackSection = modernSection || shopSections[0];
-                setSelectedShopSection(fallbackSection.shop_section_id.toString());
-                console.log('⚠️ AI kategori bulunamadı, fallback:', fallbackSection.title);
-              }
+              const categoryId = data.suggestedCategoryId.toString();
+              setSelectedShopSection(categoryId);
+              setAiCategorySelected(true);
+              console.log('🏪 AI kategori seçildi:', categoryId);
             }
-          } else {
-            console.log('❌ API\'den başlık alınamadı');
-            toast({ 
-              variant: "destructive", 
-              title: "Başlık Bulunamadı", 
-              description: "AI resmi analiz edemedi veya başlık üretemedi" 
-            });
           }
-        } catch (e) {
-          console.error('❌ Başlık üretimi hatası:', e);
-          toast({ variant: "destructive", title: "Başlık üretilemedi", description: "Görselden başlık oluşturulamadı." });
+        } catch (error) {
+          console.error('❌ Başlık oluşturma hatası:', error);
+          toast({
+            variant: "destructive",
+            title: "Başlık Oluşturulamadı",
+            description: "Bir hata oluştu. Lütfen tekrar deneyin."
+          });
         } finally {
           setAutoTitleLoading(false);
         }
@@ -1232,7 +1231,7 @@ export function ProductFormModal({
       generateTitle();
     }
   // imageCount optimize edildi, sadece gerçekten değiştiğinde tetiklenecek
-  }, [isOpen, title, autoTitleUsed, userEditedTitle, imageCount, autoTitleLoading]);
+  }, [isOpen, title, autoTitleUsed, userEditedTitle, imageCount, autoTitleLoading, shopSections]);
 
 
   // Shop section select değiştiğinde otomatik güncellemeyi kapat
@@ -1364,8 +1363,15 @@ export function ProductFormModal({
             
             // Başlık kontrolü için interval
             const titleCheckInterval = setInterval(() => {
-              if (title && title.trim().length > 0 && title.length <= 140 && !autoTitleLoading) {
+              console.log('🔍 Auto title check:', title);
+              // Etsy için temizlenmiş başlık kontrolü
+              const cleanedTitle = cleanEtsyTitle(title);
+              console.log('🧹 Cleaned title for Etsy:', cleanedTitle);
+              
+              if (cleanedTitle && cleanedTitle.trim().length > 0 && !autoTitleLoading) {
                 console.log('🎯 OTOMATIK MOD: Başlık hazır, etiket kontrolü yapılıyor...');
+                // Temizlenmiş başlığı state'e ata
+                setTitle(cleanedTitle);
                 clearInterval(titleCheckInterval);
                 
                 // Etiket kontrolü: 9+ etiket varsa direkt gönder, yoksa yeni etiket iste
@@ -1424,6 +1430,26 @@ export function ProductFormModal({
               clearInterval(titleCheckInterval);
               if (!title || title.trim().length === 0) {
                 console.log('⚠️ Otomatik mod: 15 saniye sonra başlık gelmedi, yine de gönderiliyor...');
+                
+                // OpenAI kredi/quota hatası kontrolü
+                const consoleOutput = document.querySelector('pre')?.textContent || '';
+                if (consoleOutput.includes('insufficient_quota') || 
+                    consoleOutput.includes('You exceeded your current quota') ||
+                    consoleOutput.includes('429') ||
+                    consoleOutput.includes('exceeded your current quota')) {
+                  
+                  console.error('❌ OpenAI API kredisi/quota hatası tespit edildi!');
+                  toast({
+                    variant: "destructive",
+                    title: "OpenAI API Kredisi Tükendi",
+                    description: "OpenAI API krediniz tükenmiş. Lütfen API kredinizi kontrol edin ve yenileyin.",
+                  });
+                  
+                  // İşlemi durdur
+                  setSubmitting(false);
+                  return;
+                }
+                
                 const buttonSelector = autoMode === 'direct-etsy' ? '[data-direct-submit-button]' : '[data-submit-button]';
                 const submitButton = document.querySelector(buttonSelector) as HTMLButtonElement;
                 if (submitButton && !submitButton.disabled) {
@@ -2530,6 +2556,16 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       return;
     }
 
+    // Shop sections yüklendiğinden emin ol - geçici olarak devre dışı
+    // if (shopSections.length === 0) {
+    //   toast({
+    //     variant: "destructive",
+    //     title: "Kategoriler henüz yüklenmedi",
+    //     description: "Lütfen kategoriler yüklenene kadar bekleyin..."
+    //   });
+    //   return;
+    // }
+
     setAutoTitleLoading(true);
     setTitle("");
     setUserEditedTitle(true);
@@ -2538,6 +2574,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       const file = productImages[0].file;
       const formData = new FormData();
       formData.append("image", file);
+      console.log('🏪 GenerateTitleOnly - AI\'ye gönderilen kategoriler:', shopSections.length, 'adet');
       formData.append("categories", JSON.stringify(shopSections));
       formData.append("customPrompts", JSON.stringify({}));
 
@@ -2559,6 +2596,10 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
         
         // Kategoriyi de ayarla
         if (data.suggestedCategoryId) {
+          console.log('🔍 GenerateTitleOnly - Kategori seçimi:', {
+            suggestedCategoryId: data.suggestedCategoryId,
+            shopSectionsLength: shopSections.length
+          });
           setSelectedShopSection(data.suggestedCategoryId.toString());
         }
       } else {
@@ -2588,6 +2629,16 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       return;
     }
 
+    // Shop sections yüklendiğinden emin ol - geçici olarak devre dışı
+    // if (shopSections.length === 0) {
+    //   toast({
+    //     variant: "destructive",
+    //     title: "Kategoriler henüz yüklenmedi",
+    //     description: "Lütfen kategoriler yüklenene kadar bekleyin..."
+    //   });
+    //   return;
+    // }
+
     setTitle("");
     setUserEditedTitle(true);
     setFocusStatus("Focus başlık üretiliyor...");
@@ -2597,6 +2648,7 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
       const file = productImages[0].file;
       const formData = new FormData();
       formData.append("image", file);
+      console.log('🏪 Focus - AI\'ye gönderilen kategoriler:', shopSections.length, 'adet');
       formData.append("categories", JSON.stringify(shopSections));
       
       // Custom prompt for focus
@@ -2656,6 +2708,11 @@ Return only the title, no quotes, no explanations.`
         
         // Kategoriyi de ayarla
         if (data.suggestedCategoryId) {
+          console.log('🔍 Focus - Kategori seçimi:', {
+            suggestedCategoryId: data.suggestedCategoryId,
+            shopSectionsLength: shopSections.length,
+            currentSelectedShopSection: selectedShopSection
+          });
           setSelectedShopSection(data.suggestedCategoryId.toString());
           console.log('✅ Focus kategori güncellendi:', data.suggestedCategoryId);
         }

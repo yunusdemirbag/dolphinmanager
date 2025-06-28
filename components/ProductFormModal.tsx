@@ -1199,11 +1199,18 @@ export function ProductFormModal({
             return;
           }
 
-          if (data.title) {
-            const cleanedTitle = cleanTitle(data.title);
-            setTitle(cleanedTitle);
-            
-            // Etiketleri ekle
+                if (data.title) {
+        const cleanedTitle = cleanTitle(data.title);
+        console.log('✅ Başlık alındı:', cleanedTitle);
+        setTitle(cleanedTitle);
+        
+        // Input alanını da güncelle (DOM manipülasyonu)
+        const titleInput = document.querySelector('input[name="title"]') as HTMLInputElement;
+        if (titleInput) {
+          titleInput.value = cleanedTitle;
+        }
+        
+        // Etiketleri ekle
             if (data.tags && Array.isArray(data.tags)) {
               const cleanTags = data.tags.map(tag => cleanTagText(tag)).filter(Boolean);
               setTags(cleanTags);
@@ -1363,9 +1370,12 @@ export function ProductFormModal({
             
             // Başlık kontrolü için interval
             const titleCheckInterval = setInterval(() => {
-              console.log('🔍 Auto title check:', title);
+              // State'den güncel title değerini al
+              const currentTitle = document.querySelector('input[name="title"]')?.value || title;
+              console.log('🔍 Auto title check:', currentTitle);
+              
               // Etsy için temizlenmiş başlık kontrolü
-              const cleanedTitle = cleanEtsyTitle(title);
+              const cleanedTitle = cleanEtsyTitle(currentTitle);
               console.log('🧹 Cleaned title for Etsy:', cleanedTitle);
               
               if (cleanedTitle && cleanedTitle.trim().length > 0 && !autoTitleLoading) {
@@ -1428,7 +1438,10 @@ export function ProductFormModal({
             // Maximum 15 saniye bekle
             setTimeout(() => {
               clearInterval(titleCheckInterval);
-              if (!title || title.trim().length === 0) {
+              // State'den güncel title değerini al
+              const currentTitle = document.querySelector('input[name="title"]')?.value || title;
+              
+              if (!currentTitle || currentTitle.trim().length === 0) {
                 console.log('⚠️ Otomatik mod: 15 saniye sonra başlık gelmedi, yine de gönderiliyor...');
                 
                 // OpenAI kredi/quota hatası kontrolü

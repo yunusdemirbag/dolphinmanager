@@ -1365,24 +1365,6 @@ export function ProductFormModal({
             // Shop section seçimi
             if (data.suggestedCategoryId) {
               const categoryId = data.suggestedCategoryId.toString();
-<<<<<<< HEAD
-              setSelectedShopSection(categoryId);
-              setAiCategorySelected(true);
-              console.log('🏪 AI kategori seçildi:', categoryId);
-              
-              // DOM'daki select elementini de güncelle
-              setTimeout(() => {
-                const shopSectionSelect = document.querySelector('select[name="shop_section_id"]') as HTMLSelectElement;
-                if (shopSectionSelect) {
-                  shopSectionSelect.value = categoryId;
-                  console.log('🏪 DOM shop section select güncellendi:', categoryId);
-                  
-                  // Select değişikliğini tetikle (React için)
-                  const event = new Event('change', { bubbles: true });
-                  shopSectionSelect.dispatchEvent(event);
-                }
-              }, 100);
-=======
               
               if (shopSections.length > 0) {
                 // Shop sections yüklü, direkt seç

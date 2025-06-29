@@ -160,6 +160,14 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
         .filter(file => file.type.startsWith('image/'))
         .sort((a, b) => a.name.localeCompare(b.name));
       
+      // Alfabetik sıralama debug
+      console.log('📂 Klasör dosyaları alfabetik sıralandı:', {
+        toplamDosya: files.length,
+        resimDosya: imageFiles.length,
+        ilk5Dosya: imageFiles.slice(0, 5).map(f => f.name),
+        son5Dosya: imageFiles.slice(-5).map(f => f.name)
+      });
+      
       // İlk 4 resim için önizleme URL'leri oluştur
       const previewFiles = imageFiles.slice(0, 4);
       const previewUrls = previewFiles.map(file => URL.createObjectURL(file));
@@ -309,7 +317,8 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
       alınacakResimSayısı: currentProductImages.length,
       alınacakResimAdları: currentProductImages.map(f => f.name),
       kaynakDosyaları: settings.resourceFiles.map(f => f.name),
-      toplamGönderilecek: allFiles.length
+      toplamGönderilecek: allFiles.length,
+      alfabetikSıralama: currentProductImages.map((f, i) => `${i+1}: ${f.name}`).slice(0, 3)
     });
     
     return allFiles;
@@ -394,6 +403,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
       }));
       
       console.log(`🗑️ ${filesToDelete.length} dosya listeden çıkarıldı, kalan: ${remainingFiles.length}`);
+      console.log('🔄 Kalan dosyaların ilk 5\'i:', remainingFiles.slice(0, 5).map(f => f.name));
       
       toast({
         title: "Dosyalar Temizlendi",

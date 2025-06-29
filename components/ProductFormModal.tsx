@@ -1222,6 +1222,19 @@ export function ProductFormModal({
               setSelectedShopSection(categoryId);
               setAiCategorySelected(true);
               console.log('🏪 AI kategori seçildi:', categoryId);
+              
+              // DOM'daki select elementini de güncelle
+              setTimeout(() => {
+                const shopSectionSelect = document.querySelector('select[name="shop_section_id"]') as HTMLSelectElement;
+                if (shopSectionSelect) {
+                  shopSectionSelect.value = categoryId;
+                  console.log('🏪 DOM shop section select güncellendi:', categoryId);
+                  
+                  // Select değişikliğini tetikle (React için)
+                  const event = new Event('change', { bubbles: true });
+                  shopSectionSelect.dispatchEvent(event);
+                }
+              }, 100);
             }
           }
         } catch (error) {

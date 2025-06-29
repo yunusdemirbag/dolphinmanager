@@ -582,6 +582,15 @@ export function ProductFormModal({
         title: shopSections[0].title,
         total_sections: shopSections.length
       });
+      
+      // DOM üzerinde de select elementini güncelle
+      setTimeout(() => {
+        const selectElement = document.querySelector('select[name="shopSection"]') as HTMLSelectElement;
+        if (selectElement) {
+          selectElement.value = firstSectionId;
+          console.log('🏪 DOM select değeri güncellendi:', selectElement.value);
+        }
+      }, 100);
     } else {
       console.log('❌ Otomatik seçim yapılmadı çünkü:', {
         aiCategorySelected,
@@ -610,6 +619,15 @@ export function ProductFormModal({
             setAiCategorySelected(true);
             setPendingCategoryId(null);
             console.log('✅ Pending kategori uygulandı:', matchedSection.title);
+            
+            // DOM üzerinde de select elementini güncelle
+            setTimeout(() => {
+              const selectElement = document.querySelector('select[name="shopSection"]') as HTMLSelectElement;
+              if (selectElement) {
+                selectElement.value = matchedSection.shop_section_id.toString();
+                console.log('🏪 DOM select değeri güncellendi (AI kategori):', selectElement.value);
+              }
+            }, 100);
           } else {
             console.log('⚠️ Pending kategori bulunamadı:', categoryName);
             console.log('📋 Mevcut kategoriler:', shopSections.map(s => s.title));
@@ -1412,7 +1430,7 @@ export function ProductFormModal({
                         console.log(`🚀 Otomatik mod (${autoMode}) - ${actionText}...`);
                         submitButton.click();
                       }
-                    }, 1000);
+                    }, 500);
                   } else {
                     console.log(`⚠️ Etiket eksik (${currentTagCount}/9), "Yeni Etiket İste" butonuna tıklanıyor...`);
                     
@@ -1426,7 +1444,7 @@ export function ProductFormModal({
                       setTimeout(() => {
                         console.log('🔁 Etiket güncellendikten sonra tekrar kontrol ediliyor...');
                         checkTagsAndSubmit(); // Recursive call
-                      }, 3000); // 3 saniye bekle
+                      }, 2000); // 2 saniye bekle
                     } else {
                       console.log('❌ "Yeni Etiket İste" butonu bulunamadı, mevcut etiketlerle devam ediliyor...');
                       // Buton bulunamazsa mevcut etiketlerle devam et
@@ -1438,7 +1456,7 @@ export function ProductFormModal({
                           console.log(`🚀 Otomatik mod (${autoMode}) - ${actionText}...`);
                           submitButton.click();
                         }
-                      }, 1000);
+                      }, 500);
                     }
                   }
                 };
@@ -1448,14 +1466,14 @@ export function ProductFormModal({
               }
             }, 100); // Her 100ms kontrol et - 5x daha hızlı
             
-            // Maximum 15 saniye bekle
+            // Maximum 60 saniye bekle (başlık üretimi için daha fazla zaman)
             setTimeout(() => {
               clearInterval(titleCheckInterval);
               // State'den güncel title değerini al
               const currentTitle = document.querySelector('input[name="title"]')?.value || title;
               
               if (!currentTitle || currentTitle.trim().length === 0) {
-                console.log('⚠️ Otomatik mod: 15 saniye sonra başlık gelmedi, yine de gönderiliyor...');
+                console.log('⚠️ Otomatik mod: 60 saniye sonra başlık gelmedi, yine de gönderiliyor...');
                 
                 // OpenAI kredi/quota hatası kontrolü
                 const consoleOutput = document.querySelector('pre')?.textContent || '';
@@ -1476,13 +1494,36 @@ export function ProductFormModal({
                   return;
                 }
                 
+                // API hata kontrolü
+                const errorLogs = document.querySelectorAll('pre');
+                let hasApiError = false;
+                
+                errorLogs.forEach(log => {
+                  if (log.textContent?.includes('Failed to fetch')) {
+                    hasApiError = true;
+                  }
+                });
+                
+                if (hasApiError) {
+                  console.error('❌ API bağlantı hatası tespit edildi!');
+                  toast({
+                    variant: "destructive",
+                    title: "API Bağlantı Hatası",
+                    description: "API'ye bağlanırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin.",
+                  });
+                  
+                  // İşlemi durdur
+                  setSubmitting(false);
+                  return;
+                }
+                
                 const buttonSelector = autoMode === 'direct-etsy' ? '[data-direct-submit-button]' : '[data-submit-button]';
                 const submitButton = document.querySelector(buttonSelector) as HTMLButtonElement;
                 if (submitButton && !submitButton.disabled) {
                   submitButton.click();
                 }
               }
-            }, 15000);
+            }, 60000);
             
           } else {
             // MANUEL MOD: 15 saniye geri sayım
@@ -1507,7 +1548,7 @@ export function ProductFormModal({
                       console.log('❌ Submit butonu bulunamadı veya disabled');
                     }
                     setCountdown(null);
-                  }, 100);
+                  }, 500);
                   
                   return null;
                 }
@@ -1526,7 +1567,7 @@ export function ProductFormModal({
                       submitButton.click();
                     }
                     setCountdown(null);
-                  }, 100);
+                  }, 500);
                   
                   return null;
                 }
@@ -1542,7 +1583,7 @@ export function ProductFormModal({
       }
     }
   // Kompleks nesneleri (arrays, objects) bağımlılık dizisinden çıkarıyoruz ve sadece primitive değerleri kullanıyoruz
-  }, [isAutoMode, isOpen, countdown, title, autoTitleLoading]);
+  }, [isAutoMode, isOpen, autoFiles, countdown, title, autoTitleLoading]);
 
   // KUYRUK SİSTEMİ İÇİN YENİ FONKSİYON
   const handleSubmitToQueue = async () => {

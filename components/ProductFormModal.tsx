@@ -1407,7 +1407,6 @@ export function ProductFormModal({
                 setPendingCategoryId(categoryId);
                 console.log('⏳ Shop sections henüz yüklenmemiş, kategori beklemeye alındı:', categoryId);
               }
->>>>>>> 4183400 (Otomatik ürün ekleme sistemi iyileştirmeleri ve hata düzeltmeleri)
             }
           }
         } catch (error) {

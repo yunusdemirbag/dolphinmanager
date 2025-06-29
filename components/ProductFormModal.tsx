@@ -1344,6 +1344,29 @@ export function ProductFormModal({
                   description: `"${firstThreeWords}" - ${tagCount} etiket hazır`,
                   duration: 3000
                 });
+                
+                // Manuel trigger - hemen kontrol et
+                setTimeout(() => {
+                  console.log('🔄 Manuel trigger - Auto submit kontrolü yapılıyor...');
+                  if (title && tags.length >= 9 && selectedShopSection && !submitting) {
+                    console.log('🚀 Manuel trigger - Hızlı gönderim başlatılıyor...');
+                    
+                    if (isAutoMode && autoMode === 'direct-etsy') {
+                      console.log('🤖 Manuel trigger: Direkt Etsy gönderimi başlatılıyor');
+                      handleSubmit('draft');
+                    } else {
+                      console.log('🤖 Manuel trigger: Kuyruk gönderimi başlatılıyor');
+                      handleSubmitToQueue();
+                    }
+                  } else {
+                    console.log('🔄 Manuel trigger - Koşullar henüz hazır değil:', {
+                      title: !!title,
+                      tagsLength: tags.length,
+                      selectedShopSection: !!selectedShopSection,
+                      submitting
+                    });
+                  }
+                }, 1000); // 1 saniye bekle - kategori seçiminin tamamlanması için
               } else {
                 console.log(`📝 ${tagCount} etiket var, 13'e tamamlanacak`);
                 
@@ -1542,7 +1565,7 @@ export function ProductFormModal({
       
       return () => clearTimeout(timer);
     }
-  }, [autoSubmitEnabled, title, tags.length, selectedShopSection, submitting]);
+  }, [autoSubmitEnabled, title, tags.length, selectedShopSection, submitting, aiCategorySelected]);
 
   // Mount kontrolü - hydration fix
   useEffect(() => {

@@ -282,6 +282,10 @@ export function ProductFormModal({
   const [countdown, setCountdown] = useState<number | null>(null)
   const [isMounted, setIsMounted] = useState(false)
   const [videoFile, setVideoFile] = useState<MediaFile | null>(null)
+  
+  // Form hızlandırma için state'ler
+  const [formStartTime, setFormStartTime] = useState<number | null>(null)
+  const [autoSubmitEnabled, setAutoSubmitEnabled] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   // --- BAŞLIK OTO-ÜRETİMİ STATE ---
@@ -572,8 +576,8 @@ export function ProductFormModal({
     });
     
     // Yeni ürün oluşturuluyorsa ve shop sections yüklendiyse, ilkini seç
-    // ANCAK AI kategorisi seçilmediyse
-    if (isOpen && shopSections.length > 0 && !selectedShopSection && !product && !aiCategorySelected) {
+    // ANCAK AI kategorisi seçilmediyse VE pending kategori yoksa VE AI henüz çalışmamışsa
+    if (isOpen && shopSections.length > 0 && !selectedShopSection && !product && !aiCategorySelected && !pendingCategoryId && !autoTitleUsed) {
       const firstSectionId = shopSections[0].shop_section_id.toString();
       console.log('🚨🚨🚨 OTOMATIK SEÇİM YAPILIYOR - OVERRIDE RISKI!', firstSectionId, shopSections[0].title);
       setSelectedShopSection(firstSectionId);
@@ -598,44 +602,39 @@ export function ProductFormModal({
         kondülyonlar: `isOpen:${isOpen}, shopSections:${shopSections.length}, selectedShopSection:${!selectedShopSection}, product:${!product}, aiCategorySelected:${!aiCategorySelected}`
       });
     }
-  }, [isOpen, shopSections, selectedShopSection, product, aiCategorySelected]);
+  }, [isOpen, shopSections, selectedShopSection, product, aiCategorySelected, pendingCategoryId, autoTitleUsed]);
 
   // Pending category bilgisini shop sections yüklendiğinde uygula
   useEffect(() => {
     if (pendingCategoryId && shopSections.length > 0 && !aiCategorySelected) {
       console.log('🔄 Pending category uygulanıyor:', pendingCategoryId);
       
-      try {
-        const categoryInfo = JSON.parse(pendingCategoryId);
-        const categoryName = categoryInfo.title || categoryInfo.name;
+      // pendingCategoryId direkt olarak section ID'si olarak geliyorsa
+      const matchedSection = shopSections.find(s => 
+        s.shop_section_id.toString() === pendingCategoryId
+      );
+      
+      if (matchedSection) {
+        setSelectedShopSection(pendingCategoryId);
+        setAiCategorySelected(true);
+        setPendingCategoryId(null);
+        console.log('✅ Pending kategori uygulandı:', matchedSection.title, 'ID:', pendingCategoryId);
         
-        if (categoryName) {
-          const matchedSection = shopSections.find(s => 
-            s.title.toLowerCase() === categoryName.toLowerCase()
-          );
-          
-          if (matchedSection) {
-            setSelectedShopSection(matchedSection.shop_section_id.toString());
-            setAiCategorySelected(true);
-            setPendingCategoryId(null);
-            console.log('✅ Pending kategori uygulandı:', matchedSection.title);
+        // DOM üzerinde de select elementini güncelle
+        setTimeout(() => {
+          const selectElement = document.querySelector('select[name="shopSection"]') as HTMLSelectElement;
+          if (selectElement) {
+            selectElement.value = pendingCategoryId;
+            console.log('🏪 DOM select değeri güncellendi (pending kategori):', pendingCategoryId);
             
-            // DOM üzerinde de select elementini güncelle
-            setTimeout(() => {
-              const selectElement = document.querySelector('select[name="shopSection"]') as HTMLSelectElement;
-              if (selectElement) {
-                selectElement.value = matchedSection.shop_section_id.toString();
-                console.log('🏪 DOM select değeri güncellendi (AI kategori):', selectElement.value);
-              }
-            }, 100);
-          } else {
-            console.log('⚠️ Pending kategori bulunamadı:', categoryName);
-            console.log('📋 Mevcut kategoriler:', shopSections.map(s => s.title));
-            setPendingCategoryId(null);
+            // Event tetikle
+            const event = new Event('change', { bubbles: true });
+            selectElement.dispatchEvent(event);
           }
-        }
-      } catch (error) {
-        console.log('❌ Pending category parse hatası:', error);
+        }, 100);
+      } else {
+        console.log('❌ Pending kategori ID bulunamadı:', pendingCategoryId);
+        console.log('📋 Mevcut kategoriler:', shopSections.map(s => `${s.shop_section_id}: ${s.title}`));
         setPendingCategoryId(null);
       }
     }
@@ -820,6 +819,25 @@ export function ProductFormModal({
     if (hasUnsavedChanges()) {
       setShowUnsavedChangesDialog(true);
     } else {
+      // Form kapanma süresini hesapla
+      if (formStartTime && title) {
+        const formEndTime = Date.now();
+        const totalElapsedTime = formEndTime - formStartTime;
+        const totalElapsedSeconds = Math.round(totalElapsedTime / 1000);
+        
+        // Yüklenen ürünün ilk 3 kelimesi
+        const firstThreeWords = title.split(' ').slice(0, 3).join(' ');
+        
+        console.log(`✅ ${firstThreeWords} - Form ${totalElapsedSeconds} saniyede tamamlandı (açılış→kapanış)`);
+        
+        // Toast bildirimi
+        toast({
+          title: "📊 Form Tamamlandı",
+          description: `"${firstThreeWords}" ${totalElapsedSeconds}s'de işlendi`,
+          duration: 4000
+        });
+      }
+      
       // Tüm form state'lerini temizle
       setTitle("");
       setAutoTitleUsed(false);
@@ -833,6 +851,8 @@ export function ProductFormModal({
       setSelectedShopSection("");
       setAiCategorySelected(false); // AI seçim flag'ini sıfırla
       setPendingCategoryId(null); // Pending kategori ID'yi sıfırla
+      setFormStartTime(null); // Form zamanını sıfırla
+      setAutoSubmitEnabled(false); // Otomatik gönderim flag'ini sıfırla
       // Force modal close
       setTimeout(() => {
         onClose();
@@ -889,6 +909,80 @@ export function ProductFormModal({
     setTags([...tags, cleanTag]);
     setNewTag("");
   }
+
+  // Yeni etiket isteme fonksiyonu
+  const handleRequestAdditionalTags = useCallback(async () => {
+    if (!title) {
+      console.log('❌ Başlık yok, etiket istenemez');
+      return;
+    }
+    
+    try {
+      console.log('🔄 Otomatik etiket tamamlama başlatıldı');
+      setAutoTagsLoading(true);
+      
+      // Use the tags prompt from prompts.ts
+      const tagsPromptConfig = getPromptById('tags-prompt');
+      let prompt = tagsPromptConfig?.prompt || 'Generate 13 Etsy tags for this product title.';
+      prompt = prompt.replace('${title}', title);
+      
+      const res = await fetch("/api/ai/generate-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          prompt: prompt,
+          maxTokens: 200 
+        }),
+      });
+      const data = await res.json();
+      
+      if (data.text) {
+        console.log('✅ Ek etiketler alındı:', data.text);
+        const newTags = data.text.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+        
+        if (newTags.length > 0) {
+          const existingTags = tags || [];
+          const allTags = [...existingTags];
+          
+          for (const newTag of newTags) {
+            if (allTags.length >= 13) break;
+            
+            const cleanTag = cleanTagText(newTag);
+            if (cleanTag && !allTags.includes(cleanTag)) {
+              allTags.push(cleanTag);
+            }
+          }
+          
+          const validTags = allTags.slice(0, 13);
+          setTags(validTags);
+          
+          console.log(`🏷️ Etiketler güncellendi: ${existingTags.length} → ${validTags.length}`);
+          
+          // Eğer 9'a ulaştıysak otomatik gönderim aktif et
+          if (validTags.length >= 9) {
+            console.log('🚀 Etiket tamamlandı, otomatik gönderim aktif');
+            setAutoSubmitEnabled(true);
+            
+            // Ürün başlığının ilk 3 kelimesi
+            const firstThreeWords = title.split(' ').slice(0, 3).join(' ');
+            
+            toast({
+              title: "✅ Etiketler Tamamlandı",
+              description: `"${firstThreeWords}" - ${validTags.length} etiket hazır`,
+              duration: 3000
+            });
+          }
+        }
+      } else if (data.error) {
+        toast({ variant: "destructive", title: data.error });
+      }
+    } catch (e) {
+      console.error('❌ Etiket tamamlama hatası:', e);
+      toast({ variant: "destructive", title: "Etiketler oluşturulamadı" });
+    } finally {
+      setAutoTagsLoading(false);
+    }
+  }, [title, tags, setTags, toast]);
 
   // Etiket metnini temizleme fonksiyonu
   const cleanTagText = (tag: string): string => {
@@ -1232,11 +1326,46 @@ export function ProductFormModal({
             if (data.tags && Array.isArray(data.tags)) {
               const cleanTags = data.tags.map(tag => cleanTagText(tag)).filter(Boolean);
               setTags(cleanTags);
+              
+              // Otomatik gönderim logic'i
+              const tagCount = cleanTags.length;
+              console.log(`🏷️ AI'dan ${tagCount} etiket geldi`);
+              
+              // Ürün başlığının ilk 3 kelimesi
+              const firstThreeWords = title.split(' ').slice(0, 3).join(' ');
+              
+              if (tagCount >= 9) {
+                console.log('🚀 9+ etiket var, hızlı gönderim aktif');
+                setAutoSubmitEnabled(true);
+                
+                // Toast bildirimi
+                toast({
+                  title: "⚡ Hızlı Gönderim Aktif",
+                  description: `"${firstThreeWords}" - ${tagCount} etiket hazır`,
+                  duration: 3000
+                });
+              } else {
+                console.log(`📝 ${tagCount} etiket var, 13'e tamamlanacak`);
+                
+                // Toast bildirimi  
+                toast({
+                  title: "🔄 Etiket Tamamlanıyor",
+                  description: `"${firstThreeWords}" - ${tagCount}/13 etiket`,
+                  duration: 3000
+                });
+                
+                // Otomatik olarak eksik etiketleri iste
+                setTimeout(() => {
+                  console.log('🔄 Otomatik etiket tamamlama başlatılıyor...');
+                  handleRequestAdditionalTags();
+                }, 2000); // 2 saniye bekle
+              }
             }
             
             // Shop section seçimi
-            if (data.suggestedCategoryId && shopSections.length > 0) {
+            if (data.suggestedCategoryId) {
               const categoryId = data.suggestedCategoryId.toString();
+<<<<<<< HEAD
               setSelectedShopSection(categoryId);
               setAiCategorySelected(true);
               console.log('🏪 AI kategori seçildi:', categoryId);
@@ -1253,6 +1382,32 @@ export function ProductFormModal({
                   shopSectionSelect.dispatchEvent(event);
                 }
               }, 100);
+=======
+              
+              if (shopSections.length > 0) {
+                // Shop sections yüklü, direkt seç
+                setSelectedShopSection(categoryId);
+                setAiCategorySelected(true);
+                console.log('🏪 AI kategori seçildi:', categoryId);
+                
+                // DOM üzerinde de select elementini güncelle
+                setTimeout(() => {
+                  const selectElement = document.querySelector('select[name="shopSection"]') as HTMLSelectElement;
+                  if (selectElement) {
+                    selectElement.value = categoryId;
+                    console.log('🏪 DOM select değeri AI ile güncellendi:', categoryId);
+                    
+                    // Event tetikle (React'in değişikliği algılaması için)
+                    const event = new Event('change', { bubbles: true });
+                    selectElement.dispatchEvent(event);
+                  }
+                }, 100);
+              } else {
+                // Shop sections henüz yüklenmemiş, beklet
+                setPendingCategoryId(categoryId);
+                console.log('⏳ Shop sections henüz yüklenmemiş, kategori beklemeye alındı:', categoryId);
+              }
+>>>>>>> 4183400 (Otomatik ürün ekleme sistemi iyileştirmeleri ve hata düzeltmeleri)
             }
           }
         } catch (error) {
@@ -1277,6 +1432,15 @@ export function ProductFormModal({
     setSelectedShopSection(val);
     setShopSectionAutoSelected(false); // Manuel seçim yapıldığında otomatiği kapat
     console.log('Manuel kategori seçimi:', val);
+    
+    // DOM üzerinde de select elementini güncelle
+    setTimeout(() => {
+      const selectElement = document.querySelector('select[name="shopSection"]') as HTMLSelectElement;
+      if (selectElement && selectElement.value !== val) {
+        selectElement.value = val;
+        console.log('🏪 DOM select değeri manuel güncellendi:', val);
+      }
+    }, 100);
   };
 
   // Category auto-selection is now handled by the unified AI API
@@ -1319,8 +1483,22 @@ export function ProductFormModal({
         }
         
         if (matchedSection && !selectedShopSection) {
+          const sectionId = matchedSection.shop_section_id.toString();
           console.log('Fallback kategori seçildi:', matchedSection.title);
-          setSelectedShopSection(matchedSection.shop_section_id.toString());
+          setSelectedShopSection(sectionId);
+          
+          // DOM üzerinde de select elementini güncelle
+          setTimeout(() => {
+            const selectElement = document.querySelector('select[name="shopSection"]') as HTMLSelectElement;
+            if (selectElement) {
+              selectElement.value = sectionId;
+              console.log('🏪 DOM select değeri fallback ile güncellendi:', sectionId);
+              
+              // Event tetikle (React'in değişikliği algılaması için)
+              const event = new Event('change', { bubbles: true });
+              selectElement.dispatchEvent(event);
+            }
+          }, 100);
         }
       } catch (error) {
         console.error('Fallback kategori seçimi hatası:', error);
@@ -1331,13 +1509,59 @@ export function ProductFormModal({
   // Kompleks nesneleri (arrays, objects) bağımlılık dizisinden çıkarıyoruz ve sadece primitive değerleri kullanıyoruz
   }, [title, shopSectionAutoSelected, selectedShopSection]); // shopSections çıkarıldı
 
-  // Form açıldığında otomatik seçimi aktif et
+  // Form açıldığında otomatik seçimi aktif et ve zamanlayıcıyı başlat
   useEffect(() => {
     if (isOpen) {
       setShopSectionAutoSelected(true);
-      console.log('Form açıldı, otomatik kategori seçimi aktif');
+      setFormStartTime(Date.now());
+      setAutoSubmitEnabled(false);
+      console.log('Form açıldı, otomatik kategori seçimi aktif, zamanlayıcı başlatıldı');
+    } else {
+      setFormStartTime(null);
+      setAutoSubmitEnabled(false);
     }
   }, [isOpen]);
+
+  // Başlık gelir gelmez etiket kontrolü ve hızlı gönderim
+  useEffect(() => {
+    console.log('🔍 Auto submit check:', {
+      autoSubmitEnabled,
+      title: title ? `"${title.substring(0, 30)}..."` : 'empty',
+      tagsLength: tags.length,
+      selectedShopSection,
+      submitting,
+      allConditionsMet: autoSubmitEnabled && title && tags.length >= 9 && selectedShopSection && !submitting
+    });
+    
+    if (autoSubmitEnabled && title && tags.length >= 9 && selectedShopSection && !submitting) {
+      const timer = setTimeout(() => {
+        console.log('🚀 Hızlı gönderim başlatılıyor...');
+        
+        // Ürün başlığının ilk 3 kelimesi
+        const firstThreeWords = title.split(' ').slice(0, 3).join(' ');
+        
+        console.log(`⚡ ${firstThreeWords} - Hızlı gönderim aktif (9+ etiket)`);
+        
+        // Toast bildirimi
+        toast({
+          title: "⚡ Hızlı Gönderim",
+          description: `"${firstThreeWords}" hazır - Gönderiliyor`,
+          duration: 3000
+        });
+        
+        // Formu gönder - mod'a göre
+        if (isAutoMode && autoMode === 'direct-etsy') {
+          console.log('🤖 Auto mode: Direkt Etsy gönderimi başlatılıyor');
+          handleSubmit('draft');
+        } else {
+          console.log('🤖 Auto mode: Kuyruk gönderimi başlatılıyor');
+          handleSubmitToQueue();
+        }
+      }, 500); // 0.5 saniye bekle - daha hızlı
+      
+      return () => clearTimeout(timer);
+    }
+  }, [autoSubmitEnabled, title, tags.length, selectedShopSection, submitting]);
 
   // Mount kontrolü - hydration fix
   useEffect(() => {
@@ -1403,11 +1627,14 @@ export function ProductFormModal({
             const titleCheckInterval = setInterval(() => {
               // State'den güncel title değerini al
               const currentTitle = document.querySelector('input[name="title"]')?.value || title;
-              console.log('🔍 Auto title check:', currentTitle);
+              
+              // Sadece değişiklik varsa log yaz (konsol kirliliğini azaltmak için)
+              if (currentTitle !== title) {
+                console.log('🔍 Auto title check:', currentTitle);
+              }
               
               // Etsy için temizlenmiş başlık kontrolü
               const cleanedTitle = cleanEtsyTitle(currentTitle);
-              console.log('🧹 Cleaned title for Etsy:', cleanedTitle);
               
               if (cleanedTitle && cleanedTitle.trim().length > 0 && !autoTitleLoading) {
                 console.log('🎯 OTOMATIK MOD: Başlık hazır, etiket kontrolü yapılıyor...');
@@ -1859,18 +2086,50 @@ export function ProductFormModal({
       const endTime = Date.now();
       const duration = ((endTime - startTime) / 1000).toFixed(1);
 
-      // 🚀 HAYVAN GİBİ HIZLI başarı mesajı!
-      toast({ 
-        title: "⚡ LIGHTNING KUYRUK BAŞARILI!", 
-        description: `"${title}" ${duration}s'de eklendi! Queue ID: #${result.queue_id}` 
-      });
+      // Form kapanma süresini hesapla ve logla
+      if (formStartTime) {
+        const formEndTime = Date.now();
+        const totalElapsedTime = formEndTime - formStartTime;
+        const totalElapsedSeconds = Math.round(totalElapsedTime / 1000);
+        
+        // Ürün başlığının ilk 3 kelimesi
+        const firstThreeWords = title.split(' ').slice(0, 3).join(' ');
+        
+        // Seçilen kategori adını bul
+        const selectedCategory = shopSections.find(s => s.shop_section_id.toString() === selectedShopSection);
+        const categoryName = selectedCategory ? selectedCategory.title : 'Kategori Yok';
+        
+        console.log(`✅ ${firstThreeWords} - ${categoryName} - Form ${totalElapsedSeconds} saniyede tamamlandı (açılış→kapanış)`);
+        
+        // API Rate Limit durumunu terminal formatında göster
+        if (result.rate_limit) {
+          console.table({
+            daily: `${result.rate_limit.daily_remaining || '?'}/${result.rate_limit.daily_limit || '?'}`,
+            second: `${result.rate_limit.second_remaining || '?'}/${result.rate_limit.second_limit || '?'}`
+          });
+        } else {
+          console.log('📊 Rate Limit Durumu: API yanıtında rate_limit bilgisi yok');
+        }
+        
+        // 🚀 HAYVAN GİBİ HIZLI başarı mesajı - süre ve kategori ile!
+        toast({ 
+          title: "⚡ LIGHTNING KUYRUK BAŞARILI!", 
+          description: `"${firstThreeWords}" ${categoryName} kategorisinde ${totalElapsedSeconds}s'de eklendi!` 
+        });
+      } else {
+        // Fallback toast
+        toast({ 
+          title: "⚡ LIGHTNING KUYRUK BAŞARILI!", 
+          description: `"${title}" ${duration}s'de eklendi! Queue ID: #${result.queue_id}` 
+        });
+      }
 
       // INSTANT modal kapatma - kullanıcı hemen kuyruka gidebilsin
       onClose();
       
       // Auto mode callback
       if (onSubmitSuccess) {
-        onSubmitSuccess();
+        onSubmitSuccess(title);
       }
       
       // HAYVAN GİBİ HIZLI refresh - kullanıcı hemen görsün
@@ -2055,12 +2314,45 @@ export function ProductFormModal({
       const endTime = Date.now();
       const duration = ((endTime - startTime) / 1000).toFixed(1);
 
-      // Başarı mesajı göster
-      const stateText = state === 'draft' ? 'taslak olarak' : 'aktif olarak';
-      toast({ 
-        title: "✅ Etsy'e Yüklendi!", 
-        description: `"${title}" ürünü ${duration} saniyede Etsy'e ${stateText} yüklendi!` 
-      });
+      // Form kapanma süresini hesapla ve logla
+      if (formStartTime) {
+        const formEndTime = Date.now();
+        const totalElapsedTime = formEndTime - formStartTime;
+        const totalElapsedSeconds = Math.round(totalElapsedTime / 1000);
+        
+        // Ürün başlığının ilk 3 kelimesi
+        const firstThreeWords = title.split(' ').slice(0, 3).join(' ');
+        
+        // Seçilen kategori adını bul
+        const selectedCategory = shopSections.find(s => s.shop_section_id.toString() === selectedShopSection);
+        const categoryName = selectedCategory ? selectedCategory.title : 'Kategori Yok';
+        
+        console.log(`✅ ${firstThreeWords} - ${categoryName} - Form ${totalElapsedSeconds} saniyede tamamlandı (açılış→kapanış)`);
+        
+        // API Rate Limit durumunu terminal formatında göster
+        if (result.rate_limit) {
+          console.table({
+            daily: `${result.rate_limit.daily_remaining || '?'}/${result.rate_limit.daily_limit || '?'}`,
+            second: `${result.rate_limit.second_remaining || '?'}/${result.rate_limit.second_limit || '?'}`
+          });
+        } else {
+          console.log('📊 Rate Limit Durumu: API yanıtında rate_limit bilgisi yok');
+        }
+        
+        // Başarı mesajı göster - süre ve kategori ile
+        const stateText = state === 'draft' ? 'taslak olarak' : 'aktif olarak';
+        toast({ 
+          title: "✅ Etsy'e Yüklendi!", 
+          description: `"${firstThreeWords}" ${categoryName} kategorisinde ${totalElapsedSeconds}s'de ${stateText} yüklendi!` 
+        });
+      } else {
+        // Fallback toast
+        const stateText = state === 'draft' ? 'taslak olarak' : 'aktif olarak';
+        toast({ 
+          title: "✅ Etsy'e Yüklendi!", 
+          description: `"${title}" ürünü ${duration} saniyede Etsy'e ${stateText} yüklendi!` 
+        });
+      }
 
       // Batch processing kontrolü
       if (isBatchMode && selectedFolderFiles.length > 0) {
@@ -2098,12 +2390,28 @@ export function ProductFormModal({
         }
       }
 
-      // Modal'ı kapat (sadece batch mode değilse veya tamamlandıysa)
-      onClose();
-      
-      // Auto mode callback - otomatik işleme devam etmesi için
-      if (onSubmitSuccess) {
-        onSubmitSuccess();
+      // Auto mode için özel işlem
+      if (isAutoMode && autoMode === 'direct-etsy') {
+        // Direkt Etsy modunda - işlem tamamlandığında callback çağır ama formu hemen kapatma
+        console.log('🤖 Auto mode direkt Etsy - işlem tamamlandı, callback çağrılıyor');
+        
+        if (onSubmitSuccess) {
+          onSubmitSuccess(title);
+        }
+        
+        // 2 saniye bekle, sonra formu kapat (Etsy işleminin tamamlanması için)
+        setTimeout(() => {
+          console.log('🤖 Auto mode - Form kapatılıyor');
+          onClose();
+        }, 2000);
+      } else {
+        // Normal mod veya kuyruk modu - hemen kapat
+        onClose();
+        
+        // Auto mode callback
+        if (onSubmitSuccess && isAutoMode) {
+          onSubmitSuccess(title);
+        }
       }
       
       router.refresh();
@@ -2663,11 +2971,19 @@ ${descriptionParts.deliveryInfo[randomIndex]}`;
         
         // Kategoriyi de ayarla
         if (data.suggestedCategoryId) {
+          const categoryId = data.suggestedCategoryId.toString();
           console.log('🔍 GenerateTitleOnly - Kategori seçimi:', {
-            suggestedCategoryId: data.suggestedCategoryId,
+            suggestedCategoryId: categoryId,
             shopSectionsLength: shopSections.length
           });
-          setSelectedShopSection(data.suggestedCategoryId.toString());
+          
+          if (shopSections.length > 0) {
+            setSelectedShopSection(categoryId);
+            setAiCategorySelected(true);
+          } else {
+            setPendingCategoryId(categoryId);
+            console.log('⏳ GenerateTitleOnly - Kategori beklemeye alındı:', categoryId);
+          }
         }
       } else {
         throw new Error("Başlık üretilemedi");
@@ -2775,13 +3091,21 @@ Return only the title, no quotes, no explanations.`
         
         // Kategoriyi de ayarla
         if (data.suggestedCategoryId) {
+          const categoryId = data.suggestedCategoryId.toString();
           console.log('🔍 Focus - Kategori seçimi:', {
-            suggestedCategoryId: data.suggestedCategoryId,
+            suggestedCategoryId: categoryId,
             shopSectionsLength: shopSections.length,
             currentSelectedShopSection: selectedShopSection
           });
-          setSelectedShopSection(data.suggestedCategoryId.toString());
-          console.log('✅ Focus kategori güncellendi:', data.suggestedCategoryId);
+          
+          if (shopSections.length > 0) {
+            setSelectedShopSection(categoryId);
+            setAiCategorySelected(true);
+            console.log('✅ Focus kategori güncellendi:', categoryId);
+          } else {
+            setPendingCategoryId(categoryId);
+            console.log('⏳ Focus - Kategori beklemeye alındı:', categoryId);
+          }
         }
       } else {
         console.log('❌ Focus API\'den başlık alınamadı');
@@ -3280,67 +3604,7 @@ Return only the title, no quotes, no explanations.`
                           className="border border-gray-300 hover:bg-gray-100 rounded-md"
                           title="Yeni Etiket İste"
                           disabled={autoTagsLoading || !title}
-                          onClick={async () => {
-                            if (!title) return;
-                            try {
-                              setAutoTagsLoading(true);
-                              
-                              // Use the tags prompt from prompts.ts
-                              const tagsPromptConfig = getPromptById('tags-prompt');
-                              let prompt = tagsPromptConfig?.prompt || 'Generate 13 Etsy tags for this product title.';
-                              prompt = prompt.replace('${title}', title);
-                              
-                              const res = await fetch("/api/ai/generate-text", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ 
-                                  prompt: prompt,
-                                  maxTokens: 200 
-                                }),
-                              });
-                              const data = await res.json();
-                              
-                              if (data.text) {
-                                // Parse comma-separated tags
-                                const tagsText = data.text.trim();
-                                const parsedTags = tagsText.split(',').map((tag: string) => tag.trim().toLowerCase()).filter((tag: string) => tag.length > 0);
-                                
-                                // Karakter sınırı kontrolü ve otomatik temizleme
-                                // Özel karakterleri de temizle
-                                const validTags = parsedTags
-                                  .map(tag => cleanTagText(tag))
-                                  .filter(tag => tag && tag.length <= 20);
-                                
-                                const invalidTags = parsedTags.filter(tag => !cleanTagText(tag) || cleanTagText(tag).length > 20);
-                                
-                                if (invalidTags.length > 0) {
-                                  toast({ 
-                                    variant: "default", 
-                                    title: "Geçersiz Etiketler Temizlendi", 
-                                    description: `${invalidTags.length} adet geçersiz etiket otomatik olarak silindi: ${invalidTags.slice(0,3).join(', ')}${invalidTags.length > 3 ? '...' : ''}` 
-                                  });
-                                }
-                                
-                                setTags(validTags.slice(0, 13));
-                                
-                                // Eğer geçerli etiket sayısı 13'ten azsa, yeni etiket iste
-                                if (validTags.length < 13) {
-                                  const neededTags = 13 - validTags.length;
-                                  toast({ 
-                                    variant: "default", 
-                                    title: "Ek Etiket Gerekli", 
-                                    description: `${neededTags} adet daha etiket eklemek için tekrar "Yeni Etiket İste" butonuna tıklayın.` 
-                                  });
-                                }
-                              } else if (data.error) {
-                                toast({ variant: "destructive", title: data.error });
-                              }
-                            } catch (e) {
-                              toast({ variant: "destructive", title: "Etiketler oluşturulamadı" });
-                            } finally {
-                              setAutoTagsLoading(false);
-                            }
-                          }}
+                          onClick={handleRequestAdditionalTags}
                         >
                           {autoTagsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TagIcon className="w-4 w-4" />}
                         </Button>

@@ -87,6 +87,10 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const [showProductForm, setShowProductForm] = useState(false);
   const [currentProductIndex, setCurrentProductIndex] = useState(0);
+  
+  // Form döngü süresi için state'ler
+  const [formCycleStartTime, setFormCycleStartTime] = useState<number | null>(null);
+  const [lastProductTitle, setLastProductTitle] = useState<string>('');
 
   // LocalStorage keys
   const STORAGE_KEY = 'auto-product-state';
@@ -337,8 +341,13 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
   }, []);
 
   // Handle form submission success
-  const handleFormSubmitSuccess = useCallback(async () => {
+  const handleFormSubmitSuccess = useCallback(async (productTitle?: string) => {
     console.log(`✅ Ürün ${currentProductIndex + 1} başarıyla eklendi`);
+    
+    // Ürün başlığını kaydet (döngü süresi için)
+    if (productTitle) {
+      setLastProductTitle(productTitle);
+    }
     
     // Add to processed products
     const currentFiles = getCurrentProductFiles();
@@ -359,6 +368,9 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
         progress: ((currentProductIndex + 1) / processing.totalProducts) * 100
       }));
     }
+    
+    // Form döngü zamanını başlat
+    setFormCycleStartTime(Date.now());
     
     // 🗑️ YENİ MANTIK: İlk 6 dosyayı çöp kutusuna at
     console.log('🗑️ Form başarıyla gönderildi, ilk 6 resmi silme işlemi başlıyor...');
@@ -401,17 +413,42 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
     
     if (newRemainingFiles >= settings.imagesPerProduct) {
       // Hala işlenecek dosya var - sonraki ürüne geç (ama index sıfırla)
-      console.log('⏰ Form kapandı, 1 saniye bekleniyor...');
+      // Direkt Etsy modunda daha uzun bekle (dosya upload süresi için)
+      const waitTime = settings.mode === 'direct-etsy' ? 3000 : 1000;
+      console.log(`⏰ Form kapandı, ${settings.mode === 'direct-etsy' ? '3' : '1'} saniye bekleniyor...`);
       setTimeout(() => {
         console.log(`🔄 Sonraki ürün için form açılıyor... (index sıfırlanıyor: 0)`);
+        
+        // Form döngü süresini hesapla
+        if (formCycleStartTime && lastProductTitle) {
+          const cycleEndTime = Date.now();
+          const cycleElapsed = Math.round((cycleEndTime - formCycleStartTime) / 1000);
+          const firstThreeWords = lastProductTitle.split(' ').slice(0, 3).join(' ');
+          
+          console.log(`🔄 ${firstThreeWords} - Form döngüsü ${cycleElapsed} saniyede tamamlandı (kapanış→açılış)`);
+        }
+        
         setCurrentProductIndex(0); // Index'i sıfırla çünkü dosyalar silindi
         setShowProductForm(true);
         
+        // Kalan ürün sayısını hesapla (6'şar resimle)
+        const remainingProducts = Math.ceil(newRemainingFiles / 6);
+        
+        // Toast mesajında döngü süresini göster
+        let toastDescription = `Kalan ${newRemainingFiles} dosyadan ${remainingProducts} ürün kaldı`;
+        if (formCycleStartTime && lastProductTitle) {
+          const cycleElapsed = Math.round((Date.now() - formCycleStartTime) / 1000);
+          const firstThreeWords = lastProductTitle.split(' ').slice(0, 3).join(' ');
+          const modeText = settings.mode === 'direct-etsy' ? 'Etsy\'ye' : 'kuyruğa';
+          toastDescription += ` | ${firstThreeWords} ${cycleElapsed}s'de ${modeText} gönderildi`;
+        }
+        
         toast({
           title: "Sonraki Ürün",
-          description: `Kalan ${newRemainingFiles} dosyadan sonraki 6'sı işleniyor...`
+          description: toastDescription,
+          duration: 3000 // 3 saniye
         });
-      }, 1000); // 1 saniye bekle
+      }, waitTime); // Mode'a göre bekleme süresi
     } else {
       // All products completed
       setProcessing(prev => ({

@@ -6,24 +6,36 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Direkt Etsy listing oluşturma başlatılıyor...');
     
-    // FormData'dan veriyi al
-    const formData = await request.formData();
-    const listingDataString = formData.get('listingData') as string;
+    // Content-Type kontrol et
+    const contentType = request.headers.get('content-type') || '';
+    let listingData: any;
+    let formData: FormData | null = null;
     
-    console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
-    
-    if (!listingDataString) {
-      return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
+    if (contentType.includes('application/json')) {
+      // JSON formatında veri geldi (ProductFormModal'dan)
+      console.log('📋 JSON formatında veri alındı');
+      listingData = await request.json();
+    } else {
+      // FormData formatında veri geldi (process route'dan)
+      console.log('📋 FormData formatında veri alındı');
+      formData = await request.formData();
+      const listingDataString = formData.get('listingData') as string;
+      
+      console.log('📋 Alınan listingData string:', listingDataString?.substring(0, 100) + '...');
+      
+      if (!listingDataString) {
+        return NextResponse.json({ error: 'Listing data is required' }, { status: 400 });
+      }
+      
+      try {
+        listingData = JSON.parse(listingDataString);
+      } catch (parseError) {
+        console.error('❌ JSON parse hatası:', parseError);
+        console.error('❌ Problematik string:', listingDataString);
+        return NextResponse.json({ error: 'Invalid listing data format' }, { status: 400 });
+      }
     }
     
-    let listingData;
-    try {
-      listingData = JSON.parse(listingDataString);
-    } catch (parseError) {
-      console.error('❌ JSON parse hatası:', parseError);
-      console.error('❌ Problematik string:', listingDataString);
-      return NextResponse.json({ error: 'Invalid listing data format' }, { status: 400 });
-    }
     console.log('📋 Listing data alındı:', {
       title: listingData.title,
       state: listingData.state,
@@ -130,20 +142,33 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Görselleri FormData'dan al
+    // Görselleri al - FormData veya JSON'dan
     const imageFiles: File[] = [];
-    let index = 0;
-    while (true) {
-      const imageFile = formData.get(`imageFile_${index}`) as File;
-      if (!imageFile) break;
-      imageFiles.push(imageFile);
-      index++;
+    let videoFile: File | null = null;
+    
+    if (formData) {
+      // FormData'dan görselleri al (process route'dan geldiğinde)
+      let index = 0;
+      while (true) {
+        const imageFile = formData.get(`imageFile_${index}`) as File;
+        if (!imageFile) break;
+        imageFiles.push(imageFile);
+        index++;
+      }
+      
+      // Video dosyasını FormData'dan al
+      videoFile = formData.get('videoFile') as File;
+    } else {
+      // JSON formatından geldiğinde - ProductFormModal'dan gelen resimler
+      if (listingData.images && Array.isArray(listingData.images)) {
+        console.log('📸 JSON\'dan resim verileri alınıyor:', listingData.images.length);
+        // JSON formatında base64 resimler var - bunları File objelerine çevirmek gerekir
+        // Ancak şimdilik boş bırakıyoruz çünkü ProductFormModal'da zaten dosyalar FormData olarak gönderilmeli
+        console.log('⚠️ JSON formatında resim verisi desteklenmiyor, FormData kullanın');
+      }
     }
     
     console.log('🖼️ Toplam resim sayısı:', imageFiles.length);
-    
-    // Video dosyasını FormData'dan al
-    const videoFile = formData.get('videoFile') as File;
     console.log('🎥 Video dosyası:', videoFile ? `${videoFile.name} (${(videoFile.size / 1024 / 1024).toFixed(2)} MB)` : 'Yok');
     
     // Etsy API'sine listing oluştur

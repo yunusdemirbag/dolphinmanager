@@ -1348,6 +1348,8 @@ export function ProductFormModal({
                 // Manuel trigger - hemen kontrol et
                 setTimeout(() => {
                   console.log('🔄 Manuel trigger - Auto submit kontrolü yapılıyor...');
+                  console.log('🔍 Manuel trigger - Mode kontrol:', { isAutoMode, autoMode, mode_check: autoMode === 'direct-etsy' });
+                  
                   if (title && tags.length >= 9 && selectedShopSection && !submitting) {
                     console.log('🚀 Manuel trigger - Hızlı gönderim başlatılıyor...');
                     
@@ -1355,7 +1357,7 @@ export function ProductFormModal({
                       console.log('🤖 Manuel trigger: Direkt Etsy gönderimi başlatılıyor');
                       handleSubmit('draft');
                     } else {
-                      console.log('🤖 Manuel trigger: Kuyruk gönderimi başlatılıyor');
+                      console.log('🤖 Manuel trigger: Kuyruk gönderimi başlatılıyor (mode:', autoMode, ')');
                       handleSubmitToQueue();
                     }
                   } else {
@@ -1514,16 +1516,50 @@ export function ProductFormModal({
   }, [title, shopSectionAutoSelected, selectedShopSection]); // shopSections çıkarıldı
 
   // Form açıldığında otomatik seçimi aktif et ve zamanlayıcıyı başlat
+  const [wakeLock, setWakeLock] = useState<any>(null);
+  
   useEffect(() => {
     if (isOpen) {
       setShopSectionAutoSelected(true);
       setFormStartTime(Date.now());
       setAutoSubmitEnabled(false);
       console.log('Form açıldı, otomatik kategori seçimi aktif, zamanlayıcı başlatıldı');
+      
+      // Bilgisayarın uykuya geçmesini engelle
+      const requestWakeLock = async () => {
+        try {
+          if ('wakeLock' in navigator) {
+            const wakeLock = await navigator.wakeLock.request('screen');
+            setWakeLock(wakeLock);
+            console.log('💡 WakeLock aktif - Ekran kapanmayacak');
+          }
+        } catch (err) {
+          console.log('⚠️ WakeLock hatası:', err);
+        }
+      };
+      
+      requestWakeLock();
     } else {
       setFormStartTime(null);
       setAutoSubmitEnabled(false);
+      
+      // WakeLock'u serbest bırak
+      if (wakeLock) {
+        wakeLock.release()
+          .then(() => console.log('💤 WakeLock serbest bırakıldı - Ekran kapanabilir'))
+          .catch((err: any) => console.log('⚠️ WakeLock serbest bırakma hatası:', err));
+        setWakeLock(null);
+      }
     }
+    
+    // Component unmount olduğunda wakeLock'u serbest bırak
+    return () => {
+      if (wakeLock) {
+        wakeLock.release()
+          .then(() => console.log('💤 WakeLock serbest bırakıldı (cleanup)'))
+          .catch((err: any) => console.log('⚠️ WakeLock cleanup hatası:', err));
+      }
+    };
   }, [isOpen]);
 
   // Başlık gelir gelmez etiket kontrolü ve hızlı gönderim
@@ -1554,11 +1590,13 @@ export function ProductFormModal({
         });
         
         // Formu gönder - mod'a göre
+        console.log('🔍 UseEffect - Mode kontrol:', { isAutoMode, autoMode, mode_check: autoMode === 'direct-etsy' });
+        
         if (isAutoMode && autoMode === 'direct-etsy') {
           console.log('🤖 Auto mode: Direkt Etsy gönderimi başlatılıyor');
           handleSubmit('draft');
         } else {
-          console.log('🤖 Auto mode: Kuyruk gönderimi başlatılıyor');
+          console.log('🤖 Auto mode: Kuyruk gönderimi başlatılıyor (mode:', autoMode, ')');
           handleSubmitToQueue();
         }
       }, 500); // 0.5 saniye bekle - daha hızlı

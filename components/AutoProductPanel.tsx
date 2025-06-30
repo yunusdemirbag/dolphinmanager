@@ -158,7 +158,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
     if (files) {
       const imageFiles = Array.from(files)
         .filter(file => file.type.startsWith('image/'))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
       
       // Alfabetik sıralama debug
       console.log('📂 Klasör dosyaları alfabetik sıralandı:', {
@@ -178,7 +178,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
         
         return {
           ...prev,
-          selectedImagesFolder: imageFiles.length > 0 ? `${imageFiles.length} resim seçildi` : '',
+          selectedImagesFolder: imageFiles.length > 0 ? 'selected' : '',
           imageFiles,
           imagePreviewUrls: previewUrls
         };
@@ -203,7 +203,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
     if (files) {
       const resourceFiles = Array.from(files)
         .filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
       
       console.log('📁 Kaynaklar klasörü seçildi:', {
         total: files.length,
@@ -221,7 +221,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
         
         return {
           ...prev,
-          selectedResourcesFolder: resourceFiles.length > 0 ? `${resourceFiles.length} kaynak dosya seçildi` : '',
+          selectedResourcesFolder: resourceFiles.length > 0 ? 'selected' : '',
           resourceFiles,
           resourcePreviewUrls: previewUrls
         };
@@ -560,7 +560,9 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
                 </div>
                 {settings.selectedImagesFolder && (
                   <div className="space-y-3">
-                    <p className="text-sm text-green-600 font-medium">{settings.selectedImagesFolder}</p>
+                    {settings.imageFiles.length > 0 && (
+                      <p className="text-sm text-green-600 font-medium">{settings.imageFiles.length} resim seçildi</p>
+                    )}
                     
                     {/* Resim önizlemeleri */}
                     {settings.imagePreviewUrls.length > 0 && (
@@ -617,7 +619,9 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
                 </div>
                 {settings.selectedResourcesFolder && (
                   <div className="space-y-3">
-                    <p className="text-sm text-green-600 font-medium">{settings.selectedResourcesFolder}</p>
+                    {settings.resourceFiles.length > 0 && (
+                      <p className="text-sm text-green-600 font-medium">{settings.resourceFiles.length} kaynak dosya seçildi</p>
+                    )}
                     
                     {/* Kaynak dosya önizlemeleri */}
                     {settings.resourcePreviewUrls.length > 0 && (
@@ -668,11 +672,11 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
                 }}
                 className="w-32"
               />
-              <p className="text-sm text-gray-600">
-                {settings.imageFiles.length > 0 && (
-                  `${settings.imageFiles.length} resim ÷ ${settings.imagesPerProduct} = ${Math.floor(settings.imageFiles.length / settings.imagesPerProduct)} ürün (her üründe ${settings.imagesPerProduct} resim + ${settings.resourceFiles.length} kaynak dosya)`
-                )}
-              </p>
+{settings.imageFiles.length > 0 && (
+                <p className="text-sm text-gray-600">
+                  {`${settings.imageFiles.length} resim ÷ ${settings.imagesPerProduct} = ${Math.floor(settings.imageFiles.length / settings.imagesPerProduct)} ürün (her üründe ${settings.imagesPerProduct} resim + ${settings.resourceFiles.length} kaynak dosya)`}
+                </p>
+              )}
             </div>
 
             {/* Start Button */}

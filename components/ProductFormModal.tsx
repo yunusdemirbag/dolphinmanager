@@ -344,7 +344,7 @@ export function ProductFormModal({
     // Sadece resim dosyalarını al ve alfabetik sırala
     const imageFiles = allFiles
       .filter(file => file.type.startsWith('image/'))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
     
     console.log('📁 Klasör içindeki tüm resimler:', imageFiles.map(f => f.name));
     
@@ -2510,7 +2510,7 @@ export function ProductFormModal({
               console.log('🔄 Batch mode aktif - Toplam dosya:', files.length);
               
               // Alfabetik sırala
-              const sortedFiles = files.sort((a, b) => a.name.localeCompare(b.name));
+              const sortedFiles = files.sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
               
               // Batch processing başlat
               setSelectedFolderFiles(sortedFiles);

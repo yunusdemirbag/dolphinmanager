@@ -27,11 +27,22 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const imageFile = formData.get('image') as File;
     
-    let availableCategories = JSON.parse(formData.get('categories') as string || '[]');
+    const categoriesRaw = formData.get('categories') as string;
+    console.log('📨 FormData\'dan gelen kategoriler (raw):', categoriesRaw);
     
-    // Kategoriler gelmiyorsa manuel liste kullan - geçici düzeltme
+    let availableCategories = [];
+    try {
+      availableCategories = JSON.parse(categoriesRaw || '[]');
+      console.log('✅ Kategoriler parse edildi:', availableCategories.length, 'adet');
+      console.log('📋 Parse edilen kategoriler:', availableCategories.map((c: any) => c.title || c.name).join(', '));
+    } catch (error) {
+      console.error('❌ Kategoriler parse edilemedi:', error);
+      availableCategories = [];
+    }
+    
+    // GERÇEK KATEGORİLER VARSA ONLARI KULLAN!
     if (availableCategories.length === 0) {
-      console.log('⚠️ Kategoriler gelmiyor, manuel liste kullanılıyor...');
+      console.log('⚠️ Kategoriler boş, fallback liste kullanılıyor...');
       availableCategories = [
         { title: 'Abstract Art', shop_section_id: 52817067 },
         { title: 'Love Art', shop_section_id: 52817069 },

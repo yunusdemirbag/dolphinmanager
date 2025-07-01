@@ -7,7 +7,8 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true
-  }
+  },
+  reactStrictMode: false // Geçici olarak kapatıldı - infinite mount sorunu için
 };
 
 export default nextConfig;

@@ -493,38 +493,85 @@ export async function POST(request: NextRequest) {
       console.log('📤 ADIM 2.5: Video upload ediliyor...');
       console.log(`🎥 Video upload ediliyor:`, videoFile.name, (videoFile.size / 1024 / 1024).toFixed(2), 'MB');
       
-      try {
-        const videoFormData = new FormData();
-        videoFormData.append('video', videoFile);
-        const videoName = videoFile.name.replace(/\.[^/.]+$/, ""); // Dosya adını uzantısız
-        videoFormData.append('name', videoName);
-        console.log('🔍 Video FormData:', { 
-          name: videoName, 
-          fileSize: videoFile.size, 
-          fileType: videoFile.type 
-        });
-        
-        const videoUploadUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${etsyResult.listing_id}/videos`;
-        
-        const videoResponse = await fetch(videoUploadUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${access_token}`,
-            'x-api-key': api_key,
-          },
-          body: videoFormData,
-        });
-        
-        if (videoResponse.ok) {
-          const videoResult = await videoResponse.json();
-          videoUploaded = true;
-          console.log(`✅ Video başarıyla upload edildi:`, videoResult.video_id);
-        } else {
-          const errorText = await videoResponse.text();
-          console.error(`❌ Video upload hatası:`, videoResponse.status, errorText);
+      // Video validasyonu
+      const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB limit
+      const SUPPORTED_VIDEO_TYPES = [
+        'video/mp4', 'video/mov', 'video/avi', 'video/quicktime',
+        'video/x-msvideo', 'video/mpeg', 'video/webm'
+      ];
+      
+      if (videoFile.size > MAX_VIDEO_SIZE) {
+        console.error(`❌ Video dosyası çok büyük: ${(videoFile.size / 1024 / 1024).toFixed(2)}MB (max: 100MB)`);
+      } else if (!SUPPORTED_VIDEO_TYPES.includes(videoFile.type)) {
+        console.error(`❌ Desteklenmeyen video formatı: ${videoFile.type}`);
+      } else {
+        try {
+          const videoFormData = new FormData();
+          videoFormData.append('video', videoFile);
+          const videoName = videoFile.name.replace(/\.[^/.]+$/, ""); // Dosya adını uzantısız
+          videoFormData.append('name', videoName);
+          console.log('🔍 Video FormData:', { 
+            name: videoName, 
+            fileSize: videoFile.size, 
+            fileType: videoFile.type 
+          });
+          
+          const videoUploadUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${etsyResult.listing_id}/videos`;
+          
+          // Daha uzun timeout video yükleme için
+          const videoController = new AbortController();
+          const videoTimeout = setTimeout(() => videoController.abort(), 120000); // 2 dakika timeout
+          
+          const videoResponse = await fetch(videoUploadUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${access_token}`,
+              'x-api-key': api_key,
+            },
+            body: videoFormData,
+            signal: videoController.signal
+          });
+          
+          clearTimeout(videoTimeout);
+          
+          if (videoResponse.ok) {
+            const videoResult = await videoResponse.json();
+            videoUploaded = true;
+            console.log(`✅ Video başarıyla upload edildi:`, {
+              video_id: videoResult.video_id,
+              video_url: videoResult.video_url,
+              status: videoResult.status
+            });
+          } else {
+            let errorDetails;
+            try {
+              errorDetails = await videoResponse.json();
+            } catch {
+              errorDetails = await videoResponse.text();
+            }
+            
+            console.error(`❌ Video upload hatası:`, {
+              status: videoResponse.status,
+              statusText: videoResponse.statusText,
+              error: errorDetails,
+              videoSize: `${(videoFile.size / 1024 / 1024).toFixed(2)}MB`,
+              videoType: videoFile.type,
+              videoName: videoFile.name
+            });
+            console.error(`🔗 Video upload URL:`, videoUploadUrl);
+          }
+        } catch (videoError) {
+          if (videoError.name === 'AbortError') {
+            console.error(`❌ Video upload timeout (2 dakika):`, videoFile.name);
+          } else {
+            console.error(`❌ Video upload exception:`, {
+              error: videoError.message,
+              stack: videoError.stack,
+              videoName: videoFile.name,
+              videoSize: `${(videoFile.size / 1024 / 1024).toFixed(2)}MB`
+            });
+          }
         }
-      } catch (videoError) {
-        console.error(`❌ Video upload exception:`, videoError);
       }
     }
     

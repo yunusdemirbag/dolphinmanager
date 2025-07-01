@@ -507,9 +507,9 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
     
     if (newRemainingFiles >= settings.imagesPerProduct) {
       // Hala işlenecek dosya var - sonraki ürüne geç (ama index sıfırla)
-      // Direkt Etsy modunda daha uzun bekle (dosya upload süresi için)
-      const waitTime = settings.mode === 'direct-etsy' ? 5000 : 3000;
-      console.log(`⏰ Form kapandı, ${settings.mode === 'direct-etsy' ? '5' : '3'} saniye bekleniyor...`);
+      // Minimum bekleme süresi - sadece UI render için
+      const waitTime = 500; // 0.5 saniye yeterli
+      console.log(`⏰ Form kapandı, ${waitTime}ms bekleniyor...`);
       
       // Capture current values before setTimeout to avoid stale closure
       const currentFormCycleStartTime = formCycleStartTime;

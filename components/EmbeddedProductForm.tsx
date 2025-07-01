@@ -177,7 +177,7 @@ export default function EmbeddedProductForm({
       // Sıradaki ürüne geçiş için kısa bir gecikme
       setTimeout(() => {
         console.log('🔄 Form reset edildi, sıradaki ürün için hazır');
-      }, 1000);
+      }, 200); // 1000ms → 200ms
     },
     onSubmitError: (error) => {
       console.error('❌ Form submit hatası:', error);
@@ -307,9 +307,9 @@ export default function EmbeddedProductForm({
             submitButton.click();
           }
         }
-      }, 1500);
+      }, 300); // 1500ms → 300ms (çok daha hızlı retry)
       // Reset processing flag after timeout
-      setTimeout(() => setIsProcessingAuto(false), 1600);
+      setTimeout(() => setIsProcessingAuto(false), 400); // 1600ms → 400ms
       return;
     }
 
@@ -457,7 +457,7 @@ export default function EmbeddedProductForm({
         }
         
         submitCheckTimeoutRef.current = null;
-      }, 300);
+      }, 100); // 300ms → 100ms
     }
   }, [autoMode, title, tags, selectedShopSection, shippingProfileId, productImages, submission.isSubmitting, isProcessingAuto, handleAutoSubmit]);
 
@@ -465,7 +465,7 @@ export default function EmbeddedProductForm({
   useEffect(() => {
     const debounceTimeout = setTimeout(() => {
       checkAndTriggerAutoSubmit();
-    }, 100); // 100ms debounce
+    }, 50); // 100ms → 50ms debounce
     
     return () => clearTimeout(debounceTimeout);
   }, [title, tags, selectedShopSection, shippingProfileId, checkAndTriggerAutoSubmit]);
@@ -577,21 +577,9 @@ export default function EmbeddedProductForm({
         console.log('⏰ AI generation zamanlayıcısı kuruldu, 2 saniye bekleniyor...', componentId);
         
         // State update'ini beklemek için biraz daha uzun süre ver
-        setTimeout(() => {
-          // MOUNT CHECK in timeout
-          if (!isMounted.current) {
-            console.log(`🚫 AI Generation timeout: Component ${componentId.current} unmounted, skipping`);
-            return;
-          }
-          
-          console.log('🎯 AI generation tetikleniyor, productImages length check:', productImages.length, componentId.current);
-          console.log('🔍 ShopSections durumu AI generation öncesi:', {
-            shopSectionsLength: shopSections?.length || 0,
-            loadingShopSections,
-            componentId: componentId.current
-          });
-          handleAutoGenerationWithImages(newMediaFiles);
-        }, 3000); // 3 saniye bekleme - shopSections'un yüklenmesini bekle
+        // AI generation'ı hemen başlat - paralel işlem
+        console.log('🎯 AI generation hemen tetikleniyor (shop sections paralel yüklenecek)');
+        handleAutoGenerationWithImages(newMediaFiles);
       }
     }
   }, [autoFiles?.length, isVisible, autoTitleUsed]);
@@ -648,7 +636,7 @@ export default function EmbeddedProductForm({
       }
       
       console.log('⏳ ShopSections bekleniyor... (', Date.now() - startTime, 'ms )');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 200)); // 1000ms → 200ms
     }
     
     console.log('❌ ShopSections timeout after', maxWaitTime, 'ms, devam ediliyor');
@@ -833,7 +821,7 @@ export default function EmbeddedProductForm({
           console.log('⚠️ shopSections henüz hazır değil, sonra denenecek');
           setTimeout(() => {
             selectCategoryByTitle(result.title);
-          }, 1000);
+          }, 200); // 1000ms → 200ms
         }
       } else {
         // AI'den kategori gelmezse shopSections'dan başlığa göre seç

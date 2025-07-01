@@ -20,8 +20,8 @@ export async function POST(request: NextRequest) {
     // Initialize Firebase Admin
     initializeAdminApp();
     
-    // Force update templates (only for debugging - remove in production)
-    await aiTitleTagSystem.forceUpdateTemplates();
+    // Templates artık force update edilmiyor - hız için devre dışı
+    // await aiTitleTagSystem.forceUpdateTemplates();
     
     // FormData'dan image ve diğer parametreleri al
     const formData = await request.formData();

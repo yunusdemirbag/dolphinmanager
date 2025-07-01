@@ -814,7 +814,7 @@ export default function EmbeddedProductForm({
           }
           
           if (matchedCategory) {
-            console.log('✅ Gerçek kategori bulundu:', matchedCategory.title, 'ID:', matchedCategory.shop_section_id);
+            console.log('✅ AI önerisi kabul edildi:', matchedCategory.title, 'ID:', matchedCategory.shop_section_id);
             const categoryId = matchedCategory.shop_section_id.toString();
             
             // IMMEDIATE UPDATE with ref tracking
@@ -832,23 +832,44 @@ export default function EmbeddedProductForm({
               currentStateRef.current.selectedShopSection = categoryId;
             });
           } else {
-            console.log('⚠️ AI kategorisi gerçek kategorilerde bulunamadı, başlık bazlı seçim yapılıyor');
-            setTimeout(() => {
-              selectCategoryByTitle(result.title);
-            }, 500);
+            console.log('⚠️ AI önerisi gerçek kategorilerde bulunamadı, AI kendisi belirlesin');
+            // AI'nin önerdiği kategori bulunamadıysa, AI'ya güven
+            // Abstract Art'ı default olarak seç
+            const abstractCategory = shopSections?.find(s => 
+              s.title.toLowerCase().includes('abstract')
+            );
+            
+            if (abstractCategory) {
+              console.log('🎨 AI güveni ile Abstract Art seçildi');
+              const categoryId = abstractCategory.shop_section_id.toString();
+              setSelectedShopSection(categoryId);
+              currentStateRef.current.selectedShopSection = categoryId;
+            }
           }
         } else {
-          console.log('⚠️ shopSections henüz hazır değil, sonra denenecek');
+          console.log('⚠️ shopSections henüz hazır değil, Abstract Art seçilecek');
+          // Shop sections hazır değilse Abstract Art'ı seç
           setTimeout(() => {
-            selectCategoryByTitle(result.title);
-          }, 200); // 1000ms → 200ms
+            const abstractFallback = shopSections?.find(s => 
+              s.title.toLowerCase().includes('abstract')
+            );
+            if (abstractFallback) {
+              setSelectedShopSection(abstractFallback.shop_section_id.toString());
+            }
+          }, 200);
         }
       } else {
-        // AI'den kategori gelmezse shopSections'dan başlığa göre seç
-        console.log('🔍 AI kategori gelmedi, başlık bazlı seçim yapılıyor...');
-        setTimeout(() => {
-          selectCategoryByTitle(result.title);
-        }, 500);
+        // AI'den kategori gelmezse Abstract Art'ı seç (AI'ya güven)
+        console.log('🤖 AI kategori önermedi, AI güveni ile Abstract Art seçiliyor...');
+        const abstractCategory = shopSections?.find(s => 
+          s.title.toLowerCase().includes('abstract')
+        );
+        
+        if (abstractCategory) {
+          console.log('🎨 Abstract Art varsayılan olarak seçildi');
+          setSelectedShopSection(abstractCategory.shop_section_id.toString());
+          currentStateRef.current.selectedShopSection = abstractCategory.shop_section_id.toString();
+        }
       }
 
       console.log('✅ Auto generation completed');

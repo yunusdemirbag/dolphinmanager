@@ -484,40 +484,20 @@ export async function POST(request: NextRequest) {
         }
       };
 
-      // Throttled paralel upload - max 3 resim aynı anda
-      const batchSize = 3;
-      const batches = [];
+      // Sıralı upload - güvenli ve hızlı
+      console.log('🔄 Sıralı upload başlıyor (50ms ara ile)...');
       
-      for (let i = 0; i < imageFiles.length; i += batchSize) {
-        batches.push(imageFiles.slice(i, i + batchSize));
-      }
-      
-      console.log(`📦 ${imageFiles.length} resim ${batches.length} batch'te işlenecek (${batchSize}'er grup)`);
-      
-      let totalResults = [];
-      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        const batch = batches[batchIndex];
-        console.log(`🔄 Batch ${batchIndex + 1}/${batches.length}: ${batch.length} resim upload ediliyor...`);
+      for (let i = 0; i < imageFiles.length; i++) {
+        const success = await uploadImage(imageFiles[i], i);
+        if (success) {
+          uploadedImageCount++;
+        }
         
-        const batchResults = await Promise.allSettled(
-          batch.map((file, localIndex) => {
-            const globalIndex = batchIndex * batchSize + localIndex;
-            return uploadImage(file, globalIndex);
-          })
-        );
-        
-        totalResults.push(...batchResults);
-        
-        // Batch'ler arası kısa bekleme (Etsy API için)
-        if (batchIndex < batches.length - 1) {
-          console.log('⏳ Sonraki batch için 500ms bekleniyor...');
-          await new Promise(resolve => setTimeout(resolve, 500));
+        // Kısa bekleme (409 hatasını önlemek için)
+        if (i < imageFiles.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
-      
-      uploadedImageCount = totalResults.filter(result => 
-        result.status === 'fulfilled' && result.value === true
-      ).length;
       
       console.log(`📊 Resim upload özeti: ${uploadedImageCount}/${imageFiles.length} başarılı`);
     }

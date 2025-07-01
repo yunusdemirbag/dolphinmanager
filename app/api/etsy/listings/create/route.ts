@@ -446,19 +446,17 @@ export async function POST(request: NextRequest) {
     // ADIM 2: Resimleri upload et
     let uploadedImageCount = 0;
     if (imageFiles.length > 0) {
-      console.log(`📤 ADIM 2: ${imageFiles.length} resim upload ediliyor...`);
+      console.log(`📤 ADIM 2: ${imageFiles.length} resim PARALELde upload ediliyor...`);
       
-      for (let i = 0; i < imageFiles.length; i++) {
-        const imageFile = imageFiles[i];
-        console.log(`📷 Resim ${i + 1}/${imageFiles.length} upload ediliyor:`, imageFile.name, (imageFile.size / 1024 / 1024).toFixed(2), 'MB');
+      // ChatGPT önerisi: Paralel upload function
+      const uploadImage = async (file: File, index: number) => {
+        console.log(`📷 Resim ${index + 1}/${imageFiles.length} upload ediliyor:`, file.name, (file.size / 1024 / 1024).toFixed(2), 'MB');
         
         try {
           const imageFormData = new FormData();
-          imageFormData.append('image', imageFile);
-          imageFormData.append('rank', (i + 1).toString()); // Resim sıralaması için rank ekle
-          imageFormData.append('alt_text', `Image ${i + 1} of ${listingData.title}`); // SEO için alt text
-          
-          console.log(`🔢 Resim ${i + 1} rank'ı:`, i + 1);
+          imageFormData.append('image', file);
+          imageFormData.append('rank', (index + 1).toString());
+          imageFormData.append('alt_text', `Image ${index + 1} of ${listingData.title}`);
           
           const imageUploadUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${etsyResult.listing_id}/images`;
           
@@ -473,16 +471,27 @@ export async function POST(request: NextRequest) {
           
           if (imageResponse.ok) {
             const imageResult = await imageResponse.json();
-            uploadedImageCount++;
-            console.log(`✅ Resim ${i + 1} başarıyla upload edildi:`, imageResult.listing_image_id);
+            console.log(`✅ Resim ${index + 1} başarıyla upload edildi:`, imageResult.listing_image_id);
+            return true;
           } else {
             const errorText = await imageResponse.text();
-            console.error(`❌ Resim ${i + 1} upload hatası:`, imageResponse.status, errorText);
+            console.error(`❌ Resim ${index + 1} upload hatası:`, imageResponse.status, errorText);
+            return false;
           }
         } catch (imageError) {
-          console.error(`❌ Resim ${i + 1} upload exception:`, imageError);
+          console.error(`❌ Resim ${index + 1} upload exception:`, imageError);
+          return false;
         }
-      }
+      };
+
+      // Paralel upload - tüm resimleri aynı anda gönder
+      const results = await Promise.allSettled(
+        imageFiles.map((file, index) => uploadImage(file, index))
+      );
+      
+      uploadedImageCount = results.filter(result => 
+        result.status === 'fulfilled' && result.value === true
+      ).length;
       
       console.log(`📊 Resim upload özeti: ${uploadedImageCount}/${imageFiles.length} başarılı`);
     }

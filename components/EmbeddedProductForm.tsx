@@ -584,25 +584,45 @@ export default function EmbeddedProductForm({
     }
   }, [autoFiles?.length, isVisible, autoTitleUsed]);
 
-  // === LOAD SHOP SECTIONS - Same as ProductFormModal ===
+  // === LOAD SHOP SECTIONS WITH CACHING ===
   useEffect(() => {
     if (isVisible) {
       async function loadShopSections() {
+        // Check sessionStorage cache first
+        const cached = sessionStorage.getItem('etsy-shop-sections');
+        if (cached) {
+          try {
+            const sections = JSON.parse(cached);
+            console.log('🚀 Shop sections cache\'den yüklendi:', sections.length, 'adet');
+            setShopSections(sections);
+            setLoadingShopSections(false);
+            
+            // Auto-select first section if none selected
+            if (sections.length > 0 && !selectedShopSection) {
+              setSelectedShopSection(sections[0].shop_section_id.toString());
+            }
+            return;
+          } catch (e) {
+            console.warn('Cache parse hatası, API\'den yükleniyor:', e);
+            sessionStorage.removeItem('etsy-shop-sections');
+          }
+        }
+
         try {
-          console.log('🏪 Shop sections yükleniyor (EmbeddedProductForm)...');
+          console.log('🏪 Shop sections API\'den yükleniyor...');
           setLoadingShopSections(true);
           const response = await fetch('/api/etsy/shop-sections');
           const data = await response.json();
-          console.log('📡 Shop sections API yanıtı:', data);
           
           if (response.ok && data.sections) {
-            console.log('✅ Shop sections yüklendi:', data.sections.length, 'adet');
-            console.log('🏪 Sections detayı:', data.sections.map(s => `${s.title} (${s.shop_section_id})`).join(', '));
+            console.log('✅ Shop sections yüklendi ve cache\'lendi:', data.sections.length, 'adet');
             setShopSections(data.sections);
+            
+            // Cache for session
+            sessionStorage.setItem('etsy-shop-sections', JSON.stringify(data.sections));
             
             // Auto-select first section if none selected
             if (data.sections.length > 0 && !selectedShopSection) {
-              console.log('🏪 İlk shop section otomatik seçiliyor:', data.sections[0]);
               setSelectedShopSection(data.sections[0].shop_section_id.toString());
             }
           } else {

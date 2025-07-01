@@ -905,24 +905,27 @@ export default function EmbeddedProductForm({
     const titleLower = title.toLowerCase();
     let selectedCategory = null;
 
-    // Anahtar kelime bazlı kategori eşleştirme
+    // Gelişmiş anahtar kelime bazlı kategori eşleştirme
     const categoryKeywords = [
-      { keywords: ['woman', 'women', 'female', 'girl', 'lady'], categoryName: 'woman art' },
-      { keywords: ['abstract', 'geometric', 'modern'], categoryName: 'abstract art' },
-      { keywords: ['love', 'heart', 'romantic', 'valentine'], categoryName: 'love art' },
-      { keywords: ['flower', 'floral', 'rose', 'botanical'], categoryName: 'flowers art' },
-      { keywords: ['landscape', 'mountain', 'nature', 'forest'], categoryName: 'landscape art' },
-      { keywords: ['animal', 'cat', 'dog', 'bird', 'wildlife'], categoryName: 'animal art' },
-      { keywords: ['rothko', 'color field'], categoryName: 'mark rothko art print' },
-      { keywords: ['surreal', 'surrealism', 'dream'], categoryName: 'surreal canvas art' },
-      { keywords: ['banksy', 'graffiti', 'street art'], categoryName: 'banksy & graffiti art' },
-      { keywords: ['music', 'dance', 'musical'], categoryName: 'music & dance art' },
-      { keywords: ['buddha', 'zen', 'meditation', 'spiritual'], categoryName: 'buddha and zen stones' },
-      { keywords: ['kitchen', 'coffee', 'food'], categoryName: 'kitchen art' },
-      { keywords: ['peacock'], categoryName: 'peacock art' },
-      { keywords: ['religious', 'cross', 'spiritual'], categoryName: 'religious art' },
-      { keywords: ['ethnic', 'tribal', 'cultural'], categoryName: 'ethnic' },
-      { keywords: ['oil painting', 'paint'], categoryName: 'oil painting' }
+      { keywords: ['woman', 'women', 'female', 'girl', 'lady', 'feminine'], categoryName: 'woman art' },
+      { keywords: ['abstract', 'geometric', 'modern', 'contemporary', 'minimalist'], categoryName: 'abstract art' },
+      { keywords: ['love', 'heart', 'romantic', 'valentine', 'couples', 'romance'], categoryName: 'love art' },
+      { keywords: ['flower', 'floral', 'rose', 'botanical', 'roses', 'garden', 'bloom'], categoryName: 'flowers art' },
+      { keywords: ['landscape', 'mountain', 'nature', 'forest', 'scenery', 'outdoor'], categoryName: 'landscape art' },
+      { keywords: ['animal', 'cat', 'dog', 'bird', 'wildlife', 'pet', 'fauna'], categoryName: 'animal art' },
+      { keywords: ['rothko', 'color field', 'mark rothko'], categoryName: 'mark rothko art print' },
+      { keywords: ['surreal', 'surrealism', 'dream', 'fantasy', 'psychedelic'], categoryName: 'surreal canvas art' },
+      { keywords: ['banksy', 'graffiti', 'street art', 'urban', 'spray'], categoryName: 'banksy & graffiti art' },
+      { keywords: ['music', 'dance', 'musical', 'instrument', 'melody'], categoryName: 'music & dance art' },
+      { keywords: ['ethnic', 'cultural', 'tribal', 'traditional', 'folk'], categoryName: 'ethnic' },
+      { keywords: ['religious', 'spiritual', 'sacred', 'divine', 'holy'], categoryName: 'religious art' },
+      { keywords: ['peacock', 'bird', 'feather', 'colorful bird'], categoryName: 'peacock art' },
+      { keywords: ['kitchen', 'cooking', 'food', 'culinary', 'chef'], categoryName: 'kitchen art' },
+      { keywords: ['buddha', 'zen', 'meditation', 'peaceful', 'stones', 'spiritual'], categoryName: 'buddha and zen stones' },
+      { keywords: ['oil painting', 'classical', 'traditional painting', 'realistic'], categoryName: 'oil painting' },
+      // Gothic/Dark aesthetic için fallback'ler
+      { keywords: ['gothic', 'dark', 'skeleton', 'skull', 'spooky', 'alternative', 'horror'], categoryName: 'abstract art' },
+      { keywords: ['black', 'dark aesthetic', 'alternative', 'emo', 'punk'], categoryName: 'abstract art' }
     ];
 
     // Anahtar kelimelere göre kategori bul

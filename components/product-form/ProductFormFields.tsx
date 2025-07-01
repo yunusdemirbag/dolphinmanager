@@ -144,10 +144,10 @@ export default function ProductFormFields({
       console.log('🏪 Shop sections props\'tan alındı:', shopSectionsFromProps.length, 'adet');
       setShopSections(shopSectionsFromProps);
       
-      // Auto-select first section if none selected
+      // Don't auto-select from props, let AI choose
       if (!selectedShopSection) {
-        console.log('🏪 Props\'tan otomatik shop section seçiliyor:', shopSectionsFromProps[0]);
-        onShopSectionChange(shopSectionsFromProps[0].shop_section_id.toString());
+        console.log('🏪 Props\'tan shop sections yüklendi, AI seçimi bekleniyor...');
+        // Don't auto-select, let AI choose the category
       }
     } else {
       // Fallback to loading internally if no props provided
@@ -160,10 +160,10 @@ export default function ProductFormFields({
             const sections = data.sections || data;
             setShopSections(sections);
             
-            // Auto-select first section if none selected
+            // Auto-select first section if none selected - WAIT FOR AI SELECTION
             if (sections.length > 0 && !selectedShopSection) {
-              console.log('🏪 Internal yüklemeden otomatik shop section seçiliyor:', sections[0]);
-              onShopSectionChange(sections[0].shop_section_id.toString());
+              console.log('🏪 Shop sections yüklendi, AI seçimi bekleniyor...:', sections.length, 'adet');
+              // Don't auto-select, let AI choose the category
             }
           }
         } catch (error) {

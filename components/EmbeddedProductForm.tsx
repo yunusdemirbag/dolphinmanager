@@ -597,9 +597,10 @@ export default function EmbeddedProductForm({
             setShopSections(sections);
             setLoadingShopSections(false);
             
-            // Auto-select first section if none selected
+            // Don't auto-select from cache, let AI choose
             if (sections.length > 0 && !selectedShopSection) {
-              setSelectedShopSection(sections[0].shop_section_id.toString());
+              console.log('🏪 Shop sections cache\'den yüklendi, AI seçimi bekleniyor...');
+              // Don't auto-select, let AI choose the category
             }
             return;
           } catch (e) {
@@ -688,8 +689,21 @@ export default function EmbeddedProductForm({
         firstImageType: mediaFiles[0]?.file?.type
       });
       
-      // ShopSections'ı bekle
-      await waitForShopSections();
+      // ShopSections'ı cache'den direkt al
+      let actualCategories = shopSections || [];
+      
+      // Eğer state boşsa cache'den direkt yükle
+      if (actualCategories.length === 0) {
+        const cached = sessionStorage.getItem('etsy-shop-sections');
+        if (cached) {
+          try {
+            actualCategories = JSON.parse(cached);
+            console.log('🚀 AI için kategoriler cache\'den direkt alındı:', actualCategories.length, 'adet');
+          } catch (e) {
+            console.warn('Cache parse hatası:', e);
+          }
+        }
+      }
 
       // Direkt AI API çağrısı yapalım
       const firstImage = mediaFiles[0].file;
@@ -699,21 +713,21 @@ export default function EmbeddedProductForm({
       formData.append('focus', '');
       formData.append('analysisType', 'basic');
       
-      // Mevcut kategorileri AI'ye gönder - FORCE SEND!
-      console.log('🔍 AI\'ye gönderilecek shopSections durumu:', {
-        shopSectionsLength: shopSections?.length || 0,
-        shopSectionsData: shopSections
-      });
+      // EmbeddedProductForm state'ini güncelle
+      if (actualCategories && actualCategories.length > 0) {
+        setShopSections(actualCategories);
+        console.log('🔄 EmbeddedProductForm shopSections state güncellendi:', actualCategories.length, 'adet');
+      }
       
-      // ALWAYS try to send categories, even if empty
-      const categoriesJson = JSON.stringify(shopSections || []);
+      // Cache'den alınan kategorileri AI'ye gönder
+      const categoriesJson = JSON.stringify(actualCategories || []);
       formData.append('categories', categoriesJson);
-      console.log('📨 FORCE: AI\'ye gönderilen kategoriler JSON:', categoriesJson);
+      console.log('📨 AI\'ye gönderilen kategoriler (cache):', categoriesJson);
       
-      if (shopSections && shopSections.length > 0) {
-        console.log('✅ AI\'ye gönderilen kategoriler adları:', shopSections.map(s => s.title).join(', '));
+      if (actualCategories && actualCategories.length > 0) {
+        console.log('✅ AI\'ye gönderilen kategoriler adları:', actualCategories.map(s => s.title).join(', '));
       } else {
-        console.log('❌ shopSections boş ama yine de gönderiliyor!');
+        console.log('❌ Kategoriler hala boş!');
       }
 
       console.log('📡 AI API çağrısı yapılıyor...', {
@@ -794,20 +808,21 @@ export default function EmbeddedProductForm({
       if (result.category) {
         console.log('🎯 AI kategori önerisi:', result.category);
         
-        // GERÇEK kategorilerden eşleşen bulma
+        // GERÇEK kategorilerden eşleşen bulma - actualCategories kullan
         let matchedCategory = null;
-        if (shopSections && shopSections.length > 0) {
+        if (actualCategories && actualCategories.length > 0) {
           const aiCategoryTitle = result.category.title || '';
-          console.log('🔍 AI kategori adı:', aiCategoryTitle, '- Gerçek kategorilerde arıyor...');
+          console.log('🔍 AI kategori adı:', aiCategoryTitle, '- Actual kategorilerde arıyor...');
+          console.log('📋 Aranacak kategoriler:', actualCategories.map(s => s.title).join(', '));
           
           // Tam isim eşleşmesi
-          matchedCategory = shopSections.find(s => 
+          matchedCategory = actualCategories.find(s => 
             s.title.toLowerCase() === aiCategoryTitle.toLowerCase()
           );
           
           // Kısmi eşleşme
           if (!matchedCategory) {
-            matchedCategory = shopSections.find(s => 
+            matchedCategory = actualCategories.find(s => 
               s.title.toLowerCase().includes(aiCategoryTitle.toLowerCase()) ||
               aiCategoryTitle.toLowerCase().includes(s.title.toLowerCase())
             );
@@ -831,44 +846,67 @@ export default function EmbeddedProductForm({
               setSelectedShopSection(categoryId);
               currentStateRef.current.selectedShopSection = categoryId;
             });
-          } else {
-            console.log('⚠️ AI önerisi gerçek kategorilerde bulunamadı, AI kendisi belirlesin');
-            // AI'nin önerdiği kategori bulunamadıysa, AI'ya güven
-            // Abstract Art'ı default olarak seç
-            const abstractCategory = shopSections?.find(s => 
-              s.title.toLowerCase().includes('abstract')
-            );
             
-            if (abstractCategory) {
-              console.log('🎨 AI güveni ile Abstract Art seçildi');
-              const categoryId = abstractCategory.shop_section_id.toString();
+            // Extra delay to ensure UI updates
+            setTimeout(() => {
+              console.log('🔄 Final kategori UI update:', categoryId);
               setSelectedShopSection(categoryId);
               currentStateRef.current.selectedShopSection = categoryId;
+            }, 100);
+          } else {
+            console.log('⚠️ AI önerisi actual kategorilerde bulunamadı, Modern Art default seçiliyor');
+            // AI'nin önerdiği kategori bulunamadıysa Modern Art seç
+            const modernCategory = actualCategories?.find(s => 
+              s.title.toLowerCase().includes('modern')
+            );
+            
+            if (modernCategory) {
+              console.log('🎨 Default olarak Modern Art seçildi:', modernCategory.title);
+              const categoryId = modernCategory.shop_section_id.toString();
+              setSelectedShopSection(categoryId);
+              currentStateRef.current.selectedShopSection = categoryId;
+              
+              // Extra delay to ensure UI updates
+              setTimeout(() => {
+                console.log('🔄 Modern Art UI update:', categoryId);
+                setSelectedShopSection(categoryId);
+                currentStateRef.current.selectedShopSection = categoryId;
+              }, 100);
+            } else {
+              console.log('⚠️ Modern Art bulunamadı, Abstract Art fallback');
+              const abstractCategory = shopSections?.find(s => 
+                s.title.toLowerCase().includes('abstract')
+              );
+              if (abstractCategory) {
+                setSelectedShopSection(abstractCategory.shop_section_id.toString());
+                currentStateRef.current.selectedShopSection = abstractCategory.shop_section_id.toString();
+              }
             }
           }
         } else {
-          console.log('⚠️ shopSections henüz hazır değil, Abstract Art seçilecek');
-          // Shop sections hazır değilse Abstract Art'ı seç
+          console.log('⚠️ shopSections henüz hazır değil, Modern Art seçilecek');
+          // Shop sections hazır değilse Modern Art'ı seç
           setTimeout(() => {
-            const abstractFallback = shopSections?.find(s => 
-              s.title.toLowerCase().includes('abstract')
+            const modernFallback = shopSections?.find(s => 
+              s.title.toLowerCase().includes('modern')
             );
-            if (abstractFallback) {
-              setSelectedShopSection(abstractFallback.shop_section_id.toString());
+            if (modernFallback) {
+              console.log('🎨 Fallback: Modern Art seçildi');
+              setSelectedShopSection(modernFallback.shop_section_id.toString());
             }
           }, 200);
         }
       } else {
-        // AI'den kategori gelmezse Abstract Art'ı seç (AI'ya güven)
-        console.log('🤖 AI kategori önermedi, AI güveni ile Abstract Art seçiliyor...');
-        const abstractCategory = shopSections?.find(s => 
-          s.title.toLowerCase().includes('abstract')
+        // AI'den kategori gelmezse Modern Art'ı seç (AI'ya güven)
+        console.log('🤖 AI kategori önermedi, AI güveni ile Modern Art seçiliyor...');
+        const modernCategory = shopSections?.find(s => 
+          s.title.toLowerCase().includes('modern')
         );
         
-        if (abstractCategory) {
-          console.log('🎨 Abstract Art varsayılan olarak seçildi');
-          setSelectedShopSection(abstractCategory.shop_section_id.toString());
-          currentStateRef.current.selectedShopSection = abstractCategory.shop_section_id.toString();
+        if (modernCategory) {
+          console.log('🎨 Modern Art varsayılan olarak seçildi');
+          setSelectedShopSection(modernCategory.shop_section_id.toString());
+          currentStateRef.current.selectedShopSection = modernCategory.shop_section_id.toString();
         }
       }
 
@@ -962,9 +1000,9 @@ export default function EmbeddedProductForm({
       }
     }
 
-    // Eğer hiçbir eşleşme yoksa Abstract Art seç
+    // Eğer hiçbir eşleşme yoksa Modern Art seç
     if (!selectedCategory) {
-      selectedCategory = shopSections.find(s => s.title.toLowerCase().includes('abstract')) || shopSections[0];
+      selectedCategory = shopSections.find(s => s.title.toLowerCase().includes('modern')) || shopSections[0];
       console.log('🔄 Fallback kategori seçildi:', selectedCategory?.title);
     }
 

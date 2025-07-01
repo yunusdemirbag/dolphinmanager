@@ -5,14 +5,15 @@ import OpenAI from 'openai';
 const DEFAULT_TITLE_PROMPT = `
 # SYSTEM
 1. If **no image_file** → reply "Okay, please send the image." and stop.  
-2. If the supplied image is **not suitable canvas wall art** → reply "Image isn't canvas wall art, please upload a proper one." and stop.  
-3. Otherwise continue with TASK.
+2. If the supplied image is **clearly not artwork** (like text documents, screenshots, or non-artistic content) → reply "Image isn't canvas wall art, please upload a proper one." and stop.  
+3. Otherwise continue with TASK - be flexible with artistic interpretations and abstract designs.
 
 # ROLE
 You are the **ULTIMATE ETSY SEO copywriter & conversion strategist** for PHYSICAL Canvas Wall Art Prints (no digital products) serving U.S. and global English-speaking buyers.
 
 # INPUT
 • **image_file** → Internally extract: primary subject, art style, emotional tone, 1–2 dominant colours.  
+• **For Rothko-style images**: Analyze ALL visible color blocks/rectangles - identify specific color names (Purple, Orange, Green, Red, Blue, Yellow, etc.)
 • Optional: orientation, size details, target audience/room, etc.
 
 # TASK
@@ -20,7 +21,13 @@ Generate **ONE** SEO-optimised, high-conversion Etsy product title (125–140 ch
 
 # STAGE 1 · ADVANCED IMAGE INSIGHT  *(internal only)*
 ### Artist / Movement Recognition & Format
-- **Rothko Style** → \`Bold [Colour] Rothko Style Color Field Canvas Wall Art Print | [Room] Decor | Statement Piece\`
+- **Rothko Style** → ANALYZE ACTUAL IMAGE COLORS first, then use one of these formats:
+  • \`Mark Rothko [Color] Canvas – Iconic Color Field Painting Reproduction for Modern Art Collectors\`
+  • \`Mark Rothko Inspired [Color] Canvas – Bold Color Field Painting for Contemporary Homes\`
+  • \`Rothko [Color] Painting Reproduction – Iconic Abstract Canvas Wall Art for Modern Interiors\`
+  • \`Mark Rothko Color Field Canvas – [Detailed Colors] Abstract Painting on Museum-Quality Canvas\`
+  • \`Mark Rothko [Color1] and [Color2] Canvas – Iconic Color Field Painting Reproduction for Bold Modern Interiors\`
+  • \`Mark Rothko [Color] Color Field Canvas – Deep and Bright [Color] Tones Abstract Painting Reproduction\`
 - **Frida Kahlo** → \`Vibrant Frida Kahlo Portrait Canvas Wall Art Print | [Theme] Bedroom Wall Decor | Luxury Gift\`
 - **Jesus / Religious** → \`Radiant Jesus [Scene] Canvas Wall Art Print | [Tone] Living Room Decor | Statement Piece\`
 - **African Heritage** → \`Bold African Women Portrait Canvas Wall Art Print | [Style] Living Room Decor | Statement Piece\`
@@ -36,18 +43,20 @@ Generate **ONE** SEO-optimised, high-conversion Etsy product title (125–140 ch
 \`<Emotional Adjective> <Specific Subject> <Style> Canvas Wall Art Print | <Colour/Tone> <Room Keyword> Decor | <Value Phrase>\`
 
 # MANDATORY RULES
-1. Include **Canvas Wall Art Print** exactly once.  
-2. Add **one** high-volume room keyword: *Living Room Decor, Bedroom Wall Decor, Office Artwork, Nursery Decor, Man Cave Art*.  
-3. Add **one** value phrase: *Ready to Hang, Statement Piece, Luxury Gift, Limited Edition, Art Collectors, Modern Art Lovers*.  
-4. Insert 2-3 style descriptors (modern, minimalist, abstract, boho, etc.).  
-5. Optional size hint allowed (Large, 24x36, etc.).  
-6. Max 140 chars; Title Case; no quotes, emojis, parentheses, ALL-CAPS, SKUs; no word repeated > 1 (except Art/Wall/Canvas).  
-7. **Forbidden words** anywhere: digital, download, printable, instant, pdf, file, template, svg, vector, clipart, wallpaper, mockup, psd, poster, paper print, frame included, framed poster, diy, beautiful, nice, awesome, amazing, gorgeous, stunning, wonderful, cute, lovely, pretty, high quality, cheap, best price, sale, discount, free shipping, unique, perfect, special, exclusive, set, bundle.
+1. **ETSY API COMPLIANCE**: Title MUST start with a letter or number - NO symbols, punctuation, or special characters at the beginning.
+2. **ALLOWED CHARACTERS**: Only use letters, numbers, spaces, hyphens (-), pipes (|), em dashes (—), periods, commas, exclamation marks, question marks, ampersands (&), apostrophes ('), colons (:), and parentheses ().
+3. Include **Canvas Wall Art Print** exactly once.  
+4. Add **one** high-volume room keyword: *Living Room Decor, Bedroom Wall Decor, Office Artwork, Nursery Decor, Man Cave Art*.  
+5. Add **one** value phrase: *Ready to Hang, Statement Piece, Luxury Gift, Limited Edition, Art Collectors, Modern Art Lovers*.  
+6. Insert 2-3 style descriptors (modern, minimalist, abstract, boho, etc.).  
+7. Optional size hint allowed (Large, 24x36, etc.).  
+8. Max 140 chars; Title Case; no quotes, emojis, brackets, ALL-CAPS, SKUs; no word repeated > 1 (except Art/Wall/Canvas).  
+9. **Forbidden words** anywhere: digital, download, printable, instant, pdf, file, template, svg, vector, clipart, wallpaper, mockup, psd, poster, paper print, frame included, framed poster, diy, beautiful, nice, awesome, amazing, gorgeous, stunning, wonderful, cute, lovely, pretty, high quality, cheap, best price, sale, discount, free shipping, unique, perfect, special, exclusive, set, bundle.
 
 # CRITICAL COPYRIGHT COMPLIANCE
-🚨 NEVER use artist full names like "Mark Rothko" - use "Rothko Style" instead
-🚨 This prevents DMCA takedown and legal issues
-🚨 Always use "[Artist] Style" format for inspiration-based titles
+🚨 For Mark Rothko: Use "Mark Rothko" with "Inspired" or "Reproduction" terms - this indicates inspiration/reproduction, not original artwork
+🚨 For other artists: Use "[Artist] Style" format to indicate inspiration-based titles
+🚨 ALWAYS include "Reproduction", "Inspired", or "Style" to indicate this is not original artwork
 
 # OUTPUT
 Return **only** the final title line—no quotes, no explanations.
@@ -826,7 +835,7 @@ class AITitleTagSystem {
   private async detectImageCategory(imageBase64: string): Promise<string> {
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "user",
@@ -882,6 +891,40 @@ class AITitleTagSystem {
   }
 
   /**
+   * Sanitize title for Etsy API compliance
+   */
+  private sanitizeTitle(title: string): string {
+    if (!title) return '';
+    
+    // Remove any leading/trailing whitespace
+    let sanitized = title.trim();
+    
+    // Remove invalid characters that Etsy doesn't allow
+    // Keep only letters, numbers, spaces, hyphens, and basic punctuation
+    sanitized = sanitized.replace(/[^\w\s\-|—.,!?&'():]/g, '');
+    
+    // Ensure it starts with a letter or number
+    if (sanitized && !/^[a-zA-Z0-9]/.test(sanitized)) {
+      // Find the first letter or number and start from there
+      const match = sanitized.match(/[a-zA-Z0-9]/);
+      if (match) {
+        const index = sanitized.indexOf(match[0]);
+        sanitized = sanitized.substring(index);
+      } else {
+        // If no letters/numbers found, prepend a default prefix
+        sanitized = 'Canvas Wall Art ' + sanitized;
+      }
+    }
+    
+    // Ensure maximum length compliance (140 chars for Etsy)
+    if (sanitized.length > 140) {
+      sanitized = sanitized.substring(0, 137) + '...';
+    }
+    
+    return sanitized;
+  }
+
+  /**
    * Call OpenAI for title generation
    */
   private async callOpenAI(prompt: string, imageBase64: string): Promise<string> {
@@ -908,7 +951,8 @@ class AITitleTagSystem {
       temperature: 0.7
     });
 
-    return response.choices[0]?.message?.content?.trim() || '';
+    const rawTitle = response.choices[0]?.message?.content?.trim() || '';
+    return this.sanitizeTitle(rawTitle);
   }
 
   /**

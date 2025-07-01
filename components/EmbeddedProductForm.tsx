@@ -98,6 +98,41 @@ export default function EmbeddedProductForm({
   // Component instance tracking
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
   const isMounted = useRef(true);
+
+  // AI için resim sıkıştırma fonksiyonu
+  const compressImageForAI = useCallback(async (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // 50% boyut azaltma
+        const scale = 0.5;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        
+        // Resmi çiz
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Sıkıştırılmış dosya oluştur
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: file.type,
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file); // Fallback
+          }
+        }, file.type, 0.7); // 70% kalite
+      };
+      
+      img.onerror = () => resolve(file); // Hata durumunda orijinal dosyayı döndür
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
   const hasStartedProcessing = useRef(false);
   
   // Refs to track actual state values
@@ -705,11 +740,15 @@ export default function EmbeddedProductForm({
         }
       }
 
-      // Direkt AI API çağrısı yapalım
+      // Resmi AI için sıkıştır (50% boyut azaltma)
       const firstImage = mediaFiles[0].file;
+      console.log('📷 Orijinal resim boyutu:', (firstImage.size / 1024).toFixed(1), 'KB');
+      
+      const compressedImage = await compressImageForAI(firstImage);
+      console.log('🗜️ Sıkıştırılmış resim boyutu:', (compressedImage.size / 1024).toFixed(1), 'KB');
       
       const formData = new FormData();
-      formData.append('image', firstImage);
+      formData.append('image', compressedImage);
       formData.append('focus', '');
       formData.append('analysisType', 'basic');
       
@@ -730,23 +769,35 @@ export default function EmbeddedProductForm({
         console.log('❌ Kategoriler hala boş!');
       }
 
-      console.log('📡 AI API çağrısı yapılıyor...', {
-        fileName: firstImage.name,
-        fileSize: firstImage.size,
-        fileType: firstImage.type
+      console.log('📡 AI API çağrısı yapılıyor (parallel)...', {
+        fileName: compressedImage.name,
+        originalSize: firstImage.size,
+        compressedSize: compressedImage.size,
+        compression: ((1 - compressedImage.size / firstImage.size) * 100).toFixed(1) + '%',
+        fileType: compressedImage.type
       });
 
-      const response = await fetch('/api/ai/analyze-and-generate', {
+      // 🚀 PARALLEL PROCESSING: AI + PreProcess parallel başlat
+      const aiPromise = fetch('/api/ai/analyze-and-generate', {
         method: 'POST',
         body: formData,
+      }).then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      // Parallel pre-processing (shipping, categories, etc.)
+      const preprocessPromise = Promise.resolve().then(() => {
+        console.log('⚡ Parallel pre-processing başlatıldı...');
+        // Bu kısmı daha sonra doldururuz
+        return { preprocessed: true };
+      });
 
-      const result = await response.json();
-      console.log('📋 AI API yanıtı:', result);
+      // Her ikisini de paralel bekle
+      const [result, preprocessResult] = await Promise.all([aiPromise, preprocessPromise]);
+      console.log('📋 AI API yanıtı (parallel):', result);
 
       if (result.title) {
         const cleanTitle = result.title.replace(/['\"]/g, '').replace(/\s+/g, ' ').trim();

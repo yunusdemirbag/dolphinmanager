@@ -306,6 +306,16 @@ export function useProductFormSubmission({
       errors.push('Başlık 140 karakterden uzun olamaz');
     }
 
+    // Etsy API title validation
+    if (data.title && !/^[a-zA-Z0-9]/.test(data.title.trim())) {
+      errors.push('Başlık bir harf veya rakam ile başlamalı');
+    }
+
+    // Check for invalid characters
+    if (data.title && /[^\w\s\-|—.,!?&'():]/g.test(data.title)) {
+      errors.push('Başlık geçersiz karakterler içeriyor');
+    }
+
     if (productImages.length === 0) {
       errors.push('En az bir ürün görseli gerekli');
     }

@@ -189,7 +189,7 @@ Choose the most suitable category from the list above. Return only the exact cat
             console.log('📤 OpenAI prompt gönderiliyor...');
             
             const openaiResponse = await openai.chat.completions.create({
-              model: "gpt-3.5-turbo",
+              model: "gpt-4o-mini", // Daha hızlı ve ucuz model
               messages: [{ role: "user", content: prompt }],
               max_tokens: 50,
               temperature: 0.1,

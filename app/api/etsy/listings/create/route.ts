@@ -269,6 +269,19 @@ export async function POST(request: NextRequest) {
     materials.forEach(material => {
       etsyFormData.append('materials[]', material);
     });
+    
+    // Personalization instructions temizleme - VALIDATION SUMMARY'DEN ÖNCE TANIMLA
+    let cleanInstructions = 'Phone Number for Delivery'; // Default
+    if (typeof listingData.personalization_instructions === 'string' && listingData.personalization_instructions.length > 0) {
+      cleanInstructions = listingData.personalization_instructions.trim();
+      // Özel karakterleri temizle
+      cleanInstructions = cleanInstructions.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      // 255 karakter limitini kontrol et
+      if (cleanInstructions.length > 255) {
+        cleanInstructions = cleanInstructions.substring(0, 255);
+      }
+    }
+    
     // shop_section_id sadece varsa ekle (Etsy integer bekliyor)
     console.log('🏪 Shop section kontrolü:', {
       shop_section_id: listingData.shop_section_id,
@@ -399,17 +412,7 @@ export async function POST(request: NextRequest) {
       etsyFormData.append('personalization_is_required', 'false'); // Default false
     }
     
-    // Personalization instructions temizleme
-    let cleanInstructions = 'Phone Number for Delivery'; // Default
-    if (typeof listingData.personalization_instructions === 'string' && listingData.personalization_instructions.length > 0) {
-      cleanInstructions = listingData.personalization_instructions.trim();
-      // Özel karakterleri temizle
-      cleanInstructions = cleanInstructions.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-      // 255 karakter limitini kontrol et
-      if (cleanInstructions.length > 255) {
-        cleanInstructions = cleanInstructions.substring(0, 255);
-      }
-    }
+    // Personalization instructions FormData'ya ekle (cleanInstructions yukarıda tanımlandı)
     etsyFormData.append('personalization_instructions', cleanInstructions);
     console.log('📋 Personalization instructions temizlendi:', { original: listingData.personalization_instructions, clean: cleanInstructions });
     
@@ -429,6 +432,89 @@ export async function POST(request: NextRequest) {
     
     // NOT: Video da ayrı endpoint'e upload edilecek - burada eklenmez
     
+    // TESTING MODE: Minimal data ile test et
+    const TESTING_MODE = false;
+    
+    if (TESTING_MODE) {
+      console.log('🧪 TESTING MODE ACTIVE - Minimal data ile test ediliyor...');
+      
+      // Tüm form data'yı temizle ve minimal set kullan
+      const minimalFormData = new FormData();
+      minimalFormData.append('quantity', '1');
+      minimalFormData.append('title', 'Test Canvas Art');
+      minimalFormData.append('description', 'Test description for canvas art print.');
+      minimalFormData.append('price', '25.00');
+      minimalFormData.append('who_made', 'i_did');
+      minimalFormData.append('when_made', 'made_to_order');
+      minimalFormData.append('taxonomy_id', '1027');
+      minimalFormData.append('shipping_profile_id', shippingProfileId.toString());
+      minimalFormData.append('state', 'draft');
+      
+      // Test tags (sadece 3 adet)
+      minimalFormData.append('tags[]', 'art');
+      minimalFormData.append('tags[]', 'canvas');
+      minimalFormData.append('tags[]', 'print');
+      
+      // Test materials (sadece 2 adet)
+      minimalFormData.append('materials[]', 'Canvas');
+      minimalFormData.append('materials[]', 'Wood');
+      
+      console.log('🧪 Minimal test data:', {
+        keys: Array.from(minimalFormData.keys()),
+        title: 'Test Canvas Art',
+        price: '25.00',
+        tags: ['art', 'canvas', 'print'],
+        materials: ['Canvas', 'Wood']
+      });
+      
+      // Test API call
+      try {
+        const testResponse = await fetch(etsyListingUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'x-api-key': api_key,
+          },
+          body: minimalFormData,
+        });
+        
+        console.log('🧪 Test API Response:', {
+          status: testResponse.status,
+          ok: testResponse.ok,
+          statusText: testResponse.statusText
+        });
+        
+        if (!testResponse.ok) {
+          const testErrorText = await testResponse.text();
+          console.log('🧪 Test API Error Text:', testErrorText);
+          
+          return NextResponse.json({
+            error: `TEST MODE - Etsy API Error: ${testErrorText}`,
+            testMode: true,
+            minimalData: true,
+            status: testResponse.status
+          }, { status: testResponse.status });
+        }
+        
+        const testResult = await testResponse.json();
+        console.log('✅ TEST BAŞARILI! Minimal data çalışıyor:', testResult.listing_id);
+        
+        return NextResponse.json({
+          success: true,
+          testMode: true,
+          message: 'Test başarılı - minimal data çalışıyor',
+          listing_id: testResult.listing_id
+        });
+        
+      } catch (testError) {
+        console.error('🧪 Test error:', testError);
+        return NextResponse.json({
+          error: `Test mode error: ${testError.message}`,
+          testMode: true
+        }, { status: 500 });
+      }
+    }
+
     console.log('📤 ADIM 1: Draft listing oluşturuluyor...');
     console.log('⏰ Başlangıç zamanı:', new Date().toISOString());
     console.log('📋 Listing state:', 'draft'); // Her zaman draft olarak başla

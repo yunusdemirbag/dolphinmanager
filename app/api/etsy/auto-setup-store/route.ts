@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     const shopSections = await fetchShopSections(shopId, apiKey, access_token);
     
     // 4. Cache'e kaydet
-    console.log('💾 Cache'e kaydediliyor...');
+    console.log('💾 Cache\'e kaydediliyor...');
     await saveToCache(shopId, canvasCategories, shippingProfiles, shopSections);
     
     return NextResponse.json({

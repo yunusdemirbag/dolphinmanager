@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
+import { generateRandomDescription } from '@/lib/random-descriptions'
 import { useRouter, useSearchParams } from "next/navigation"
 import { ProductMediaSection } from './ProductMediaSection';
 import { PromptEditor } from './PromptEditor';
@@ -2858,8 +2859,8 @@ export function ProductFormModal({
     </div>
   );
 
-  // Sabit açıklama bölümleri
-  const descriptionParts = {
+  // Eski sabit açıklama bölümleri kaldırıldı - artık lib/random-descriptions.ts kullanılıyor
+  /*const descriptionParts = {
     headers: [
       "🌟 Personalized Artwork & Fast Shipping 🌟",
       "🌟 Customize Your Canvas with Confidence 🌟",
@@ -2935,23 +2936,9 @@ Your satisfaction and the safety of your artwork are our top priorities!`,
 📬 Tracking code provided on shipment
 🕓 Delivery window: 3 to 5 business days`
     ]
-  };
+  };*/
 
-  // Rastgele bir açıklama oluştur
-  const generateRandomDescription = () => {
-    const randomIndex = Math.floor(Math.random() * 5);
-    return `${descriptionParts.headers[randomIndex]}
-
-${descriptionParts.intros[randomIndex]}
-
-━━━━━━━━━━━━━━━━━━
-
-${descriptionParts.shippingTitles[randomIndex]}
-
-${descriptionParts.shippingDetails[randomIndex]}
-
-${descriptionParts.deliveryInfo[randomIndex]}`;
-  };
+  // Eski lokal generateRandomDescription kaldırıldı - artık lib/random-descriptions.ts kullanılıyor
 
   // This function is removed - unified AI API now handles everything in one call
 

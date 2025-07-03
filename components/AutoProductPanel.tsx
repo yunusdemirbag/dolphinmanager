@@ -58,6 +58,41 @@ interface Settings {
   resourcePreviewUrls: string[];
 }
 
+// Helper function to format time duration
+const formatDuration = (totalSeconds: number): string => {
+  if (totalSeconds <= 0) return '0 dk';
+  
+  const days = Math.floor(totalSeconds / (24 * 60 * 60));
+  const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+  const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+  
+  let result = '';
+  
+  // Gün varsa ekle
+  if (days > 0) {
+    result += `${days} gün`;
+  }
+  
+  // Saat varsa ekle  
+  if (hours > 0) {
+    if (result) result += ' ';
+    result += `${hours} saat`;
+  }
+  
+  // Dakika varsa ekle
+  if (minutes > 0) {
+    if (result) result += ' ';
+    result += `${minutes} dk`;
+  }
+  
+  // Hiçbiri yoksa en az 1 dk göster
+  if (!result) {
+    result = '< 1 dk';
+  }
+  
+  return result;
+};
+
 export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
   const { toast } = useToast();
   const imagesFolderRef = useRef<HTMLInputElement>(null);
@@ -538,7 +573,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
         if (cycleTimes.length > 0) {
           const avgTime = cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length;
           const modeText = settings.mode === 'direct-etsy' ? 'Etsy\'ye' : 'kuyruğa';
-          toastDescription += ` | Ortalama: ${Math.round(avgTime)}s`;
+          toastDescription += ` | Ortalama: ${formatDuration(Math.round(avgTime))}`;
         }
         
         toast({
@@ -558,12 +593,10 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
       }));
       
       const totalTimeElapsed = globalStartTime ? Math.round((Date.now() - globalStartTime) / 1000) : 0;
-      const totalMinutes = Math.floor(totalTimeElapsed / 60);
-      const totalSeconds = totalTimeElapsed % 60;
       
       toast({
         title: "Tamamlandı!",
-        description: `Tüm dosyalar işlendi! Toplam süre: ${totalMinutes}dk ${totalSeconds}s`
+        description: `Tüm dosyalar işlendi! Toplam süre: ${formatDuration(totalTimeElapsed)}`
       });
     }
   }, [currentProductIndex, settings.imageFiles, settings.imagesPerProduct, processing.totalProducts, toast, getCurrentProductFiles, generateProductTitle]);
@@ -925,11 +958,11 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
                     <div className="text-lg font-semibold text-blue-800">
                       {cycleTimes.length > 0 ? (() => {
                         const avgTimePerProduct = cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length;
-                        return `${Math.floor(avgTimePerProduct / 60).toString().padStart(2, '0')}:${Math.floor(avgTimePerProduct % 60).toString().padStart(2, '0')}`;
-                      })() : '--:--'}
+                        return formatDuration(Math.floor(avgTimePerProduct));
+                      })() : '--'}
                     </div>
                     <div className="text-xs text-blue-600">
-                      1 Ürün Ortalama Süresi (dakika:saniye)
+                      1 Ürün Ortalama Süresi
                     </div>
                   </div>
                 </div>
@@ -960,7 +993,7 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
                         const avgTimePerProduct = cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length;
                         const remainingProducts = Math.max(0, Math.floor(settings.imageFiles.length / settings.imagesPerProduct));
                         const totalRemainingTime = remainingProducts * avgTimePerProduct;
-                        return `${Math.floor(totalRemainingTime / 60)}dk ${Math.floor(totalRemainingTime % 60)}s`;
+                        return formatDuration(Math.floor(totalRemainingTime));
                       })() : '--'}
                     </div>
                     <div className="text-xs text-blue-600">

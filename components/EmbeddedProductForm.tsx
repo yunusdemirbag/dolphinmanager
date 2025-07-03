@@ -23,6 +23,7 @@ import ProductMediaManager, { MediaFile } from './product-form/ProductMediaManag
 import ProductFormFields from './product-form/ProductFormFields';
 import { useProductAutoGeneration } from './product-form/ProductAutoGeneration';
 import { useProductFormSubmission } from './product-form/ProductFormSubmission';
+import { generateRandomDescription } from '@/lib/random-descriptions';
 
 interface EmbeddedProductFormProps {
   isVisible: boolean;
@@ -100,6 +101,15 @@ export default function EmbeddedProductForm({
   // Component instance tracking
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
   const isMounted = useRef(true);
+  
+  // Initial description set (rastgele açıklama)
+  useEffect(() => {
+    if (isVisible && !description) {
+      const randomDesc = generateRandomDescription();
+      setDescription(randomDesc);
+      console.log('🎲 Form açılışında rastgele açıklama set edildi:', randomDesc.substring(0, 50) + '...');
+    }
+  }, [isVisible, description]);
 
   // 🔍 Ürün yükleme öncesi otomatik kontrol
   const preUploadCheck = useCallback(async (shopId: string) => {
@@ -624,23 +634,9 @@ export default function EmbeddedProductForm({
         console.log('🎥 Video file otomatik olarak ayarlandı:', firstVideoFile.name, `(${(firstVideoFile.size / 1024 / 1024).toFixed(2)}MB)`);
       }
 
-      // Set default description
-      const autoDescription = `🌟 Made Just for You – Fast & Safe Delivery 🌟
-
-💡 Looking to personalize your wall art? We offer custom sizing and can turn your personal images into beautiful canvas prints.
-
-✨ Features:
-• High-quality canvas material
-• Multiple size options available
-• Ready to hang with included hardware
-• Perfect for home, office, or as a gift
-
-📦 Fast Processing & Shipping:
-• Orders processed within 1-3 business days
-• Secure packaging to ensure safe delivery
-• Multiple frame options available
-
-🎨 Want something unique? Message us for custom orders!`;
+      // Rastgele açıklama üret
+      const autoDescription = generateRandomDescription();
+      console.log('🎲 Rastgele açıklama üretildi:', autoDescription.substring(0, 100) + '...');
 
       // Update form state - ÖNCE RESİMLERİ SET ET
       console.log('🔄 Setting product images and initial state...');
@@ -1423,13 +1419,15 @@ export default function EmbeddedProductForm({
   const handleGenerateDescription = useCallback(async () => {
     try {
       setAutoDescriptionLoading(true);
-      await autoGeneration.generateDescription(title);
+      const randomDesc = generateRandomDescription();
+      setDescription(randomDesc);
+      console.log('🎲 Manuel olarak rastgele açıklama üretildi:', randomDesc.substring(0, 50) + '...');
     } catch (error) {
-      console.error('Description generation error:', error);
+      console.error('Random description generation error:', error);
     } finally {
       setAutoDescriptionLoading(false);
     }
-  }, [autoGeneration, title]);
+  }, []);
 
   const handleGenerateTags = useCallback(async () => {
     try {

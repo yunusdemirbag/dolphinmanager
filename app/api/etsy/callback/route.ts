@@ -195,6 +195,34 @@ export async function GET(request: NextRequest) {
     await batch.commit();
     console.log('Mağaza ve API bilgileri Firebase\'e kaydedildi, ID:', shopIdStr);
 
+    // 🚀 Otomatik Canvas kategorileri ve kargo profillerini çek (async - background)
+    setTimeout(async () => {
+      try {
+        console.log(`🎨 ${shopIdStr} mağazası için otomatik setup başlatılıyor...`);
+        
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const autoSetupResponse = await fetch(`${baseUrl}/api/etsy/auto-setup-store`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shopId: shopIdStr })
+        });
+        
+        if (autoSetupResponse.ok) {
+          console.log(`✅ ${shopIdStr} mağazası için otomatik setup tamamlandı`);
+        } else {
+          const errorText = await autoSetupResponse.text();
+          console.error(`❌ ${shopIdStr} mağazası için otomatik setup başarısız:`, {
+            status: autoSetupResponse.status,
+            statusText: autoSetupResponse.statusText,
+            url: `${baseUrl}/api/etsy/auto-setup-store`,
+            error: errorText
+          });
+        }
+      } catch (error) {
+        console.error('❌ Otomatik setup hatası:', error);
+      }
+    }, 2000); // 2 saniye bekle
+
     return NextResponse.redirect(new URL('/stores?success=connected&refresh=true', request.url));
   } catch (error: any) {
     console.error('Etsy callback genel hatası:', error);

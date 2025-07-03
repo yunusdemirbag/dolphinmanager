@@ -252,6 +252,8 @@ export async function POST(request: NextRequest) {
     // Shop Section ID'yi sadece geçerliyse ekle - eski çalışan versiyona uygun
     const sectionId = Number(listingData.shop_section_id);
     if (sectionId && sectionId > 0) {
+      // Shop section'ı tekrar aktif et - güncel section ID kullan
+      console.log(`✅ Shop section ${sectionId} Etsy'ye gönderiliyor...`);
       etsyFormData.append('shop_section_id', sectionId.toString());
       console.log(`✅ Ürün, dükkan bölümü ${sectionId}'e eklenecek.`);
     } else {

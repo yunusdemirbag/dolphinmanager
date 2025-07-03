@@ -94,6 +94,9 @@ interface ProductFormFieldsProps {
   onGenerateTitle?: () => void;
   onGenerateDescription?: () => void;
   onGenerateTags?: () => void;
+  
+  // Shop sections callback to sync with parent
+  onShopSectionsLoaded?: (sections: ShopSection[]) => void;
 }
 
 export default function ProductFormFields({
@@ -132,7 +135,8 @@ export default function ProductFormFields({
   onShippingProfileChange,
   onGenerateTitle,
   onGenerateDescription,
-  onGenerateTags
+  onGenerateTags,
+  onShopSectionsLoaded
 }: ProductFormFieldsProps) {
   const [newTag, setNewTag] = useState('');
   const [shopSections, setShopSections] = useState<ShopSection[]>([]);
@@ -164,6 +168,12 @@ export default function ProductFormFields({
             if (sections.length > 0 && !selectedShopSection) {
               console.log('🏪 Shop sections yüklendi, AI seçimi bekleniyor...:', sections.length, 'adet');
               // Don't auto-select, let AI choose the category
+            }
+            
+            // Notify parent component about loaded sections
+            if (onShopSectionsLoaded && sections.length > 0) {
+              console.log('🔄 Parent component\'ı shop sections ile güncelleniyor:', sections.length, 'adet');
+              onShopSectionsLoaded(sections);
             }
           }
         } catch (error) {
@@ -408,8 +418,16 @@ export default function ProductFormFields({
 
       {/* Shop Section */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium">Kanvas Kategorisi</Label>
+        <Label className="text-sm font-medium">
+          Kanvas Kategorisi 
+          {selectedShopSection && (
+            <span className="text-green-600 text-xs font-normal ml-2">
+              (AI seçti: {shopSections?.find(s => s.shop_section_id.toString() === selectedShopSection)?.title || 'Loading...'})
+            </span>
+          )}
+        </Label>
         <Select 
+          key={`shop-section-${selectedShopSection}-${shopSections?.length || 0}`}
           value={selectedShopSection} 
           onValueChange={onShopSectionChange}
           disabled={isSubmitting || loadingShopSections}
@@ -429,6 +447,11 @@ export default function ProductFormFields({
         </Select>
         <div className="text-xs text-gray-500">
           {shopSections ? shopSections.length : 0} kategori mevcut
+          {selectedShopSection && shopSections?.find(s => s.shop_section_id.toString() === selectedShopSection) && (
+            <span className="text-green-600 font-medium ml-2">
+              ✓ {shopSections.find(s => s.shop_section_id.toString() === selectedShopSection)?.title}
+            </span>
+          )}
         </div>
       </div>
 

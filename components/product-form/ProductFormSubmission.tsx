@@ -228,8 +228,11 @@ export function useProductFormSubmission({
         hasVariations: data.hasVariations,
         variationCount: data.variations.filter(v => v.is_active).length,
         shopSection: data.selectedShopSection,
+        shippingProfileId: data.shippingProfileId,
         taxonomyId: data.taxonomyId,
-        imageCount: productImages.length
+        imageCount: productImages.length,
+        price: data.price,
+        tags: data.tags.length
       });
 
       const response = await fetch('/api/etsy/listings/create', {
@@ -251,6 +254,34 @@ export function useProductFormSubmission({
         // Handle specific Etsy errors
         if (response.status === 401 || errorText.includes('unauthorized') || errorText.includes('token')) {
           throw new Error('Etsy bağlantısı kesildi. Lütfen Etsy hesabınızı yeniden bağlayın.');
+        }
+
+        // Handle API user limit error
+        if (errorText.includes('maximum number of users') || errorText.includes('commercial level access')) {
+          setTimeout(() => {
+            window.open('https://www.etsy.com/developers/your-apps', '_blank');
+          }, 2000);
+          
+          throw new Error('❌ Etsy API kullanıcı limiti!\n\n📋 Acil Çözüm:\n1. Etsy Developer Dashboard 2 saniye içinde açılacak\n2. Eski/kullanılmayan bağlantıları temizle\n3. Veya yeni Developer App oluştur\n\n💡 Kalıcı çözüm: Commercial access başvurusu yap');
+        }
+
+        // Handle shipping profile error specifically
+        if (errorText.includes('NO_SHIPPING_PROFILE') || errorText.includes('shipping profile')) {
+          // Show helpful error with instructions and open Etsy in new tab
+          setTimeout(() => {
+            window.open('https://www.etsy.com/your/account/shop/shipping', '_blank');
+          }, 2000);
+          
+          throw new Error('❌ Kargo profili bulunamadı!\n\n📋 Çözüm:\n1. Etsy Shipping ayarlarınız 2 saniye içinde açılacak\n2. En az bir kargo profili oluşturun\n3. Buraya geri dönüp tekrar deneyin\n\n💡 İpucu: "Standard" adında basit bir profil oluşturmanız yeterli');
+        }
+
+        // Handle other specific errors
+        if (errorText.includes('INVALID_TAXONOMY')) {
+          throw new Error('Kategori hatası. Lütfen farklı bir kategori seçin.');
+        }
+
+        if (errorText.includes('INVALID_TITLE')) {
+          throw new Error('Başlık formatı hatalı. Lütfen başlığı kontrol edin.');
         }
 
         throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -334,6 +365,15 @@ export function useProductFormSubmission({
 
     if (data.tags.some(tag => tag.length > 20)) {
       errors.push('Etiketler 20 karakterden uzun olamaz');
+    }
+
+    // Note: We'll handle shipping profile in the API fallback, don't block here
+    // if (!data.shippingProfileId || data.shippingProfileId.trim() === '') {
+    //   errors.push('Kargo profili seçilmeli. Etsy hesabınızda kargo profili oluşturun.');
+    // }
+
+    if (!data.taxonomyId || data.taxonomyId === 0) {
+      errors.push('Kategori seçilmeli');
     }
 
     return {

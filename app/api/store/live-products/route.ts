@@ -88,6 +88,9 @@ export async function POST(request: NextRequest) {
     const listings: EtsyListing[] = etsyData.results || [];
 
     console.log(`📦 ${listings.length} ürün Etsy'den alındı (Live)`);
+    console.log(`🔍 DEBUG - Shop ID: ${shopId}`);
+    console.log(`🔍 DEBUG - API URL: ${ETSY_API_URL}/application/shops/${shopId}/listings/active?limit=12&includes=Images,Videos`);
+    console.log(`🔍 DEBUG - Response data:`, etsyData);
     
     // TÜM ürünler için resimleri ayrı çek
     console.log(`🖼️ ${listings.length} ürün için resimler alınıyor...`);

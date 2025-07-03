@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
+import { useStore } from '@/contexts/StoreContext';
 
 // Import our modular components
 import ProductMediaManager, { MediaFile } from './product-form/ProductMediaManager';
@@ -55,6 +56,7 @@ export default function EmbeddedProductForm({
   onClose
 }: EmbeddedProductFormProps) {
   const { toast } = useToast();
+  const { activeStore } = useStore();
 
   // === MAIN FORM STATE - Identical to ProductFormModal ===
   const [title, setTitle] = useState('');
@@ -98,6 +100,49 @@ export default function EmbeddedProductForm({
   // Component instance tracking
   const componentId = useRef(Math.random().toString(36).substr(2, 9));
   const isMounted = useRef(true);
+
+  // 🔍 Ürün yükleme öncesi otomatik kontrol
+  const preUploadCheck = useCallback(async (shopId: string) => {
+    try {
+      console.log('🔍 Pre-upload check başlıyor...', shopId);
+      
+      const response = await fetch('/api/etsy/pre-upload-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shopId })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Pre-upload check tamamlandı:', result);
+        
+        if (!result.result.allReady) {
+          console.log(`⏳ ${result.result.actions.length} işlem yapılıyor, bekleniyor...`);
+          
+          // Kullanıcıya bilgi ver
+          toast({
+            title: "Mağaza Verileri Hazırlanıyor",
+            description: "Canvas kategorileri ve kargo profilleri çekiliyor...",
+          });
+          
+          // 3 saniye bekle ve tekrar kontrol et - Geçici olarak devre dışı
+          // setTimeout(async () => {
+          //   await preUploadCheck(shopId);
+          // }, 3000);
+        } else {
+          console.log('🎉 Tüm veriler hazır, ürün yükleme başlayabilir!');
+        }
+        
+        return result.result;
+      } else {
+        console.error('❌ Pre-upload check başarısız:', response.status);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Pre-upload check hatası:', error);
+      return null;
+    }
+  }, [toast]);
 
   // AI için resim sıkıştırma fonksiyonu
   const compressImageForAI = useCallback(async (file: File): Promise<File> => {
@@ -158,6 +203,27 @@ export default function EmbeddedProductForm({
   useEffect(() => {
     currentStateRef.current.shippingProfileId = shippingProfileId;
   }, [shippingProfileId]);
+
+  // Aktif mağaza değişimini takip et - mağaza odaklı cache sistemi için
+  useEffect(() => {
+    if (activeStore?.shop_id) {
+      console.log(`🔄 Aktif mağaza değişti: ${activeStore.shop_id} (${activeStore.shop_name})`);
+      // Yeni mağaza için cache'den kategorileri yükle (varsa)
+      const cacheKey = `etsy-shop-sections-${activeStore.shop_id}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const cachedCategories = JSON.parse(cached);
+          setShopSections(cachedCategories);
+          console.log(`✅ Mağaza ${activeStore.shop_id} kategorileri cache'den state'e yüklendi:`, cachedCategories.length, 'adet');
+        } catch (e) {
+          console.warn('Cache parse hatası:', e);
+        }
+      } else {
+        console.log(`📋 Mağaza ${activeStore.shop_id} için henüz cache yok, API'den çekilecek`);
+      }
+    }
+  }, [activeStore?.shop_id]);
 
   // Mount/unmount tracking
   useEffect(() => {
@@ -604,17 +670,22 @@ export default function EmbeddedProductForm({
         currentStateRef.current.productImages = newMediaFiles;
       }, 100);
 
-      // Trigger AI generation after images are set - STATE UPDATE BEKLEYELİM
+      // Trigger AI generation after images are set - ANCAK SHOP SECTIONS YÜKLENDİKTEN SONRA
       if (imageFiles.length > 0 && !autoTitleUsed) {
         setAutoTitleUsed(true);
         setIsProcessingAuto(true);
         
-        console.log('⏰ AI generation zamanlayıcısı kuruldu, 2 saniye bekleniyor...', componentId);
+        console.log('⏰ AI generation başlatılıyor, shop sections yüklenmesi bekleniyor...');
         
-        // State update'ini beklemek için biraz daha uzun süre ver
-        // AI generation'ı hemen başlat - paralel işlem
-        console.log('🎯 AI generation hemen tetikleniyor (shop sections paralel yüklenecek)');
-        handleAutoGenerationWithImages(newMediaFiles);
+        // Shop sections yüklenmesini bekle, sonra AI'yi çağır
+        setTimeout(async () => {
+          console.log('🔍 Shop sections kontrolü başlatılıyor...');
+          await waitForShopSections(5000); // 5 saniye bekle
+          
+          // Shop sections yüklendikten sonra AI'yi çağır
+          console.log('🎯 Shop sections hazır, AI generation tetikleniyor');
+          handleAutoGenerationWithImages(newMediaFiles);
+        }, 500); // 500ms sonra kontrol et
       }
     }
   }, [autoFiles?.length, isVisible, autoTitleUsed]);
@@ -718,24 +789,109 @@ export default function EmbeddedProductForm({
 
     try {
       setAutoTitleLoading(true);
+      
+      // 🔍 PRE-UPLOAD CHECK: Geçici olarak devre dışı - 405 endpoint hatası
+      // if (activeStore?.shop_id) {
+      //   console.log('🔍 Pre-upload check tetikleniyor...');
+      //   await preUploadCheck(activeStore.shop_id.toString());
+      // }
+      
       console.log('🤖 Starting auto generation with direct media files...', {
         imageCount: mediaFiles.length,
         firstImageName: mediaFiles[0]?.file?.name,
         firstImageType: mediaFiles[0]?.file?.type
       });
       
-      // ShopSections'ı cache'den direkt al
-      let actualCategories = shopSections || [];
+      // Mağaza odaklı shop sections cache sistemi - bir kez çek, sonra cache kullan
+      let actualCategories = [];
+      let cacheKey = '';
       
-      // Eğer state boşsa cache'den direkt yükle
-      if (actualCategories.length === 0) {
-        const cached = sessionStorage.getItem('etsy-shop-sections');
+      if (activeStore?.shop_id) {
+        const shopId = activeStore.shop_id.toString();
+        cacheKey = `etsy-shop-sections-${shopId}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        
         if (cached) {
+          // Cache'de var, kullan
           try {
             actualCategories = JSON.parse(cached);
-            console.log('🚀 AI için kategoriler cache\'den direkt alındı:', actualCategories.length, 'adet');
+            console.log(`🚀 Mağaza ${shopId} kategorileri cache'den alındı:`, actualCategories.length, 'adet');
+            console.log('📋 Cache kategorileri:', actualCategories.map((c: any) => `${c.title} (ID: ${c.shop_section_id})`).join(', '));
+            
+            // State'i de güncelle
+            setShopSections(actualCategories);
+            console.log('🔄 Cache\'den state\'e de aktarıldı');
           } catch (e) {
-            console.warn('Cache parse hatası:', e);
+            console.warn('Cache parse hatası, API\'den çekilecek:', e);
+          }
+        }
+        
+        // Cache yoksa veya boşsa API'den çek ve bekle
+        if (actualCategories.length === 0) {
+          console.log(`🏪 Mağaza ${shopId} kategorileri ilk kez API'den çekiliyor...`);
+          try {
+            const sectionsResponse = await fetch(`/api/etsy/shop-sections`);
+            if (sectionsResponse.ok) {
+              const sectionsData = await sectionsResponse.json();
+              actualCategories = sectionsData.shopSections || [];
+              
+              if (actualCategories.length > 0) {
+                // Cache'e kaydet (mağaza odaklı)
+                sessionStorage.setItem(cacheKey, JSON.stringify(actualCategories));
+                console.log(`✅ Mağaza ${shopId} kategorileri API'den alındı ve cache'e kaydedildi:`, actualCategories.length, 'adet');
+                console.log('📋 API kategorileri:', actualCategories.map((c: any) => `${c.title} (ID: ${c.shop_section_id})`).join(', '));
+                
+                // State'e de kaydet
+                setShopSections(actualCategories);
+                console.log('🔄 Shop sections state\'e de kaydedildi');
+              } else {
+                console.warn(`⚠️ API'den 0 kategori geldi, retry yapılacak...`);
+                // 2 saniye bekle ve tekrar dene
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                const retryResponse = await fetch(`/api/etsy/shop-sections`);
+                if (retryResponse.ok) {
+                  const retryData = await retryResponse.json();
+                  actualCategories = retryData.shopSections || [];
+                  if (actualCategories.length > 0) {
+                    sessionStorage.setItem(cacheKey, JSON.stringify(actualCategories));
+                    setShopSections(actualCategories);
+                    console.log(`✅ Retry başarılı: ${actualCategories.length} kategori alındı`);
+                  }
+                }
+              }
+            } else {
+              console.warn(`❌ Mağaza ${shopId} shop sections API hatası:`, sectionsResponse.status);
+            }
+          } catch (error) {
+            console.error(`❌ Mağaza ${shopId} shop sections çekme hatası:`, error);
+          }
+        }
+      }
+
+      // Son kontrol: Kategoriler hazır mı?
+      if (actualCategories.length === 0) {
+        console.log('⏳ Kategoriler henüz hazır değil, alternatif kaynaklardan alınacak...');
+        
+        // Önce state'deki shopSections'ı kontrol et
+        if (shopSections && shopSections.length > 0) {
+          actualCategories = shopSections;
+          console.log('✅ State\'deki shopSections kullanıldı:', actualCategories.length, 'adet');
+          
+          // Cache'e de kaydet
+          if (cacheKey) {
+            sessionStorage.setItem(cacheKey, JSON.stringify(actualCategories));
+            console.log('🔄 State\'den cache\'e kaydedildi');
+          }
+        } else {
+          // Cache'den tekrar kontrol et
+          const finalCacheCheck = sessionStorage.getItem(cacheKey);
+          if (finalCacheCheck) {
+            try {
+              actualCategories = JSON.parse(finalCacheCheck);
+              console.log('✅ Final cache check: kategoriler bulundu:', actualCategories.length, 'adet');
+            } catch (e) {
+              console.warn('Final cache parse hatası:', e);
+            }
           }
         }
       }
@@ -766,7 +922,7 @@ export default function EmbeddedProductForm({
       if (actualCategories && actualCategories.length > 0) {
         console.log('✅ AI\'ye gönderilen kategoriler adları:', actualCategories.map(s => s.title).join(', '));
       } else {
-        console.log('❌ Kategoriler hala boş!');
+        console.log('❌ Kategoriler HALA boş! Fallback kullanılacak.');
       }
 
       console.log('📡 AI API çağrısı yapılıyor (parallel)...', {
@@ -782,10 +938,24 @@ export default function EmbeddedProductForm({
         method: 'POST',
         body: formData,
       }).then(async (response) => {
+        console.log('📡 AI API Response Status:', response.status);
+        
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const errorText = await response.text();
+          console.error('❌ AI API Error:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
         }
-        return response.json();
+        
+        const data = await response.json();
+        console.log('📋 AI API Raw Response:', data);
+        return data;
+      }).catch(error => {
+        console.error('❌ AI API Promise Error:', error);
+        throw error;
       });
 
       // Parallel pre-processing (shipping, categories, etc.)
@@ -798,6 +968,29 @@ export default function EmbeddedProductForm({
       // Her ikisini de paralel bekle
       const [result, preprocessResult] = await Promise.all([aiPromise, preprocessPromise]);
       console.log('📋 AI API yanıtı (parallel):', result);
+      
+      // Debug: AI response kontrolü
+      if (!result) {
+        console.error('❌ AI API yanıtı boş!');
+        return;
+      }
+      
+      if (!result.success) {
+        console.error('❌ AI API başarısız:', result.error);
+        toast({
+          variant: "destructive",
+          title: "AI Hatası",
+          description: result.error || "AI başlık üretiminde hata",
+        });
+        return;
+      }
+      
+      console.log('🔍 AI Response Debug:', {
+        hasTitle: !!result.title,
+        hasTags: !!result.tags,
+        titleLength: result.title?.length || 0,
+        title: result.title
+      });
 
       if (result.title) {
         const cleanTitle = result.title.replace(/['\"]/g, '').replace(/\s+/g, ' ').trim();
@@ -820,6 +1013,41 @@ export default function EmbeddedProductForm({
           setTitle(finalTitle);
           currentStateRef.current.title = finalTitle;
         });
+
+        // 🧠 AI ile otomatik kategori eşleştirme
+        if (activeStore?.shop_id) {
+          console.log('🧠 AI kategori eşleştirme başlıyor...', finalTitle);
+          
+          setTimeout(async () => {
+            try {
+              const categoryResponse = await fetch('/api/ai/smart-category-match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  title: finalTitle, 
+                  shopId: activeStore.shop_id.toString() 
+                })
+              });
+
+              if (categoryResponse.ok) {
+                const categoryResult = await categoryResponse.json();
+                if (categoryResult.success && categoryResult.match) {
+                  console.log('✅ AI kategori seçti:', categoryResult.match);
+                  
+                  // Kategori ID'sini güncelle
+                  setTaxonomyId(categoryResult.match.category_id);
+                  
+                  console.log(`🎯 Kategori otomatik seçildi: ${categoryResult.match.category_name} (ID: ${categoryResult.match.category_id})`);
+                }
+              } else if (categoryResponse.status === 202) {
+                const errorResult = await categoryResponse.json();
+                console.log('⏳ Kategoriler yükleniyor:', errorResult.error);
+              }
+            } catch (error) {
+              console.error('❌ AI kategori eşleştirme hatası:', error);
+            }
+          }, 1000); // 1 saniye sonra kategori eşleştir
+        }
       }
 
       if (result.tags) {
@@ -898,12 +1126,28 @@ export default function EmbeddedProductForm({
               currentStateRef.current.selectedShopSection = categoryId;
             });
             
-            // Extra delay to ensure UI updates
+            // Agresif UI update stratejisi
             setTimeout(() => {
-              console.log('🔄 Final kategori UI update:', categoryId);
+              console.log('🔄 Final kategori UI update (100ms):', categoryId);
               setSelectedShopSection(categoryId);
               currentStateRef.current.selectedShopSection = categoryId;
             }, 100);
+            
+            // Çoklu timer ile UI zorla update
+            setTimeout(() => {
+              console.log('🔄 Zorla UI update (500ms):', categoryId);
+              setSelectedShopSection(categoryId);
+              currentStateRef.current.selectedShopSection = categoryId;
+              
+              // ProductFormFields'ı yeniden render etmek için shopSections güncelle
+              setShopSections([...shopSections]);
+            }, 500);
+            
+            // En son kontrol
+            setTimeout(() => {
+              console.log('🔄 Son kontrol UI update (1000ms):', categoryId);
+              setSelectedShopSection(categoryId);
+            }, 1000);
           } else {
             console.log('⚠️ AI önerisi actual kategorilerde bulunamadı, Modern Art default seçiliyor');
             // AI'nin önerdiği kategori bulunamadıysa Modern Art seç
@@ -917,12 +1161,18 @@ export default function EmbeddedProductForm({
               setSelectedShopSection(categoryId);
               currentStateRef.current.selectedShopSection = categoryId;
               
-              // Extra delay to ensure UI updates
+              // Agresif UI update stratejisi - Modern Art
               setTimeout(() => {
-                console.log('🔄 Modern Art UI update:', categoryId);
+                console.log('🔄 Modern Art UI update (100ms):', categoryId);
                 setSelectedShopSection(categoryId);
                 currentStateRef.current.selectedShopSection = categoryId;
               }, 100);
+              
+              setTimeout(() => {
+                console.log('🔄 Modern Art zorla UI update (500ms):', categoryId);
+                setSelectedShopSection(categoryId);
+                setShopSections([...shopSections]);
+              }, 500);
             } else {
               console.log('⚠️ Modern Art bulunamadı, Abstract Art fallback');
               const abstractCategory = shopSections?.find(s => 
@@ -1192,6 +1442,20 @@ export default function EmbeddedProductForm({
     }
   }, [autoGeneration, title]);
 
+  // Handle shop sections loaded from ProductFormFields
+  const handleShopSectionsLoaded = useCallback((sections: ShopSection[]) => {
+    console.log('🔄 EmbeddedProductForm shop sections güncelleniyor:', sections.length, 'adet');
+    setShopSections(sections);
+    
+    // Update cache as well
+    if (activeStore?.shop_id) {
+      const shopId = activeStore.shop_id.toString();
+      const cacheKey = `etsy-shop-sections-${shopId}`;
+      sessionStorage.setItem(cacheKey, JSON.stringify(sections));
+      console.log(`💾 Cache güncellendi: ${cacheKey}`);
+    }
+  }, [activeStore]);
+
   if (!isVisible) return null;
 
   return (
@@ -1283,6 +1547,7 @@ export default function EmbeddedProductForm({
                 onGenerateTitle={handleGenerateTitle}
                 onGenerateDescription={handleGenerateDescription}
                 onGenerateTags={handleGenerateTags}
+                onShopSectionsLoaded={handleShopSectionsLoaded}
               />
             </CardContent>
           </Card>

@@ -198,16 +198,24 @@ Choose the most suitable category from the list above. Return only the exact cat
             const selectedCategoryName = openaiResponse.choices[0]?.message?.content?.trim();
             console.log(`🎯 OpenAI seçimi: "${selectedCategoryName}"`);
             
-            // Kategori bul
+            // Kategori bul - Debug detayları
+            console.log(`🔍 OpenAI seçimi debug:`, {
+              openai_response: selectedCategoryName,
+              available_categories: availableCategories.map(cat => cat.title || cat.name),
+              exact_match_check: selectedCategoryName?.toLowerCase()
+            });
+            
             const matchedCategory = availableCategories.find((cat: any) => 
               (cat.title || cat.name || '').toLowerCase() === selectedCategoryName?.toLowerCase()
             );
             
             if (matchedCategory) {
               selectedCategory = matchedCategory;
-              console.log(`✅ Kategori bulundu: "${matchedCategory.title || matchedCategory.name}"`);
+              console.log(`✅ Kategori bulundu: "${matchedCategory.title || matchedCategory.name}" (ID: ${matchedCategory.shop_section_id})`);
             } else {
-              console.log(`⚠️ "${selectedCategoryName}" listede bulunamadı, fallback yapılıyor...`);
+              console.log(`⚠️ "${selectedCategoryName}" listede bulunamadı!`);
+              console.log(`📋 Mevcut kategoriler:`, availableCategories.map(cat => `"${cat.title || cat.name}"`));
+              console.log(`🔍 Fallback yapılıyor...`);
             }
           }
         }

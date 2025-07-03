@@ -176,10 +176,30 @@ export async function POST(request: NextRequest) {
     
     const etsyFormData = new FormData();
     
-    // Listing verisini ekle - ESKİ ÇALIŞAN VERSİYONA UYGUN DEFAULT DEĞERLER
-    etsyFormData.append('quantity', (listingData.quantity || 4).toString()); // DEFAULT 4
-    etsyFormData.append('title', listingData.title || 'Untitled Product');
-    etsyFormData.append('description', listingData.description || 'No description provided');
+    // Listing verisini ekle - ENHANCED VALIDATION
+    etsyFormData.append('quantity', (listingData.quantity || 4).toString());
+    
+    // Title validation ve temizleme
+    let cleanTitle = (listingData.title || 'Untitled Product').trim();
+    // Etsy'nin desteklemediği karakterleri temizle
+    cleanTitle = cleanTitle.replace(/[^\w\s\-\.\(\)\[\]\/\&\'\,\:\!]/g, '');
+    // 140 karakter limitini kontrol et
+    if (cleanTitle.length > 140) {
+      cleanTitle = cleanTitle.substring(0, 137) + '...';
+    }
+    etsyFormData.append('title', cleanTitle);
+    console.log('🔤 Title temizlendi:', { original: listingData.title, clean: cleanTitle });
+    
+    // Description validation ve temizleme
+    let cleanDescription = (listingData.description || 'No description provided').trim();
+    // Çok uzunsa kes (Etsy limit: 13000 karakter)
+    if (cleanDescription.length > 13000) {
+      cleanDescription = cleanDescription.substring(0, 12990) + '...';
+    }
+    // Problem yaratabilecek karakterleri temizle
+    cleanDescription = cleanDescription.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    etsyFormData.append('description', cleanDescription);
+    console.log('📝 Description temizlendi:', { originalLength: listingData.description?.length || 0, cleanLength: cleanDescription.length });
     // Price kontrolü - Variation kullanıyorsak base price'ı en düşük variation'dan al
     let finalPrice = 0; // Default 0
     
@@ -222,11 +242,21 @@ export async function POST(request: NextRequest) {
     if (listingData.return_policy_id && listingData.return_policy_id !== '') {
       etsyFormData.append('return_policy_id', listingData.return_policy_id.toString());
     }
-    // Etsy Materials Temizleme Fonksiyonu - eski çalışan versiyona uygun
+    // Etsy Materials Temizleme Fonksiyonu - ENHANCED
     function cleanEtsyMaterials(materials: string[]): string[] {
       return materials
         .filter(material => material && material.trim().length > 0)
-        .map(material => material.trim())
+        .map(material => {
+          let cleanMaterial = material.trim();
+          // Özel karakterleri temizle
+          cleanMaterial = cleanMaterial.replace(/[^\w\s\-\.\(\)]/g, '');
+          // 20 karakter limitini kontrol et
+          if (cleanMaterial.length > 20) {
+            cleanMaterial = cleanMaterial.substring(0, 20);
+          }
+          return cleanMaterial;
+        })
+        .filter(material => material.length > 0)
         .slice(0, 13); // Etsy maksimum 13 material
     }
     
@@ -288,7 +318,7 @@ export async function POST(request: NextRequest) {
     }
     etsyFormData.append('processing_min', '1');
     etsyFormData.append('processing_max', '3');
-    // Etsy Tags Temizleme Fonksiyonu - eski çalışan versiyona uygun  
+    // Etsy Tags Temizleme Fonksiyonu - ENHANCED  
     function cleanEtsyTags(tags: string[]): string[] {
       return tags
         .filter(tag => tag && tag.trim().length > 0)
@@ -312,12 +342,19 @@ export async function POST(request: NextRequest) {
             .replace(/Ç/g, 'C');
           
           // Sadece alfanumerik karakterleri ve boşlukları koru
-          // Tüm diğer özel karakterleri (*, -, ', !, vb.) kaldır
           cleanTag = cleanTag.replace(/[^a-zA-Z0-9\s]/g, '');
           
-          return cleanTag.toLowerCase(); // Tüm etiketleri küçük harfe dönüştür
+          // Küçük harfe dönüştür
+          cleanTag = cleanTag.toLowerCase();
+          
+          // 20 karakter limitini kontrol et
+          if (cleanTag.length > 20) {
+            cleanTag = cleanTag.substring(0, 20);
+          }
+          
+          return cleanTag;
         })
-        .filter(tag => tag.length > 0) // Temizleme sonrası boş kalan etiketleri filtrele
+        .filter(tag => tag.length > 0 && tag.length >= 2) // En az 2 karakter olmalı
         .slice(0, 13); // Maksimum 13 tag
     }
     
@@ -333,15 +370,14 @@ export async function POST(request: NextRequest) {
       }
     });
     
-    console.log('🧹 Tags ve Materials hazırlandı (listing ile birlikte ekleniyor):', {
-      original_price: listingData.price,
-      final_price: finalPrice,
-      original_tags_count: listingData.tags?.length,
-      clean_tags_count: cleanTags.length,
-      clean_tags: cleanTags,
-      clean_materials: materials,
-      original_materials_count: listingData.materials?.length,
-      mode: 'TAGS_MATERIALS_WITH_LISTING'
+    console.log('🧹 TÜM VERİLER TEMİZLENDİ - VALIDATION SUMMARY:', {
+      title: { original: listingData.title?.length || 0, clean: cleanTitle.length, valid: cleanTitle.length <= 140 },
+      description: { originalLength: listingData.description?.length || 0, cleanLength: cleanDescription.length, valid: cleanDescription.length <= 13000 },
+      tags: { original: listingData.tags?.length || 0, clean: cleanTags.length, valid: cleanTags.length <= 13, tags: cleanTags },
+      materials: { original: listingData.materials?.length || 0, clean: materials.length, valid: materials.length <= 13, materials: materials },
+      price: { original: listingData.price, final: finalPrice, valid: finalPrice > 0 },
+      instructions: { original: listingData.personalization_instructions?.length || 0, clean: cleanInstructions.length, valid: cleanInstructions.length <= 255 },
+      allValid: cleanTitle.length <= 140 && cleanDescription.length <= 13000 && cleanTags.length <= 13 && materials.length <= 13 && finalPrice > 0
     });
     console.log('🎨 Personalization ayarları:', {
       is_personalizable: listingData.is_personalizable,
@@ -363,11 +399,19 @@ export async function POST(request: NextRequest) {
       etsyFormData.append('personalization_is_required', 'false'); // Default false
     }
     
+    // Personalization instructions temizleme
+    let cleanInstructions = 'Phone Number for Delivery'; // Default
     if (typeof listingData.personalization_instructions === 'string' && listingData.personalization_instructions.length > 0) {
-      etsyFormData.append('personalization_instructions', listingData.personalization_instructions);
-    } else {
-      etsyFormData.append('personalization_instructions', 'Phone Number for Delivery'); // Default
+      cleanInstructions = listingData.personalization_instructions.trim();
+      // Özel karakterleri temizle
+      cleanInstructions = cleanInstructions.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      // 255 karakter limitini kontrol et
+      if (cleanInstructions.length > 255) {
+        cleanInstructions = cleanInstructions.substring(0, 255);
+      }
     }
+    etsyFormData.append('personalization_instructions', cleanInstructions);
+    console.log('📋 Personalization instructions temizlendi:', { original: listingData.personalization_instructions, clean: cleanInstructions });
     
     if (typeof listingData.personalization_char_count_max !== 'undefined') {
       etsyFormData.append('personalization_char_count_max', listingData.personalization_char_count_max.toString());

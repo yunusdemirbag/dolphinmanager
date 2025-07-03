@@ -235,6 +235,13 @@ export function useProductFormSubmission({
         tags: data.tags.length
       });
 
+      console.log('📤 Etsy API request başlatılıyor...', {
+        endpoint: '/api/etsy/listings/create',
+        method: 'POST',
+        formDataKeys: Array.from(formData.keys()),
+        timestamp: new Date().toISOString()
+      });
+
       const response = await fetch('/api/etsy/listings/create', {
         method: 'POST',
         body: formData,
@@ -243,13 +250,56 @@ export function useProductFormSubmission({
       clearInterval(progressInterval);
       setProgress(100);
 
+      console.log('📥 Etsy API response alındı:', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText,
+        headers: {
+          contentType: response.headers.get('content-type'),
+          contentLength: response.headers.get('content-length')
+        },
+        timestamp: new Date().toISOString()
+      });
+
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Etsy API Error:', {
+        let errorText;
+        let errorObject;
+        
+        try {
+          const clonedResponse = response.clone();
+          errorText = await response.text();
+          
+          // JSON parse etmeyi dene
+          try {
+            errorObject = JSON.parse(errorText);
+          } catch (jsonError) {
+            console.log('⚠️ Response JSON değil, raw text:', errorText);
+            errorObject = { message: errorText };
+          }
+        } catch (textError) {
+          console.error('❌ Response text okunamadı:', textError);
+          errorText = 'Could not read error response';
+          errorObject = { message: errorText };
+        }
+        
+        const errorDetails = {
           status: response.status,
           statusText: response.statusText,
-          error: errorText
-        });
+          error: errorText,
+          errorObject: errorObject,
+          url: response.url,
+          timestamp: new Date().toISOString()
+        };
+        
+        console.error('❌ Etsy API Error Status:', response.status);
+        console.error('❌ Etsy API Error Text:', errorText);
+        console.error('❌ Etsy API Error URL:', response.url);
+        
+        // JSON obje yerine string olarak log
+        if (errorObject) {
+          console.error('❌ Etsy API Error Message:', errorObject.message || 'No message');
+          console.error('❌ Etsy API Error Code:', errorObject.code || 'No code');
+        }
 
         // Handle specific Etsy errors
         if (response.status === 401 || errorText.includes('unauthorized') || errorText.includes('token')) {

@@ -249,13 +249,40 @@ export async function POST(request: NextRequest) {
       isUndefined: listingData.shop_section_id === undefined
     });
     
-    // Shop Section ID'yi sadece geçerliyse ekle - eski çalışan versiyona uygun
+    // Shop Section ID'yi sadece geçerliyse ekle - önce doğrula
     const sectionId = Number(listingData.shop_section_id);
     if (sectionId && sectionId > 0) {
-      // Shop section'ı tekrar aktif et - güncel section ID kullan
-      console.log(`✅ Shop section ${sectionId} Etsy'ye gönderiliyor...`);
-      etsyFormData.append('shop_section_id', sectionId.toString());
-      console.log(`✅ Ürün, dükkan bölümü ${sectionId}'e eklenecek.`);
+      // Shop section'ın geçerli olup olmadığını kontrol et
+      console.log(`🔍 Shop section ${sectionId} doğrulanıyor...`);
+      
+      try {
+        const sectionsResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${shop_id}/sections`, {
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'x-api-key': api_key,
+          }
+        });
+        
+        if (sectionsResponse.ok) {
+          const sectionsData = await sectionsResponse.json();
+          const validSection = sectionsData.results?.find((s: any) => s.shop_section_id === sectionId);
+          
+          if (validSection) {
+            console.log(`✅ Shop section ${sectionId} geçerli, Etsy'ye gönderiliyor...`);
+            etsyFormData.append('shop_section_id', sectionId.toString());
+            console.log(`✅ Ürün, dükkan bölümü "${validSection.title}" (${sectionId})'e eklenecek.`);
+          } else {
+            console.log(`❌ Shop section ${sectionId} artık geçerli değil. Mevcut sections:`, 
+              sectionsData.results?.map((s: any) => `${s.shop_section_id}: ${s.title}`) || []);
+            console.log(`⚠️ Ürün ana sayfada yer alacak (section ID geçersiz).`);
+          }
+        } else {
+          console.log(`⚠️ Shop sections alınamadı (${sectionsResponse.status}), section ID kullanılmayacak.`);
+        }
+      } catch (sectionError) {
+        console.error('❌ Shop section doğrulama hatası:', sectionError);
+        console.log(`⚠️ Section doğrulama başarısız, ürün ana sayfada yer alacak.`);
+      }
     } else {
       console.log(`⚠️ Dükkan bölümü belirtilmedi, ürün ana sayfada yer alacak. (Değer: ${listingData.shop_section_id})`);
     }

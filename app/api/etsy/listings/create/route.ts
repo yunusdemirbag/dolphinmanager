@@ -127,19 +127,71 @@ export async function POST(request: NextRequest) {
       // Step 2: Cache yoksa veya eskiyse Firebase'den al
       if (!shippingProfileId) {
         console.log('🔍 Firebase shipping_profiles koleksiyonundan aranıyor...');
-        const shippingProfilesSnapshot = await adminDb
-          .collection('shipping_profiles')
-          .where('user_id', '==', userId)
-          .where('shop_id', '==', shop_id) // Shop-specific arama
-          .orderBy('created_at', 'desc')
-          .limit(1)
-          .get();
         
-        if (!shippingProfilesSnapshot.empty) {
-          const shippingProfile = shippingProfilesSnapshot.docs[0].data();
-          shippingProfileId = shippingProfile.profile_id;
-          console.log('✅ Firebase\'de shipping profile bulundu:', shippingProfileId);
+        // Composite index gerekmeyecek şekilde basit query kullan
+        try {
+          const shippingProfilesSnapshot = await adminDb
+            .collection('shipping_profiles')
+            .where('user_id', '==', userId)
+            .where('shop_id', '==', shop_id)
+            .limit(5) // orderBy kaldırdık, index gerektirmiyor
+            .get();
           
+          console.log(`📋 Firebase'den ${shippingProfilesSnapshot.size} shipping profile bulundu`);
+        
+          if (!shippingProfilesSnapshot.empty) {
+            // En yeni olanı manual olarak seç (created_at'e göre)
+            let newestProfile = null;
+            let newestDate = 0;
+            
+            shippingProfilesSnapshot.docs.forEach(doc => {
+              const data = doc.data();
+              const createdAt = data.created_at?.toMillis?.() || data.created_at?.getTime?.() || 0;
+              if (createdAt > newestDate) {
+                newestDate = createdAt;
+                newestProfile = data;
+              }
+            });
+            
+            if (newestProfile) {
+              shippingProfileId = newestProfile.profile_id;
+              console.log('✅ Firebase\'de shipping profile bulundu:', {
+                profile_id: shippingProfileId,
+                title: newestProfile.title,
+                age_hours: ((Date.now() - newestDate) / (1000 * 60 * 60)).toFixed(1)
+              });
+            }
+          }
+        } catch (indexError) {
+          console.log('⚠️ Firebase composite query hatası, basit query deneniyor:', indexError.message);
+          
+          // Fallback: Sadece user_id ile ara
+          try {
+            const simpleSnapshot = await adminDb
+              .collection('shipping_profiles')
+              .where('user_id', '==', userId)
+              .limit(10)
+              .get();
+            
+            console.log(`📋 Basit query ile ${simpleSnapshot.size} shipping profile bulundu`);
+            
+            if (!simpleSnapshot.empty) {
+              // Shop_id'ye göre filtrele (client-side)
+              const matchingProfiles = simpleSnapshot.docs
+                .map(doc => doc.data())
+                .filter(data => data.shop_id === shop_id);
+              
+              if (matchingProfiles.length > 0) {
+                shippingProfileId = matchingProfiles[0].profile_id;
+                console.log('✅ Client-side filter ile shipping profile bulundu:', shippingProfileId);
+              }
+            }
+          } catch (simpleError) {
+            console.error('❌ Basit Firebase query de hatası:', simpleError.message);
+          }
+        }
+        
+        if (shippingProfileId) {
           // Cache'e kaydet
           await adminDb.collection('shipping_cache').doc(SHIPPING_CACHE_KEY).set({
             profile_id: shippingProfileId,

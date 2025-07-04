@@ -53,33 +53,115 @@ export async function GET(request: NextRequest) {
 
     console.log('🔑 Etsy credentials alındı, shop_id:', shop_id);
     
-    // Etsy API'den shop sections'ları çek
-    const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shop_id}/sections`, {
-      headers: { 
-        'Authorization': `Bearer ${access_token}`, 
-        'x-api-key': api_key 
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Etsy shop sections API hatası:', response.status, errorText);
-      return NextResponse.json({ 
-        error: 'Etsy shop sections alınamadı',
-        details: errorText 
-      }, { status: response.status });
-    }
-
-    const etsyData = await response.json();
-    console.log('✅ Etsy shop sections alındı:', etsyData.results?.length || 0, 'adet');
+    // ENHANCED SHOP SECTIONS CACHE SYSTEM
+    const SECTIONS_CACHE_KEY = `shop_sections_${shop_id}`;
+    const CACHE_DURATION = 6 * 60 * 60 * 1000; // 6 saat cache (sections daha sık değişebilir)
+    let sections: any[] = [];
     
-    // Etsy'den gelen data formatını dönüştür
-    const sections = etsyData.results?.map((section: any) => ({
-      shop_section_id: section.shop_section_id,
-      title: section.title,
-      rank: section.rank || 0,
-      active_listing_count: section.active_listing_count || 0
-    })) || [];
+    console.log('🏪 ENHANCED shop sections cache sistemi başlatılıyor...');
+    
+    try {
+      // Step 1: Cache'den al (en hızlı)
+      const cachedSectionsDoc = await adminDb
+        .collection('sections_cache')
+        .doc(SECTIONS_CACHE_KEY)
+        .get();
+      
+      if (cachedSectionsDoc.exists) {
+        const cachedData = cachedSectionsDoc.data()!;
+        const cacheAge = Date.now() - cachedData.timestamp;
+        
+        if (cacheAge < CACHE_DURATION) {
+          sections = cachedData.sections;
+          console.log(`✅ Shop sections cache'den alındı:`, {
+            sections_count: sections.length,
+            cache_age_hours: (cacheAge / (1000 * 60 * 60)).toFixed(1),
+            shop_id: shop_id
+          });
+          
+          return NextResponse.json({ sections });
+        } else {
+          console.log(`⚠️ Shop sections cache eski (${(cacheAge / (1000 * 60 * 60)).toFixed(1)} saat), yenileniyor...`);
+        }
+      }
+      
+      // Step 2: Cache yoksa veya eskiyse Etsy API'den al
+      console.log('🌐 Etsy API\'den shop sections çekiliyor...');
+      const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shop_id}/sections`, {
+        headers: { 
+          'Authorization': `Bearer ${access_token}`, 
+          'x-api-key': api_key 
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Etsy shop sections API hatası:', response.status, errorText);
+        
+        // API hatası varsa cache'den eski veriyi dön (eğer varsa)
+        if (cachedSectionsDoc.exists) {
+          const cachedData = cachedSectionsDoc.data()!;
+          sections = cachedData.sections;
+          console.log('⚠️ API hatası, eski cache\'den sections alındı:', sections.length);
+          return NextResponse.json({ 
+            sections, 
+            warning: 'Cached data returned due to API error',
+            cache_age_hours: ((Date.now() - cachedData.timestamp) / (1000 * 60 * 60)).toFixed(1)
+          });
+        }
+        
+        return NextResponse.json({ 
+          error: 'Etsy shop sections alınamadı',
+          details: errorText 
+        }, { status: response.status });
+      }
+
+      const etsyData = await response.json();
+      console.log('✅ Etsy API\'den shop sections alındı:', etsyData.results?.length || 0, 'adet');
+      
+      // Etsy'den gelen data formatını dönüştür
+      sections = etsyData.results?.map((section: any) => ({
+        shop_section_id: section.shop_section_id,
+        title: section.title,
+        rank: section.rank || 0,
+        active_listing_count: section.active_listing_count || 0
+      })) || [];
+      
+      // Cache'e kaydet
+      await adminDb.collection('sections_cache').doc(SECTIONS_CACHE_KEY).set({
+        sections: sections,
+        shop_id: shop_id,
+        timestamp: Date.now(),
+        source: 'etsy_api'
+      });
+      console.log('💾 Shop sections cache\'e kaydedildi:', sections.length, 'adet');
+      
+    } catch (cacheError) {
+      console.error('❌ Shop sections cache sistemi hatası:', cacheError);
+      
+      // Cache hatası varsa geleneksel yöntemle dene
+      try {
+        const response = await fetch(`https://openapi.etsy.com/v3/application/shops/${shop_id}/sections`, {
+          headers: { 
+            'Authorization': `Bearer ${access_token}`, 
+            'x-api-key': api_key 
+          },
+        });
+
+        if (response.ok) {
+          const etsyData = await response.json();
+          sections = etsyData.results?.map((section: any) => ({
+            shop_section_id: section.shop_section_id,
+            title: section.title,
+            rank: section.rank || 0,
+            active_listing_count: section.active_listing_count || 0
+          })) || [];
+          console.log('✅ Fallback: Etsy API\'den sections alındı:', sections.length);
+        }
+      } catch (fallbackError) {
+        console.error('❌ Fallback shop sections hatası:', fallbackError);
+      }
+    }
 
     // Mock data'yı da ekle (eğer hiç section yoksa)
     if (sections.length === 0) {

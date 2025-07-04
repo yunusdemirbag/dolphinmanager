@@ -94,53 +94,153 @@ export async function POST(request: NextRequest) {
     
     console.log('🔑 Etsy credentials alındı, shop_id:', shop_id, 'shop_name:', storeData.shop_name);
     
-    // Shipping profile ID'yi Firebase'den al
+    // ENHANCED SHIPPING PROFILE CACHE SYSTEM
     let shippingProfileId = null;
+    const SHIPPING_CACHE_KEY = `shipping_profile_${shop_id}`;
+    const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 saat cache
+    
+    console.log('🚛 ENHANCED shipping profile cache sistemi başlatılıyor...');
+    
     try {
-      const shippingProfilesSnapshot = await adminDb
-        .collection('shipping_profiles')
-        .where('user_id', '==', userId)
-        .limit(1)
+      // Step 1: Shop-specific cache'den al (en hızlı)
+      const cachedShippingDoc = await adminDb
+        .collection('shipping_cache')
+        .doc(SHIPPING_CACHE_KEY)
         .get();
       
-      if (!shippingProfilesSnapshot.empty) {
-        const shippingProfile = shippingProfilesSnapshot.docs[0].data();
-        shippingProfileId = shippingProfile.profile_id;
-        console.log('✅ Shipping profile bulundu:', shippingProfileId);
-      } else {
-        console.log('⚠️ Firebase\'de shipping profile bulunamadı, Etsy API\'den alınacak');
+      if (cachedShippingDoc.exists) {
+        const cachedData = cachedShippingDoc.data()!;
+        const cacheAge = Date.now() - cachedData.timestamp;
         
-        // Firebase'de yoksa, Etsy API'den mevcut shipping profile'ları al
-        try {
-          const shippingResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${shop_id}/shipping-profiles`, {
-            headers: {
-              'Authorization': `Bearer ${access_token}`,
-              'x-api-key': api_key,
-            }
+        if (cacheAge < CACHE_DURATION) {
+          shippingProfileId = cachedData.profile_id;
+          console.log(`✅ Shipping profile cache'den alındı:`, {
+            profile_id: shippingProfileId,
+            cache_age_hours: (cacheAge / (1000 * 60 * 60)).toFixed(1),
+            shop_id: shop_id
           });
-          
-          if (shippingResponse.ok) {
-            const shippingData = await shippingResponse.json();
-            if (shippingData.results && shippingData.results.length > 0) {
-              shippingProfileId = shippingData.results[0].shipping_profile_id;
-              console.log('✅ Etsy API\'den shipping profile alındı:', shippingProfileId);
-            }
-          }
-        } catch (etsyApiError) {
-          console.error('❌ Etsy API\'den shipping profile alınamadı:', etsyApiError);
+        } else {
+          console.log(`⚠️ Shipping profile cache eski (${(cacheAge / (1000 * 60 * 60)).toFixed(1)} saat), yenileniyor...`);
         }
       }
+      
+      // Step 2: Cache yoksa veya eskiyse Firebase'den al
+      if (!shippingProfileId) {
+        console.log('🔍 Firebase shipping_profiles koleksiyonundan aranıyor...');
+        const shippingProfilesSnapshot = await adminDb
+          .collection('shipping_profiles')
+          .where('user_id', '==', userId)
+          .where('shop_id', '==', shop_id) // Shop-specific arama
+          .orderBy('created_at', 'desc')
+          .limit(1)
+          .get();
+        
+        if (!shippingProfilesSnapshot.empty) {
+          const shippingProfile = shippingProfilesSnapshot.docs[0].data();
+          shippingProfileId = shippingProfile.profile_id;
+          console.log('✅ Firebase\'de shipping profile bulundu:', shippingProfileId);
+          
+          // Cache'e kaydet
+          await adminDb.collection('shipping_cache').doc(SHIPPING_CACHE_KEY).set({
+            profile_id: shippingProfileId,
+            shop_id: shop_id,
+            user_id: userId,
+            timestamp: Date.now(),
+            source: 'firebase'
+          });
+          console.log('💾 Shipping profile cache\'e kaydedildi');
+        }
+      }
+      
+      // Step 3: Firebase'de de yoksa Etsy API'den al ve cache'le
+      if (!shippingProfileId) {
+        console.log('🌐 Etsy API\'den shipping profiles çekiliyor...');
+        
+        const shippingResponse = await fetch(`https://openapi.etsy.com/v3/application/shops/${shop_id}/shipping-profiles`, {
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+            'x-api-key': api_key,
+          }
+        });
+        
+        if (shippingResponse.ok) {
+          const shippingData = await shippingResponse.json();
+          console.log(`📦 Etsy API'den ${shippingData.results?.length || 0} shipping profile alındı`);
+          
+          if (shippingData.results && shippingData.results.length > 0) {
+            // En uygun profile'ı seç (aktif ve default olanları öncelikle)
+            const bestProfile = shippingData.results.find((p: any) => p.is_default) || shippingData.results[0];
+            shippingProfileId = bestProfile.shipping_profile_id;
+            
+            console.log('✅ Etsy API\'den shipping profile alındı:', {
+              profile_id: shippingProfileId,
+              title: bestProfile.title,
+              is_default: bestProfile.is_default,
+              total_profiles: shippingData.results.length
+            });
+            
+            // Hem cache'e hem de Firebase'e kalıcı olarak kaydet
+            const profileData = {
+              profile_id: shippingProfileId,
+              shop_id: shop_id,
+              user_id: userId,
+              title: bestProfile.title,
+              is_default: bestProfile.is_default,
+              created_at: new Date(),
+              source: 'etsy_api'
+            };
+            
+            // Cache'e kaydet (hızlı erişim için)
+            await adminDb.collection('shipping_cache').doc(SHIPPING_CACHE_KEY).set({
+              ...profileData,
+              timestamp: Date.now()
+            });
+            
+            // Firebase'e kalıcı kaydet
+            await adminDb.collection('shipping_profiles').add(profileData);
+            
+            console.log('💾 Shipping profile hem cache\'e hem Firebase\'e kaydedildi');
+          } else {
+            console.log('❌ Etsy API\'den hiç shipping profile dönmedi');
+          }
+        } else {
+          const errorText = await shippingResponse.text();
+          console.error('❌ Etsy shipping profiles API hatası:', {
+            status: shippingResponse.status,
+            error: errorText
+          });
+        }
+      }
+      
     } catch (shippingError) {
-      console.error('❌ Shipping profile alınırken hata:', shippingError);
+      console.error('❌ Enhanced shipping profile sistemi hatası:', shippingError);
     }
     
-    // Hala bulunamadıysa hata fırlat
+    // Final check: Hala bulunamadıysa detaylı hata mesajı
     if (!shippingProfileId) {
+      console.error('❌ SHIPPING PROFILE BULUNAMADI - Tüm yöntemler denendi:', {
+        shop_id: shop_id,
+        user_id: userId,
+        cache_key: SHIPPING_CACHE_KEY,
+        tried_methods: ['cache', 'firebase', 'etsy_api']
+      });
+      
       return NextResponse.json({ 
-        error: 'Geçerli bir shipping profile bulunamadı. Lütfen Etsy\'de en az bir kargo profili oluşturun.',
-        code: 'NO_SHIPPING_PROFILE'
+        error: 'Geçerli bir shipping profile bulunamadı. Tüm yöntemler denendi (cache, Firebase, Etsy API). Lütfen Etsy\'de en az bir kargo profili oluşturun ve ProductFormModal\'ı bir kez açıp kapatın.',
+        code: 'NO_SHIPPING_PROFILE',
+        shop_id: shop_id,
+        debug_info: {
+          cache_key: SHIPPING_CACHE_KEY,
+          methods_tried: ['cache', 'firebase', 'etsy_api']
+        }
       }, { status: 400 });
     }
+    
+    console.log('🎯 FINAL shipping profile:', {
+      profile_id: shippingProfileId,
+      shop_id: shop_id,
+      cache_key: SHIPPING_CACHE_KEY
+    });
     
     // Görselleri al - FormData veya JSON'dan
     const imageFiles: File[] = [];

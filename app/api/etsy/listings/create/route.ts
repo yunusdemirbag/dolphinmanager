@@ -983,16 +983,47 @@ export async function POST(request: NextRequest) {
           digitalFormData.append('file', digitalFile);
           
           // Dosya ismini Etsy kurallarına uygun hale getir
-          let cleanFileName = digitalFile.name
-            .replace(/\.[^/.]+$/, "") // Uzantıyı kaldır
-            .replace(/[^a-zA-Z0-9\-_.]/g, '_') // Geçersiz karakterleri _ ile değiştir
-            .substring(0, 70); // Maksimum 70 karakter
+          // Sadece dosya adını al (klasör yolunu kaldır)
+          const fullPath = digitalFile.name;
+          // Dosya adının sadece son kısmını al (klasör yolları olmadan)
+          const fileName = fullPath.split('/').pop()?.split('\\').pop() || fullPath;
           
-          // En az 3 karakter olmalı
-          if (cleanFileName.length < 3) {
-            cleanFileName = `file_${i + 1}`;
+          console.log(`📄 Orijinal dosya adı: "${digitalFile.name}"`);
+          console.log(`📄 Temizlenmiş dosya adı: "${fileName}"`);
+          
+          // Dosya uzantısını al
+          const fileExtension = fileName.match(/\.[^/.]+$/) ? fileName.match(/\.[^/.]+$/)[0] : '';
+          const isJpgOrPng = fileExtension.toLowerCase() === '.jpg' ||
+                            fileExtension.toLowerCase() === '.jpeg' ||
+                            fileExtension.toLowerCase() === '.png';
+          
+          if (!isJpgOrPng) {
+            console.log(`⚠️ Desteklenmeyen dosya formatı: ${fileName} - Sadece JPG ve PNG dosyaları desteklenir`);
+            continue; // Bu dosyayı atla
           }
           
+          // Dosya adını olduğu gibi koru
+          let cleanFileName = fileName;
+          
+          // Sadece dosya adı uzunluğunu kontrol et ve gerekirse kısalt
+          if (cleanFileName.length > 70) {
+            // Uzantıyı koru, sadece adı kısalt
+            const nameWithoutExt = cleanFileName.replace(/\.[^/.]+$/, "");
+            const shortenedName = nameWithoutExt.substring(0, 70 - fileExtension.length);
+            cleanFileName = shortenedName + fileExtension;
+          }
+          
+          // En az 3 karakter olmalı
+          if (cleanFileName.replace(/\.[^/.]+$/, "").length < 3) {
+            // Orijinal dosya adını koru, sadece çok kısaysa file_X kullan
+            if (fileName.length < 3) {
+              cleanFileName = `file_${i + 1}${fileExtension}`;
+            }
+          }
+          
+          console.log(`📝 Dosya ismi korundu: "${fileName}" → "${cleanFileName}"`);
+          
+          console.log(`📝 Dosya ismi temizlendi: "${digitalFile.name}" → "${cleanFileName}"`);
           digitalFormData.append('name', cleanFileName);
           digitalFormData.append('rank', (i + 1).toString());
           

@@ -52,11 +52,14 @@ interface Settings {
   imagesPerProduct: number;
   selectedImagesFolder: string;
   selectedResourcesFolder: string;
+  selectedSourceResourcesFolder: string; // Yeni eklenen kaynak klasörü
   mode: 'queue' | 'direct-etsy'; // İki mod: Kuyruğa ekle veya direkt Etsy'ye
   imageFiles: File[];
-  resourceFiles: File[];
+  resourceFiles: File[]; // Digital dosyalar için
+  sourceResourceFiles: File[]; // Kaynak dosyaları için (digital ürünlerde)
   imagePreviewUrls: string[];
   resourcePreviewUrls: string[];
+  sourceResourcePreviewUrls: string[]; // Kaynak önizlemeleri için
 }
 
 // Helper function to format time duration
@@ -103,12 +106,20 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
     imagesPerProduct: 6,
     selectedImagesFolder: '',
     selectedResourcesFolder: '',
+    selectedSourceResourcesFolder: '', // Yeni eklenen kaynak klasörü
     mode: 'direct-etsy', // Default: Direkt Etsy'ye
     imageFiles: [],
     resourceFiles: [],
+    sourceResourceFiles: [], // Kaynak dosyaları için
     imagePreviewUrls: [],
-    resourcePreviewUrls: []
+    resourcePreviewUrls: [],
+    sourceResourcePreviewUrls: [] // Kaynak önizlemeleri için
   });
+  
+  // Son seçilen klasör isimlerini tutmak için state'ler
+  const [lastImagesFolderName, setLastImagesFolderName] = useState<string>('');
+  const [lastResourcesFolderName, setLastResourcesFolderName] = useState<string>('');
+  const [lastSourceResourcesFolderName, setLastSourceResourcesFolderName] = useState<string>('');
 
   const [processing, setProcessing] = useState<ProcessingState>({
     status: 'idle',
@@ -157,6 +168,17 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
       try {
         const parsedSettings = JSON.parse(savedSettings);
         setSettings(prev => ({ ...prev, ...parsedSettings }));
+        
+        // Son seçilen klasör isimlerini yükle
+        if (parsedSettings.lastImagesFolderName) {
+          setLastImagesFolderName(parsedSettings.lastImagesFolderName);
+        }
+        if (parsedSettings.lastResourcesFolderName) {
+          setLastResourcesFolderName(parsedSettings.lastResourcesFolderName);
+        }
+        if (parsedSettings.lastSourceResourcesFolderName) {
+          setLastSourceResourcesFolderName(parsedSettings.lastSourceResourcesFolderName);
+        }
       } catch (error) {
         console.error('Failed to load saved settings:', error);
       }
@@ -179,20 +201,26 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
 
   // Save settings to localStorage
   useEffect(() => {
-    if (settings.imagesPerProduct !== 6 || settings.selectedImagesFolder || settings.selectedResourcesFolder) {
+    if (settings.imagesPerProduct !== 6 || settings.selectedImagesFolder || settings.selectedResourcesFolder || settings.selectedSourceResourcesFolder) {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({
         imagesPerProduct: settings.imagesPerProduct,
         selectedImagesFolder: settings.selectedImagesFolder,
-        selectedResourcesFolder: settings.selectedResourcesFolder
+        selectedResourcesFolder: settings.selectedResourcesFolder,
+        selectedSourceResourcesFolder: settings.selectedSourceResourcesFolder,
+        // Son seçilen klasör isimlerini de kaydet
+        lastImagesFolderName,
+        lastResourcesFolderName,
+        lastSourceResourcesFolderName
       }));
     }
-  }, [settings]);
+  }, [settings, lastImagesFolderName, lastResourcesFolderName, lastSourceResourcesFolderName]);
   
   // Component unmount olduğunda preview URL'leri temizle
   useEffect(() => {
     return () => {
       settings.imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
       settings.resourcePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+      settings.sourceResourcePreviewUrls.forEach(url => URL.revokeObjectURL(url));
     };
   }, []);
 
@@ -222,8 +250,18 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
         .filter(file => file.type.startsWith('image/'))
         .sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
       
+      // Klasör adını al (webkitdirectory kullanıldığında ilk dosyanın yolundan alınabilir)
+      let folderName = "Görseller Klasörü";
+      if (imageFiles.length > 0 && imageFiles[0].webkitRelativePath) {
+        // webkitRelativePath formatı: "klasör_adı/dosya_adı.uzantı"
+        folderName = imageFiles[0].webkitRelativePath.split('/')[0];
+        // Klasör adını kaydet
+        setLastImagesFolderName(folderName);
+      }
+      
       // Alfabetik sıralama debug
       console.log('📂 Klasör dosyaları alfabetik sıralandı:', {
+        klasörAdı: folderName,
         toplamDosya: files.length,
         resimDosya: imageFiles.length,
         ilk5Dosya: imageFiles.slice(0, 5).map(f => f.name),
@@ -255,7 +293,7 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
 
       toast({
         title: "Görseller Klasörü",
-        description: `${imageFiles.length} resim yüklendi. ${settings.imagesPerProduct} resim + kaynaklar = ${totalProducts} ürün oluşturulacak.`
+        description: `${folderName}: ${imageFiles.length} resim yüklendi. ${settings.imagesPerProduct} resim + kaynaklar = ${totalProducts} ürün oluşturulacak.`
       });
     }
   }, [settings.imagesPerProduct, toast]);
@@ -265,52 +303,44 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
     if (files) {
       let resourceFiles: File[] = [];
       
+      // Klasör adını al (webkitdirectory kullanıldığında ilk dosyanın yolundan alınabilir)
+      let folderName = isDigital ? "Digital Dosyalar Klasörü" : "Kaynaklar Klasörü";
+      if (files.length > 0 && files[0].webkitRelativePath) {
+        // webkitRelativePath formatı: "klasör_adı/dosya_adı.uzantı"
+        folderName = files[0].webkitRelativePath.split('/')[0];
+        // Klasör adını kaydet
+        setLastResourcesFolderName(folderName);
+      }
+      
       if (isDigital) {
-        // Digital dosyalar için özel validasyon
+        // Digital dosyalar için klasör seçme mantığı
         const allFiles = Array.from(files);
         
-        // 5 dosya sınırı kontrolü
-        if (allFiles.length > 5) {
-          toast({
-            variant: "destructive",
-            title: "Dosya Sayısı Hatası",
-            description: "Digital ürünler için maksimum 5 dosya yükleyebilirsiniz."
-          });
-          return;
-        }
-        
-        // Dosya formatı ve boyut kontrolü
-        const validExtensions = ['.jpg', '.jpeg', '.png', '.pdf', '.zip', '.svg'];
-        const maxFileSize = 20 * 1024 * 1024; // 20MB
-        
-        for (const file of allFiles) {
-          // Format kontrolü
-          const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-          if (!validExtensions.includes(fileExtension)) {
-            toast({
-              variant: "destructive",
-              title: "Geçersiz Dosya Formatı",
-              description: `"${file.name}" dosyası desteklenmiyor. Sadece JPG, PNG, PDF, ZIP, SVG formatları kabul edilir.`
-            });
-            return;
+        // Sistem dosyalarını filtrele (.DS_Store gibi) ve sadece jpg/png dosyalarını al
+        const filteredFiles = allFiles.filter(file => {
+          // Mac OS sistem dosyalarını filtrele
+          if (file.name === '.DS_Store' || file.name.startsWith('._')) {
+            console.log(`🚫 Sistem dosyası filtrelendi: ${file.name}`);
+            return false;
           }
           
-          // Boyut kontrolü
-          if (file.size > maxFileSize) {
-            toast({
-              variant: "destructive",
-              title: "Dosya Boyutu Hatası",
-              description: `"${file.name}" dosyası çok büyük. Maksimum 20MB boyutunda dosya yükleyebilirsiniz.`
-            });
-            return;
+          // Sadece .jpg ve .png uzantılı dosyaları kabul et
+          const lowerName = file.name.toLowerCase();
+          if (!lowerName.endsWith('.jpg') && !lowerName.endsWith('.jpeg') && !lowerName.endsWith('.png')) {
+            console.log(`🚫 Desteklenmeyen dosya formatı filtrelendi: ${file.name}`);
+            return false;
           }
-        }
+          
+          return true;
+        });
         
-        resourceFiles = allFiles.sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
+        // Dosya formatı kontrolü (sadece jpg/png)
+        resourceFiles = filteredFiles.sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
         
-        console.log('📁 Digital dosyalar seçildi:', {
+        console.log('📁 Digital dosyalar klasörü seçildi:', {
+          klasörAdı: folderName,
           total: resourceFiles.length,
-          files: resourceFiles.map(f => ({ name: f.name, size: (f.size / 1024 / 1024).toFixed(2) + 'MB' }))
+          files: resourceFiles.slice(0, 10).map(f => ({ name: f.name, size: (f.size / 1024 / 1024).toFixed(2) + 'MB' }))
         });
       } else {
         // Normal ürünler için mevcut mantık
@@ -319,6 +349,7 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
           .sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
         
         console.log('📁 Kaynaklar klasörü seçildi:', {
+          klasörAdı: folderName,
           total: files.length,
           images: resourceFiles.filter(f => f.type.startsWith('image/')).length,
           videos: resourceFiles.filter(f => f.type.startsWith('video/')).length
@@ -326,10 +357,10 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
       }
       
       // Önizleme URL'leri oluştur (sadece resimler için)
-      const previewFiles = resourceFiles.filter(file => 
-        file.type.startsWith('image/') || 
-        (isDigital && (file.name.toLowerCase().endsWith('.jpg') || 
-                      file.name.toLowerCase().endsWith('.jpeg') || 
+      const previewFiles = resourceFiles.filter(file =>
+        file.type.startsWith('image/') ||
+        (isDigital && (file.name.toLowerCase().endsWith('.jpg') ||
+                      file.name.toLowerCase().endsWith('.jpeg') ||
                       file.name.toLowerCase().endsWith('.png')))
       ).slice(0, 4);
       const previewUrls = previewFiles.map(file => URL.createObjectURL(file));
@@ -348,7 +379,7 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
 
       toast({
         title: isDigital ? "Digital Dosyalar" : "Kaynaklar Klasörü",
-        description: `${resourceFiles.length} ${isDigital ? 'digital dosya' : 'kaynak dosya'} yüklendi.`
+        description: `${folderName}: ${resourceFiles.length} ${isDigital ? 'digital dosya' : 'kaynak dosya'} yüklendi.`
       });
     }
   }, [toast, isDigital]);
@@ -420,10 +451,12 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
     // Preview URL'leri de temizle
     settings.imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
     settings.resourcePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    settings.sourceResourcePreviewUrls.forEach(url => URL.revokeObjectURL(url));
     setSettings(prev => ({
       ...prev,
       imagePreviewUrls: [],
-      resourcePreviewUrls: []
+      resourcePreviewUrls: [],
+      sourceResourcePreviewUrls: []
     }));
 
     // Reset form states
@@ -444,18 +477,24 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
     // Artık index hesaplamaya gerek yok - her zaman ilk 6 dosyayı al
     const currentProductImages = settings.imageFiles.slice(0, settings.imagesPerProduct);
     
-    // Digital dosyalar - isDigital modunda TÜM resource dosyaları digital sayılır
-    const digitalFiles = isDigital 
-      ? settings.resourceFiles // İsDigital modunda tüm resource files digital file
+    // Digital dosyalar - isDigital modunda ilk 5 resource dosyasını al
+    const digitalFiles = isDigital
+      ? settings.resourceFiles.slice(0, 5) // İsDigital modunda ilk 5 resource files digital file
       : [];
     
+    // Kaynak dosyaları - isDigital modunda sourceResourceFiles kullan, değilse resourceFiles
+    const sourceFiles = isDigital
+      ? settings.sourceResourceFiles // Digital ürünler için kaynak klasöründen dosyalar
+      : settings.resourceFiles; // Normal ürünler için resource files
+    
     // Normal modda kaynak dosyalarını ayır (sadece isDigital=false olduğunda)
-    const resourceImages = !isDigital 
-      ? settings.resourceFiles.filter(file => file.type.startsWith('image/'))
-      : [];
-    const resourceVideos = !isDigital 
-      ? settings.resourceFiles.filter(file => file.type.startsWith('video/'))
-      : [];
+    const resourceImages = !isDigital
+      ? sourceFiles.filter(file => file.type.startsWith('image/'))
+      : settings.sourceResourceFiles.filter(file => file.type.startsWith('image/')); // Digital modda da kaynak resimleri
+    
+    const resourceVideos = !isDigital
+      ? sourceFiles.filter(file => file.type.startsWith('video/'))
+      : settings.sourceResourceFiles.filter(file => file.type.startsWith('video/')); // Digital modda da kaynak videoları
     
     // Her ürün için: İlk 6 resim + Kaynak resimleri (video hariç)
     const allFiles = [...currentProductImages, ...resourceImages];
@@ -474,12 +513,12 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
     });
     
     return { files: allFiles, videos: resourceVideos, digitalFiles };
-  }, [settings.imageFiles, settings.resourceFiles, settings.imagesPerProduct, isDigital]);
+  }, [settings.imageFiles, settings.resourceFiles, settings.sourceResourceFiles, settings.imagesPerProduct, isDigital]);
 
   // Memoize edilmiş dosya listesi - infinite loop önlemi
   const memoizedProductFiles = useMemo(() => {
     return getCurrentProductFiles();
-  }, [settings.imageFiles.length, settings.resourceFiles.length, settings.imagesPerProduct]);
+  }, [settings.imageFiles.length, settings.resourceFiles.length, settings.sourceResourceFiles.length, settings.imagesPerProduct]);
 
   // Generate product title from image name
   const generateProductTitle = useCallback((imageName: string): string => {
@@ -569,37 +608,62 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
       console.log(`📝 Eklenen ürün kaydedildi: "${finalProductTitle}" - Resim: ${firstProductImage.name}`);
     }
     
-    // 🗑️ YENİ MANTIK: İlk 6 dosyayı çöp kutusuna at
-    console.log('🗑️ Form başarıyla gönderildi, ilk 6 resmi silme işlemi başlıyor...');
-    const filesToDelete = settings.imageFiles.slice(0, settings.imagesPerProduct); // İlk 6 dosya
+    // 🗑️ YENİ MANTIK: İlk 6 resmi ve ilk 5 digital dosyayı çöp kutusuna at
+    console.log('🗑️ Form başarıyla gönderildi, dosya silme işlemi başlıyor...');
     
-    // Calculate remaining files BEFORE try block
-    const remainingFiles = settings.imageFiles.slice(settings.imagesPerProduct);
-    const newRemainingFiles = remainingFiles.length;
-    const newTotalProducts = Math.floor(newRemainingFiles / settings.imagesPerProduct);
+    // İlk 6 resmi sil
+    const imagesToDelete = settings.imageFiles.slice(0, settings.imagesPerProduct); // İlk 6 dosya
+    const remainingImages = settings.imageFiles.slice(settings.imagesPerProduct);
+    const newRemainingImages = remainingImages.length;
+    const newTotalProducts = Math.floor(newRemainingImages / settings.imagesPerProduct);
+    
+    // Digital dosyaları sil (eğer digital modundaysa)
+    let digitalFilesToDelete: File[] = [];
+    let remainingDigitalFiles: File[] = [];
+    
+    if (isDigital) {
+      digitalFilesToDelete = settings.resourceFiles.slice(0, 5); // İlk 5 digital dosya
+      remainingDigitalFiles = settings.resourceFiles.slice(5);
+      console.log('🗑️ Digital dosya silme işlemi:', {
+        silinecekDosyalar: digitalFilesToDelete.map(f => f.name),
+        kalanDosyalar: remainingDigitalFiles.map(f => f.name)
+      });
+    }
     
     try {
       // Dosyaları çöp kutusuna taşı (macOS için)
-      for (const file of filesToDelete) {
+      for (const file of imagesToDelete) {
         const filePath = file.webkitRelativePath || file.name;
-        console.log(`🗑️ Çöp kutusuna taşınıyor: ${file.name}`);
+        console.log(`🗑️ Çöp kutusuna taşınıyor (resim): ${file.name}`);
         
         // Web API ile dosya silme (sadece referansı kaldırır)
         // Gerçek dosya silme browser'da mümkün değil, ama listeden çıkarabiliriz
       }
       
-      // Dosya listesini güncelle - ilk 6'yı çıkar
+      // Digital dosyaları da sil (eğer digital modundaysa)
+      if (isDigital && digitalFilesToDelete.length > 0) {
+        for (const file of digitalFilesToDelete) {
+          console.log(`🗑️ Çöp kutusuna taşınıyor (digital): ${file.name}`);
+        }
+      }
+      
+      // Dosya listelerini güncelle
       setSettings(prev => ({
         ...prev,
-        imageFiles: remainingFiles
+        imageFiles: remainingImages,
+        resourceFiles: isDigital ? remainingDigitalFiles : prev.resourceFiles
       }));
       
-      console.log(`🗑️ ${filesToDelete.length} dosya listeden çıkarıldı, kalan: ${remainingFiles.length}`);
-      console.log('🔄 Kalan dosyaların ilk 5\'i:', remainingFiles.slice(0, 5).map(f => f.name));
+      console.log(`🗑️ ${imagesToDelete.length} resim listeden çıkarıldı, kalan: ${remainingImages.length}`);
+      if (isDigital) {
+        console.log(`🗑️ ${digitalFilesToDelete.length} digital dosya listeden çıkarıldı, kalan: ${remainingDigitalFiles.length}`);
+      }
       
       toast({
         title: "Dosyalar Temizlendi",
-        description: `${filesToDelete.length} işlenen dosya listeden çıkarıldı`
+        description: isDigital
+          ? `${imagesToDelete.length} resim ve ${digitalFilesToDelete.length} digital dosya listeden çıkarıldı`
+          : `${imagesToDelete.length} işlenen dosya listeden çıkarıldı`
       });
       
     } catch (error) {
@@ -609,7 +673,7 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
     // Close current form
     setShowProductForm(false);
     
-    if (newRemainingFiles >= settings.imagesPerProduct) {
+    if (newRemainingImages >= settings.imagesPerProduct) {
       // Hala işlenecek dosya var - sonraki ürüne geç (ama index sıfırla)
       // Minimum bekleme süresi - sadece UI render için
       const waitTime = 500; // 0.5 saniye yeterli
@@ -635,10 +699,10 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
         setShowProductForm(true);
         
         // Kalan ürün sayısını hesapla (6'şar resimle)
-        const remainingProducts = Math.ceil(newRemainingFiles / 6);
+        const remainingProducts = Math.ceil(newRemainingImages / 6);
         
         // Toast mesajında döngü süresini göster
-        let toastDescription = `Kalan ${newRemainingFiles} dosyadan ${remainingProducts} ürün kaldı`;
+        let toastDescription = `Kalan ${newRemainingImages} dosyadan ${remainingProducts} ürün kaldı`;
         if (cycleTimes.length > 0) {
           const avgTime = cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length;
           const modeText = settings.mode === 'direct-etsy' ? 'Etsy\'ye' : 'kuyruğa';
@@ -735,6 +799,7 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
                     type="file"
                     multiple
                     accept="image/*"
+                    // @ts-ignore - webkitdirectory özelliği TypeScript tarafından tanınmıyor
                     webkitdirectory=""
                     className="hidden"
                     onChange={handleImagesFolderSelect}
@@ -779,10 +844,10 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
 
               {/* Resources Folder / Digital Files */}
               <div className="space-y-2">
-                <Label htmlFor="resources-folder">{isDigital ? "Digital Dosyalar" : "Kaynaklar Klasörü"}</Label>
+                <Label htmlFor="resources-folder">{isDigital ? "Digital Dosyalar Klasörü" : "Kaynaklar Klasörü"}</Label>
                 {isDigital && (
                   <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border">
-                    📁 En fazla 5 dosya, her biri max 20MB • JPG/PNG/PDF/ZIP/SVG formatları
+                    📁 Seçilen klasördeki tüm dosyalar 5'er 5'er işlenecek
                   </div>
                 )}
                 <div className="flex gap-2">
@@ -792,14 +857,15 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
                     className="flex-1"
                   >
                     <FolderOpen className="w-4 h-4 mr-2" />
-                    {isDigital ? "Digital Dosya Seç" : "Klasör Seç"}
+                    {isDigital ? "Digital Dosyalar Klasörü Seç" : "Klasör Seç"}
                   </Button>
                   <input
                     ref={resourcesFolderRef}
                     type="file"
-                    multiple={isDigital ? true : true}
-                    accept={isDigital ? ".jpg,.jpeg,.png,.pdf,.zip,.svg" : "image/*,video/*"}
-                    webkitdirectory={isDigital ? undefined : ""}
+                    multiple={true}
+                    accept="*/*"
+                    // @ts-ignore - webkitdirectory özelliği TypeScript tarafından tanınmıyor
+                    webkitdirectory=""
                     className="hidden"
                     onChange={handleResourcesFolderSelect}
                   />
@@ -840,6 +906,122 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
                   </div>
                 )}
               </div>
+              
+              {/* Kaynaklar Klasörü - Digital ürünler için de ekledik */}
+              {isDigital && (
+                <div className="space-y-2 mt-4">
+                  <Label htmlFor="source-resources-folder">Kaynaklar Klasörü</Label>
+                  <div className="text-xs text-green-600 bg-green-50 p-2 rounded border">
+                    📁 Her otomatik digital ürün yüklemede bu klasördeki dosyalar kaynak olarak kullanılacak
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        // Yeni bir input element oluştur
+                        const sourceResourcesInput = document.createElement('input');
+                        sourceResourcesInput.type = 'file';
+                        sourceResourcesInput.multiple = true;
+                        // @ts-ignore - webkitdirectory özelliği TypeScript tarafından tanınmıyor
+                        sourceResourcesInput.webkitdirectory = '';
+                        sourceResourcesInput.accept = "image/*,video/*";
+                        
+                        // onChange event handler ekle
+                        sourceResourcesInput.onchange = (e) => {
+                          const target = e.target as HTMLInputElement;
+                          const files = target?.files;
+                          if (files) {
+                            const sourceResourceFiles = Array.from(files)
+                              .filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'))
+                              .sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
+                            
+                            // Klasör adını al (webkitdirectory kullanıldığında ilk dosyanın yolundan alınabilir)
+                            let folderName = "Kaynaklar Klasörü";
+                            if (sourceResourceFiles.length > 0 && sourceResourceFiles[0].webkitRelativePath) {
+                              // webkitRelativePath formatı: "klasör_adı/dosya_adı.uzantı"
+                              folderName = sourceResourceFiles[0].webkitRelativePath.split('/')[0];
+                              // Klasör adını kaydet
+                              setLastSourceResourcesFolderName(folderName);
+                            }
+                            
+                            console.log('📁 Kaynaklar klasörü seçildi:', {
+                              klasörAdı: folderName,
+                              total: files.length,
+                              images: sourceResourceFiles.filter((f: File) => f.type.startsWith('image/')).length,
+                              videos: sourceResourceFiles.filter((f: File) => f.type.startsWith('video/')).length
+                            });
+                            
+                            // Önizleme URL'leri oluştur (sadece resimler için)
+                            const previewFiles = sourceResourceFiles.filter((file: File) =>
+                              file.type.startsWith('image/')
+                            ).slice(0, 4);
+                            const previewUrls = previewFiles.map((file: File) => URL.createObjectURL(file));
+                            
+                            setSettings(prev => {
+                              // Önceki preview URL'leri temizle
+                              prev.sourceResourcePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+                              
+                              return {
+                                ...prev,
+                                selectedSourceResourcesFolder: sourceResourceFiles.length > 0 ? 'selected' : '',
+                                sourceResourceFiles: sourceResourceFiles as File[],
+                                sourceResourcePreviewUrls: previewUrls
+                              };
+                            });
+                            
+                            toast({
+                              title: "Kaynaklar Klasörü",
+                              description: `${folderName}: ${sourceResourceFiles.length} kaynak dosya yüklendi.`
+                            });
+                          }
+                        };
+                        
+                        // Tıklama olayını tetikle
+                        sourceResourcesInput.click();
+                      }}
+                      className="flex-1"
+                    >
+                      <FolderOpen className="w-4 h-4 mr-2" />
+                      Klasör Seç
+                    </Button>
+                  </div>
+                  {settings.selectedSourceResourcesFolder && (
+                    <div className="space-y-3">
+                      {settings.sourceResourceFiles.length > 0 && (
+                        <p className="text-sm text-green-600 font-medium">{settings.sourceResourceFiles.length} kaynak dosya seçildi</p>
+                      )}
+                      
+                      {/* Kaynak dosya önizlemeleri */}
+                      {settings.sourceResourcePreviewUrls.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-gray-500">Önizleme:</p>
+                          <div className="grid grid-cols-4 gap-2">
+                            {settings.sourceResourcePreviewUrls.map((url, index) => (
+                              <div key={index} className="relative">
+                                <img
+                                  src={url}
+                                  alt={`Kaynak önizleme ${index + 1}`}
+                                  className="w-full h-16 object-cover rounded-md border border-gray-200 shadow-sm"
+                                />
+                                <div className="absolute bottom-1 right-1 bg-green-600 bg-opacity-80 text-white text-xs px-1 py-0.5 rounded">
+                                  K{index + 1}
+                                </div>
+                              </div>
+                            ))}
+                            {settings.sourceResourceFiles.length > settings.sourceResourcePreviewUrls.length && (
+                              <div className="flex items-center justify-center h-16 bg-green-50 rounded-md border border-green-200">
+                                <span className="text-xs text-green-600 text-center">
+                                  +{settings.sourceResourceFiles.length - settings.sourceResourcePreviewUrls.length}<br/>tane daha
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Images per Product */}
@@ -940,6 +1122,7 @@ export default function AutoProductPanel({ onClose, isDigital = false }: AutoPro
                       autoFiles={memoizedProductFiles.files}
                       autoVideoFiles={memoizedProductFiles.videos}
                       autoDigitalFiles={memoizedProductFiles.digitalFiles}
+                      forceShopSection="52805768" // Abstract Art kategorisini zorla seç
                       autoMode={settings.mode}
                       onSubmitSuccess={handleFormSubmitSuccess}
                       onClose={handleFormClose}

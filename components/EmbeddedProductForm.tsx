@@ -116,6 +116,7 @@ interface EmbeddedProductFormProps {
   onSubmitSuccess: (productTitle?: string) => void;
   onClose: () => void;
   isDigital?: boolean;
+  forceShopSection?: string; // Zorla seçilecek kategori ID'si
 }
 
 interface Variation {
@@ -140,7 +141,8 @@ export default function EmbeddedProductForm({
   autoMode,
   onSubmitSuccess,
   onClose,
-  isDigital = false
+  isDigital = false,
+  forceShopSection
 }: EmbeddedProductFormProps) {
   const { toast } = useToast();
   const { activeStore } = useStore();
@@ -165,7 +167,7 @@ export default function EmbeddedProductForm({
   );
 
   // Shop data
-  const [selectedShopSection, setSelectedShopSection] = useState('');
+  const [selectedShopSection, setSelectedShopSection] = useState(forceShopSection || '');
   const [shippingProfileId, setShippingProfileId] = useState('loading'); // Loading placeholder
   const [shopSections, setShopSections] = useState<ShopSection[]>([]);
 
@@ -246,6 +248,27 @@ export default function EmbeddedProductForm({
     }
   }, [toast]);
 
+  // === CLEAN TITLE FUNCTION ===
+  const cleanTitleForEtsy = useCallback((title: string): string => {
+    // Başlıktaki & işaretlerini say
+    const ampersandCount = (title.match(/&/g) || []).length;
+    
+    // Eğer birden fazla & işareti varsa, ilki hariç diğerlerini tire (-) ile değiştir
+    if (ampersandCount > 1) {
+      console.log('⚠️ Başlıkta birden fazla & işareti tespit edildi, temizleniyor...');
+      let firstAmpFound = false;
+      return title.replace(/&/g, (match) => {
+        if (!firstAmpFound) {
+          firstAmpFound = true;
+          return match; // İlk & işaretini koru
+        }
+        return "-"; // Diğer & işaretlerini tire (-) ile değiştir
+      });
+    }
+    
+    return title;
+  }, []);
+
   // AI için resim sıkıştırma fonksiyonu
   const compressImageForAI = useCallback(async (file: File): Promise<File> => {
     return new Promise((resolve) => {
@@ -283,7 +306,19 @@ export default function EmbeddedProductForm({
   const hasStartedProcessing = useRef(false);
   
   // Refs to track actual state values
-  const currentStateRef = useRef({ title: '', tags: [], productImages: [], selectedShopSection: '', shippingProfileId: 'loading' });
+  const currentStateRef = useRef<{
+    title: string;
+    tags: string[];
+    productImages: MediaFile[];
+    selectedShopSection: string;
+    shippingProfileId: string;
+  }>({
+    title: '',
+    tags: [],
+    productImages: [],
+    selectedShopSection: forceShopSection || '',
+    shippingProfileId: 'loading'
+  });
   
   // Update refs when state changes - comprehensive sync
   useEffect(() => {
@@ -333,6 +368,13 @@ export default function EmbeddedProductForm({
     isMounted.current = true;
     hasStartedProcessing.current = false; // Reset on mount
     
+    // forceShopSection varsa, kategoriyi zorla seç
+    if (forceShopSection) {
+      console.log(`🔄 forceShopSection prop ile kategori zorla seçiliyor: ${forceShopSection}`);
+      setSelectedShopSection(forceShopSection);
+      currentStateRef.current.selectedShopSection = forceShopSection;
+    }
+    
     return () => {
       console.log(`🏗️ EmbeddedProductForm unmounting: ${componentId.current}`);
       isMounted.current = false;
@@ -345,7 +387,7 @@ export default function EmbeddedProductForm({
         console.log('🧹 Cleared submit timeout on unmount');
       }
     };
-  }, []);
+  }, [forceShopSection]);
 
   // === INITIALIZE SUBMISSION HOOKS ===
   const autoGeneration = useProductAutoGeneration({
@@ -519,7 +561,9 @@ export default function EmbeddedProductForm({
     console.log('🚀 Auto submitting to Etsy with REF-BASED form data...');
     
     // Use ref values as primary source, fallback to state values
-    const finalTitle = refTitle || title;
+    // Başlığı temizle - & işaretlerini kontrol et
+    let finalTitle = refTitle || title;
+    finalTitle = cleanTitleForEtsy(finalTitle);
     const finalTags = (refTags && refTags.length > 0) ? refTags : tags;
     const finalProductImages = (refImages && refImages.length > 0) ? refImages : productImages;
     const finalSelectedShopSection = refSection || selectedShopSection;
@@ -578,7 +622,7 @@ export default function EmbeddedProductForm({
     title, description, price, quantity, tags, isPersonalizable,
     personalizationRequired, personalizationInstructions, taxonomyId,
     hasVariations, variations, selectedShopSection, shippingProfileId,
-    productImages, videoFile, autoDigitalFiles, submission
+    productImages, videoFile, autoDigitalFiles, submission, cleanTitleForEtsy
   ]);
 
   // Add debounce ref to prevent multiple triggers
@@ -1458,7 +1502,9 @@ export default function EmbeddedProductForm({
     });
     
     // Use ref values if state is empty
-    const finalTitle = title || currentStateRef.current.title;
+    // Başlığı temizle - & işaretlerini kontrol et
+    let finalTitle = title || currentStateRef.current.title;
+    finalTitle = cleanTitleForEtsy(finalTitle);
     const finalTags = tags.length > 0 ? tags : currentStateRef.current.tags;
     const finalProductImages = productImages.length > 0 ? productImages : currentStateRef.current.productImages;
     const finalSelectedShopSection = selectedShopSection || currentStateRef.current.selectedShopSection;

@@ -1,0 +1,16 @@
+# Dolphin Manager V2 - Değişiklikler
+
+## 13 Temmuz 2025 Değişiklikleri
+
+### 1. Klasör İsimleri Özelliği
+- AutoProductPanel.tsx dosyasında, kullanıcıların seçtiği klasörlerin isimlerini kaydetme ve görüntüleme özelliği eklendi.
+- Klasör isimleri webkitRelativePath özelliği kullanılarak çıkarılıyor.
+- Klasör isimleri localStorage'da saklanıyor ve kullanıcı arayüzünde gösteriliyor.
+- Sistem dosyaları (.DS_Store) filtrelendi ve dijital dosyalar JPG/PNG formatlarıyla sınırlandırıldı.
+
+### 2. Dijital Ürün Fiyat Değişikliği
+- EmbeddedProductForm.tsx dosyasında, dijital ürünler için varsayılan fiyat 9.0 dolardan 5.0 dolara düşürüldü.
+
+### 3. Yedekleme
+- Projenin tam yedeği (1.0 GB) dokümantasyon ile birlikte oluşturuldu.
+- Tüm değişiklikler GitHub'a Türkçe commit mesajlarıyla push edildi.

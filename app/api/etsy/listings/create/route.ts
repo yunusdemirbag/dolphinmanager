@@ -29,6 +29,16 @@ export async function POST(request: NextRequest) {
       
       try {
         listingData = JSON.parse(listingDataString);
+        
+        // IMPORTANT: Digital ürünler için AI'dan gelen shop_section_id'yi kullan
+        if (listingData.type === 'download') {
+          // FormData'da shopSection varsa (AI'dan gelen), onu kullan
+          const aiShopSection = formData.get('shopSection');
+          if (aiShopSection && aiShopSection !== 'undefined' && aiShopSection !== '') {
+            listingData.shop_section_id = parseInt(aiShopSection.toString());
+            console.log(`🔄 Digital ürün için AI shopSection kullanılıyor: ${listingData.shop_section_id}`);
+          }
+        }
       } catch (parseError) {
         console.error('❌ JSON parse hatası:', parseError);
         console.error('❌ Problematik string:', listingDataString);
@@ -36,11 +46,35 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Digital dosyaları FormData'dan çıkar
+    const digitalFiles: File[] = [];
+    let digitalFileIndex = 0;
+    console.log('🔍 FormData içeriği kontrol ediliyor...');
+    
+    // FormData'daki tüm key'leri debug için göster
+    const formDataKeys = Array.from(formData.keys());
+    console.log('📋 FormData keys:', formDataKeys);
+    
+    while (formData.has(`digitalFile_${digitalFileIndex}`)) {
+      const digitalFile = formData.get(`digitalFile_${digitalFileIndex}`) as File;
+      console.log(`🔍 digitalFile_${digitalFileIndex} bulundu:`, digitalFile?.name, digitalFile?.size);
+      if (digitalFile && digitalFile.size > 0) {
+        digitalFiles.push(digitalFile);
+      }
+      digitalFileIndex++;
+    }
+    
+    console.log(`📊 Digital dosya çıkarma özeti: ${digitalFiles.length} dosya bulundu`);
+
     console.log('📋 Listing data alındı:', {
       title: listingData.title,
       state: listingData.state,
-      hasImages: !!(listingData.images),
-      hasVideo: !!(listingData.video || listingData.videoUrl),
+      type: listingData.type,
+      hasImages: !!formData.get('imageFile_0'),
+      hasVideo: !!formData.get('videoFile'),
+      hasDigitalFiles: digitalFiles.length > 0,
+      digitalFileCount: digitalFiles.length,
+      digitalFileNames: digitalFiles.map(f => f.name),
       has_variations: listingData.has_variations,
       variation_count: listingData.variations?.length || 0
     });
@@ -232,15 +266,21 @@ export async function POST(request: NextRequest) {
             });
             
             // Hem cache'e hem de Firebase'e kalıcı olarak kaydet
-            const profileData = {
+            const cleanProfile: Record<string, any> = {
               profile_id: shippingProfileId,
               shop_id: shop_id,
               user_id: userId,
-              title: bestProfile.title,
-              is_default: bestProfile.is_default,
+              title: bestProfile.title || 'Unknown',
               created_at: new Date(),
               source: 'etsy_api'
             };
+            
+            // is_default sadece undefined değilse ekle
+            if (bestProfile.is_default !== undefined) {
+              cleanProfile.is_default = bestProfile.is_default;
+            }
+            
+            const profileData = cleanProfile;
             
             // Cache'e kaydet (hızlı erişim için)
             await adminDb.collection('shipping_cache').doc(SHIPPING_CACHE_KEY).set({
@@ -389,7 +429,11 @@ export async function POST(request: NextRequest) {
     etsyFormData.append('who_made', listingData.who_made || 'i_did');
     etsyFormData.append('when_made', listingData.when_made || 'made_to_order');
     etsyFormData.append('taxonomy_id', (listingData.taxonomy_id || 1027).toString());
-    etsyFormData.append('shipping_profile_id', shippingProfileId.toString());
+    
+    // Shipping profile sadece fiziksel ürünler için
+    if (listingData.type !== 'download') {
+      etsyFormData.append('shipping_profile_id', shippingProfileId.toString());
+    }
     // return_policy_id sadece varsa ekle (Etsy integer bekliyor)
     if (listingData.return_policy_id && listingData.return_policy_id !== '') {
       etsyFormData.append('return_policy_id', listingData.return_policy_id.toString());
@@ -412,15 +456,21 @@ export async function POST(request: NextRequest) {
         .slice(0, 13); // Etsy maksimum 13 material
     }
     
-    // Materials'ı direkt listing oluştururken ekle - eski çalışan yöntem
-    const materials = listingData.materials && listingData.materials.length > 0 
-      ? cleanEtsyMaterials(listingData.materials) 
-      : ['Cotton Canvas', 'Wood Frame', 'Hanger']; // Eski çalışan default materials
-    
-    // Materials'ı eski format ile ekle
-    materials.forEach(material => {
-      etsyFormData.append('materials[]', material);
-    });
+    // Materials'ı sadece fiziksel ürünler için ekle - digital ürünlerde materials yok
+    let materials: string[] = [];
+    if (listingData.type !== 'download') {
+      materials = listingData.materials && listingData.materials.length > 0 
+        ? cleanEtsyMaterials(listingData.materials) 
+        : ['Cotton Canvas', 'Wood Frame', 'Hanger']; // Eski çalışan default materials
+      
+      // Materials'ı eski format ile ekle
+      materials.forEach(material => {
+        etsyFormData.append('materials[]', material);
+      });
+      console.log('🧱 Physical ürün - Materials eklendi:', materials.length, 'adet');
+    } else {
+      console.log('💾 Digital ürün - Materials atlandı (gerekli değil)');
+    }
     
     // Personalization instructions temizleme - VALIDATION SUMMARY'DEN ÖNCE TANIMLA
     let cleanInstructions = 'Phone Number for Delivery'; // Default
@@ -577,6 +627,24 @@ export async function POST(request: NextRequest) {
     etsyFormData.append('is_customizable', 'true');
     etsyFormData.append('should_auto_renew', listingData.renewal_option === 'automatic' ? 'true' : 'false');
     etsyFormData.append('state', 'draft'); // Her zaman draft olarak başla, sonra resim ekleyip activate ederiz
+    
+    // Add type field for digital products (critical for Etsy API)
+    if (listingData.type === 'download') {
+      etsyFormData.append('type', 'download');
+      // Digital ürünler için taxonomy_id = 688 (Digital Prints)
+      etsyFormData.delete('taxonomy_id');
+      etsyFormData.append('taxonomy_id', '688');
+      console.log('📦 Digital product detected - type: download, taxonomy_id: 688, shipping_profile_id not added');
+    } else {
+      etsyFormData.append('type', 'physical');
+      console.log('📦 Physical product detected - type: physical field added to Etsy FormData');
+    }
+    
+    console.log('✅ Type field validation:', {
+      listingData_type: listingData.type,
+      formData_includes_type: Array.from(etsyFormData.keys()).includes('type'),
+      taxonomy_id: listingData.taxonomy_id
+    });
     
     // NOT: Varyasyonlar draft listing oluşturduktan sonra ayrı API call'la eklenecek
     
@@ -899,6 +967,67 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+    }
+    
+    // ADIM 2.7: Digital dosyalar ekle (digital ürünler için)
+    let uploadedDigitalFiles = 0;
+    if (listingData.type === 'download' && digitalFiles && digitalFiles.length > 0) {
+      console.log(`📤 ADIM 2.7: ${digitalFiles.length} digital dosya yükleniyor...`);
+      
+      for (let i = 0; i < digitalFiles.length; i++) {
+        const digitalFile = digitalFiles[i];
+        console.log(`📁 Digital dosya ${i + 1}/${digitalFiles.length} yükleniyor:`, digitalFile.name, (digitalFile.size / 1024 / 1024).toFixed(2), 'MB');
+        
+        try {
+          const digitalFormData = new FormData();
+          digitalFormData.append('file', digitalFile);
+          
+          // Dosya ismini Etsy kurallarına uygun hale getir
+          let cleanFileName = digitalFile.name
+            .replace(/\.[^/.]+$/, "") // Uzantıyı kaldır
+            .replace(/[^a-zA-Z0-9\-_.]/g, '_') // Geçersiz karakterleri _ ile değiştir
+            .substring(0, 70); // Maksimum 70 karakter
+          
+          // En az 3 karakter olmalı
+          if (cleanFileName.length < 3) {
+            cleanFileName = `file_${i + 1}`;
+          }
+          
+          digitalFormData.append('name', cleanFileName);
+          digitalFormData.append('rank', (i + 1).toString());
+          
+          console.log(`📝 Dosya ismi temizlendi: "${digitalFile.name}" → "${cleanFileName}"`);
+          
+          const digitalUploadUrl = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${etsyResult.listing_id}/files`;
+          
+          const digitalResponse = await fetch(digitalUploadUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${access_token}`,
+              'x-api-key': api_key,
+            },
+            body: digitalFormData,
+          });
+          
+          if (digitalResponse.ok) {
+            const digitalResult = await digitalResponse.json();
+            uploadedDigitalFiles++;
+            console.log(`✅ Digital dosya ${i + 1} başarıyla yüklendi:`, digitalResult.listing_file_id);
+          } else {
+            const errorText = await digitalResponse.text();
+            console.error(`❌ Digital dosya ${i + 1} yükleme hatası:`, digitalResponse.status, errorText);
+          }
+        } catch (digitalError) {
+          console.error(`❌ Digital dosya ${i + 1} yükleme exception:`, digitalError);
+        }
+        
+        // Rate limit için kısa bekleme
+        if (i < digitalFiles.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      
+      console.log(`📊 Digital dosya yükleme özeti: ${uploadedDigitalFiles}/${digitalFiles.length} başarılı`);
     }
     
     // ADIM 2.8: Varyasyonları ekle (yeni sistem)

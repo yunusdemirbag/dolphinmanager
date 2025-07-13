@@ -8,6 +8,11 @@ import { StoreSelector } from '@/components/StoreSelector';
 
 const Navigation = () => {
   const pathname = usePathname();
+  
+  // Login sayfasında navigasyon çubuğunu gösterme
+  if (pathname === '/login') {
+    return null;
+  }
 
   const links = [
     {

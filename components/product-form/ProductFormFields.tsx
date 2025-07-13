@@ -74,6 +74,8 @@ interface ProductFormFieldsProps {
   loadingShopSections: boolean;
   loadingShippingProfiles: boolean;
   isSubmitting: boolean;
+  isDigital?: boolean;
+  digitalFiles?: File[];
   
   // Handlers
   onTitleChange: (title: string) => void;
@@ -120,6 +122,8 @@ export default function ProductFormFields({
   loadingShopSections,
   loadingShippingProfiles,
   isSubmitting,
+  isDigital = false,
+  digitalFiles,
   onTitleChange,
   onDescriptionChange,
   onPriceChange,
@@ -416,44 +420,97 @@ export default function ProductFormFields({
         </div>
       </div>
 
-      {/* Shop Section */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">
-          Kanvas Kategorisi 
-          {selectedShopSection && (
-            <span className="text-green-600 text-xs font-normal ml-2">
-              (AI seçti: {shopSections?.find(s => s.shop_section_id.toString() === selectedShopSection)?.title || 'Loading...'})
-            </span>
-          )}
-        </Label>
-        <Select 
-          key={`shop-section-${selectedShopSection}-${shopSections?.length || 0}`}
-          value={selectedShopSection} 
-          onValueChange={onShopSectionChange}
-          disabled={isSubmitting || loadingShopSections}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Kategori seçin..." />
-          </SelectTrigger>
-          <SelectContent>
-            {shopSections && shopSections.length > 0 ? shopSections.map((section) => (
-              <SelectItem key={section.shop_section_id} value={section.shop_section_id.toString()}>
-                {section.title}
-              </SelectItem>
-            )) : (
-              <SelectItem value="loading" disabled>Kategoriler yükleniyor...</SelectItem>
+      {/* Shop Section - Hidden for Digital Products */}
+      {!isDigital && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">
+            Kanvas Kategorisi 
+            {selectedShopSection && (
+              <span className="text-green-600 text-xs font-normal ml-2">
+                (AI seçti: {shopSections?.find(s => s.shop_section_id.toString() === selectedShopSection)?.title || 'Loading...'})
+              </span>
             )}
-          </SelectContent>
-        </Select>
-        <div className="text-xs text-gray-500">
-          {shopSections ? shopSections.length : 0} kategori mevcut
-          {selectedShopSection && shopSections?.find(s => s.shop_section_id.toString() === selectedShopSection) && (
-            <span className="text-green-600 font-medium ml-2">
-              ✓ {shopSections.find(s => s.shop_section_id.toString() === selectedShopSection)?.title}
-            </span>
+          </Label>
+          <Select 
+            key={`shop-section-${selectedShopSection}-${shopSections?.length || 0}`}
+            value={selectedShopSection} 
+            onValueChange={onShopSectionChange}
+            disabled={isSubmitting || loadingShopSections}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Kategori seçin..." />
+            </SelectTrigger>
+            <SelectContent>
+              {shopSections && shopSections.length > 0 ? shopSections.map((section) => (
+                <SelectItem key={section.shop_section_id} value={section.shop_section_id.toString()}>
+                  {section.title}
+                </SelectItem>
+              )) : (
+                <SelectItem value="loading" disabled>Kategoriler yükleniyor...</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+          <div className="text-xs text-gray-500">
+            {shopSections ? shopSections.length : 0} kategori mevcut
+            {selectedShopSection && shopSections?.find(s => s.shop_section_id.toString() === selectedShopSection) && (
+              <span className="text-green-600 font-medium ml-2">
+                ✓ {shopSections.find(s => s.shop_section_id.toString() === selectedShopSection)?.title}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Digital Products Info */}
+      {isDigital && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-blue-600">
+              📁 Digital Ürün Kategorisi
+            </Label>
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-sm font-medium text-blue-800">Digital Prints (2078)</div>
+              <div className="text-xs text-blue-600 mt-1">Digital ürünler otomatik olarak bu kategoriye atanır</div>
+            </div>
+          </div>
+
+          {/* Digital Files Display */}
+          {digitalFiles && digitalFiles.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-green-600">
+                📥 İndirilebilir Dosyalar ({digitalFiles.length}/5)
+              </Label>
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="space-y-2">
+                  {digitalFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded border">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
+                          <span className="text-xs font-medium text-green-600">
+                            {file.name.split('.').pop()?.toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-800">{file.name}</div>
+                          <div className="text-xs text-gray-500">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="bg-green-100 text-green-700">
+                        Dijital Dosya
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-green-600 mt-2">
+                  Bu dosyalar müşteri satın aldıktan sonra indirebilecek
+                </div>
+              </div>
+            </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* Shipping Profile */}
       <div className="space-y-2">
@@ -478,62 +535,65 @@ export default function ProductFormFields({
         </Select>
       </div>
 
-      {/* Personalization */}
-      <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="personalizable"
-            checked={isPersonalizable}
-            onCheckedChange={onPersonalizableChange}
-            disabled={isSubmitting}
-          />
-          <Label htmlFor="personalizable" className="text-sm font-medium">
-            Kişiselleştirilebilir
-          </Label>
+      {/* Personalization - Hidden for Digital Products */}
+      {!isDigital && (
+        <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="personalizable"
+              checked={isPersonalizable}
+              onCheckedChange={onPersonalizableChange}
+              disabled={isSubmitting}
+            />
+            <Label htmlFor="personalizable" className="text-sm font-medium">
+              Kişiselleştirilebilir
+            </Label>
+          </div>
+          
+          {isPersonalizable && (
+            <>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="personalization-required"
+                  checked={personalizationRequired}
+                  onCheckedChange={onPersonalizationRequiredChange}
+                  disabled={isSubmitting}
+                />
+                <Label htmlFor="personalization-required" className="text-sm">
+                  Kişiselleştirme zorunlu
+                </Label>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Kişiselleştirme Talimatları</Label>
+                <Textarea
+                  value={personalizationInstructions}
+                  onChange={(e) => onPersonalizationInstructionsChange(e.target.value)}
+                  placeholder="Kişiselleştirme talimatlarını girin..."
+                  className="text-sm"
+                  rows={2}
+                  disabled={isSubmitting}
+                />
+              </div>
+            </>
+          )}
         </div>
-        
-        {isPersonalizable && (
-          <>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="personalization-required"
-                checked={personalizationRequired}
-                onCheckedChange={onPersonalizationRequiredChange}
-                disabled={isSubmitting}
-              />
-              <Label htmlFor="personalization-required" className="text-sm">
-                Kişiselleştirme zorunlu
-              </Label>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Kişiselleştirme Talimatları</Label>
-              <Textarea
-                value={personalizationInstructions}
-                onChange={(e) => onPersonalizationInstructionsChange(e.target.value)}
-                placeholder="Kişiselleştirme talimatlarını girin..."
-                className="text-sm"
-                rows={2}
-                disabled={isSubmitting}
-              />
-            </div>
-          </>
-        )}
-      </div>
+      )}
 
-      {/* Variations */}
-      <div className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="has-variations"
-            checked={hasVariations}
-            onCheckedChange={onHasVariationsChange}
-            disabled={isSubmitting}
-          />
-          <Label htmlFor="has-variations" className="text-sm font-medium">
-            Varyasyonlar var
-          </Label>
-        </div>
+      {/* Variations - Hidden for Digital Products */}
+      {!isDigital && (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="has-variations"
+              checked={hasVariations}
+              onCheckedChange={onHasVariationsChange}
+              disabled={isSubmitting}
+            />
+            <Label htmlFor="has-variations" className="text-sm font-medium">
+              Varyasyonlar var
+            </Label>
+          </div>
         
         {hasVariations && (
           <div className="border rounded-lg p-4">
@@ -588,7 +648,21 @@ export default function ProductFormFields({
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
+
+      {/* Digital Product Info */}
+      {isDigital && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-blue-600">
+            💰 Digital Ürün Fiyatı
+          </Label>
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-sm font-medium text-blue-800">$9.00 Sabit Fiyat</div>
+            <div className="text-xs text-blue-600 mt-1">Digital ürünler için varyasyon bulunmaz</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

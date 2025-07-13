@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css";
-import Navigation from "@/components/Navigation";
+import "../globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { StoreProvider } from "@/contexts/StoreContext";
-import { headers } from 'next/headers';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -12,11 +10,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Dolphin Manager",
-  description: "Hiper-modern Etsy ürün yönetim sistemi",
+  title: "Dolphin Manager - Giriş",
+  description: "Dolphin Manager giriş sayfası",
 };
 
-export default function RootLayout({
+export default function LoginLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -26,7 +24,6 @@ export default function RootLayout({
       <body className={`${inter.className} antialiased`} style={{backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))' }} suppressHydrationWarning={true}>
         <StoreProvider>
           <div className="min-h-screen bg-gray-50">
-            <Navigation />
             <main className="container mx-auto py-8 px-4">
               {children}
             </main>

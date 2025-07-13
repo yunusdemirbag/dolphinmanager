@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Send, 
-  Loader2, 
+import {
+  Send,
+  Loader2,
   Package,
   CheckCircle,
-  Wand2 
+  Wand2
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { predefinedVariations } from '@/lib/etsy-variation-presets';
@@ -25,13 +25,97 @@ import { useProductAutoGeneration } from './product-form/ProductAutoGeneration';
 import { useProductFormSubmission } from './product-form/ProductFormSubmission';
 import { generateRandomDescription } from '@/lib/random-descriptions';
 
+// Digital Product Description Template - Combined all sections into one long description
+const DIGITAL_DESCRIPTIONS = [
+  `🖼️ DIGITAL PRODUCT ONLY – NO PHYSICAL ITEM
+
+▶︎ This is a digital download. No frame or physical product will be shipped.
+
+▶︎ You'll receive 5 high-resolution JPG files (300 DPI) ready to print in 20+ sizes.
+
+▶︎ Sizes include 2x3 | 3x4 | 4x5 | 11x14 | 5x7 | A2-A5 | 50x70 cm
+
+▶︎ Download files via your Etsy account after purchase or from email.
+
+▶︎ Colors may vary slightly due to different screens and printers.
+
+▶︎ Personal use only. Message for commercial rights.
+
+⸻
+
+💻 INSTANT DOWNLOAD – PRINT & DECORATE
+
+▶︎ 5 JPG files (300 DPI) – compatible with most frame sizes.
+
+▶︎ Sizes: 4x5, 2x3, 3x4, 11x14, 5x7, A sizes & more.
+
+▶︎ Print at home, local shop, or online (like Shutterfly).
+
+▶︎ No physical product will be sent. Digital item only.
+
+▶︎ For personal use only. Contact for licensing options.
+
+⸻
+
+🎨 PRINTABLE ART – FAST & EASY DECOR
+
+▶︎ Includes 5 high-resolution JPGs (300 DPI) in multiple ratios.
+
+▶︎ Fits popular frames: 8x10, 16x20, 24x36, 50x70 cm & more.
+
+▶︎ Download instantly after purchase from Etsy or your email.
+
+▶︎ This is a DIGITAL FILE – nothing will be shipped.
+
+▶︎ Personal use only. Message me for commercial use.
+
+⸻
+
+🖨️ DIGITAL FILE – PRINT INSTANTLY
+
+▶︎ No frame or physical print included. Digital product only.
+
+▶︎ You get 5 JPGs (300 DPI) printable in over 20 sizes.
+
+▶︎ Print at home, at a local print shop, or online.
+
+▶︎ Files available in your Etsy account after purchase.
+
+▶︎ Personal use only. Commercial inquiries welcome.
+
+⸻
+
+🛒 INSTANT DIGITAL DOWNLOAD
+
+▶︎ 5 high-quality JPGs (300 DPI) included. No shipping – digital only.
+
+▶︎ Printable sizes: 2:3, 3:4, 4:5, 5x7, 11x14, 50x70, A4 and more.
+
+▶︎ Download via Etsy after purchase confirmation.
+
+▶︎ Colors may slightly vary. For best results, use premium paper.
+
+▶︎ Personal use only – please ask about licensing.
+
+▶︎ Read more about digital downloads here:
+https://www.etsy.com/help/article/3949`
+];
+
+// Always return the same combined digital description
+function generateDigitalDescription(): string {
+  // Since we only have one description now, just return it
+  return DIGITAL_DESCRIPTIONS[0];
+}
+
 interface EmbeddedProductFormProps {
   isVisible: boolean;
   autoFiles: File[];
   autoVideoFiles?: File[];
+  autoDigitalFiles?: File[];
   autoMode: 'queue' | 'direct-etsy';
   onSubmitSuccess: (productTitle?: string) => void;
   onClose: () => void;
+  isDigital?: boolean;
 }
 
 interface Variation {
@@ -52,9 +136,11 @@ export default function EmbeddedProductForm({
   isVisible,
   autoFiles,
   autoVideoFiles = [],
+  autoDigitalFiles = [],
   autoMode,
   onSubmitSuccess,
-  onClose
+  onClose,
+  isDigital = false
 }: EmbeddedProductFormProps) {
   const { toast } = useToast();
   const { activeStore } = useStore();
@@ -62,18 +148,18 @@ export default function EmbeddedProductForm({
   // === MAIN FORM STATE - Identical to ProductFormModal ===
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState(80);
-  const [quantity, setQuantity] = useState(999);
+  const [price, setPrice] = useState(isDigital ? 9.0 : 80);
+  const [quantity, setQuantity] = useState(isDigital ? 999 : 999);
   const [tags, setTags] = useState<string[]>([]);
 
   // Advanced fields
-  const [isPersonalizable, setIsPersonalizable] = useState(true);
+  const [isPersonalizable, setIsPersonalizable] = useState(isDigital ? false : true);
   const [personalizationRequired, setPersonalizationRequired] = useState(false);
-  const [personalizationInstructions, setPersonalizationInstructions] = useState('Phone Number for Delivery');
-  const [taxonomyId, setTaxonomyId] = useState(1027); // Wall decor
+  const [personalizationInstructions, setPersonalizationInstructions] = useState(isDigital ? '' : 'Phone Number for Delivery');
+  const [taxonomyId, setTaxonomyId] = useState(isDigital ? 2078 : 1027); // Digital Prints : Wall decor
 
   // Variations - Using predefined variations exactly like ProductFormModal
-  const [hasVariations, setHasVariations] = useState(true);
+  const [hasVariations, setHasVariations] = useState(isDigital ? false : true);
   const [variations, setVariations] = useState<Variation[]>(
     predefinedVariations.map(v => ({ ...v, is_active: true }))
   );
@@ -105,11 +191,17 @@ export default function EmbeddedProductForm({
   // Initial description set (rastgele açıklama)
   useEffect(() => {
     if (isVisible && !description) {
-      const randomDesc = generateRandomDescription();
-      setDescription(randomDesc);
-      console.log('🎲 Form açılışında rastgele açıklama set edildi:', randomDesc.substring(0, 50) + '...');
+      let newDescription;
+      if (isDigital) {
+        newDescription = generateDigitalDescription();
+        console.log('🎲 Form açılışında dijital açıklama set edildi:', newDescription.substring(0, 50) + '...');
+      } else {
+        newDescription = generateRandomDescription();
+        console.log('🎲 Form açılışında rastgele açıklama set edildi:', newDescription.substring(0, 50) + '...');
+      }
+      setDescription(newDescription);
     }
-  }, [isVisible, description]);
+  }, [isVisible, description, isDigital]);
 
   // 🔍 Ürün yükleme öncesi otomatik kontrol
   const preUploadCheck = useCallback(async (shopId: string) => {
@@ -460,10 +552,12 @@ export default function EmbeddedProductForm({
       selectedShopSection: finalSelectedShopSection,
       shippingProfileId,
       whoMade: "i_did",
-      whenMade: "made_to_order",
+      whenMade: isDigital ? "2020_2025" : "made_to_order",
       isSupply: false,
       renewalOption: "automatic",
-      state: "draft"
+      state: "draft",
+      ...(!isDigital && { materials: ["Cotton Canvas", "Wood Frame", "Hanger"] }),
+      ...(isDigital && { type: "download" })
     };
 
     console.log('📦 Submission data prepared:', {
@@ -475,7 +569,7 @@ export default function EmbeddedProductForm({
     });
 
     try {
-      await submission.submitToEtsy(submissionData, finalProductImages, videoFile);
+      await submission.submitToEtsy(submissionData, finalProductImages, videoFile, autoDigitalFiles);
     } finally {
       // Always reset processing flag when done (success or error)
       setIsProcessingAuto(false);
@@ -484,7 +578,7 @@ export default function EmbeddedProductForm({
     title, description, price, quantity, tags, isPersonalizable,
     personalizationRequired, personalizationInstructions, taxonomyId,
     hasVariations, variations, selectedShopSection, shippingProfileId,
-    productImages, videoFile, submission
+    productImages, videoFile, autoDigitalFiles, submission
   ]);
 
   // Add debounce ref to prevent multiple triggers
@@ -634,9 +728,15 @@ export default function EmbeddedProductForm({
         console.log('🎥 Video file otomatik olarak ayarlandı:', firstVideoFile.name, `(${(firstVideoFile.size / 1024 / 1024).toFixed(2)}MB)`);
       }
 
-      // Rastgele açıklama üret
-      const autoDescription = generateRandomDescription();
-      console.log('🎲 Rastgele açıklama üretildi:', autoDescription.substring(0, 100) + '...');
+      // Açıklama üret (dijital veya fiziksel)
+      let autoDescription;
+      if (isDigital) {
+        autoDescription = generateDigitalDescription();
+        console.log('🎲 Dijital açıklama üretildi:', autoDescription.substring(0, 100) + '...');
+      } else {
+        autoDescription = generateRandomDescription();
+        console.log('🎲 Rastgele açıklama üretildi:', autoDescription.substring(0, 100) + '...');
+      }
 
       // Update form state - ÖNCE RESİMLERİ SET ET
       console.log('🔄 Setting product images and initial state...');
@@ -930,7 +1030,9 @@ export default function EmbeddedProductForm({
       });
 
       // 🚀 PARALLEL PROCESSING: AI + PreProcess parallel başlat
-      const aiPromise = fetch('/api/ai/analyze-and-generate', {
+      const aiEndpoint = isDigital ? '/api/ai/analyze-and-generate-digital' : '/api/ai/analyze-and-generate';
+      console.log(`🤖 AI endpoint seçimi: ${aiEndpoint} (isDigital: ${isDigital})`);
+      const aiPromise = fetch(aiEndpoint, {
         method: 'POST',
         body: formData,
       }).then(async (response) => {
@@ -1010,9 +1112,24 @@ export default function EmbeddedProductForm({
           currentStateRef.current.title = finalTitle;
         });
 
-        // 🧠 AI ile otomatik kategori eşleştirme
-        if (activeStore?.shop_id) {
-          console.log('🧠 AI kategori eşleştirme başlıyor...', finalTitle);
+        // 🔄 AI'dan gelen shopSection'ı kontrol et ve kullan
+        if (result.shopSection) {
+          console.log(`🎯 AI'dan shopSection alındı: ${result.shopSection} (${result.shopSectionTitle || 'Unknown'})`);
+          setSelectedShopSection(result.shopSection.toString());
+          currentStateRef.current.selectedShopSection = result.shopSection.toString();
+          
+          // Store shopSection in a way that can be passed to FormData later
+          (window as any).aiSelectedShopSection = result.shopSection.toString();
+          console.log(`🔥 DIGITAL: window.aiSelectedShopSection set to: ${(window as any).aiSelectedShopSection}`);
+          
+          console.log(`✅ Digital kategori state'e aktarıldı: ${result.shopSection} - ${result.shopSectionTitle}`);
+        } else {
+          console.log(`⚠️ AI result.shopSection bulunamadı!`, result);
+        }
+
+        // 🧠 AI ile otomatik kategori eşleştirme (SADECE NON-DIGITAL ürünler için)
+        if (activeStore?.shop_id && !isDigital) {
+          console.log('🧠 AI kategori eşleştirme başlıyor (non-digital)...', finalTitle);
           
           setTimeout(async () => {
             try {
@@ -1043,6 +1160,10 @@ export default function EmbeddedProductForm({
               console.error('❌ AI kategori eşleştirme hatası:', error);
             }
           }, 1000); // 1 saniye sonra kategori eşleştir
+        } else if (isDigital) {
+          console.log('🎯 Digital ürün - Smart category match atlanıyor (AI digital kategori kullanılacak)');
+        } else {
+          console.log('⚠️ Aktif mağaza bulunamadı, kategori eşleştirme atlanıyor');
         }
       }
 
@@ -1080,8 +1201,11 @@ export default function EmbeddedProductForm({
         }
       }
 
-      if (result.category) {
-        console.log('🎯 AI kategori önerisi:', result.category);
+      // Digital ürünler için result.category işleme ATLA (shopSection zaten ayarlandı)
+      if (result.category && isDigital) {
+        console.log('🎯 Digital ürün - result.category atlanıyor (shopSection kullanılacak)');
+      } else if (result.category && !isDigital) {
+        console.log('🎯 AI kategori önerisi (non-digital):', result.category);
         
         // GERÇEK kategorilerden eşleşen bulma - actualCategories kullan
         let matchedCategory = null;
@@ -1354,10 +1478,12 @@ export default function EmbeddedProductForm({
       selectedShopSection: finalSelectedShopSection,
       shippingProfileId,
       whoMade: "i_did",
-      whenMade: "made_to_order",
+      whenMade: isDigital ? "2020_2025" : "made_to_order",
       isSupply: false,
       renewalOption: "automatic",
-      state: "draft"
+      state: "draft",
+      ...(!isDigital && { materials: ["Cotton Canvas", "Wood Frame", "Hanger"] }),
+      ...(isDigital && { type: "download" })
     };
 
     // Validate form
@@ -1377,15 +1503,15 @@ export default function EmbeddedProductForm({
     console.log('✅ Form validation passed, submitting...');
 
     if (autoMode === 'direct-etsy') {
-      await submission.submitToEtsy(submissionData, finalProductImages, videoFile);
+      await submission.submitToEtsy(submissionData, finalProductImages, videoFile, autoDigitalFiles);
     } else {
-      await submission.submitToQueue(submissionData, finalProductImages, videoFile);
+      await submission.submitToQueue(submissionData, finalProductImages, videoFile, autoDigitalFiles);
     }
   }, [
     title, description, price, quantity, tags, isPersonalizable,
     personalizationRequired, personalizationInstructions, taxonomyId,
     hasVariations, variations, selectedShopSection, shippingProfileId,
-    productImages, videoFile, autoMode, submission, toast
+    productImages, videoFile, autoDigitalFiles, autoMode, submission, toast
   ]);
 
   // === RESET FORM ===
@@ -1419,15 +1545,21 @@ export default function EmbeddedProductForm({
   const handleGenerateDescription = useCallback(async () => {
     try {
       setAutoDescriptionLoading(true);
-      const randomDesc = generateRandomDescription();
-      setDescription(randomDesc);
-      console.log('🎲 Manuel olarak rastgele açıklama üretildi:', randomDesc.substring(0, 50) + '...');
+      let newDescription;
+      if (isDigital) {
+        newDescription = generateDigitalDescription();
+        console.log('🎲 Manuel olarak dijital açıklama üretildi:', newDescription.substring(0, 50) + '...');
+      } else {
+        newDescription = generateRandomDescription();
+        console.log('🎲 Manuel olarak rastgele açıklama üretildi:', newDescription.substring(0, 50) + '...');
+      }
+      setDescription(newDescription);
     } catch (error) {
-      console.error('Random description generation error:', error);
+      console.error('Description generation error:', error);
     } finally {
       setAutoDescriptionLoading(false);
     }
-  }, []);
+  }, [isDigital]);
 
   const handleGenerateTags = useCallback(async () => {
     try {
@@ -1529,6 +1661,8 @@ export default function EmbeddedProductForm({
                 loadingShopSections={loadingShopSections}
                 loadingShippingProfiles={loadingShippingProfiles}
                 isSubmitting={submission.isSubmitting}
+                isDigital={isDigital}
+                digitalFiles={autoDigitalFiles}
                 onTitleChange={setTitle}
                 onDescriptionChange={setDescription}
                 onPriceChange={setPrice}

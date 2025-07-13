@@ -259,6 +259,7 @@ export async function POST(request: NextRequest) {
         renewal_option: 'automatic',
         state: isDraft ? 'draft' : 'active',
         has_variations: queueData.has_variations || false,
+        type: queueData.type || 'physical', // Include type field for digital products
         variations: (() => {
           try {
             const originalVariations = JSON.parse(queueData.variations_json || '[]');
@@ -283,6 +284,13 @@ export async function POST(request: NextRequest) {
         })()
         // NOT: images ve video base64 data'sı burada DEĞİL, FormData'da ayrı olarak ekleniyor
       };
+      
+      // Debug: Log the type field specifically
+      console.log('🔍 Product type debug:', {
+        queueData_type: queueData.type,
+        listingData_type: listingData.type,
+        taxonomy_id: listingData.taxonomy_id
+      });
       
       // Her alanı kontrol et ve büyük olanları temizle
       console.log('🔍 ListingData alanlarının boyutları:');

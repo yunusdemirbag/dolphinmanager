@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle, AlertCircle, Store } from 'lucide-react';
 import ProductsPageClient from '@/components/ProductsPageClient';
 import Link from 'next/link';
+import AuthCheck from '../auth-check';
 
 // ASLA MOCK VERİ KULLANILMIYOR
 
@@ -111,6 +112,7 @@ export default async function ProductsPage() {
   const initialProductsData = await getInitialProducts(userId);
 
   return (
+    <AuthCheck>
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-black">Ürünler</h1>
@@ -129,7 +131,14 @@ export default async function ProductsPage() {
                     Aktif mağaza: {activeStore.shop_name}
                   </span>
                   <p className="text-sm text-green-600">
-                    Son senkronizasyon: {activeStore.last_sync_at ? new Date(activeStore.last_sync_at).toLocaleString('tr-TR') : 'Henüz yok'}
+                    Son senkronizasyon: {activeStore.last_sync_at ? (() => {
+                      try {
+                        const date = new Date(activeStore.last_sync_at);
+                        return isNaN(date.getTime()) ? 'Geçersiz tarih' : date.toLocaleString('tr-TR');
+                      } catch {
+                        return 'Geçersiz tarih';
+                      }
+                    })() : 'Henüz yok'}
                   </p>
                   {connectedStores.length > 1 && (
                     <p className="text-xs text-green-600">
@@ -164,13 +173,42 @@ export default async function ProductsPage() {
         initialNextCursor={initialProductsData.nextCursor}
         store={activeStore ? {
           ...activeStore,
-          connected_at: activeStore.connected_at ? (typeof activeStore.connected_at === 'string' ? activeStore.connected_at : activeStore.connected_at.toISOString?.() || activeStore.connected_at.toString()) : null,
-          last_sync_at: activeStore.last_sync_at ? (typeof activeStore.last_sync_at === 'string' ? activeStore.last_sync_at : activeStore.last_sync_at.toISOString?.() || activeStore.last_sync_at.toString()) : null,
-          last_activated_at: activeStore.last_activated_at ? (typeof activeStore.last_activated_at === 'string' ? activeStore.last_activated_at : activeStore.last_activated_at.toISOString?.() || activeStore.last_activated_at.toString()) : null,
-          last_token_refresh: activeStore.last_token_refresh ? (typeof activeStore.last_token_refresh === 'string' ? activeStore.last_token_refresh : activeStore.last_token_refresh.toISOString?.() || activeStore.last_token_refresh.toString()) : null,
+          connected_at: activeStore.connected_at ? (typeof activeStore.connected_at === 'string' ? activeStore.connected_at : (() => {
+            try {
+              const date = new Date(activeStore.connected_at);
+              return isNaN(date.getTime()) ? activeStore.connected_at.toString() : date.toISOString();
+            } catch {
+              return activeStore.connected_at.toString();
+            }
+          })()) : null,
+          last_sync_at: activeStore.last_sync_at ? (typeof activeStore.last_sync_at === 'string' ? activeStore.last_sync_at : (() => {
+            try {
+              const date = new Date(activeStore.last_sync_at);
+              return isNaN(date.getTime()) ? activeStore.last_sync_at.toString() : date.toISOString();
+            } catch {
+              return activeStore.last_sync_at.toString();
+            }
+          })()) : null,
+          last_activated_at: activeStore.last_activated_at ? (typeof activeStore.last_activated_at === 'string' ? activeStore.last_activated_at : (() => {
+            try {
+              const date = new Date(activeStore.last_activated_at);
+              return isNaN(date.getTime()) ? activeStore.last_activated_at.toString() : date.toISOString();
+            } catch {
+              return activeStore.last_activated_at.toString();
+            }
+          })()) : null,
+          last_token_refresh: activeStore.last_token_refresh ? (typeof activeStore.last_token_refresh === 'string' ? activeStore.last_token_refresh : (() => {
+            try {
+              const date = new Date(activeStore.last_token_refresh);
+              return isNaN(date.getTime()) ? activeStore.last_token_refresh.toString() : date.toISOString();
+            } catch {
+              return activeStore.last_token_refresh.toString();
+            }
+          })()) : null,
         } : null}
         userId={userId}
       />
     </div>
+    </AuthCheck>
   );
 }

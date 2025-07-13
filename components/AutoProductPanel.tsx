@@ -27,6 +27,7 @@ import EmbeddedProductForm from './EmbeddedProductForm';
 
 interface AutoProductPanelProps {
   onClose?: () => void;
+  isDigital?: boolean;
 }
 
 interface ProcessingState {
@@ -93,7 +94,7 @@ const formatDuration = (totalSeconds: number): string => {
   return result;
 };
 
-export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
+export default function AutoProductPanel({ onClose, isDigital = false }: AutoProductPanelProps) {
   const { toast } = useToast();
   const imagesFolderRef = useRef<HTMLInputElement>(null);
   const resourcesFolderRef = useRef<HTMLInputElement>(null);
@@ -262,18 +263,75 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
   const handleResourcesFolderSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
-      const resourceFiles = Array.from(files)
-        .filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'))
-        .sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
+      let resourceFiles: File[] = [];
       
-      console.log('📁 Kaynaklar klasörü seçildi:', {
-        total: files.length,
-        images: resourceFiles.filter(f => f.type.startsWith('image/')).length,
-        videos: resourceFiles.filter(f => f.type.startsWith('video/')).length
-      });
+      if (isDigital) {
+        // Digital dosyalar için özel validasyon
+        const allFiles = Array.from(files);
+        
+        // 5 dosya sınırı kontrolü
+        if (allFiles.length > 5) {
+          toast({
+            variant: "destructive",
+            title: "Dosya Sayısı Hatası",
+            description: "Digital ürünler için maksimum 5 dosya yükleyebilirsiniz."
+          });
+          return;
+        }
+        
+        // Dosya formatı ve boyut kontrolü
+        const validExtensions = ['.jpg', '.jpeg', '.png', '.pdf', '.zip', '.svg'];
+        const maxFileSize = 20 * 1024 * 1024; // 20MB
+        
+        for (const file of allFiles) {
+          // Format kontrolü
+          const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+          if (!validExtensions.includes(fileExtension)) {
+            toast({
+              variant: "destructive",
+              title: "Geçersiz Dosya Formatı",
+              description: `"${file.name}" dosyası desteklenmiyor. Sadece JPG, PNG, PDF, ZIP, SVG formatları kabul edilir.`
+            });
+            return;
+          }
+          
+          // Boyut kontrolü
+          if (file.size > maxFileSize) {
+            toast({
+              variant: "destructive",
+              title: "Dosya Boyutu Hatası",
+              description: `"${file.name}" dosyası çok büyük. Maksimum 20MB boyutunda dosya yükleyebilirsiniz.`
+            });
+            return;
+          }
+        }
+        
+        resourceFiles = allFiles.sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
+        
+        console.log('📁 Digital dosyalar seçildi:', {
+          total: resourceFiles.length,
+          files: resourceFiles.map(f => ({ name: f.name, size: (f.size / 1024 / 1024).toFixed(2) + 'MB' }))
+        });
+      } else {
+        // Normal ürünler için mevcut mantık
+        resourceFiles = Array.from(files)
+          .filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'))
+          .sort((a, b) => a.name.localeCompare(b.name, 'tr-TR', { numeric: true }));
+        
+        console.log('📁 Kaynaklar klasörü seçildi:', {
+          total: files.length,
+          images: resourceFiles.filter(f => f.type.startsWith('image/')).length,
+          videos: resourceFiles.filter(f => f.type.startsWith('video/')).length
+        });
+      }
       
-      // İlk 4 dosya için önizleme URL'leri oluştur (sadece resimler için)
-      const previewFiles = resourceFiles.filter(file => file.type.startsWith('image/')).slice(0, 4);
+      // Önizleme URL'leri oluştur (sadece resimler için)
+      const previewFiles = resourceFiles.filter(file => 
+        file.type.startsWith('image/') || 
+        (isDigital && (file.name.toLowerCase().endsWith('.jpg') || 
+                      file.name.toLowerCase().endsWith('.jpeg') || 
+                      file.name.toLowerCase().endsWith('.png')))
+      ).slice(0, 4);
       const previewUrls = previewFiles.map(file => URL.createObjectURL(file));
       
       setSettings(prev => {
@@ -289,11 +347,11 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
       });
 
       toast({
-        title: "Kaynaklar Klasörü",
-        description: `${resourceFiles.length} kaynak dosya yüklendi.`
+        title: isDigital ? "Digital Dosyalar" : "Kaynaklar Klasörü",
+        description: `${resourceFiles.length} ${isDigital ? 'digital dosya' : 'kaynak dosya'} yüklendi.`
       });
     }
-  }, [toast]);
+  }, [toast, isDigital]);
 
 
   const startProcessing = useCallback(async () => {
@@ -386,9 +444,18 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
     // Artık index hesaplamaya gerek yok - her zaman ilk 6 dosyayı al
     const currentProductImages = settings.imageFiles.slice(0, settings.imagesPerProduct);
     
-    // Kaynak dosyalarını video ve resim olarak ayır
-    const resourceImages = settings.resourceFiles.filter(file => file.type.startsWith('image/'));
-    const resourceVideos = settings.resourceFiles.filter(file => file.type.startsWith('video/'));
+    // Digital dosyalar - isDigital modunda TÜM resource dosyaları digital sayılır
+    const digitalFiles = isDigital 
+      ? settings.resourceFiles // İsDigital modunda tüm resource files digital file
+      : [];
+    
+    // Normal modda kaynak dosyalarını ayır (sadece isDigital=false olduğunda)
+    const resourceImages = !isDigital 
+      ? settings.resourceFiles.filter(file => file.type.startsWith('image/'))
+      : [];
+    const resourceVideos = !isDigital 
+      ? settings.resourceFiles.filter(file => file.type.startsWith('video/'))
+      : [];
     
     // Her ürün için: İlk 6 resim + Kaynak resimleri (video hariç)
     const allFiles = [...currentProductImages, ...resourceImages];
@@ -399,13 +466,15 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
       alınacakResimAdları: currentProductImages.map(f => f.name),
       kaynakResimleri: resourceImages.map(f => f.name),
       kaynakVideoları: resourceVideos.map(f => f.name),
+      digitalDosyalar: digitalFiles.map(f => f.name),
       toplamGönderilecekResim: allFiles.length,
       toplamGönderilecekVideo: resourceVideos.length,
+      toplamDigitalDosya: digitalFiles.length,
       alfabetikSıralama: currentProductImages.map((f, i) => `${i+1}: ${f.name}`).slice(0, 3)
     });
     
-    return { files: allFiles, videos: resourceVideos };
-  }, [settings.imageFiles, settings.resourceFiles, settings.imagesPerProduct]);
+    return { files: allFiles, videos: resourceVideos, digitalFiles };
+  }, [settings.imageFiles, settings.resourceFiles, settings.imagesPerProduct, isDigital]);
 
   // Memoize edilmiş dosya listesi - infinite loop önlemi
   const memoizedProductFiles = useMemo(() => {
@@ -708,9 +777,14 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
                 )}
               </div>
 
-              {/* Resources Folder */}
+              {/* Resources Folder / Digital Files */}
               <div className="space-y-2">
-                <Label htmlFor="resources-folder">Kaynaklar Klasörü</Label>
+                <Label htmlFor="resources-folder">{isDigital ? "Digital Dosyalar" : "Kaynaklar Klasörü"}</Label>
+                {isDigital && (
+                  <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border">
+                    📁 En fazla 5 dosya, her biri max 20MB • JPG/PNG/PDF/ZIP/SVG formatları
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -718,14 +792,14 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
                     className="flex-1"
                   >
                     <FolderOpen className="w-4 h-4 mr-2" />
-                    Klasör Seç
+                    {isDigital ? "Digital Dosya Seç" : "Klasör Seç"}
                   </Button>
                   <input
                     ref={resourcesFolderRef}
                     type="file"
-                    multiple
-                    accept="image/*,video/*"
-                    webkitdirectory=""
+                    multiple={isDigital ? true : true}
+                    accept={isDigital ? ".jpg,.jpeg,.png,.pdf,.zip,.svg" : "image/*,video/*"}
+                    webkitdirectory={isDigital ? undefined : ""}
                     className="hidden"
                     onChange={handleResourcesFolderSelect}
                   />
@@ -865,9 +939,11 @@ export default function AutoProductPanel({ onClose }: AutoProductPanelProps) {
                       isVisible={true}
                       autoFiles={memoizedProductFiles.files}
                       autoVideoFiles={memoizedProductFiles.videos}
+                      autoDigitalFiles={memoizedProductFiles.digitalFiles}
                       autoMode={settings.mode}
                       onSubmitSuccess={handleFormSubmitSuccess}
                       onClose={handleFormClose}
+                      isDigital={isDigital}
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full">

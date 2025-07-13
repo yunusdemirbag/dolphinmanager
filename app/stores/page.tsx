@@ -1,5 +1,6 @@
 import { getAllUserStores } from '@/lib/firebase-admin';
 import { StoreClientPage } from '@/components/StoreClientPage';
+import AuthCheck from '../auth-check';
 
 // Server Component
 export default async function StoresPage() {
@@ -9,5 +10,9 @@ export default async function StoresPage() {
 
   const stores = await getAllUserStores(userId);
   
-  return <StoreClientPage initialStores={stores} />;
+  return (
+    <AuthCheck>
+      <StoreClientPage initialStores={stores} />
+    </AuthCheck>
+  );
 }

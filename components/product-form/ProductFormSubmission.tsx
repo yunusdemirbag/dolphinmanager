@@ -35,6 +35,7 @@ interface SubmissionData {
   isSupply: boolean;
   renewalOption: string;
   state: string;
+  type?: string;
 }
 
 interface ProductFormSubmissionProps {
@@ -54,7 +55,8 @@ export function useProductFormSubmission({
   const createFormData = useCallback((
     data: SubmissionData,
     productImages: MediaFile[],
-    videoFile: MediaFile | null
+    videoFile: MediaFile | null,
+    digitalFiles: File[] = []
   ): FormData => {
     const formData = new FormData();
     
@@ -86,10 +88,29 @@ export function useProductFormSubmission({
       shipping_profile_id: data.shippingProfileId ? parseInt(data.shippingProfileId) : null,
       shop_section_id: data.selectedShopSection ? parseInt(data.selectedShopSection) : null,
       has_variations: data.hasVariations,
-      variations: data.hasVariations ? data.variations.filter(v => v.is_active) : []
+      variations: data.hasVariations ? data.variations.filter(v => v.is_active) : [],
+      // Digital product type handling
+      ...(data.type === 'download' && {
+        type: 'download'
+      }),
+      // Digital files ekleme
+      ...(digitalFiles.length > 0 && {
+        digitalFiles: digitalFiles
+      })
     };
 
     formData.append('listingData', JSON.stringify(listingData));
+
+    // Add AI-selected shopSection if available (for digital products)
+    console.log(`🔍 Digital product check: type=${data.type}, aiSelectedShopSection=${(window as any).aiSelectedShopSection}`);
+    if (data.type === 'download') {
+      if ((window as any).aiSelectedShopSection) {
+        formData.append('shopSection', (window as any).aiSelectedShopSection);
+        console.log(`📤 AI shopSection FormData'ya eklendi: ${(window as any).aiSelectedShopSection}`);
+      } else {
+        console.log(`⚠️ AI shopSection bulunamadı! window.aiSelectedShopSection undefined`);
+      }
+    }
 
     // Add images
     productImages.forEach((mediaFile, index) => {
@@ -101,6 +122,16 @@ export function useProductFormSubmission({
       formData.append('videoFile', videoFile.file);
     }
 
+    // Add digital files
+    digitalFiles.forEach((digitalFile, index) => {
+      formData.append(`digitalFile_${index}`, digitalFile);
+      console.log(`📁 Digital dosya ${index} FormData'ya eklendi:`, digitalFile.name, (digitalFile.size / 1024 / 1024).toFixed(2), 'MB');
+    });
+    
+    if (digitalFiles.length > 0) {
+      console.log(`📤 Toplam ${digitalFiles.length} digital dosya FormData'ya eklendi`);
+    }
+
     return formData;
   }, []);
 
@@ -109,6 +140,7 @@ export function useProductFormSubmission({
     data: SubmissionData,
     productImages: MediaFile[],
     videoFile: MediaFile | null,
+    digitalFiles: File[] = [],
     userId?: string
   ): Promise<boolean> => {
     if (isSubmitting) {
@@ -131,7 +163,7 @@ export function useProductFormSubmission({
         });
       }, 200);
 
-      const formData = createFormData(data, productImages, videoFile);
+      const formData = createFormData(data, productImages, videoFile, digitalFiles);
       
       if (userId) {
         formData.append('userId', userId);
@@ -192,6 +224,7 @@ export function useProductFormSubmission({
     data: SubmissionData,
     productImages: MediaFile[],
     videoFile: MediaFile | null,
+    digitalFiles: File[] = [],
     asActive: boolean = false
   ): Promise<boolean> => {
     if (isSubmitting) {
@@ -220,7 +253,7 @@ export function useProductFormSubmission({
         state: asActive ? 'active' : 'draft'
       };
 
-      const formData = createFormData(submissionData, productImages, videoFile);
+      const formData = createFormData(submissionData, productImages, videoFile, digitalFiles);
 
       console.log(`🚀 Etsy'ye ${asActive ? 'aktif' : 'draft'} olarak gönderiliyor:`, data.title);
       console.log('📋 Submission data:', {
@@ -231,6 +264,7 @@ export function useProductFormSubmission({
         shippingProfileId: data.shippingProfileId,
         taxonomyId: data.taxonomyId,
         imageCount: productImages.length,
+        digitalFileCount: digitalFiles.length,
         price: data.price,
         tags: data.tags.length
       });

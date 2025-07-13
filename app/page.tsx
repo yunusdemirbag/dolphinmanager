@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowRight, Store, Package, Settings, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { getConnectedStoreFromFirebaseAdmin } from '@/lib/firebase-admin';
 
+import AuthCheck from './auth-check';
+
 export default async function Home() {
   // Etsy mağaza durumunu al
   let storeInfo = null;
@@ -14,6 +16,7 @@ export default async function Home() {
     console.error('Store bilgisi alınamadı:', error);
   }
   return (
+    <AuthCheck>
     <div className="space-y-8">
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-bold text-black">
@@ -58,11 +61,8 @@ export default async function Home() {
                   <div>
                     <p className="text-sm text-gray-600">Son Senkronizasyon</p>
                     <p className="font-semibold text-gray-900">
-                      {storeInfo.updated_at ? 
-                        (storeInfo.updated_at.seconds ? 
-                          new Date(storeInfo.updated_at.seconds * 1000).toLocaleString('tr-TR') :
-                          new Date(storeInfo.updated_at).toLocaleString('tr-TR')
-                        ) : 
+                      {storeInfo.last_sync_at ?
+                        new Date(storeInfo.last_sync_at).toLocaleString('tr-TR') :
                         new Date().toLocaleString('tr-TR')
                       }
                     </p>
@@ -157,5 +157,6 @@ export default async function Home() {
         </Card>
       </div>
     </div>
+    </AuthCheck>
   );
 }

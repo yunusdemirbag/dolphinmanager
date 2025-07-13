@@ -14,3 +14,9 @@
 ### 3. Yedekleme
 - Projenin tam yedeği (1.0 GB) dokümantasyon ile birlikte oluşturuldu.
 - Tüm değişiklikler GitHub'a Türkçe commit mesajlarıyla push edildi.
+
+### 4. Etsy API Token Yenileme Mekanizması
+- app/api/etsy/listings/create/route.ts dosyasında, Etsy API token'ının otomatik yenilenmesi için mekanizma eklendi.
+- Token süresi dolduğunda otomatik olarak yenileme yapılıyor.
+- API çağrısı sırasında 401 hatası alındığında, token yenileniyor ve istek tekrarlanıyor.
+- Bu değişiklik, uygulama uzun süre çalıştığında oluşan token süresi dolma sorununu çözüyor.

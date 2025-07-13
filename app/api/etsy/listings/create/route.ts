@@ -96,9 +96,9 @@ export async function POST(request: NextRequest) {
       .get();
     
     if (storesSnapshot.empty) {
-      return NextResponse.json({ 
-        error: 'Etsy hesabınız bağlı değil', 
-        code: 'NO_ETSY_TOKEN' 
+      return NextResponse.json({
+        error: 'Etsy hesabınız bağlı değil',
+        code: 'NO_ETSY_TOKEN'
       }, { status: 400 });
     }
     
@@ -110,19 +110,49 @@ export async function POST(request: NextRequest) {
     const apiKeysDoc = await adminDb.collection('etsy_api_keys').doc(shop_id).get();
     
     if (!apiKeysDoc.exists) {
-      return NextResponse.json({ 
-        error: 'Etsy token bilgileri bulunamadı', 
-        code: 'NO_API_KEYS' 
+      return NextResponse.json({
+        error: 'Etsy token bilgileri bulunamadı',
+        code: 'NO_API_KEYS'
       }, { status: 400 });
     }
     
     const apiKeysData = apiKeysDoc.data()!;
-    const { access_token, api_key } = apiKeysData;
+    let { access_token, api_key, refresh_token, expires_at } = apiKeysData;
+    
+    // Token süresinin dolup dolmadığını kontrol et
+    const tokenExpired = expires_at ? new Date(expires_at.toDate()) < new Date() : true;
+    
+    if (tokenExpired) {
+      console.log('⚠️ Etsy token süresi dolmuş, yenileniyor...');
+      
+      // Token'ı yenile
+      try {
+        const { refreshEtsyToken } = await import('@/lib/etsy-api');
+        const newToken = await refreshEtsyToken(shop_id);
+        
+        if (newToken) {
+          console.log('✅ Etsy token başarıyla yenilendi');
+          access_token = newToken;
+        } else {
+          console.error('❌ Etsy token yenilenemedi');
+          return NextResponse.json({
+            error: 'Etsy bağlantısı kesildi. Lütfen Etsy hesabınızı yeniden bağlayın.',
+            code: 'REFRESH_TOKEN_FAILED'
+          }, { status: 401 });
+        }
+      } catch (refreshError) {
+        console.error('❌ Token yenileme hatası:', refreshError);
+        return NextResponse.json({
+          error: 'Etsy bağlantısı kesildi. Lütfen Etsy hesabınızı yeniden bağlayın.',
+          code: 'REFRESH_TOKEN_ERROR'
+        }, { status: 401 });
+      }
+    }
     
     if (!access_token || !api_key) {
-      return NextResponse.json({ 
-        error: 'Etsy token geçersiz', 
-        code: 'INVALID_ETSY_TOKEN' 
+      return NextResponse.json({
+        error: 'Etsy token geçersiz',
+        code: 'INVALID_ETSY_TOKEN'
       }, { status: 400 });
     }
     
@@ -767,7 +797,7 @@ export async function POST(request: NextRequest) {
     
     try {
       // Etsy API çağrısı
-      const etsyResponse = await fetch(etsyListingUrl, {
+      let etsyResponse = await fetch(etsyListingUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${access_token}`,
@@ -776,6 +806,44 @@ export async function POST(request: NextRequest) {
         body: etsyFormData,
         signal: controller.signal,
       });
+      
+      // 401 hatası alındıysa token'ı yenile ve tekrar dene
+      if (etsyResponse.status === 401) {
+        console.log('⚠️ Etsy API 401 hatası, token yenileniyor...');
+        
+        try {
+          const { refreshEtsyToken } = await import('@/lib/etsy-api');
+          const newToken = await refreshEtsyToken(shop_id);
+          
+          if (newToken) {
+            console.log('✅ Etsy token başarıyla yenilendi, istek tekrarlanıyor');
+            access_token = newToken;
+            
+            // İsteği yeni token ile tekrarla
+            etsyResponse = await fetch(etsyListingUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${access_token}`,
+                'x-api-key': api_key,
+              },
+              body: etsyFormData,
+              signal: controller.signal,
+            });
+          } else {
+            console.error('❌ Etsy token yenilenemedi');
+            return NextResponse.json({
+              error: 'Etsy bağlantısı kesildi. Lütfen Etsy hesabınızı yeniden bağlayın.',
+              code: 'REFRESH_TOKEN_FAILED'
+            }, { status: 401 });
+          }
+        } catch (refreshError) {
+          console.error('❌ Token yenileme hatası:', refreshError);
+          return NextResponse.json({
+            error: 'Etsy bağlantısı kesildi. Lütfen Etsy hesabınızı yeniden bağlayın.',
+            code: 'REFRESH_TOKEN_ERROR'
+          }, { status: 401 });
+        }
+      }
       
       clearTimeout(timeoutId);
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);

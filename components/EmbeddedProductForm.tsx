@@ -150,7 +150,7 @@ export default function EmbeddedProductForm({
   // === MAIN FORM STATE - Identical to ProductFormModal ===
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState(isDigital ? 9.0 : 80);
+  const [price, setPrice] = useState(isDigital ? 5.0 : 80);
   const [quantity, setQuantity] = useState(isDigital ? 999 : 999);
   const [tags, setTags] = useState<string[]>([]);
 

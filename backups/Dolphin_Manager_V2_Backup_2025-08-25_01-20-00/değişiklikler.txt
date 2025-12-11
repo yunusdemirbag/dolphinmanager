@@ -1,0 +1,36 @@
+# Dolphin Manager V2 - Klasör İsimleri Güncellemesi (2025-07-13)
+
+## Yapılan Değişiklikler
+
+### 1. Klasör İsimlerini Kaydetme ve Gösterme
+
+#### Görseller Klasörü
+- Klasör adı webkitRelativePath özelliğinden alınıyor
+- `setLastImagesFolderName` ile state'e kaydediliyor
+- Konsol loglarında klasör adı gösteriliyor
+- Toast bildiriminde klasör adı gösteriliyor
+
+#### Kaynaklar Klasörü
+- Klasör adı webkitRelativePath özelliğinden alınıyor
+- `setLastResourcesFolderName` ile state'e kaydediliyor
+- Konsol loglarında klasör adı gösteriliyor
+- Toast bildiriminde klasör adı gösteriliyor
+
+#### Kaynak Klasörü (Digital Ürünler İçin)
+- Klasör adı webkitRelativePath özelliğinden alınıyor
+- `setLastSourceResourcesFolderName` ile state'e kaydediliyor
+- Konsol loglarında klasör adı gösteriliyor
+- Toast bildiriminde klasör adı gösteriliyor
+
+### 2. LocalStorage Entegrasyonu
+- Klasör isimleri localStorage'a kaydediliyor
+- Uygulama yeniden açıldığında klasör isimleri geri yükleniyor
+
+### 3. Dosya Filtreleme İyileştirmeleri
+- Sistem dosyaları (.DS_Store gibi) filtreleniyor
+- Digital dosyalar için sadece JPG ve PNG dosyaları kabul ediliyor
+
+## Faydaları
+- Kullanıcı hangi klasörleri seçtiğini daha kolay hatırlayabilecek
+- Tarayıcı güvenlik kısıtlamaları nedeniyle dosya referanslarını kalıcı olarak kaydetmek mümkün olmasa da, en azından klasör isimlerini göstererek kullanıcı deneyimi iyileştirildi
+- Dijital dosya isimlerinin Etsy'ye yüklenirken korunması ve sadece JPG/PNG dosyalarının kabul edilmesi sorunları çözüldü

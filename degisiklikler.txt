@@ -1,0 +1,22 @@
+# Yapılan Değişiklikler
+
+## 13 Temmuz 2025 Tarihli Değişiklikler
+
+### Ürünler Sayfasındaki Aktif Mağaza Bilgisi Kaldırıldı
+
+**Değiştirilen Dosya:** components/ProductsPageClient.tsx
+
+**Yapılan Değişiklikler:**
+- Ürünler sayfasında gösterilen "Aktif mağaza: ButiqDecor" yazısı kaldırıldı
+- Yeşil renkli son senkronizasyon bilgisi ("Son senkronizasyon: 12.07.2025 22:56:02") kaldırıldı
+- Mağaza ID bilgisi kaldırıldı
+- "Mağaza Verilerini Çek" ve "Bağlantıyı Kes" butonları kaldırıldı
+- Senkronizasyon ilerleme çubuğu kaldırıldı
+- "Etsy hesabı bağlı değil" uyarısı kaldırıldı
+
+**Neden Yapıldı:**
+- Kullanıcı isteği üzerine arayüzün daha sade olması için bu bilgiler kaldırıldı
+
+**Yedekleme Bilgisi:**
+- Değişiklik öncesi son durum: Dolphin_Manager_V2_Backup_2025-07-08_23-24-07
+- Değişiklik sonrası yedek: Dolphin_Manager_V2_Backup_2025-07-13_05-25_Aktif_Magaza_Kaldirildi
